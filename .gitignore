@@ -1,0 +1,28 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies and builds
+node_modules/
+dist/
+build/
+coverage/
+
+# Local runtime and generated QA artifacts
+*.log
+app/.runtime/*
+!app/.runtime/.keep
+app/qa-output/
+app/output/
+app/tmp/
+playwright-report/
+test-results/
+
+# Context exports
+repomix-output.*
+
+# Isolated agent worktrees
+.worktrees/

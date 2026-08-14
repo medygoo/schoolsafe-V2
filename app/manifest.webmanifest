@@ -1,0 +1,20 @@
+{
+  "name": "SchoolSafe",
+  "short_name": "SchoolSafe",
+  "description": "Gestion scolaire, securite et communication pour une ecole.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#071a3d",
+  "theme_color": "#071a3d",
+  "icons": [
+    {
+      "src": "./schoolsafe-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
