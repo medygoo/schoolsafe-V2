@@ -1,10 +1,12 @@
 "use strict";
 
-const CACHE_VERSION = "schoolsafe-v2-shell-3";
+const CACHE_VERSION = "schoolsafe-v2-shell-4";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
+  "./styles-original.css",
+  "./v3-theme.css",
   "./app.js",
   "./i18n.js",
   "./offline-sync.js",
