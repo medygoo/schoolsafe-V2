@@ -31,6 +31,137 @@
     { src: "login-kid-6.jpg", alt: "Élève SchoolSafe", desktop: [52,28], mobile: [52,27], active: true, order: 6 }
   ];
 
+  var apiBase = "http://127.0.0.1:8787";
+  var supabaseClient = null;
+  var currentSession = null;
+  var backendConfig = null;
+  var pendingPhone = null;
+  var setupToken = null;
+
+  function tryLocalStorage() { try { return window.localStorage; } catch (e) { return null; } }
+  function storageGet(key) { var s = tryLocalStorage(); return s ? s.getItem(key) : null; }
+  function storageSet(key, value) { var s = tryLocalStorage(); if (s) s.setItem(key, value); }
+  function storageRemove(key) { var s = tryLocalStorage(); if (s) s.removeItem(key); }
+
+  function normalizePhone(raw) {
+    var digits = String(raw || "").replace(/\D/g, "");
+    if (digits.indexOf("243") === 0 && digits.length > 9) digits = digits.substring(3);
+    return "+243" + digits;
+  }
+
+  function getSupabaseClient() {
+    if (supabaseClient) return supabaseClient;
+    if (!backendConfig || !backendConfig.supabase_url || !backendConfig.supabase_anon_key) return null;
+    if (!window.SchoolSafeSupabaseSDK || !window.SchoolSafeSupabaseSDK.createClient) return null;
+    supabaseClient = window.SchoolSafeSupabaseSDK.createClient(backendConfig.supabase_url, backendConfig.supabase_anon_key, {
+      auth: { autoRefreshToken: true, persistSession: false }
+    });
+    return supabaseClient;
+  }
+
+  async function loadBackendConfig() {
+    try {
+      var res = await fetch(apiBase + "/config", { method: "GET", headers: { Accept: "application/json" } });
+      if (!res.ok) return null;
+      backendConfig = await res.json();
+      return backendConfig;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function apiPost(path, body) {
+    var res = await fetch(apiBase + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body)
+    });
+    var data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) {
+      var message = data && data.message ? data.message : ("Erreur " + res.status);
+      throw new Error(message);
+    }
+    return data;
+  }
+
+  function storeSession(session) {
+    currentSession = session;
+    if (session) storageSet("schoolsafe-v2-session", JSON.stringify(session));
+    else storageRemove("schoolsafe-v2-session");
+  }
+
+  function loadSession() {
+    try {
+      var raw = storageGet("schoolsafe-v2-session");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function clearSession() {
+    currentSession = null;
+    storageRemove("schoolsafe-v2-session");
+    supabaseClient = null;
+  }
+
+  async function callBootstrap(token) {
+    var res = await fetch(apiBase + "/session/bootstrap", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, Accept: "application/json" }
+    });
+    if (!res.ok) throw new Error("Bootstrap " + res.status);
+    return await res.json();
+  }
+
+  function applyBootstrap(bootstrap) {
+    if (!bootstrap || !bootstrap.profile || !bootstrap.roles || !bootstrap.roles.length) {
+      throw new Error("Profil incomplet");
+    }
+    var session = {
+      token: currentSession && currentSession.token ? currentSession.token : null,
+      profile: bootstrap.profile,
+      roles: bootstrap.roles,
+      permissions: bootstrap.permissions || [],
+      scopes: bootstrap.scopes || [],
+      school: bootstrap.school || null,
+      offline_policy: bootstrap.offline_policy || { max_offline_hours: 24 }
+    };
+    storeSession(session);
+    document.getElementById("workspaceProfileName").textContent = bootstrap.profile.display_name || "";
+    document.getElementById("workspaceInitials").textContent = initialsFromName(bootstrap.profile.display_name || "SchoolSafe");
+    document.getElementById("workspaceSchoolName").textContent = bootstrap.school ? bootstrap.school.name : "Configuration en cours";
+    document.getElementById("workspaceRole").textContent = roleCatalog[bootstrap.roles[0]] ? roleCatalog[bootstrap.roles[0]].label : bootstrap.roles[0];
+    document.getElementById("statusRole").textContent = roleCatalog[bootstrap.roles[0]] ? roleCatalog[bootstrap.roles[0]].label : bootstrap.roles[0];
+    document.getElementById("statusScope").textContent = scopeSummary(session);
+    document.getElementById("syncStatusDetail").textContent = "Connecté · " + (bootstrap.school ? bootstrap.school.name : "école");
+    renderWorkspace(bootstrap.roles[0]);
+  }
+
+  function initialsFromName(name) {
+    return String(name || "")
+      .split(/\s+/)
+      .filter(function (w) { return w.length > 0; })
+      .slice(0, 2)
+      .map(function (w) { return w[0].toUpperCase(); })
+      .join("");
+  }
+
+  function scopeSummary(session) {
+    if (!session || !session.scopes || !session.scopes.length) return "Instance";
+    var parts = session.scopes.map(function (s) { return s.label || s.type + (s.id ? " · " + s.id : ""); });
+    return parts.join(" · ") || "Instance";
+  }
+
+  function enterDemo() {
+    notify("Accès de démonstration — ouverture de l’espace Administrateur principal.");
+    window.setTimeout(function () { showScreen("workspace"); }, 250);
+  }
+
+  function enterLiveSession() {
+    notify("Connexion réussie. Chargement de l’espace.");
+    window.setTimeout(function () { showScreen("workspace"); }, 250);
+  }
+
   var branchDefinitions = {
     pilotage: { label: "Pilotage", icon: "layout-dashboard", color: "#1264df", background: "#dceaff" },
     school: { label: "École", icon: "school", color: "#087a55", background: "#dff8ee" },
@@ -1523,6 +1654,19 @@
     notify("Règles pédagogiques enregistrées localement.");
   }
 
+  function sessionDisplayName() {
+    return (currentSession && currentSession.profile && currentSession.profile.display_name) || "";
+  }
+
+  function sessionInitials() {
+    return initialsFromName(sessionDisplayName() || "SchoolSafe");
+  }
+
+  function sessionRoleLabel(roleKey) {
+    var profile = roleCatalog[roleKey] || roleCatalog.admin;
+    return profile.label;
+  }
+
   function renderWorkspace(roleKey) {
     var profile = roleCatalog[roleKey] || roleCatalog.admin;
     currentDemoRole = roleCatalog[roleKey] ? roleKey : "admin";
@@ -1530,16 +1674,20 @@
     document.getElementById("financeModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.querySelector(".workspace-grid").hidden = false;
-    document.getElementById("workspaceRole").textContent = profile.label;
+    var liveName = sessionDisplayName();
+    var liveInitials = sessionInitials();
+    var roleLabel = sessionRoleLabel(currentDemoRole);
+    var scopeText = (currentSession && currentSession.scopes && currentSession.scopes.length) ? scopeSummary(currentSession) : profile.scope;
+    document.getElementById("workspaceRole").textContent = roleLabel;
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
-    document.getElementById("workspaceInitials").textContent = profile.initials;
-    document.getElementById("workspaceProfileName").textContent = profile.short;
+    document.getElementById("workspaceInitials").textContent = liveInitials || profile.initials;
+    document.getElementById("workspaceProfileName").textContent = liveName || profile.short;
     document.getElementById("workspaceEyebrow").textContent = profile.eyebrow;
     document.getElementById("workspaceWelcomeTitle").textContent = profile.welcome;
     document.getElementById("workspaceWelcomeCopy").textContent = profile.copy;
-    document.getElementById("statusRole").textContent = profile.label;
-    document.getElementById("statusScope").textContent = profile.scope;
-    document.getElementById("priorityScope").textContent = profile.short + " · " + profile.scope;
+    document.getElementById("statusRole").textContent = roleLabel;
+    document.getElementById("statusScope").textContent = scopeText;
+    document.getElementById("priorityScope").textContent = (liveName || profile.short) + " · " + scopeText;
     document.getElementById("profileOverview").innerHTML = (profileIndicators[currentDemoRole] || profileIndicators.admin).map(function (indicator, index) {
       return '<article class="overview-stat overview-' + (index % 6) + '"><span><i data-lucide="' + indicator[2] + '"></i></span><div><small>' + indicator[0] + '</small><b>' + indicator[1] + "</b></div></article>";
     }).join("");
@@ -1879,11 +2027,32 @@
   document.getElementById("backToSplash").addEventListener("click", function () { showScreen("splash"); });
   document.getElementById("setupHome").addEventListener("click", function () { showScreen("splash"); });
   document.getElementById("closeSetup").addEventListener("click", function () { showScreen("auth"); });
-  document.getElementById("startSetup").addEventListener("click", function () {
-    renderStep();
-    showScreen("setup");
+  document.getElementById("startSetup").addEventListener("click", async function () {
+    var token = window.prompt("Token de configuration de l'école :");
+    if (!token) return;
+    try {
+      var config = await loadBackendConfig();
+      if (!config) { notify("Serveur de configuration non disponible."); return; }
+      var result = await apiPost("/setup/validate-token", { token: token });
+      if (!result || !result.valid) { notify("Token de configuration invalide."); return; }
+      setupToken = token;
+      renderStep();
+      showScreen("setup");
+    } catch (error) {
+      notify(error.message || "Impossible de valider le token.");
+    }
   });
-  document.getElementById("workspaceBack").addEventListener("click", function () { showScreen("auth"); });
+  document.getElementById("workspaceBack").addEventListener("click", async function () {
+    clearSession();
+    try { await getSupabaseClient()?.auth?.signOut(); } catch (e) {}
+    document.getElementById("emailIdentifier").value = "";
+    document.getElementById("phoneIdentifier").value = "";
+    document.getElementById("password").value = "";
+    document.getElementById("otpIdentifier").value = "";
+    document.getElementById("otpIdentity").classList.add("hidden");
+    pendingPhone = null;
+    showScreen("auth");
+  });
   document.getElementById("previewWorkspace").addEventListener("click", function () { showScreen("workspace"); });
   document.getElementById("returnSetup").addEventListener("click", function () { showScreen("setup"); });
   document.getElementById("closePedagogyModule").addEventListener("click", closePedagogyModule);
@@ -1950,10 +2119,65 @@
     notify("Brouillon d’accès enregistré localement. Aucun serveur n’a été modifié.");
   });
 
-  document.getElementById("loginForm").addEventListener("submit", function (event) {
+  document.getElementById("loginForm").addEventListener("submit", async function (event) {
     event.preventDefault();
-    notify("Accès de démonstration — ouverture de l’espace Administrateur principal.");
-    window.setTimeout(function () { showScreen("workspace"); }, 250);
+    var mode = document.querySelector("[data-login-mode].selected")?.getAttribute("data-login-mode") || "email";
+    var client = getSupabaseClient();
+    if (!client) {
+      var config = await loadBackendConfig();
+      if (!config || !config.supabase_url) {
+        notify("Backend local non disponible — passage en démonstration.");
+        enterDemo();
+        return;
+      }
+      client = getSupabaseClient();
+      if (!client) {
+        notify("Impossible d’initialiser le client Supabase.");
+        return;
+      }
+    }
+
+    try {
+      if (mode === "email") {
+        var email = document.getElementById("emailIdentifier").value.trim();
+        var password = document.getElementById("password").value;
+        if (!email || !password) { notify("Renseignez l’e-mail et le mot de passe."); return; }
+        var result = await client.auth.signInWithPassword({ email: email, password: password });
+        if (result.error) throw result.error;
+        var token = result.data.session.access_token;
+        currentSession = { token: token };
+        var bootstrap = await callBootstrap(token);
+        applyBootstrap(bootstrap);
+        enterLiveSession();
+      } else {
+        var phone = normalizePhone(document.getElementById("phoneIdentifier").value);
+        var otp = document.getElementById("otpIdentifier").value.trim();
+        if (!phone) { notify("Renseignez le numéro de téléphone."); return; }
+        if (!otp) {
+          var sendResult = await client.auth.signInWithOtp({ phone: phone });
+          if (sendResult.error) throw sendResult.error;
+          pendingPhone = phone;
+          document.getElementById("otpIdentity").classList.remove("hidden");
+          document.getElementById("otpIdentifier").focus();
+          notify("Code envoyé au " + phone + " — saisissez-le et reconnectez-vous.");
+          return;
+        }
+        if (pendingPhone && phone !== pendingPhone) { notify("Numéro modifié. Recommencez l’envoi du code."); return; }
+        var verifyResult = await client.auth.verifyOtp({ phone: phone, token: otp, type: "sms" });
+        if (verifyResult.error) throw verifyResult.error;
+        var token = verifyResult.data.session.access_token;
+        currentSession = { token: token };
+        var bootstrap = await callBootstrap(token);
+        applyBootstrap(bootstrap);
+        document.getElementById("otpIdentity").classList.add("hidden");
+        document.getElementById("otpIdentifier").value = "";
+        pendingPhone = null;
+        enterLiveSession();
+      }
+    } catch (error) {
+      console.error("Login error", error);
+      notify("Échec de connexion : " + (error.message || error.statusText || "erreur inconnue"));
+    }
   });
   document.querySelectorAll("[data-login-mode]").forEach(function (button) {
     button.addEventListener("click", function () {
@@ -1965,12 +2189,18 @@
       });
       var emailGroup = document.getElementById("emailIdentity");
       var phoneGroup = document.getElementById("phoneIdentity");
+      var otpGroup = document.getElementById("otpIdentity");
       var emailInput = document.getElementById("emailIdentifier");
       var phoneInput = document.getElementById("phoneIdentifier");
+      var otpInput = document.getElementById("otpIdentifier");
       emailGroup.classList.toggle("hidden", mode !== "email");
       phoneGroup.classList.toggle("hidden", mode !== "phone");
+      otpGroup.classList.add("hidden");
+      otpInput.value = "";
+      pendingPhone = null;
       emailInput.required = mode === "email";
       phoneInput.required = mode === "phone";
+      otpInput.required = false;
       (mode === "email" ? emailInput : phoneInput).focus();
     });
   });
@@ -2048,7 +2278,9 @@
     adminFirstName: "",
     adminLastName: "",
     adminEmail: "",
-    adminPhone: "+243 "
+    adminPhone: "+243 ",
+    adminPassword: "",
+    adminPasswordConfirm: ""
   };
   var state = loadDraft();
 
@@ -2194,7 +2426,9 @@
       field("Nom", "adminLastName", state.adminLastName),
       field("E-mail professionnel", "adminEmail", state.adminEmail, { type: "email", placeholder: "direction@ecole.cd" }),
       field("Téléphone", "adminPhone", state.adminPhone, { type: "tel" }),
-      '<div class="warning-note form-field wide"><i data-lucide="key-round"></i><span>Le compte réel recevra un code d’activation temporaire par e-mail. WhatsApp restera un canal de secours administré. L’authentification forte sera exigée pour les profils sensibles.</span></div>',
+      field("Mot de passe", "adminPassword", state.adminPassword, { type: "password", placeholder: "Minimum 8 caractères" }),
+      field("Confirmer le mot de passe", "adminPasswordConfirm", state.adminPasswordConfirm, { type: "password" }),
+      '<div class="warning-note form-field wide"><i data-lucide="key-round"></i><span>Ce compte sera créé immédiatement. L’authentification forte sera exigée pour les profils sensibles.</span></div>',
       "</div>"
     ].join("");
   }
@@ -2276,6 +2510,76 @@
     });
   }
 
+  function validateStep(index) {
+    if (index === 0) {
+      if (!state.schoolName.trim()) return "Le nom de l’école est obligatoire.";
+    }
+    if (index === 1) {
+      if (!state.cycles.length) return "Sélectionnez au moins un cycle.";
+    }
+    if (index === 5) {
+      if (!state.adminFirstName.trim() || !state.adminLastName.trim()) return "Le prénom et le nom sont obligatoires.";
+      if (!state.adminEmail.trim()) return "L’e-mail de l’administrateur est obligatoire.";
+      if (!state.adminPassword || state.adminPassword.length < 8) return "Le mot de passe doit faire au moins 8 caractères.";
+      if (state.adminPassword !== state.adminPasswordConfirm) return "Les mots de passe ne correspondent pas.";
+    }
+    return null;
+  }
+
+  async function submitSetup() {
+    if (!setupToken) throw new Error("Token de configuration manquant.");
+
+    var schoolPayload = {
+      token: setupToken,
+      identity: {
+        name_fr: state.schoolName,
+        name_en: state.name_en || state.schoolName,
+        legal_name: state.legalName,
+        school_type: state.schoolType,
+        approval_code: state.schoolCode
+      },
+      cycles: state.cycles,
+      academic_year: {
+        label: state.yearLabel,
+        starts_on: state.yearStart,
+        ends_on: state.yearEnd,
+        periods: state.periods
+      },
+      contact: {
+        country: state.country,
+        province: state.province,
+        city: state.city,
+        address: state.address,
+        email: state.email,
+        phone: state.phone,
+        website_url: state.website,
+        website_mode: state.websiteMode,
+        public_news: state.publicNews,
+        public_gallery: state.publicGallery,
+        public_honors: state.publicHonors
+      },
+      brand: {
+        primary_color: state.primaryColor,
+        accent_color: state.accentColor,
+        document_footer: state.documentFooter,
+        logo_path: state.officialLogoData || null
+      }
+    };
+
+    await apiPost("/setup/school", schoolPayload);
+
+    var adminPayload = {
+      token: setupToken,
+      email: state.adminEmail,
+      password: state.adminPassword,
+      first_name: state.adminFirstName,
+      last_name: state.adminLastName,
+      phone: state.adminPhone
+    };
+
+    await apiPost("/setup/admin", adminPayload);
+  }
+
   function renderStep() {
     document.getElementById("stepCounter").textContent = "Étape " + (stepIndex + 1) + " sur " + stepLabels.length;
     document.getElementById("stepTitle").textContent = stepTitles[stepIndex];
@@ -2283,7 +2587,7 @@
     document.getElementById("stepContent").innerHTML = renderers[stepIndex]();
     document.getElementById("prevStep").disabled = stepIndex === 0;
     document.getElementById("nextStep").innerHTML = stepIndex === stepLabels.length - 1
-      ? 'Terminer l’aperçu <i data-lucide="check"></i>'
+      ? 'Terminer la configuration <i data-lucide="check"></i>'
       : 'Continuer <i data-lucide="arrow-right"></i>';
     renderNav();
     bindStepEvents();
@@ -2291,24 +2595,65 @@
     document.querySelector(".setup-main").scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  async function restoreSession() {
+    var saved = loadSession();
+    if (saved && saved.token) {
+      try {
+        var config = await loadBackendConfig();
+        if (config && config.supabase_url) {
+          currentSession = { token: saved.token };
+          var bootstrap = await callBootstrap(saved.token);
+          applyBootstrap(bootstrap);
+          notify("Session restaurée.");
+          return;
+        }
+      } catch (e) {
+        console.warn("Session restore failed", e);
+        clearSession();
+      }
+    }
+    renderStep();
+    initParticles();
+    initPwaExperience();
+    icons();
+  }
+
   document.getElementById("prevStep").addEventListener("click", function () {
     collectFields();
     if (stepIndex > 0) stepIndex -= 1;
     renderStep();
   });
-  document.getElementById("nextStep").addEventListener("click", function () {
+  document.getElementById("nextStep").addEventListener("click", async function () {
     collectFields();
+    var error = validateStep(stepIndex);
+    if (error) { notify(error); return; }
+
     if (stepIndex < stepLabels.length - 1) {
       stepIndex += 1;
       renderStep();
-    } else {
-      notify("Aperçu enregistré localement. Aucun service distant n’a été modifié.");
-      window.setTimeout(function () { showScreen("workspace"); }, 650);
+      return;
+    }
+
+    var button = document.getElementById("nextStep");
+    button.disabled = true;
+    button.innerHTML = 'Configuration en cours…';
+
+    try {
+      await submitSetup();
+      storageRemove("schoolsafe-v2-setup");
+      notify("Configuration enregistrée. Connectez-vous avec le compte administrateur.");
+      window.setTimeout(function () {
+        showScreen("auth");
+        button.disabled = false;
+      }, 900);
+    } catch (error) {
+      console.error("Setup error", error);
+      notify("Échec de la configuration : " + (error.message || "erreur inconnue"));
+      button.disabled = false;
+      button.innerHTML = 'Terminer la configuration <i data-lucide="check"></i>';
+      icons();
     }
   });
 
-  renderStep();
-  initParticles();
-  initPwaExperience();
-  icons();
+  restoreSession();
 }());

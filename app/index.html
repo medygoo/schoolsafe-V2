@@ -110,6 +110,13 @@
             </button>
           </div>
           <label class="check-row"><input type="checkbox" name="remember"><span>Rester connecté sur cet appareil</span></label>
+          <div class="login-identity hidden" id="otpIdentity">
+            <label for="otpIdentifier">Code de vérification</label>
+            <div class="input-shell">
+              <i data-lucide="key-round"></i>
+              <input id="otpIdentifier" name="otpIdentifier" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" maxlength="6">
+            </div>
+          </div>
           <button class="login-button" type="submit">Se connecter <i data-lucide="arrow-right"></i></button>
           <div class="demo-access"><i data-lucide="flask-conical"></i><span>Accès de démonstration actif</span></div>
           <div class="demo-role-field">
@@ -141,7 +148,7 @@
       </div>
       <footer class="auth-footer">
         <span><i data-lucide="shield-check"></i> Accès protégé</span>
-        <span>Version 2.0 · Étape 1</span>
+        <span>Version 2.0 · Étape 2</span>
       </footer>
     </section>
 
@@ -181,7 +188,7 @@
     <section class="screen workspace-screen" id="workspace" aria-label="Espace SchoolSafe">
       <aside class="workspace-sidebar" id="workspaceSidebar">
         <div class="workspace-brand"><img src="./schoolsafe-logo.png" alt=""><span>School<strong>Safe</strong></span><button class="close-workspace-menu" id="closeWorkspaceMenu" type="button" aria-label="Fermer le menu"><i data-lucide="x"></i></button></div>
-        <div class="workspace-school"><span>Instance école</span><b>Configuration en cours</b></div>
+        <div class="workspace-school"><span>Instance école</span><b id="workspaceSchoolName">Configuration en cours</b></div>
         <nav class="workspace-nav" id="workspaceNav" aria-label="Navigation principale">
           <button class="active" type="button"><i data-lucide="layout-dashboard"></i><span>Tableau de bord</span></button>
           <button type="button"><i data-lucide="users-round"></i><span>Élèves</span></button>
