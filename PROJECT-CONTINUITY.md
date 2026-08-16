@@ -74,13 +74,31 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - On le connectera par un **adaptateur versionné** après validation de tests de contrat.
 - Le QR code actuel contient : `schoolsafe://student/{matricule}`.
 - **Décision d'architecture** : la production physique des cartes (téléchargement + impression) se fait dans l'**application de contrôle des tokens** (app centrale).
-- **Flux validé** : SchoolSafe V2 prépare la demande avec les informations de l'élève et la carte conçue ; l'app centrale reçoit la demande, télécharge la carte et gère l'impression physique.
+- **Flux validé** :
+  1. V2 génère la carte (image/PDF) avec le moteur existant.
+  2. V2 n'a **pas** de bouton "Imprimer" ; seul un bouton "Demander l'impression" est disponible.
+  3. La carte est stockée dans **R2** dans un bucket privé dédié (`cards/{school_id}/{année}/{student_id}/`).
+  4. V2 crée une demande d'impression dans la base locale.
+  5. V2 pousse la demande vers l'app centrale via une API sécurisée avec une URL signée R2.
+  6. L'app centrale télécharge la carte et gère l'impression physique.
+  7. L'app centrale confirme le statut à V2.
+- **Accès R2** : seul l'app centrale peut télécharger les fichiers finis ; V2 génère des URLs signées à durée limitée.
+- **Validation** : oui, l'admin principal ou la personne autorisée valide visuellement avant envoi.
+- **Paiement** : inclus dans l'abonnement.
 
 ### Sécurité
 
 - RLS sur toutes les tables sensibles.
 - Aucun multi-tenant complexe : une base = une école.
 - L'interface ne constitue pas une barrière de sécurité ; l'autorité définitive est côté serveur et base.
+
+### Rôles et permissions
+
+- **Double rôle possible pour tous les postes** : une personne peut cumuler plusieurs rôles (parent + enseignant, enseignant + secrétariat, etc.).
+- Les permissions se calculent par **union** des droits de tous les rôles.
+- Les périmètres se calculent par **union** des périmètres de chaque rôle.
+- L'interface indique les rôles actifs ou fusionne les contextes de manière transparente.
+- Chaque action reste soumise à la permission correspondante : un parent qui est aussi enseignant ne peut pas modifier une note en tant que parent, seulement la consulter.
 
 ---
 
@@ -157,14 +175,19 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Conception du flux de production de cartes entre SchoolSafe V2 et l'application de contrôle des tokens**.
-
-Le système zalavrai a déjà été analysé ; il reste à décider comment V2 prépare et transmet la demande, et comment l'app centrale la réceptionne pour impression.
+**Conception détaillée du flux de production de cartes V2 → application de contrôle des tokens**, et définition du modèle de double rôle pour tous les postes.
 
 ### État d'avancement
 
 - Fichier complet téléchargé localement : `analysis/zalavrai.html` (~2,2 Mo).
 - Analyse technique complète réalisée (section détaillée ci-dessous).
+- Architecture des cartes verrouillée :
+  - V2 génère la carte finie (PNG/PDF).
+  - V2 n'a pas de bouton "Imprimer" ; seul "Demander l'impression" existe.
+  - Stockage dans R2 (bucket privé `cards/`).
+  - L'app centrale télécharge via URL signée et imprime.
+  - Validation obligatoire avant envoi.
+- Modèle de double rôle validé : union des permissions et des périmètres.
 - Technologies confirmées : `qrcodejs`, `html2canvas`, `jszip`, `html2pdf.js`.
 - Deux formats physiques confirmés :
   - **Badge vertical** : 340 × 540 px — Maternelle → 4ᵉ Primaire.
@@ -223,6 +246,22 @@ Le système zalavrai a déjà été analysé ; il reste à décider comment V2 p
 - Upload vers Supabase Storage : `POST ${SUPA_URL}/storage/v1/object/photos/cards/{filename}`
 - Mise à jour base : `students.card_printed`, `students.card_print_date`, `students.card_print_count`
 
+#### Flux V2 → application de contrôle des tokens (proposé)
+1. Dans V2, l'admin/personne autorisée sélectionne un élève ou une classe et clique sur **"Demander l'impression"**.
+2. V2 affiche un **aperçu final** de la carte recto/verso.
+3. L'utilisateur **valide** l'aperçu.
+4. V2 génère la carte (PNG/PDF) avec le moteur zalavrai via adaptateur.
+5. V2 upload le fichier dans **R2** sous `cards/{school_id}/{academic_year}/{student_id}/{uuid}.png`.
+6. V2 crée un enregistrement dans `card_print_requests` avec statut `pending`.
+7. V2 appelle l'**API de l'app centrale** avec :
+   - `school_id`, `request_id`, `student_id`, `student_name`, `class_name`
+   - URL signée R2 à durée limitée
+   - métadonnées de la carte (format, recto/verso, duplicata ou non)
+8. L'app centrale reçoit la demande, la liste dans son tableau de bord.
+9. L'opérateur dans l'app centrale **télécharge** la carte depuis R2 et **imprime**.
+10. L'app centrale confirme à V2 le statut `printed` + date + référence d'impression.
+11. V2 met à jour `students.card_printed`, `card_print_date`, `card_print_count`.
+
 ### Fichiers concernés
 
 - `analysis/zalavrai.html` (analyse temporaire, non versionné pour l'instant).
@@ -239,15 +278,17 @@ Le système zalavrai a déjà été analysé ; il reste à décider comment V2 p
 
 1. ✅ **Emplacement de la production de cartes** : dans l'**application de contrôle des tokens** (validé).
 2. ✅ **Qui produit physiquement** : l'app de contrôle des tokens télécharge et imprime (validé).
-3. **Contenu de la demande** : V2 envoie-t-il l'**image/PDF déjà généré**, ou seulement les **données brutes** pour que l'app centrale génère la carte ?
-4. **Transmission** : comment la demande passe-t-elle de V2 à l'app centrale ? API directe, file de messages, e-mail, notification push ?
-5. **Stockage intermédiaire** : l'image/PDF transite-t-il par R2, Supabase Storage, ou est-il généré à la volée dans l'app centrale ?
-6. **Qui déclenche la demande dans V2** ? L'admin principal, le secrétariat, ou l'enseignant titulaire ?
-7. **zalavrai est-il le système définitif** ou juste un exemple de référence ?
-8. **Le code source est-il disponible localement** (fichiers séparés, non le HTML monolithique) ?
-9. **Le format du QR code** `schoolsafe://student/{matricule}` doit-il être conservé tel quel ?
-10. Le scanneur d'entrée/sortie actuel utilise un **QR signé** (`/{YYYYMMDD}/{sig8}`). Faut-il conserver cette signature dans V2 ?
-11. Les **patrimoines visuels** (60 images `patrimoine/{v}.png`) sont-ils disponibles séparément ou doivent-ils être extraits de zalavrai ?
+3. ✅ **Contenu de la demande** : V2 génère la **carte finie** (image/PDF) et l'envoie à l'app centrale (validé).
+4. ✅ **Stockage intermédiaire** : la carte transite par **R2** dans un bucket privé ; V2 génère des URLs signées pour l'app centrale (validé).
+5. ✅ **Qui déclenche la demande dans V2** : l'**admin principal** ou la personne à qui il a donné accès (validé).
+6. ✅ **Validation avant envoi** : oui (validé).
+7. ✅ **Paiement** : inclus dans l'abonnement (validé).
+8. **zalavrai est-il le système définitif** ou juste un exemple de référence ?
+9. **Le code source est-il disponible localement** (fichiers séparés, non le HTML monolithique) ?
+10. **Le format du QR code** `schoolsafe://student/{matricule}` doit-il être conservé tel quel ?
+11. Le scanneur d'entrée/sortie actuel utilise un **QR signé** (`/{YYYYMMDD}/{sig8}`). Faut-il conserver cette signature dans V2 ?
+12. Les **patrimoines visuels** (60 images `patrimoine/{v}.png`) sont-ils disponibles séparément ou doivent-ils être extraits de zalavrai ?
+13. **Transmission** : V2 pousse-t-il la demande vers l'app centrale via **API directe**, ou l'app centrale interroge V2 par **polling** ?
 
 ---
 
@@ -369,14 +410,16 @@ Décision d'architecture prise : la production physique des cartes (télécharge
 
 ### Ce que j'étais en train de faire
 
-- Documenter la décision dans `PROJECT-CONTINUITY.md`.
-- Identifier les questions restantes : contenu de la demande (image vs données), canal de transmission, stockage intermédiaire.
+- Documenter les décisions dans `PROJECT-CONTINUITY.md`.
+- Concevoir le flux V2 → app centrale avec R2 privé et URL signée.
+- Valider le modèle de double rôle pour tous les postes.
 
 ### Prochaine action
 
 1. Commiter la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Poser au propriétaire les questions sur le contenu de la demande et le canal de transmission.
-3. Concevoir le flux V2 → app centrale et l'adaptateur correspondant.
+2. Attendre la confirmation du propriétaire sur le flux proposé.
+3. Répondre aux questions restantes sur zalavrai (définitif ?, code source ?, QR, patrimoines).
+4. Commencer la conception technique de l'adaptateur de génération de cartes dans V2.
 
 ### Commandes/tests restants
 
@@ -399,4 +442,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026 — après décision : production physique dans l'app de contrôle des tokens, V2 prépare et transmet la demande.*
+*Dernière mise à jour : 16 août 2026 — après définition du flux V2 → app centrale et du modèle de double rôle.*
