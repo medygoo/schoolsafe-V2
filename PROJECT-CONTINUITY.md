@@ -238,7 +238,15 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - dossier R2 nommé par école + élève ;
   - polices hébergées localement sur le VPS.
 - **Schéma Supabase terminé** : tables `classes`, `students`, `student_guardians`, `card_print_requests` créées avec RLS.
-- **En cours** : module de génération de cartes côté VPS.
+- **Analyse design/couleur par classe terminée** :
+  - 10 familles de design globales (A-J) avec 4 variantes chacune ;
+  - 60 patrimoines visuels regroupés en 5 thèmes ;
+  - chaque classe peut définir `card_color`, `card_color_soft`, `card_color_dark` ;
+  - chaque classe peut choisir un patrimoine (`card_pat`) ou laisser le mode `auto` ;
+  - le format badge/carte est déterminé par le cycle + le nom de la classe ;
+  - champs déjà présents dans `classes` : `card_color`, `card_color_soft`, `card_color_dark`, `card_pat` ;
+  - champs à ajouter pour reproduire fidèlement : `card_family`, `card_variant`, `card_pat_style`.
+- **Assets à extraire** : bloc CSS `.ss-card-studio`, 60 images PNG `patrimoine/`, polices `Baloo 2` et `Nunito Sans`.
 - Sorties : PNG recto+verso, impression navigateur (PDF via print), liste de distribution classe.
 
 ### Synthèse technique du système de cartes
@@ -278,6 +286,19 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - `name`, `cycle` (maternelle/primaire/humanites/secondaire), `option`
 - `teacher_id` / `titulaire_id`
 - `card_color`, `card_color_soft`, `card_color_dark`, `card_pat`
+- `card_family` (A-J), `card_variant` (0-3), `card_pat_style` (vignette/fond/both)
+
+#### Design et couleurs par classe
+- **10 familles de design globales** (`A` à `J`) : Arc-en-ciel, Océan ludique, Pop Bento, Prestige Or, Ciel rêveur, Cahier d'écolier, Jungle Safari, Espace Galaxie, Bonbons Pastel, Tableau & Craie.
+- **4 variantes de couleur** par famille (`FVARS`).
+- **60 patrimoines visuels** répartis en 5 thèmes : Animaux de la RDC, Pierres & minerais, Animaux aquatiques, Animaux terrestres, Oiseaux.
+- **Personnalisation par classe** : couleurs `card_color`/`soft`/`dark` + patrimoine `card_pat`.
+- **Mode patrimoine** : `vignette` (image + nom), `fond` (arrière-plan), `both` (les deux).
+- **Format badge/carte** déterminé par `ssClassType` selon le cycle et le nom de la classe :
+  - Maternelle → badge ;
+  - Humanités/Secondaire → carte ;
+  - Primaire 1e-4e → badge ;
+  - Primaire 5e-6e → carte.
 
 #### Stockage et traçabilité
 - Upload vers Supabase Storage : `POST ${SUPA_URL}/storage/v1/object/photos/cards/{filename}`
@@ -307,9 +328,10 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Problèmes rencontrés / Points de décision
 
-- Le système zalavrai est autosuffisant et contient tout le moteur graphique.
+- Le système historique est autosuffisant et contient tout le moteur graphique.
 - `docs/CARDS_IMMUTABILITY.md` interdit formellement de réimplémenter ce moteur.
-- Plusieurs options d'intégration sont possibles ; aucune n'a encore été choisie par le propriétaire.
+- Options d'intégration résolues : génération dans le front PWA, impression dans l'app de contrôle des tokens.
+- Mapping cycle à adapter : `maternelle/humanites/secondaire/''` (historique) → `nursery/primary/secondary` (V2).
 
 ### Questions en attente de réponse du propriétaire
 
@@ -449,18 +471,18 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Génération d'image validée dans le front PWA. Prochaine étape : analyse du système de design/couleur par classe dans le moteur historique, sans coder.
+Analyse du système de design/couleur par classe terminée. Toutes les décisions métier et techniques sur les cartes sont verrouillées.
 
 ### Ce que j'étais en train de faire
 
-- Documenter la validation du front PWA dans `PROJECT-CONTINUITY.md`.
-- Préparer l'analyse des designs et couleurs par classe.
+- Analyser `analysis/zalavrai.html` pour comprendre les familles de design, les variantes, les patrimoines et la personnalisation par classe.
+- Documenter les conclusions dans `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
 1. Commiter la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Analyser en profondeur le système de design/couleur par classe dans `analysis/zalavrai.html`.
-3. Présenter les conclusions au propriétaire.
+2. Demander au propriétaire s'il valide l'extraction des assets et le début de l'adaptateur front.
+3. Si validation, extraire le CSS, les patrimoines et les polices, puis commencer l'adaptateur front.
 
 ### Commandes/tests restants
 
@@ -483,4 +505,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026 — génération front PWA validée, analyse design/couleur par classe en cours.*
+*Dernière mise à jour : 16 août 2026 — analyse design/couleur par classe terminée.*
