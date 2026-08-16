@@ -85,6 +85,12 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - **Accès R2** : seul l'app centrale peut télécharger les fichiers finis ; V2 génère des URLs signées à durée limitée.
 - **Validation** : oui, l'admin principal ou la personne autorisée valide visuellement avant envoi.
 - **Paiement** : inclus dans l'abonnement.
+- **Nommage** : le nom "zalavrai" ne doit **pas** apparaître dans l'application V2. On parle du **moteur de cartes SchoolSafe historique** ou du **sous-système de cartes**.
+- **Code source disponible** : seul le fichier monolithique est disponible ; il servira de référence pour construire l'adaptateur sans réimplémentation.
+- **QR code et tuteurs** : le format `schoolsafe://student/{matricule}` est conservé. La carte identifie le **tuteur principal** et les **autres tuteurs** pour la récupération des élèves. Les informations tuteurs apparaissent sur le verso.
+- **Scan et présence** : le scan d'entrée/sortie crée automatiquement les **listes de présence** pour toutes les salles de classe.
+- **Archivage des scans** : les scans de plus de **3 mois** seront déplacés vers **R2** pour alléger la base Supabase.
+- **Patrimoines visuels** : ce sont des éléments de design intégrés à la carte ; ils seront extraits du fichier de référence pour l'adaptateur.
 
 ### Sécurité
 
@@ -175,7 +181,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Conception détaillée du flux de production de cartes V2 → application de contrôle des tokens**, et définition du modèle de double rôle pour tous les postes.
+**Finalisation de la conception du sous-système de cartes** : intégrer les contraintes QR, tuteurs, présence automatique, archivage des scans, et choisir le mode de transmission V2 → app centrale.
 
 ### État d'avancement
 
@@ -188,6 +194,11 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - L'app centrale télécharge via URL signée et imprime.
   - Validation obligatoire avant envoi.
 - Modèle de double rôle validé : union des permissions et des périmètres.
+- Contraintes métier ajoutées :
+  - le nom "zalavrai" ne doit pas apparaître dans V2 ;
+  - le QR code identifie le tuteur principal et les autres tuteurs pour la récupération des élèves ;
+  - le scan d'entrée/sortie crée automatiquement les listes de présence ;
+  - les scans de plus de 3 mois sont archivés dans R2.
 - Technologies confirmées : `qrcodejs`, `html2canvas`, `jszip`, `html2pdf.js`.
 - Deux formats physiques confirmés :
   - **Badge vertical** : 340 × 540 px — Maternelle → 4ᵉ Primaire.
@@ -201,7 +212,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - scan pour contrôle de frais ;
   - scan pour contrôle d'arrivée et de sortie de classe.
 - **Décision d'architecture prise** : la production physique (téléchargement + impression) se fait dans l'**application de contrôle des tokens**. SchoolSafe V2 prépare et transmet la demande.
-- **En cours de décision** : V2 envoie-t-il l'image/PDF déjà généré, ou seulement les données brutes pour que l'app centrale génère la carte ?
+- **En cours de décision** : mode de transmission entre V2 et l'app centrale (push API directe vs polling).
 - Sorties : PNG recto+verso, impression navigateur (PDF via print), liste de distribution classe.
 
 ### Synthèse technique du système de cartes
@@ -283,11 +294,11 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 5. ✅ **Qui déclenche la demande dans V2** : l'**admin principal** ou la personne à qui il a donné accès (validé).
 6. ✅ **Validation avant envoi** : oui (validé).
 7. ✅ **Paiement** : inclus dans l'abonnement (validé).
-8. **zalavrai est-il le système définitif** ou juste un exemple de référence ?
-9. **Le code source est-il disponible localement** (fichiers séparés, non le HTML monolithique) ?
-10. **Le format du QR code** `schoolsafe://student/{matricule}` doit-il être conservé tel quel ?
-11. Le scanneur d'entrée/sortie actuel utilise un **QR signé** (`/{YYYYMMDD}/{sig8}`). Faut-il conserver cette signature dans V2 ?
-12. Les **patrimoines visuels** (60 images `patrimoine/{v}.png`) sont-ils disponibles séparément ou doivent-ils être extraits de zalavrai ?
+8. ✅ **zalavrai est-il le système définitif** : oui, c'est le moteur de référence, mais le nom "zalavrai" ne doit pas apparaître dans V2 (validé).
+9. ✅ **Le code source est-il disponible localement** : seul le fichier monolithique est disponible ; il servira de référence pour l'adaptateur (validé).
+10. ✅ **Le format du QR code** `schoolsafe://student/{matricule}` : conservé tel quel (validé).
+11. ✅ **QR signé au scan** (`/{YYYYMMDD}/{sig8}`) : conservé, car le scan crée aussi les listes de présence (validé).
+12. ✅ **Patrimoines visuels** : éléments de design de la carte, à extraire du fichier de référence pour l'adaptateur (validé).
 13. **Transmission** : V2 pousse-t-il la demande vers l'app centrale via **API directe**, ou l'app centrale interroge V2 par **polling** ?
 
 ---
@@ -406,20 +417,18 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Décision d'architecture prise : la production physique des cartes (téléchargement + impression) se fait dans l'**application de contrôle des tokens**. SchoolSafe V2 prépare et transmet la demande.
+Toutes les contraintes métier sur les cartes sont identifiées et documentées : moteur de référence (nom masqué), QR, tuteurs, présence automatique, archivage des scans. Il reste à choisir le mode de transmission V2 → app centrale.
 
 ### Ce que j'étais en train de faire
 
-- Documenter les décisions dans `PROJECT-CONTINUITY.md`.
-- Concevoir le flux V2 → app centrale avec R2 privé et URL signée.
-- Valider le modèle de double rôle pour tous les postes.
+- Documenter les nouvelles contraintes dans `PROJECT-CONTINUITY.md`.
+- Mettre à jour les questions en attente.
 
 ### Prochaine action
 
 1. Commiter la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Attendre la confirmation du propriétaire sur le flux proposé.
-3. Répondre aux questions restantes sur zalavrai (définitif ?, code source ?, QR, patrimoines).
-4. Commencer la conception technique de l'adaptateur de génération de cartes dans V2.
+2. Choisir le mode de transmission (push API directe recommandé).
+3. Commencer la conception technique de l'adaptateur de génération de cartes dans V2.
 
 ### Commandes/tests restants
 
@@ -442,4 +451,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026 — après définition du flux V2 → app centrale et du modèle de double rôle.*
+*Dernière mise à jour : 16 août 2026 — après intégration des contraintes QR, tuteurs, présence et archivage.*
