@@ -197,19 +197,19 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Choisir où se fait exactement la génération de l'image de la carte** : front PWA (html2canvas) ou VPS headless (Puppeteer/Playwright), puis implémenter le module correspondant.
+**Analyse du système de design et de couleurs par classe** dans le moteur historique, sans écrire de code. Objectif : comprendre comment chaque classe peut avoir son propre design et ses propres couleurs de carte.
 
 ### État d'avancement
 
 - Fichier complet téléchargé localement : `analysis/zalavrai.html` (~2,2 Mo).
 - Analyse technique complète réalisée (section détaillée ci-dessous).
 - Architecture des cartes verrouillée :
-  - V2 génère la carte finie (PNG/PDF).
+  - V2 génère la carte finie (PNG/PDF) dans le **front PWA** avec `html2canvas`.
   - V2 n'a pas de bouton "Imprimer" ; seul "Demander l'impression" existe.
   - Stockage dans R2 (bucket privé `cards/`).
   - L'app centrale télécharge via URL signée et imprime.
   - Validation obligatoire avant envoi.
-- **Question bloquante** : la génération de l'image se fait-elle dans le **front PWA** (html2canvas) ou sur le **VPS** (headless browser) ?
+- **Génération d'image validée** : dans le **front PWA** (Option A).
 - Modèle de double rôle validé : union des permissions et des périmètres.
 - Contraintes métier ajoutées :
   - le nom "zalavrai" ne doit pas apparaître dans V2 ;
@@ -331,7 +331,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 16. ✅ **Gestion des échecs** : retry exponentiel (1 min, 5 min, 15 min), puis `failed` ; notification admin principal ; relance manuelle possible.
 17. ✅ **Format de sortie** : **PNG HD** ; deux fichiers séparés `front.png` et `back.png` dans un dossier nommé par école + élève.
 18. ✅ **Polices** : **hébergées localement sur le VPS** recommandé.
-19. **Génération de l'image** : dans le **front PWA** (html2canvas) ou sur le **VPS headless** (Puppeteer/Playwright) ?
+19. ✅ **Génération de l'image** : dans le **front PWA** avec `html2canvas`. Pas de bouton "Imprimer" dans V2 (validé).
 
 ---
 
@@ -449,18 +449,18 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Migration Supabase du sous-système de cartes créée, testée et commitée. Question bloquante avant de continuer : la génération de l'image se fait-elle dans le front PWA ou sur le VPS headless ?
+Génération d'image validée dans le front PWA. Prochaine étape : analyse du système de design/couleur par classe dans le moteur historique, sans coder.
 
 ### Ce que j'étais en train de faire
 
-- Créer et committer la migration `supabase/migrations/202608160002_card_system.sql`.
-- Identifier que la question de l'emplacement exact de la génération d'image n'est pas encore tranchée.
+- Documenter la validation du front PWA dans `PROJECT-CONTINUITY.md`.
+- Préparer l'analyse des designs et couleurs par classe.
 
 ### Prochaine action
 
-1. Obtenir la réponse du propriétaire sur l'emplacement de la génération d'image.
-2. Implémenter le module de génération de cartes au bon endroit.
-3. Implémenter les endpoints Fastify, le client HMAC et l'upload R2.
+1. Commiter la mise à jour de `PROJECT-CONTINUITY.md`.
+2. Analyser en profondeur le système de design/couleur par classe dans `analysis/zalavrai.html`.
+3. Présenter les conclusions au propriétaire.
 
 ### Commandes/tests restants
 
@@ -483,4 +483,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026 — en attente de décision sur l'emplacement de la génération d'image.*
+*Dernière mise à jour : 16 août 2026 — génération front PWA validée, analyse design/couleur par classe en cours.*
