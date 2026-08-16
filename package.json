@@ -1,0 +1,28 @@
+{
+  "name": "schoolsafe-v2",
+  "private": true,
+  "workspaces": [
+    "server"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspace server",
+    "test": "npm run test --workspace server",
+    "ci": "npm run typecheck && npm test",
+    "build:auth-sdk": "esbuild frontend/vendor/supabase-entry.js --bundle --format=iife --global-name=SchoolSafeSupabaseSDK --outfile=app/vendor/supabase-sdk.js",
+    "check:auth-sdk": "node scripts/check-auth-bundle.mjs",
+    "test:e2e:existing": "node app/qa-smoke.cjs && node app/qa-pwa.cjs && node app/qa-i18n.cjs",
+    "test:e2e:staging": "npm run test:e2e:existing",
+    "supabase:start": "supabase start",
+    "supabase:reset": "supabase db reset",
+    "test:rls": "node scripts/run-rls-tests.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "pg": "8.23.0",
+    "playwright": "1.62.1",
+    "supabase": "2.114.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.112.3"
+  }
+}
