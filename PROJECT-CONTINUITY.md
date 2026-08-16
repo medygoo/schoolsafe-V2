@@ -157,9 +157,18 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Test permanent preview (3/3 passent).
 - `STATUS_V2.md` mis à jour.
 
+### Sous-système de cartes — schéma de données
+
+- Migration Supabase créée : `supabase/migrations/202608160002_card_system.sql`.
+- Tables créées : `classes`, `students`, `student_guardians`, `card_print_requests`.
+- Colonnes ajoutées à `students` : `card_printed`, `card_print_date`, `card_print_count`.
+- RLS activées sur les 4 nouvelles tables.
+- Tests serveur existants toujours verts (26/26).
+
 ### Fichiers importants créés ou modifiés
 
 - `supabase/migrations/202608160001_step2_school_configuration.sql`
+- `supabase/migrations/202608160002_card_system.sql`
 - `server/src/setup/schema.ts`
 - `server/src/setup/service.ts`
 - `server/src/setup/routes.ts`
@@ -188,7 +197,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Conception technique de l'adaptateur de génération de cartes dans SchoolSafe V2** : schéma de données, API V2, API app centrale, module de génération d'image.
+**Implémentation du module de génération de cartes côté VPS** : extraction des fonctions du moteur historique, rendu HTML/CSS, génération QR code, capture html2canvas.
 
 ### État d'avancement
 
@@ -227,7 +236,8 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - PNG HD, deux fichiers `front.png` + `back.png` ;
   - dossier R2 nommé par école + élève ;
   - polices hébergées localement sur le VPS.
-- **En cours de conception** : schéma `card_print_requests`, endpoints API, module d'adaptateur de génération.
+- **Schéma Supabase terminé** : tables `classes`, `students`, `student_guardians`, `card_print_requests` créées avec RLS.
+- **En cours** : module de génération de cartes côté VPS.
 - Sorties : PNG recto+verso, impression navigateur (PDF via print), liste de distribution classe.
 
 ### Synthèse technique du système de cartes
@@ -437,18 +447,20 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Tous les choix techniques sont validés. La conception de l'adaptateur de cartes est complète. Prêt à commencer l'implémentation après validation du propriétaire.
+Migration Supabase du sous-système de cartes créée et testée. Passage à l'implémentation du module de génération de cartes côté VPS.
 
 ### Ce que j'étais en train de faire
 
-- Documenter les choix techniques dans `PROJECT-CONTINUITY.md`.
-- Finaliser la conception complète (schéma, API, sécurité, assets).
+- Créer la migration `supabase/migrations/202608160002_card_system.sql`.
+- Vérifier que les tests serveur existants passent toujours.
+- Mettre à jour `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
-1. Commiter la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Obtenir le feu vert du propriétaire sur les choix techniques.
-3. Commencer l'implémentation : migration Supabase, routes Fastify, module de génération.
+1. Commiter la migration et la mise à jour de `PROJECT-CONTINUITY.md`.
+2. Implémenter le module de génération de cartes côté VPS.
+3. Implémenter les endpoints Fastify.
+4. Implémenter le client HMAC et l'upload R2.
 
 ### Commandes/tests restants
 
@@ -471,4 +483,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026 — après validation de tous les choix techniques de l'adaptateur cartes.*
+*Dernière mise à jour : 16 août 2026 — après création du schéma Supabase du sous-système de cartes.*
