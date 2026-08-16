@@ -155,24 +155,85 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Analyse du système de production de cartes élèves existant** à l'URL [https://medt121.github.io/zalavrai/](https://medt121.github.io/zalavrai/).
+**Analyse détaillée du système de production de cartes élèves existant** à l'URL [https://medt121.github.io/zalavrai/](https://medt121.github.io/zalavrai/), en vue de son intégration dans SchoolSafe V2 via un adaptateur versionné.
 
 ### État d'avancement
 
-- Le système a été récupéré et analysé à haut niveau.
-- Technologies identifiées : html2canvas, qrcodejs, jszip, html2pdf.js.
-- Deux formats identifiés : badge vertical et carte PVC horizontale.
-- QR code : `schoolsafe://student/{matricule}`.
-- Processus de production identifié : aperçu → capture → upload → impression/téléchargement.
+- Fichier complet téléchargé localement : `analysis/zalavrai.html` (~2,2 Mo).
+- Analyse technique complète réalisée (section détaillée ci-dessous).
+- Technologies confirmées : `qrcodejs`, `html2canvas`, `jszip`, `html2pdf.js`.
+- Deux formats physiques confirmés :
+  - **Badge vertical** : 340 × 540 px — Maternelle → 4ᵉ Primaire.
+  - **Carte PVC horizontale** : 560 × 353 px — 5ᵉ/6ᵉ Primaire + Humanités/Secondaire.
+- QR code sur la carte (non signé) : `schoolsafe://student/{matricule}`.
+- QR code au scan (signé) : `schoolsafe://student/{matricule}/{YYYYMMDD}/{sig8}` avec HMAC-SHA256.
+- Processus de production : aperçu recto/verso → capture html2canvas scale 2 → assemblage recto+verso → upload Supabase Storage (`photos/cards/`) → marquage élève `card_printed`, `card_print_date`, `card_print_count`.
+- Duplicata géré avec tampon `DUPLICATA` et incrément du compteur.
+- Données d'entrée identifiées : élève, classe/cycle, école, année scolaire, personne autorisée, logo école.
+- Sorties : PNG recto+verso, impression navigateur (PDF via print), liste de distribution classe.
+
+### Synthèse technique du système de cartes
+
+#### Dépendances externes (CDN)
+- `qrcodejs 1.0.0`
+- `jsqr 1.4.0`
+- `jszip 3.10.1`
+- `html2pdf.js 0.10.1`
+- `html2canvas 1.4.1`
+- Polices Google : `Baloo 2`, `Nunito Sans`, `DM Sans`
+
+#### Fonctions principales identifiées
+| Fonction | Rôle |
+|----------|------|
+| `window.ssClassType(cl)` | Choix badge/carte et index couleur |
+| `window.ssBuildBadge(s,cl,teacher,year,patB,patStyle)` | HTML recto/verso badge |
+| `window.ssBuildCarte(s,cl,teacher,year,patC,patStyle)` | HTML recto/verso carte |
+| `window.ssGenQR(elId,data,size)` | Rendu QR code dans le DOM |
+| `window.ssRenderPreview()` | Mise à jour de l'aperçu studio |
+| `window.exportSSCardPNG()` | Export PNG via html2canvas |
+| `window.ssPrintCard()` | Fenêtre d'impression navigateur |
+| `window.printClassCards(cid)` | Impression d'une classe entière |
+| `window.generateDuplicata(sid)` | Duplicata tamponné |
+| `window.submitCardOrder(sid)` | Capture, upload, marquage impression |
+
+#### Données élève requises
+- `id`, `name`, `mat` (matricule), `dob` (YYYY-MM-DD), `photo`, `cid` (classe), `pid` (parent)
+- `nom_papa` / `nom_maman` (fallback tuteur)
+- `card_printed`, `card_print_date`, `card_print_count`
+
+#### Données école requises
+- `name`, `name_en`, `address`, `phone`, `email`, `motto`/`slogan`, `website`
+- Logo école via `window.SCHOOL_LOGO` (base64 ou URL)
+
+#### Données classe requises
+- `name`, `cycle` (maternelle/primaire/humanites/secondaire), `option`
+- `teacher_id` / `titulaire_id`
+- `card_color`, `card_color_soft`, `card_color_dark`, `card_pat`
+
+#### Stockage et traçabilité
+- Upload vers Supabase Storage : `POST ${SUPA_URL}/storage/v1/object/photos/cards/{filename}`
+- Mise à jour base : `students.card_printed`, `students.card_print_date`, `students.card_print_count`
 
 ### Fichiers concernés
 
-- Analyse temporaire stockée dans `/tmp/zalavrai.html` (hors projet).
+- `analysis/zalavrai.html` (analyse temporaire, non versionné pour l'instant).
 - `docs/CARDS_IMMUTABILITY.md` (règles de protection).
+- `PROJECT-CONTINUITY.md` (ce fichier).
 
-### Problèmes rencontrés
+### Problèmes rencontrés / Points de décision
 
-- Aucun problème bloquant. Attente de la décision du propriétaire sur la méthode d'intégration.
+- Le système zalavrai est autosuffisant et contient tout le moteur graphique.
+- `docs/CARDS_IMMUTABILITY.md` interdit formellement de réimplémenter ce moteur.
+- Plusieurs options d'intégration sont possibles ; aucune n'a encore été choisie par le propriétaire.
+
+### Questions en attente de réponse du propriétaire
+
+1. **zalavrai est-il le système définitif** ou juste un exemple de référence ?
+2. **Le code source est-il disponible localement** (fichiers séparés, non le HTML monolithique) ?
+3. **Faut-il continuer à produire les cartes dans zalavrai** (iframe/external link) ou **les intégrer directement dans V2** ?
+4. **Le format du QR code** `schoolsafe://student/{matricule}` doit-il être conservé tel quel ?
+5. Le scanneur d'entrée/sortie actuel utilise un **QR signé** (`/{YYYYMMDD}/{sig8}`). Faut-il conserver cette signature dans V2 ?
+6. Les **patrimoines visuels** (60 images `patrimoine/{v}.png`) sont-ils disponibles séparément ou doivent-ils être extraits de zalavrai ?
 
 ---
 
@@ -191,13 +252,23 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Documentation de l'interface du système de cartes.
 - Gestion des duplicatas et de l'historique d'impression.
 
+### Options d'intégration à valider
+
+1. **Iframe / lien externe** : garder zalavrai déployé tel quel, y accéder depuis V2 via iframe ou lien. Rapide mais fragmente l'expérience et l'authentification.
+2. **Adaptateur front** : embarquer le moteur graphique zalavrai (HTML/CSS/JS) dans V2 et l'alimenter avec les données V2. UX unifiée mais dépend des mêmes contraintes (CDN, html2canvas).
+3. **Adaptateur VPS headless** : générer les cartes côté serveur avec le HTML/CSS de zalavrai rendu par Puppeteer/Playwright. Plus fiable mais nécessite un navigateur headless sur le VPS.
+4. **Service interne API** : exposer le moteur zalavrai comme un micro-service interne que V2 appelle. Séparation propre mais plus complexe.
+
+La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tests de contrat** quelle que soit l'option choisie.
+
 ### Prochaines étapes logiques
 
-1. Confirmer avec le propriétaire la méthode d'intégration des cartes.
-2. Documenter l'interface d'entrée/sortie du système de cartes.
-3. Créer l'adaptateur versionné.
-4. Écrire les tests de contrat.
-5. Passer à l'application de contrôle centrale.
+1. Obtenir les réponses du propriétaire aux 6 questions ci-dessus.
+2. Choisir l'option d'intégration.
+3. Documenter l'interface d'entrée/sortie du système de cartes.
+4. Créer l'adaptateur versionné.
+5. Capturer des exemples de référence et écrire les tests de contrat.
+6. Passer à l'application de contrôle centrale.
 
 ---
 
@@ -278,20 +349,19 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Où je me suis arrêté
 
-Analyse du système de production de cartes existant à [https://medt121.github.io/zalavrai/](https://medt121.github.io/zalavrai/).  
-L'analyse à haut niveau est terminée ; la décision d'intégration n'est pas encore prise.
+Analyse technique complète du système de production de cartes existant à [https://medt121.github.io/zalavrai/](https://medt121.github.io/zalavrai/).  
+Le fichier a été téléchargé localement sous `analysis/zalavrai.html` et décortiqué.
 
 ### Ce que j'étais en train de faire
 
-Poser des questions au propriétaire pour choisir la méthode d'intégration :
-- le système zalavrai est-il l'application définitive ?
-- le code source est-il disponible localement ?
-- faut-il continuer à produire les cartes dans ce système ou les intégrer dans V2 ?
-- le format du QR code doit-il être conservé tel quel ?
+- Documenter l'analyse dans `PROJECT-CONTINUITY.md`.
+- Préparer les options d'intégration et les questions de décision pour le propriétaire.
 
 ### Prochaine action
 
-Attendre les réponses du propriétaire, puis concevoir l'adaptateur ou l'intégration choisie.
+1. Commiter la mise à jour de `PROJECT-CONTINUITY.md`.
+2. Poser au propriétaire les 6 questions de décision sur l'intégration des cartes.
+3. Selon sa réponse, concevoir l'adaptateur versionné approprié.
 
 ### Commandes/tests restants
 
@@ -314,4 +384,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026.*
+*Dernière mise à jour : 16 août 2026 — après analyse complète du système de cartes zalavrai.*
