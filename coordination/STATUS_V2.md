@@ -15,15 +15,17 @@ Etat: terminee et verifiee.
 
 ## Etape 2 - Configuration mono-ecole
 
-Etat: interface construite, validation complete en cours.
+Etat: terminee, validee et poussee sur GitHub.
 
-- identite de l'ecole;
+- identite de l'ecole (nom francais et anglais);
 - cycles Maternelle, Primaire, Secondaire et Humanites;
 - annee scolaire;
-- coordonnees officielles;
+- coordonnees officielles et parametres du site public;
 - logo et couleurs;
-- Administrateur principal;
-- recapitulatif local sans ecriture distante.
+- Administrateur principal avec mot de passe defini a la configuration;
+- recapitulatif local + ecriture dans Supabase via l'API VPS;
+- schema Supabase, RLS, API VPS et tests unitaires deployes;
+- connexion par e-mail ou par telephone (resolu en e-mail cote VPS).
 
 ## Etape 3 - Shell des profils
 
