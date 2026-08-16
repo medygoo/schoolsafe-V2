@@ -2151,27 +2151,22 @@
         enterLiveSession();
       } else {
         var phone = normalizePhone(document.getElementById("phoneIdentifier").value);
-        var otp = document.getElementById("otpIdentifier").value.trim();
+        var password = document.getElementById("password").value;
         if (!phone) { notify("Renseignez le numéro de téléphone."); return; }
-        if (!otp) {
-          var sendResult = await client.auth.signInWithOtp({ phone: phone });
-          if (sendResult.error) throw sendResult.error;
-          pendingPhone = phone;
-          document.getElementById("otpIdentity").classList.remove("hidden");
-          document.getElementById("otpIdentifier").focus();
-          notify("Code envoyé au " + phone + " — saisissez-le et reconnectez-vous.");
+        if (!password) { notify("Renseignez le mot de passe."); return; }
+
+        var lookup = await apiPost("/auth/lookup-phone", { phone: phone });
+        if (!lookup || !lookup.email) {
+          notify("Aucun compte trouvé pour ce numéro.");
           return;
         }
-        if (pendingPhone && phone !== pendingPhone) { notify("Numéro modifié. Recommencez l’envoi du code."); return; }
-        var verifyResult = await client.auth.verifyOtp({ phone: phone, token: otp, type: "sms" });
-        if (verifyResult.error) throw verifyResult.error;
-        var token = verifyResult.data.session.access_token;
+
+        var result = await client.auth.signInWithPassword({ email: lookup.email, password: password });
+        if (result.error) throw result.error;
+        var token = result.data.session.access_token;
         currentSession = { token: token };
         var bootstrap = await callBootstrap(token);
         applyBootstrap(bootstrap);
-        document.getElementById("otpIdentity").classList.add("hidden");
-        document.getElementById("otpIdentifier").value = "";
-        pendingPhone = null;
         enterLiveSession();
       }
     } catch (error) {
