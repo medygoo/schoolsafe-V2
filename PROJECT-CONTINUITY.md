@@ -165,6 +165,14 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - RLS activées sur les 4 nouvelles tables.
 - Tests serveur existants toujours verts (26/26).
 
+### Sous-système de cartes — extraction des assets
+
+- Migration `supabase/migrations/202608160003_card_design_fields.sql` créée : ajout de `card_family`, `card_variant`, `card_pat_style` dans `classes`.
+- 60 images patrimoine téléchargées dans `app/modules/cards/assets/patrimoine/`.
+- CSS des cartes extrait dans `app/modules/cards/assets/cards.css`.
+- Données de design (familles, variantes, palette, patrimoines) créées dans `app/modules/cards/assets/card-data.js`.
+- Script de téléchargement des patrimoines : `scripts/download-patrimoines.py`.
+
 ### Fichiers importants créés ou modifiés
 
 - `supabase/migrations/202608160001_step2_school_configuration.sql`
@@ -197,7 +205,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Analyse du système de design et de couleurs par classe** dans le moteur historique, sans écrire de code. Objectif : comprendre comment chaque classe peut avoir son propre design et ses propres couleurs de carte.
+**Implémentation du moteur de génération de cartes dans le front PWA** : fonctions de rendu HTML, QR code, capture html2canvas, et envoi des images au VPS.
 
 ### État d'avancement
 
@@ -246,7 +254,12 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - le format badge/carte est déterminé par le cycle + le nom de la classe ;
   - champs déjà présents dans `classes` : `card_color`, `card_color_soft`, `card_color_dark`, `card_pat` ;
   - champs à ajouter pour reproduire fidèlement : `card_family`, `card_variant`, `card_pat_style`.
-- **Assets à extraire** : bloc CSS `.ss-card-studio`, 60 images PNG `patrimoine/`, polices `Baloo 2` et `Nunito Sans`.
+- **Assets extraits** :
+  - migration `202608160003_card_design_fields.sql` avec `card_family`, `card_variant`, `card_pat_style` ;
+  - 60 images PNG dans `app/modules/cards/assets/patrimoine/` ;
+  - CSS dans `app/modules/cards/assets/cards.css` ;
+  - données design dans `app/modules/cards/assets/card-data.js`.
+- **En cours** : implémentation du moteur de génération dans le front PWA.
 - Sorties : PNG recto+verso, impression navigateur (PDF via print), liste de distribution classe.
 
 ### Synthèse technique du système de cartes
@@ -471,18 +484,21 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Analyse du système de design/couleur par classe terminée. Toutes les décisions métier et techniques sur les cartes sont verrouillées.
+Extraction des assets terminée. Schéma complété avec les champs design. Passage à l'implémentation du moteur de génération dans le front PWA.
 
 ### Ce que j'étais en train de faire
 
-- Analyser `analysis/zalavrai.html` pour comprendre les familles de design, les variantes, les patrimoines et la personnalisation par classe.
-- Documenter les conclusions dans `PROJECT-CONTINUITY.md`.
+- Extraire le CSS des cartes et créer `app/modules/cards/assets/cards.css`.
+- Télécharger les 60 images patrimoine.
+- Créer `app/modules/cards/assets/card-data.js` avec familles, variantes, palette et patrimoines.
+- Créer la migration `202608160003_card_design_fields.sql`.
 
 ### Prochaine action
 
-1. Commiter la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Demander au propriétaire s'il valide l'extraction des assets et le début de l'adaptateur front.
-3. Si validation, extraire le CSS, les patrimoines et les polices, puis commencer l'adaptateur front.
+1. Commiter les nouveaux fichiers et la mise à jour de `PROJECT-CONTINUITY.md`.
+2. Implémenter les fonctions de rendu HTML des cartes dans le front PWA.
+3. Intégrer `qrcodejs` et `html2canvas`.
+4. Créer l'endpoint VPS `/cards/requests` pour recevoir les images et les pousser vers l'app centrale.
 
 ### Commandes/tests restants
 
@@ -505,4 +521,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026 — analyse design/couleur par classe terminée.*
+*Dernière mise à jour : 16 août 2026 — extraction des assets et complément du schéma design terminés.*
