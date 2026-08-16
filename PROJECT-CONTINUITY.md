@@ -173,10 +173,19 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Données de design (familles, variantes, palette, patrimoines) créées dans `app/modules/cards/assets/card-data.js`.
 - Script de téléchargement des patrimoines : `scripts/download-patrimoines.py`.
 
+### Sous-système de cartes — test visuel autonome
+
+- Fichier `app/modules/cards/test-card.html` créé : page autonome qui reproduit le rendu badge vertical et carte PVC horizontale avec des données de test.
+- Charge le CSS local, les données design `card-data.js`, et les librairies `qrcodejs` + `html2canvas` depuis CDN.
+- Permet de changer la classe test, la famille de design (A-J), la variante de couleur et le style de patrimoine (vignette/fond/both).
+- Permet de capturer le PNG en haute définition (scale 2).
+- Servi localement par `app/server.mjs` sur `http://127.0.0.1:4175/modules/cards/test-card.html`.
+
 ### Fichiers importants créés ou modifiés
 
 - `supabase/migrations/202608160001_step2_school_configuration.sql`
 - `supabase/migrations/202608160002_card_system.sql`
+- `supabase/migrations/202608160003_card_design_fields.sql`
 - `server/src/setup/schema.ts`
 - `server/src/setup/service.ts`
 - `server/src/setup/routes.ts`
@@ -187,6 +196,10 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - `server/tests/setup.test.ts`
 - `app/app.js`
 - `app/index.html`
+- `app/modules/cards/assets/cards.css`
+- `app/modules/cards/assets/card-data.js`
+- `app/modules/cards/assets/patrimoine/*.png`
+- `app/modules/cards/test-card.html`
 - `coordination/STATUS_V2.md`
 
 ### Merges et pushes
@@ -205,7 +218,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Implémentation du moteur de génération de cartes dans le front PWA** : fonctions de rendu HTML, QR code, capture html2canvas, et envoi des images au VPS.
+**Validation visuelle du moteur de cartes** via `app/modules/cards/test-card.html`, puis **démarrage de l'application de contrôle des tokens d'instance**.
 
 ### État d'avancement
 
@@ -232,7 +245,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - QR code au scan (signé) : `schoolsafe://student/{matricule}/{YYYYMMDD}/{sig8}` avec HMAC-SHA256.
 - Processus de production : aperçu recto/verso → capture html2canvas scale 2 → assemblage recto+verso → upload Supabase Storage (`photos/cards/`) → marquage élève `card_printed`, `card_print_date`, `card_print_count`.
 - Duplicata géré avec tampon `DUPLICATA` et incrément du compteur.
-- **La création de cartes est déjà fonctionnelle et terminée dans zalavrai** ; il ne s'agit pas de la réinventer, mais de la brancher proprement dans V2.
+- **La création de cartes est déjà fonctionnelle et terminée dans le moteur historique** ; il ne s'agit pas de le réinventer, mais de le brancher proprement dans V2.
 - **V2 possède déjà deux systèmes de scan** :
   - scan pour contrôle de frais ;
   - scan pour contrôle d'arrivée et de sortie de classe.
@@ -259,7 +272,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - 60 images PNG dans `app/modules/cards/assets/patrimoine/` ;
   - CSS dans `app/modules/cards/assets/cards.css` ;
   - données design dans `app/modules/cards/assets/card-data.js`.
-- **En cours** : implémentation du moteur de génération dans le front PWA.
+- **Test visuel créé** : `app/modules/cards/test-card.html` sert les cartes en local sur `http://127.0.0.1:4175/modules/cards/test-card.html`.
 - Sorties : PNG recto+verso, impression navigateur (PDF via print), liste de distribution classe.
 
 ### Synthèse technique du système de cartes
@@ -348,6 +361,8 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Questions en attente de réponse du propriétaire
 
+#### Cartes élèves (toutes répondues / verrouillées)
+
 1. ✅ **Emplacement de la production de cartes** : dans l'**application de contrôle des tokens** (validé).
 2. ✅ **Qui produit physiquement** : l'app de contrôle des tokens télécharge et imprime (validé).
 3. ✅ **Contenu de la demande** : V2 génère la **carte finie** (image/PDF) et l'envoie à l'app centrale (validé).
@@ -355,11 +370,11 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 5. ✅ **Qui déclenche la demande dans V2** : l'**admin principal** ou la personne à qui il a donné accès (validé).
 6. ✅ **Validation avant envoi** : oui (validé).
 7. ✅ **Paiement** : inclus dans l'abonnement (validé).
-8. ✅ **zalavrai est-il le système définitif** : oui, c'est le moteur de référence, mais le nom "zalavrai" ne doit pas apparaître dans V2 (validé).
+8. ✅ **Le moteur historique est-il le système définitif** : oui, c'est le moteur de référence, mais son nom d'origine ne doit pas apparaître dans V2 (validé).
 9. ✅ **Le code source est-il disponible localement** : seul le fichier monolithique est disponible ; il servira de référence pour l'adaptateur (validé).
 10. ✅ **Le format du QR code** `schoolsafe://student/{matricule}` : conservé tel quel (validé).
 11. ✅ **QR signé au scan** (`/{YYYYMMDD}/{sig8}`) : conservé, car le scan crée aussi les listes de présence (validé).
-12. ✅ **Patrimoines visuels** : éléments de design de la carte, à extraire du fichier de référence pour l'adaptateur (validé).
+12. ✅ **Patrimoines visuels** : éléments de design de la carte, extraits dans `app/modules/cards/assets/patrimoine/` (validé).
 13. ✅ **Transmission** : **push API directe** validé, avec file d'attente locale en cas d'échec.
 14. ✅ **Authentification V2 ↔ app centrale** : **HMAC signé avec timestamp** recommandé.
 15. ✅ **Durée de validité de l'URL signée R2** : **72 heures** recommandé.
@@ -367,6 +382,17 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 17. ✅ **Format de sortie** : **PNG HD** ; deux fichiers séparés `front.png` et `back.png` dans un dossier nommé par école + élève.
 18. ✅ **Polices** : **hébergées localement sur le VPS** recommandé.
 19. ✅ **Génération de l'image** : dans le **front PWA** avec `html2canvas`. Pas de bouton "Imprimer" dans V2 (validé).
+
+#### Application de contrôle des tokens (en attente)
+
+20. ❓ **Dossier / nom du projet** : `control-app/` à la racine est proposé.
+21. ❓ **Fonctionnalités minimales pour la première étape** :
+    - tableau de bord des demandes d'impression de cartes reçues de chaque VPS école ;
+    - téléchargement des PNG `front.png` + `back.png` depuis R2 ;
+    - bouton "Marquer comme imprimée" pour confirmer le statut ;
+    - génération/révocation des tokens d'instance ;
+    - blocage/déblocage d'une instance.
+22. ❓ **Authentification app centrale ↔ VPS école** : clé HMAC signée avec timestamp, échangée hors bande au déploiement.
 
 ---
 
@@ -396,14 +422,15 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Prochaines étapes logiques
 
-1. Clarifier si V2 envoie l'image/PDF généré ou seulement les données brutes.
-2. Choisir le canal de transmission entre V2 et l'app centrale.
-3. Choisir le stockage intermédiaire (R2, Supabase Storage, génération à la volée).
-4. Choisir l'option technique d'intégration du moteur graphique (front, VPS headless, iframe, service interne).
-5. Documenter l'interface d'entrée/sortie du système de cartes.
-6. Créer l'adaptateur versionné.
-7. Capturer des exemples de référence et écrire les tests de contrat.
-8. Passer à l'application de contrôle centrale.
+1. Valider le rendu visuel via `app/modules/cards/test-card.html`.
+2. Répondre aux questions en attente sur l'application de contrôle des tokens.
+3. Créer le squelette de l'application de contrôle des tokens (`control-app/`).
+4. Implémenter la génération/révocation de tokens d'instance.
+5. Implémenter le endpoint de réception des demandes d'impression de cartes.
+6. Connecter V2 à l'app centrale pour l'envoi des demandes.
+7. Documenter l'interface d'entrée/sortie du système de cartes.
+8. Créer l'adaptateur versionné avec tests de contrat.
+9. Rédiger la fiche de lancement de l'application.
 
 ---
 
@@ -484,26 +511,26 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Extraction des assets terminée. Schéma complété avec les champs design. Passage à l'implémentation du moteur de génération dans le front PWA.
+Test visuel de carte créé et servi localement. Le moteur de rendu badge + carte PVC est fonctionnel dans `app/modules/cards/test-card.html`. Passage imminent à l'application de contrôle des tokens.
 
 ### Ce que j'étais en train de faire
 
-- Extraire le CSS des cartes et créer `app/modules/cards/assets/cards.css`.
-- Télécharger les 60 images patrimoine.
-- Créer `app/modules/cards/assets/card-data.js` avec familles, variantes, palette et patrimoines.
-- Créer la migration `202608160003_card_design_fields.sql`.
+- Créer `app/modules/cards/test-card.html` avec données de test et rendu recto/verso.
+- Adapter les fonctions `ssBuildBadge`, `ssBuildCarte`, `ssClassType`, `ssGetPat`, etc. au format des assets extraits.
+- Lancer le serveur preview `app/server.mjs` sur `http://127.0.0.1:4175`.
+- Mettre à jour `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
-1. Commiter les nouveaux fichiers et la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Implémenter les fonctions de rendu HTML des cartes dans le front PWA.
-3. Intégrer `qrcodejs` et `html2canvas`.
-4. Créer l'endpoint VPS `/cards/requests` pour recevoir les images et les pousser vers l'app centrale.
+1. Commiter `app/modules/cards/test-card.html` et `PROJECT-CONTINUITY.md`.
+2. Poser au propriétaire les questions en attente sur l'application de contrôle des tokens.
+3. Créer le squelette `control-app/` dès validation.
 
 ### Commandes/tests restants
 
 - `cd server && npm test` (à relancer après chaque modification serveur).
 - `node tests/qa-permanent-preview.cjs` (à relancer après chaque modification front).
+- Ouvrir `http://127.0.0.1:4175/modules/cards/test-card.html` pour validation visuelle.
 
 ---
 
