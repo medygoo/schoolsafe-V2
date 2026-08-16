@@ -83,7 +83,13 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   6. L'app centrale télécharge la carte et gère l'impression physique.
   7. L'app centrale confirme le statut à V2.
 - **Accès R2** : seul l'app centrale peut télécharger les fichiers finis ; V2 génère des URLs signées à durée limitée.
-- **Mode de transmission** : **push API directe** validé. V2 appelle l'app centrale dès qu'une carte est prête, avec clé API et file d'attente locale en cas d'échec.
+- **Mode de transmission** : **push API directe** validé. V2 appelle l'app centrale dès qu'une carte est prête, avec file d'attente locale en cas d'échec.
+- **Authentification V2 ↔ app centrale** : **HMAC signé avec timestamp** recommandé (plus sûr qu'une clé API simple, résistant au replay).
+- **Durée URL signée R2** : **72 heures** (suffisant pour un opérateur humain, court pour limiter les risques).
+- **Gestion des échecs** : retry exponentiel (1 min, 5 min, 15 min), puis statut `failed` ; notification à l'admin principal ; possibilité de relancer manuellement.
+- **Format de sortie** : **PNG HD** ; deux images séparées (`front.png`, `back.png`) dans un dossier nommé par école + élève.
+- **Structure R2** : `cards/{school_slug}/{academic_year}/{student_matricule}_{student_name}/front.png` et `back.png`.
+- **Polices** : **hébergées localement sur le VPS** pour fonctionner hors ligne et éviter la dépendance à Google Fonts.
 - **Validation** : oui, l'admin principal ou la personne autorisée valide visuellement avant envoi.
 - **Paiement** : inclus dans l'abonnement.
 - **Nommage** : le nom "zalavrai" ne doit **pas** apparaître dans l'application V2. On parle du **moteur de cartes SchoolSafe historique** ou du **sous-système de cartes**.
@@ -214,6 +220,13 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - scan pour contrôle d'arrivée et de sortie de classe.
 - **Décision d'architecture prise** : la production physique (téléchargement + impression) se fait dans l'**application de contrôle des tokens**. SchoolSafe V2 prépare et transmet la demande.
 - Mode de transmission validé : **push API directe** avec clé API et file d'attente locale.
+- Choix techniques validés :
+  - authentification HMAC signé avec timestamp ;
+  - URL R2 signées 72 heures ;
+  - retry exponentiel puis `failed` ;
+  - PNG HD, deux fichiers `front.png` + `back.png` ;
+  - dossier R2 nommé par école + élève ;
+  - polices hébergées localement sur le VPS.
 - **En cours de conception** : schéma `card_print_requests`, endpoints API, module d'adaptateur de génération.
 - Sorties : PNG recto+verso, impression navigateur (PDF via print), liste de distribution classe.
 
@@ -301,11 +314,12 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 10. ✅ **Le format du QR code** `schoolsafe://student/{matricule}` : conservé tel quel (validé).
 11. ✅ **QR signé au scan** (`/{YYYYMMDD}/{sig8}`) : conservé, car le scan crée aussi les listes de présence (validé).
 12. ✅ **Patrimoines visuels** : éléments de design de la carte, à extraire du fichier de référence pour l'adaptateur (validé).
-13. ✅ **Transmission** : **push API directe** validé, avec clé API et file d'attente locale en cas d'échec.
-14. **Authentification V2 ↔ app centrale** : clé API simple, JWT, ou HMAC signé ?
-15. **Durée de validité de l'URL signée R2** : 24 heures, 72 heures, 7 jours ?
-16. **Gestion des échecs** : combien de tentatives avant marquage `failed` ? Notification à qui ?
-17. **Format de sortie** : PNG recto+verso combiné, ou deux fichiers séparés (recto.png + verso.png) ?
+13. ✅ **Transmission** : **push API directe** validé, avec file d'attente locale en cas d'échec.
+14. ✅ **Authentification V2 ↔ app centrale** : **HMAC signé avec timestamp** recommandé.
+15. ✅ **Durée de validité de l'URL signée R2** : **72 heures** recommandé.
+16. ✅ **Gestion des échecs** : retry exponentiel (1 min, 5 min, 15 min), puis `failed` ; notification admin principal ; relance manuelle possible.
+17. ✅ **Format de sortie** : **PNG HD** ; deux fichiers séparés `front.png` et `back.png` dans un dossier nommé par école + élève.
+18. ✅ **Polices** : **hébergées localement sur le VPS** recommandé.
 
 ---
 
@@ -423,18 +437,18 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Mode de transmission **push API directe** validé. Toutes les décisions métier sur les cartes sont verrouillées. Passage à la conception technique de l'adaptateur.
+Tous les choix techniques sont validés. La conception de l'adaptateur de cartes est complète. Prêt à commencer l'implémentation après validation du propriétaire.
 
 ### Ce que j'étais en train de faire
 
-- Documenter la validation du push API dans `PROJECT-CONTINUITY.md`.
-- Préparer la conception technique de l'adaptateur.
+- Documenter les choix techniques dans `PROJECT-CONTINUITY.md`.
+- Finaliser la conception complète (schéma, API, sécurité, assets).
 
 ### Prochaine action
 
 1. Commiter la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Présenter la conception technique complète (schéma, API, module).
-3. Valider avec le propriétaire avant d'écrire le moindre code.
+2. Obtenir le feu vert du propriétaire sur les choix techniques.
+3. Commencer l'implémentation : migration Supabase, routes Fastify, module de génération.
 
 ### Commandes/tests restants
 
@@ -457,4 +471,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026 — après validation du push API directe, passage à la conception technique.*
+*Dernière mise à jour : 16 août 2026 — après validation de tous les choix techniques de l'adaptateur cartes.*
