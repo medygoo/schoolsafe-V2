@@ -169,6 +169,11 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - QR code au scan (signé) : `schoolsafe://student/{matricule}/{YYYYMMDD}/{sig8}` avec HMAC-SHA256.
 - Processus de production : aperçu recto/verso → capture html2canvas scale 2 → assemblage recto+verso → upload Supabase Storage (`photos/cards/`) → marquage élève `card_printed`, `card_print_date`, `card_print_count`.
 - Duplicata géré avec tampon `DUPLICATA` et incrément du compteur.
+- **La création de cartes est déjà fonctionnelle et terminée dans zalavrai** ; il ne s'agit pas de la réinventer, mais de la brancher proprement dans V2.
+- **V2 possède déjà deux systèmes de scan** :
+  - scan pour contrôle de frais ;
+  - scan pour contrôle d'arrivée et de sortie de classe.
+- **Question d'architecture ouverte** : la production de cartes doit-elle vivre dans SchoolSafe V2 ou dans l'application de gestion centrale ?
 - Données d'entrée identifiées : élève, classe/cycle, école, année scolaire, personne autorisée, logo école.
 - Sorties : PNG recto+verso, impression navigateur (PDF via print), liste de distribution classe.
 
@@ -228,12 +233,14 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Questions en attente de réponse du propriétaire
 
-1. **zalavrai est-il le système définitif** ou juste un exemple de référence ?
-2. **Le code source est-il disponible localement** (fichiers séparés, non le HTML monolithique) ?
-3. **Faut-il continuer à produire les cartes dans zalavrai** (iframe/external link) ou **les intégrer directement dans V2** ?
-4. **Le format du QR code** `schoolsafe://student/{matricule}` doit-il être conservé tel quel ?
-5. Le scanneur d'entrée/sortie actuel utilise un **QR signé** (`/{YYYYMMDD}/{sig8}`). Faut-il conserver cette signature dans V2 ?
-6. Les **patrimoines visuels** (60 images `patrimoine/{v}.png`) sont-ils disponibles séparément ou doivent-ils être extraits de zalavrai ?
+1. **Emplacement de la production de cartes** : dans SchoolSafe V2 (application de l'école) ou dans l'**application de gestion centrale** ?
+2. Qu'appelles-tu exactement par **application de gestion** : l'app de contrôle des tokens d'instance, une app multi-école, ou autre chose ?
+3. **Qui produit physiquement les cartes** ? L'école elle-même (admin/secretariat depuis son V2), ou toi depuis l'app de gestion ?
+4. **zalavrai est-il le système définitif** ou juste un exemple de référence ?
+5. **Le code source est-il disponible localement** (fichiers séparés, non le HTML monolithique) ?
+6. **Le format du QR code** `schoolsafe://student/{matricule}` doit-il être conservé tel quel ?
+7. Le scanneur d'entrée/sortie actuel utilise un **QR signé** (`/{YYYYMMDD}/{sig8}`). Faut-il conserver cette signature dans V2 ?
+8. Les **patrimoines visuels** (60 images `patrimoine/{v}.png`) sont-ils disponibles séparément ou doivent-ils être extraits de zalavrai ?
 
 ---
 
@@ -263,12 +270,13 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Prochaines étapes logiques
 
-1. Obtenir les réponses du propriétaire aux 6 questions ci-dessus.
-2. Choisir l'option d'intégration.
-3. Documenter l'interface d'entrée/sortie du système de cartes.
-4. Créer l'adaptateur versionné.
-5. Capturer des exemples de référence et écrire les tests de contrat.
-6. Passer à l'application de contrôle centrale.
+1. Répondre à la question principale : production de cartes dans V2 ou dans l'application de gestion ?
+2. Clarifier qui produit les cartes et ce qu'est exactement l'application de gestion.
+3. Choisir l'option technique d'intégration (front, VPS headless, iframe, service interne).
+4. Documenter l'interface d'entrée/sortie du système de cartes.
+5. Créer l'adaptateur versionné.
+6. Capturer des exemples de référence et écrire les tests de contrat.
+7. Passer à l'application de contrôle centrale.
 
 ---
 
@@ -355,12 +363,13 @@ Le fichier a été téléchargé localement sous `analysis/zalavrai.html` et dé
 ### Ce que j'étais en train de faire
 
 - Documenter l'analyse dans `PROJECT-CONTINUITY.md`.
-- Préparer les options d'intégration et les questions de décision pour le propriétaire.
+- Intégrer les nouvelles informations : création de cartes déjà finie dans zalavrai, deux scanners déjà dans V2.
+- Préparer les options d'intégration et les questions de décision pour le propriétaire, en particulier sur l'emplacement (V2 vs app de gestion).
 
 ### Prochaine action
 
 1. Commiter la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Poser au propriétaire les 6 questions de décision sur l'intégration des cartes.
+2. Poser au propriétaire les questions de décision, en commençant par l'emplacement de la production de cartes.
 3. Selon sa réponse, concevoir l'adaptateur versionné approprié.
 
 ### Commandes/tests restants
@@ -384,4 +393,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026 — après analyse complète du système de cartes zalavrai.*
+*Dernière mise à jour : 16 août 2026 — après clarification sur les scanners existants et l'emplacement de la production de cartes.*
