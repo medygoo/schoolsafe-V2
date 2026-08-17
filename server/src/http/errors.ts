@@ -10,6 +10,7 @@ export type ApiErrorCode =
   | "SETUP_TOKEN_INVALID"
   | "SETUP_SCHOOL_FAILED"
   | "SETUP_ADMIN_FAILED"
+  | "SCHOOL_NOT_FOUND"
   | "INTERNAL_ERROR";
 
 export type ApiErrorBody = {

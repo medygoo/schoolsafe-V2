@@ -12,6 +12,7 @@ import { registerDashboardRoutes, type DashboardRouteDependencies } from "./pilo
 import { registerEmailRoutes, type EmailRouteDependencies } from "./email/routes.js";
 import { registerFeeControlRoutes, type FeeControlRouteDependencies } from "./finance/control/routes.js";
 import { registerPedagogyRoutes, type PedagogyRouteDependencies } from "./pedagogy/routes.js";
+import { registerSchoolRoutes, type SchoolRouteDependencies } from "./school/routes.js";
 import { requirePermission } from "./access/guard.js";
 import type { AccessService } from "./access/service.js";
 
@@ -27,6 +28,7 @@ export type BuildAppOptions = {
   email?: EmailRouteDependencies;
   feeControl?: FeeControlRouteDependencies;
   pedagogy?: PedagogyRouteDependencies;
+  school?: SchoolRouteDependencies;
   access?: AccessService;
 };
 
@@ -105,6 +107,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.pedagogy) {
     registerPedagogyRoutes(app, options.pedagogy);
+  }
+
+  if (options.school) {
+    registerSchoolRoutes(app, options.school);
   }
 
   if (options.testRoutes) {

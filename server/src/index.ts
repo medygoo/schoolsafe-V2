@@ -11,6 +11,7 @@ import { createDashboardService } from "./pilotage/dashboard/service.js";
 import { createBrevoEmailService, createNoopEmailService } from "./email/service.js";
 import { createFeeControlService } from "./finance/control/service.js";
 import { createPedagogyService } from "./pedagogy/service.js";
+import { createSchoolService } from "./school/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
 
 const env = parseEnv(process.env);
@@ -64,6 +65,10 @@ const feeControlService = env.SUPABASE_SERVICE_ROLE_KEY
 
 const pedagogyService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createPedagogyService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  : undefined;
+
+const schoolService = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createSchoolService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, env.DEFAULT_STAFF_PASSWORD ?? "SchoolSafe2026!")
   : undefined;
 
 const app = buildApp({
@@ -121,6 +126,13 @@ const app = buildApp({
   pedagogy: pedagogyService
     ? {
         service: pedagogyService,
+        resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        access: accessService,
+      }
+    : undefined,
+  school: schoolService
+    ? {
+        service: schoolService,
         resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
       }

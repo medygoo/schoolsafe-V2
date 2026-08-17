@@ -162,6 +162,20 @@ Nouvelle feuille de route technique validée (20 phases). Nous sommes en **Phase
 - RLS activées sur les trois nouvelles tables.
 - Pas encore de code serveur ; la Phase 3 implémentera le `NotificationService`.
 
+### Backend École & Personnel
+
+- Décision validée via Impeccable `shape` : espace admin principal avec deux onglets — **Mon école** et **Mon équipe**.
+- Backend créé dans `server/src/school/` :
+  - `schema.ts` : `updateSchoolSettingsSchema`, `inviteStaffSchema`, `updateStaffRolesSchema`, `toggleStaffActiveSchema`.
+  - `service.ts` : `createSchoolService` avec `getSettings`, `updateSettings`, `listStaff`, `inviteStaff`, `updateStaffRoles`, `toggleStaffActive`, `listRoles`, `listPermissions`.
+  - `routes.ts` : endpoints `/school/settings`, `/school/staff`, `/school/staff/invite`, `/school/staff/:id/roles`, `/school/staff/:id/toggle`, `/school/roles`, `/school/permissions`.
+- Intégration dans `server/src/app.ts` et `server/src/index.ts`.
+- Variable d'environnement `DEFAULT_STAFF_PASSWORD` ajoutée dans `server/src/config/env.ts`.
+- Code d'erreur `SCHOOL_NOT_FOUND` ajouté dans `server/src/http/errors.ts`.
+- Permissions ajoutées à `shared/permissions.json` : `school.manage`, `staff.manage`, `roles.manage`.
+- Tests créés dans `server/tests/school.test.ts` : 9 tests, tous verts.
+- Vérifications : `npm run typecheck` ✅ et `npm test` ✅ 67/67.
+
 ### Étape 2 — Configuration mono-école
 
 - Schéma Supabase étendu (`schools`, `academic_years`, `school_cycles`, `school_contacts`, `profiles`).
@@ -506,6 +520,7 @@ Nouvelle feuille de route technique validée (20 phases). Nous sommes en **Phase
 
 - Phase 1 (audit PostgreSQL) : terminée et documentée.
 - Phase 2 (migrations SQL) : migrations `system_events`, `notifications`, `notification_templates`, `data_retention_policies` créées.
+- Backend **École & Personnel** : routes, service, schémas, permissions, tests créés et verts (67/67).
 - `PROJECT-CONTINUITY.md` en cours de synchronisation.
 
 ### Fichiers concernés
@@ -515,13 +530,22 @@ Nouvelle feuille de route technique validée (20 phases). Nous sommes en **Phase
 - `supabase/migrations/202608180001_system_events.sql`
 - `supabase/migrations/202608180002_notification_service.sql`
 - `supabase/migrations/202608180003_data_retention_policies.sql`
-- (à venir) `server/src/events/`, `server/src/notifications/`
+- `server/src/school/schema.ts`
+- `server/src/school/service.ts`
+- `server/src/school/routes.ts`
+- `server/src/app.ts`
+- `server/src/index.ts`
+- `server/src/config/env.ts`
+- `server/src/http/errors.ts`
+- `server/tests/school.test.ts`
+- `shared/permissions.json`
+- (à venir) `app/modules/school/` (frontend PWA)
 
 ### Prochaine action immédiate
 
-1. Commiter et pousser les migrations Phase 2.
-2. Implémenter le `NotificationService` côté serveur avec abstraction `EmailProvider` (Brevo) et `SmsProvider`.
-3. Brancher les événements QR (entrée/sortie/refus) sur `system_events` sans attendre Brevo.
+1. Commiter et pousser le backend École & Personnel.
+2. Créer le frontend PWA `app/modules/school/` (onglets Mon école / Mon équipe).
+3. Puis reprendre Phase 3 technique : `NotificationService` + Brevo provider + abstraction SMS.
 
 ---
 
@@ -552,14 +576,15 @@ Nouvelle feuille de route technique validée (20 phases). Nous sommes en **Phase
 
 ### Prochaines étapes logiques
 
-1. Phase 3 technique : implémenter NotificationService + Brevo provider + abstraction SMS.
-2. Phase 4 technique : brancher QR/présence/sorties sur le système d'événements (pas d'appel direct Brevo).
-3. Pédagogie Phase 2 : connecter publication des devoirs/cotations et vue parent.
-4. Pédagogie Phase 3 : spécifier puis implémenter le moteur de calcul des moyennes et bulletins.
-5. Notifications push/Web Push pour les alertes de sécurité.
-6. Module Approbations (workflow transactionnel avec audit).
-7. Snapshots historiques et tendances Pilotage.
-6. Gestion avancée du double rôle (affichage contextuel par module).
+1. Frontend École & Personnel dans `app/modules/school/`.
+2. Phase 3 technique : implémenter NotificationService + Brevo provider + abstraction SMS.
+3. Phase 4 technique : brancher QR/présence/sorties sur le système d'événements (pas d'appel direct Brevo).
+4. Pédagogie Phase 2 : connecter publication des devoirs/cotations et vue parent.
+5. Pédagogie Phase 3 : spécifier puis implémenter le moteur de calcul des moyennes et bulletins.
+6. Notifications push/Web Push pour les alertes de sécurité.
+7. Module Approbations (workflow transactionnel avec audit).
+8. Snapshots historiques et tendances Pilotage.
+9. Gestion avancée du double rôle (affichage contextuel par module).
 
 ---
 

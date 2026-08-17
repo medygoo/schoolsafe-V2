@@ -18,7 +18,8 @@ const envSchema = z.object({
   CARD_HMAC_SECRET: z.string().min(1).optional(),
   BREVO_API_KEY: z.string().min(1).optional(),
   BREVO_SENDER_EMAIL: z.string().email().optional(),
-  VAPID_PRIVATE_KEY: z.string().min(1).optional()
+  VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+  DEFAULT_STAFF_PASSWORD: z.string().min(8).default("SchoolSafe2026!"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
