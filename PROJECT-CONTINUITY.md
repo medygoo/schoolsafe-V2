@@ -393,7 +393,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Améliorations prévues
 
-- Gestion du double role (enseignant + parent) : union des permissions et des perimetres cote front et API.
+- Gestion avancee du double role : affichage contextuel par module (enseignant vs parent), filtrage des actions selon le contexte.
 - Tests de contrat pour l'adaptateur cartes.
 - Documentation de l'interface du systeme de cartes.
 - Gestion des duplicatas et de l'historique d'impression.
