@@ -18,6 +18,7 @@ app/.runtime/*
 app/qa-output/
 app/output/
 app/tmp/
+tmp/
 playwright-report/
 test-results/
 

@@ -10,10 +10,14 @@
   <link rel="apple-touch-icon" href="./schoolsafe-logo.png">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./modules/cards/assets/cards.css">
   <script src="./lucide.min.js" defer></script>
   <script src="./jspdf.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
   <script src="./i18n.js" defer></script>
   <script src="./offline-sync.js" defer></script>
+  <script type="module" src="./modules/cards/cards-module.js"></script>
   <script src="./app.js" defer></script>
 </head>
 <body>
@@ -192,6 +196,7 @@
         <nav class="workspace-nav" id="workspaceNav" aria-label="Navigation principale">
           <button class="active" type="button"><i data-lucide="layout-dashboard"></i><span>Tableau de bord</span></button>
           <button type="button"><i data-lucide="users-round"></i><span>Élèves</span></button>
+          <button type="button" id="navCards"><i data-lucide="credit-card"></i><span>Cartes élèves</span></button>
           <button type="button"><i data-lucide="shield-check"></i><span>Sécurité et accès</span></button>
           <button type="button"><i data-lucide="book-open-check"></i><span>Pédagogie</span></button>
           <button type="button"><i data-lucide="wallet-cards"></i><span>Finances</span></button>
@@ -294,6 +299,36 @@
                 <section class="access-data-policy" id="accessDataPolicy" hidden></section>
                 <div class="permission-tree" id="permissionTree"></div>
                 <footer class="permission-actions"><span><i data-lucide="info"></i> Démonstration locale uniquement</span><button class="primary-button dark" id="savePermissions" type="button"><i data-lucide="save"></i> Enregistrer le brouillon</button></footer>
+              </div>
+            </div>
+          </section>
+          <section class="cards-studio" id="cardsStudio" hidden>
+            <header class="cards-studio-header">
+              <button class="secondary-button" id="closeCardsStudio" type="button"><i data-lucide="arrow-left"></i> Tableau de bord</button>
+              <div><span>Production de cartes</span><h2>Cartes élèves SchoolSafe</h2><p>Sélectionnez une classe puis un élève, vérifiez l'aperçu et demandez l'impression.</p></div>
+            </header>
+            <div class="cards-studio-layout">
+              <aside class="cards-studio-panel">
+                <label for="cardsClassSelect">Classe</label>
+                <select id="cardsClassSelect"><option value="">Choisir une classe</option></select>
+                <label for="cardsStudentSelect">Élève</label>
+                <select id="cardsStudentSelect" disabled><option value="">Choisir un élève</option></select>
+                <label for="cardsPatStyle">Style du patrimoine</label>
+                <select id="cardsPatStyle">
+                  <option value="vignette">Vignette</option>
+                  <option value="fond">Fond</option>
+                  <option value="both" selected>Vignette + Fond</option>
+                </select>
+                <div class="cards-actions">
+                  <button class="primary-button dark" id="cardsRenderBtn" type="button" disabled><i data-lucide="eye"></i> Générer l'aperçu</button>
+                  <button class="primary-button" id="cardsRequestPrintBtn" type="button" disabled><i data-lucide="send"></i> Demander l'impression</button>
+                </div>
+                <div class="cards-status" id="cardsStatus"></div>
+              </aside>
+              <div class="cards-preview-wrap">
+                <div id="cardsPreview" class="ss-card-studio">
+                  <div style="text-align:center;padding:40px;color:#888;font-size:13px">Sélectionnez une classe et un élève, puis générez l'aperçu.</div>
+                </div>
               </div>
             </div>
           </section>

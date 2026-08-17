@@ -27,8 +27,8 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 ### Priorités actuelles
 
 1. Terminer et valider l'Étape 2 — Configuration mono-école (**FAIT**).
-2. Étudier et intégrer la production de cartes élèves (**EN COURS**).
-3. Construire l'application de contrôle centrale des tokens d'instance.
+2. Intégrer la production de cartes élèves dans V2 (**FAIT**).
+3. Construire l'application de contrôle centrale des tokens d'instance (**EN COURS**).
 4. Rédiger la fiche de lancement de l'application.
 
 ---
@@ -201,6 +201,22 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Tests unitaires : 8/8 passent (`npm test` dans `control-app/`).
 - Serveur lancé localement sur `http://127.0.0.1:4176` ; smoke test réussi (création d'instance + réception HMAC d'une demande de carte).
 
+### Intégration front du moteur de cartes dans V2
+
+- Module ES réutilisable créé : `app/modules/cards/card-renderer.js` (exporte `renderCardPreview`, `captureCardPng`, `ssClassType`, etc.).
+- Module d'intégration workspace créé : `app/modules/cards/cards-module.js` :
+  - charge les classes et élèves depuis Supabase ;
+  - adapte les données V2 au format du moteur historique ;
+  - affiche l'aperçu recto/verso avec les couleurs/patrimoines par classe ;
+  - capture les images PNG via `html2canvas` ;
+  - envoie la demande d'impression au VPS via `POST /cards/request-print`.
+- `app/index.html` : bouton "Cartes élèves" dans la sidebar, section `<section id="cardsStudio">`, chargement des libs et du module.
+- `app/app.js` : appel de `window.SchoolSafeCards.init()` dans `renderWorkspace()`.
+- `app/modules/cards/assets/cards.css` : styles du studio de production de cartes ajoutés.
+- Tests visuels automatisés :
+  - `app/modules/cards/test-card.html` : rendu badge + carte validé par capture Playwright ;
+  - intégration V2 : le studio s'affiche correctement dans le workspace.
+
 ### Connexion V2 → app centrale pour les cartes
 
 - Endpoint VPS créé : `POST /cards/request-print` dans `server/src/cards/routes.ts`.
@@ -246,6 +262,8 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - `app/modules/cards/assets/cards.css`
 - `app/modules/cards/assets/card-data.js`
 - `app/modules/cards/assets/patrimoine/*.png`
+- `app/modules/cards/card-renderer.js`
+- `app/modules/cards/cards-module.js`
 - `app/modules/cards/test-card.html`
 - `control-app/package.json`
 - `control-app/tsconfig.json`
@@ -279,10 +297,11 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Connexion SchoolSafe V2 → app centrale terminée côté VPS** : endpoint `/cards/request-print` créé, service de push HMAC implémenté, tests passants. Prochaine étape : intégrer le moteur de cartes dans le front PWA pour générer et envoyer les images.
+**Intégration du moteur de cartes dans le front PWA terminée** : sélection classe/élève, aperçu recto/verso, capture PNG, envoi au VPS via `POST /cards/request-print`. Tests visuels passants. Prochaine étape : finaliser l'application de contrôle centrale des tokens d'instance et rédiger la fiche de lancement.
 
 ### État d'avancement
 
+- Intégration front du moteur de cartes terminée et testée visuellement.
 - Fichier complet téléchargé localement : `analysis/zalavrai.html` (~2,2 Mo).
 - Analyse technique complète réalisée (section détaillée ci-dessous).
 - Architecture des cartes verrouillée :
@@ -463,8 +482,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Fonctionnalités non terminées
 
-- Intégration concrète de la production de cartes dans SchoolSafe V2.
-- Application de contrôle centrale.
+- Application de contrôle centrale (finalisation du tableau de bord et des actions opérateur).
 - Fiche de lancement.
 - Gestion du double rôle (enseignant + parent).
 
@@ -485,15 +503,14 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Prochaines étapes logiques
 
-1. Valider le rendu visuel via `app/modules/cards/test-card.html`.
-2. Répondre aux questions en attente sur l'application de contrôle des tokens.
-3. Créer le squelette de l'application de contrôle des tokens (`control-app/`).
-4. Implémenter la génération/révocation de tokens d'instance.
-5. Implémenter le endpoint de réception des demandes d'impression de cartes.
-6. Connecter V2 à l'app centrale pour l'envoi des demandes.
-7. Documenter l'interface d'entrée/sortie du système de cartes.
-8. Créer l'adaptateur versionné avec tests de contrat.
-9. Rédiger la fiche de lancement de l'application.
+1. Finaliser l'application de contrôle centrale (`control-app/`) :
+   - tableau de bord des demandes d'impression reçues ;
+   - actions "Marquer comme imprimée" / "Échec" ;
+   - génération/révocation des tokens d'instance et blocage d'instance.
+2. Connecter V2 à l'app centrale pour l'envoi des demandes (côté front et VPS déjà prêt).
+3. Documenter l'interface d'entrée/sortie du système de cartes.
+4. Créer l'adaptateur versionné avec tests de contrat.
+5. Rédiger la fiche de lancement de l'application.
 
 ---
 
@@ -507,6 +524,8 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
   - `styles.css` : styles
   - `i18n.js` : internationalisation
   - `offline-sync.js` : synchronisation hors connexion
+  - `modules/cards/cards-module.js` : studio de production de cartes élèves
+  - `modules/cards/card-renderer.js` : moteur de rendu des cartes (badge + carte PVC)
 - Serveur local `app/server.mjs` sur `127.0.0.1:4175`.
 
 ### Backend
@@ -543,6 +562,7 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 - `POST /setup/school` : création de l'école.
 - `POST /setup/admin` : création de l'administrateur.
 - `POST /auth/lookup-phone` : recherche d'e-mail par téléphone.
+- `POST /cards/request-print` : réception d'une demande d'impression de carte, upload R2, push HMAC vers l'app centrale.
 
 ### RLS et permissions
 
@@ -574,27 +594,26 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Connexion V2 → app centrale terminée côté VPS. Endpoint `/cards/request-print` fonctionnel, service `CardService` opérationnel, tests serveur 31/31 passants.
+Intégration du moteur de cartes dans le front PWA terminée. Le studio de cartes est accessible depuis le workspace, les aperçus recto/verso sont générés, et la demande d'impression est envoyée au VPS via `POST /cards/request-print`.
 
 ### Ce que j'étais en train de faire
 
-- Créer `server/src/cards/service.ts` pour orchestrer upload R2, enregistrement base et push HMAC.
-- Créer `server/src/cards/routes.ts` et `server/src/cards/schema.ts`.
-- Créer `server/src/control-app/client.ts` pour signer et pousser les demandes.
-- Créer `server/src/storage/r2.ts` pour uploader dans R2.
-- Ajouter les variables d'environnement dans `server/src/config/env.ts`.
-- Connecter les routes dans `server/src/app.ts` et `server/src/index.ts`.
-- Écrire les tests unitaires (`server/tests/cards.test.ts`).
+- Créer `app/modules/cards/card-renderer.js` à partir du moteur historique.
+- Créer `app/modules/cards/cards-module.js` pour le studio de cartes dans V2.
+- Modifier `app/index.html` pour ajouter le bouton "Cartes élèves" et la section `#cardsStudio`.
+- Modifier `app/app.js` pour appeler `window.SchoolSafeCards.init()` dans `renderWorkspace()`.
+- Ajouter les styles du studio dans `app/modules/cards/assets/cards.css`.
+- Tester visuellement avec Playwright (`test-card.html` + intégration V2).
 - Mettre à jour `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
-1. Commiter les modifications de `server/` et `PROJECT-CONTINUITY.md`.
-2. Intégrer le moteur de cartes dans le front PWA (`app/app.js`) :
-   - sélection d'un élève / d'une classe ;
-   - aperçu recto/verso ;
-   - capture PNG via html2canvas ;
-   - appel de `POST /cards/request-print` sur le VPS.
+1. Commiter et pousser les modifications sur `origin/main`.
+2. Finaliser l'application de contrôle centrale (`control-app/`) :
+   - tableau de bord des demandes d'impression ;
+   - actions opérateur (imprimée / échec) ;
+   - gestion des tokens d'instance (générer, révoquer, bloquer).
+3. Rédiger la fiche de lancement de l'application.
 
 ### Commandes/tests restants
 
@@ -603,6 +622,7 @@ Connexion V2 → app centrale terminée côté VPS. Endpoint `/cards/request-pri
 - `cd server && npm test` (à relancer après chaque modification serveur).
 - `node tests/qa-permanent-preview.cjs` (à relancer après chaque modification front).
 - Ouvrir `http://127.0.0.1:4175/modules/cards/test-card.html` pour validation visuelle.
+- Ouvrir `http://127.0.0.1:4175/` pour tester le parcours workspace → Cartes élèves.
 
 ---
 
@@ -620,4 +640,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026 — extraction des assets et complément du schéma design terminés.*
+*Dernière mise à jour : 16 août 2026 — intégration du moteur de cartes dans le front PWA terminée et testée visuellement.*

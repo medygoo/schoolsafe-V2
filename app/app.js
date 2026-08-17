@@ -64,6 +64,7 @@
       var res = await fetch(apiBase + "/config", { method: "GET", headers: { Accept: "application/json" } });
       if (!res.ok) return null;
       backendConfig = await res.json();
+      window.schoolSafeBackendConfig = backendConfig;
       return backendConfig;
     } catch (e) {
       return null;
@@ -1797,6 +1798,7 @@
       });
     });
     icons();
+    if (window.SchoolSafeCards) window.SchoolSafeCards.init();
   }
 
   function populateRoleSelect(select, value) {

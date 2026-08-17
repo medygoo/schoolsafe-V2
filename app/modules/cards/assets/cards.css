@@ -209,3 +209,28 @@
 
 /* Tampon DUPLICATA */
 .ss-duplicata-stamp{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-28deg);z-index:100;border:4px solid rgba(196,22,22,.82);color:rgba(196,22,22,.82);font-family:'Baloo 2',cursive;font-size:30px;font-weight:900;letter-spacing:4px;padding:7px 18px;border-radius:8px;pointer-events:none;background:rgba(255,255,255,.15);backdrop-filter:blur(1px);white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.12)}
+
+/* === Cards Studio layout (V2 workspace) === */
+.cards-studio{position:fixed;inset:0;z-index:100;background:#f6f7fb;display:flex;flex-direction:column;overflow:hidden}
+.cards-studio-header{flex:none;display:flex;align-items:center;gap:18px;padding:16px 22px;background:#fff;border-bottom:1px solid #e5e8eb;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.cards-studio-header button{white-space:nowrap}
+.cards-studio-header div{flex:1;min-width:0}
+.cards-studio-header div>span{display:block;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#6b7280}
+.cards-studio-header h2{margin:2px 0 0;font-size:22px;font-weight:800;color:#111827;line-height:1.2}
+.cards-studio-header p{margin:4px 0 0;font-size:13px;color:#4b5563;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cards-studio-layout{flex:1;display:flex;min-height:0;overflow:hidden}
+.cards-studio-panel{flex:none;width:320px;background:#fff;border-right:1px solid #e5e8eb;padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.cards-studio-panel label{font-size:12px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:.6px}
+.cards-studio-panel select{width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;color:#111827;outline:none}
+.cards-studio-panel select:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.cards-studio-panel select:disabled{background:#f3f4f6;color:#9ca3af}
+.cards-preview-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto;background:linear-gradient(135deg,#f0f2f7,#e8ebf3)}
+.cards-preview-wrap .ss-card-studio{transform-origin:center top}
+.cards-actions{display:flex;flex-direction:column;gap:10px;margin-top:auto;padding-top:8px}
+.cards-actions button{width:100%;justify-content:center}
+.cards-status{font-size:13px;font-weight:700;line-height:1.4;min-height:40px;padding:10px 12px;border-radius:10px;background:#f3f4f6;color:#374151}
+@media(max-width:900px){
+  .cards-studio-layout{flex-direction:column}
+  .cards-studio-panel{width:100%;border-right:none;border-bottom:1px solid #e5e8eb;max-height:45vh}
+  .cards-preview-wrap{padding:16px;align-items:flex-start}
+}
