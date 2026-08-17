@@ -45,21 +45,41 @@ export function createBootstrapService(
           ) ?? []) as Array<{ id: string; code: string }> )
         : [];
 
-      const grants = roleIds.length
-        ? ((assertQuery(
-            await client
-              .from("role_permission_grants")
-              .select("permission_id")
-              .in("role_id", roleIds)
-              .eq("allowed", true),
-            "role_permission_grants",
-          ) ?? []) as Array<{ permission_id: string }> )
-        : [];
-      const permissionIds = [...new Set(grants.map((row) => row.permission_id))];
+      const [allowedGrants, deniedGrants] = roleIds.length
+        ? await Promise.all([
+            assertQuery(
+              await client
+                .from("role_permission_grants")
+                .select("permission_id")
+                .in("role_id", roleIds)
+                .eq("allowed", true),
+              "role_permission_grants_allowed",
+            ) ?? [],
+            assertQuery(
+              await client
+                .from("role_permission_grants")
+                .select("permission_id")
+                .in("role_id", roleIds)
+                .eq("allowed", false),
+              "role_permission_grants_denied",
+            ) ?? [],
+          ])
+        : [[], []];
 
-      const permissions = permissionIds.length
+      const deniedPermissionIds = new Set(
+        (deniedGrants as Array<{ permission_id: string }>).map((row) => row.permission_id),
+      );
+      const effectivePermissionIds = [
+        ...new Set(
+          (allowedGrants as Array<{ permission_id: string }>)
+            .map((row) => row.permission_id)
+            .filter((id) => !deniedPermissionIds.has(id)),
+        ),
+      ];
+
+      const permissions = effectivePermissionIds.length
         ? ((assertQuery(
-            await client.from("permissions").select("id,code").in("id", permissionIds),
+            await client.from("permissions").select("id,code").in("id", effectivePermissionIds),
             "permissions",
           ) ?? []) as Array<{ id: string; code: string }> )
         : [];

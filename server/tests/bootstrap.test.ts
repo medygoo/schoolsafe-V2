@@ -84,4 +84,41 @@ describe("POST /session/bootstrap", () => {
     expect(JSON.stringify(response.json())).not.toContain("expired-token");
     await app.close();
   });
+
+  it("returns all roles, effective permissions and scopes for a multi-role user", async () => {
+    const multiRoleBootstrap = {
+      contract_version: "1" as const,
+      profile: { id: "profile-multi", display_name: "Multi Role Test" },
+      roles: ["parent", "teacher"],
+      permissions: ["school.student.read", "pedagogy.grade.read"],
+      scopes: [
+        { type: "school", id: "school-1", label: "Test school" },
+        { type: "parent_of", id: "student-1", label: "Lucas Martin" },
+      ],
+      school: { id: "school-1", name: "Test school" },
+      academic_year: null,
+      features: [],
+      offline_policy: { max_offline_hours: 24 },
+    };
+
+    const app = Fastify();
+    registerBootstrapRoutes(app, {
+      authVerifier: verifier({ userId: "auth-multi-role" }),
+      service: { load: vi.fn().mockResolvedValue(multiRoleBootstrap) },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/session/bootstrap",
+      headers: { authorization: "Bearer signed-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.roles).toEqual(["parent", "teacher"]);
+    expect(body.permissions).toContain("school.student.read");
+    expect(body.permissions).toContain("pedagogy.grade.read");
+    expect(body.scopes).toHaveLength(2);
+    await app.close();
+  });
 });

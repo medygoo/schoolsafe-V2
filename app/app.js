@@ -118,6 +118,8 @@
     if (!bootstrap || !bootstrap.profile || !bootstrap.roles || !bootstrap.roles.length) {
       throw new Error("Profil incomplet");
     }
+    var savedActiveRole = storageGet("schoolsafe-v2-active-role");
+    var activeRole = bootstrap.roles.indexOf(savedActiveRole) >= 0 ? savedActiveRole : bootstrap.roles[0];
     var session = {
       token: currentSession && currentSession.token ? currentSession.token : null,
       profile: bootstrap.profile,
@@ -128,14 +130,15 @@
       offline_policy: bootstrap.offline_policy || { max_offline_hours: 24 }
     };
     storeSession(session);
+    storageSet("schoolsafe-v2-active-role", activeRole);
     document.getElementById("workspaceProfileName").textContent = bootstrap.profile.display_name || "";
     document.getElementById("workspaceInitials").textContent = initialsFromName(bootstrap.profile.display_name || "SchoolSafe");
     document.getElementById("workspaceSchoolName").textContent = bootstrap.school ? bootstrap.school.name : "Configuration en cours";
-    document.getElementById("workspaceRole").textContent = roleCatalog[bootstrap.roles[0]] ? roleCatalog[bootstrap.roles[0]].label : bootstrap.roles[0];
-    document.getElementById("statusRole").textContent = roleCatalog[bootstrap.roles[0]] ? roleCatalog[bootstrap.roles[0]].label : bootstrap.roles[0];
+    document.getElementById("workspaceRole").textContent = roleCatalog[activeRole] ? roleCatalog[activeRole].label : activeRole;
+    document.getElementById("statusRole").textContent = roleCatalog[activeRole] ? roleCatalog[activeRole].label : activeRole;
     document.getElementById("statusScope").textContent = scopeSummary(session);
     document.getElementById("syncStatusDetail").textContent = "Connecté · " + (bootstrap.school ? bootstrap.school.name : "école");
-    renderWorkspace(bootstrap.roles[0]);
+    renderWorkspace(activeRole);
   }
 
   function initialsFromName(name) {
@@ -1694,9 +1697,13 @@
     }).join("");
 
     var roleSwitch = document.getElementById("workspaceRoleSwitch");
-    roleSwitch.innerHTML = Array.prototype.map.call(document.getElementById("demoRole").options, function (option) {
-      return '<option value="' + option.value + '"' + (option.value === currentDemoRole ? " selected" : "") + ">" + option.textContent + "</option>";
+    var userRoles = (currentSession && currentSession.roles) || [currentDemoRole];
+    roleSwitch.innerHTML = userRoles.map(function (role) {
+      var label = roleCatalog[role] ? roleCatalog[role].label : role;
+      return '<option value="' + role + '"' + (role === currentDemoRole ? " selected" : "") + ">" + label + "</option>";
     }).join("");
+    roleSwitch.hidden = userRoles.length <= 1;
+    roleSwitch.disabled = userRoles.length <= 1;
 
     document.getElementById("workspaceNav").innerHTML = profile.branches.map(function (item, index) {
       var definition = branchDefinitions[item.key];
@@ -2096,6 +2103,7 @@
   });
   document.getElementById("workspaceRoleSwitch").addEventListener("change", function () {
     closeAccessConsole();
+    storageSet("schoolsafe-v2-active-role", this.value);
     renderWorkspace(this.value);
   });
   document.getElementById("permissionsNav").addEventListener("click", openAccessConsole);
