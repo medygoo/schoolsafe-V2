@@ -1,0 +1,235 @@
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { z } from "zod";
+import { SchoolSafeError } from "../http/errors.js";
+import { extractBearerToken } from "../auth/session.js";
+import type { PedagogyService } from "./service.js";
+import {
+  createSubjectSchema,
+  createTeacherAssignmentSchema,
+  createAssignmentSchema,
+  updateAssignmentSchema,
+  gradeInputSchema,
+  createLessonPlanSchema,
+  updateLessonPlanSchema,
+} from "./schema.js";
+import { requirePermission } from "../access/guard.js";
+import type { AccessService } from "../access/service.js";
+
+export type ResolveProfileAndSchool = (token: string) => Promise<{ profileId: string | null; schoolId: string | null }>;
+
+export type PedagogyRouteDependencies = {
+  service: PedagogyService;
+  resolveProfileAndSchool: ResolveProfileAndSchool;
+  access: AccessService;
+};
+
+async function authenticate(request: FastifyRequest, resolve: ResolveProfileAndSchool) {
+  let token: string;
+  try {
+    token = extractBearerToken(request.headers.authorization);
+  } catch {
+    throw new SchoolSafeError(401, "AUTH_REQUIRED", "Authentification requise", false);
+  }
+  const { profileId, schoolId } = await resolve(token);
+  if (!profileId || !schoolId) {
+    throw new SchoolSafeError(401, "AUTH_REQUIRED", "Profil ou école non trouvé", false);
+  }
+  return { profileId, schoolId };
+}
+
+function parseQuery(request: FastifyRequest): Record<string, string> {
+  return (request.query ?? {}) as Record<string, string>;
+}
+
+export function registerPedagogyRoutes(app: FastifyInstance, dependencies: PedagogyRouteDependencies): void {
+  // Subjects
+  app.get(
+    "/pedagogy/subjects",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.subject.read")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const result = await dependencies.service.listSubjects(schoolId);
+      return { data: result };
+    },
+  );
+
+  app.post(
+    "/pedagogy/subjects",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.subject.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const parsed = createSubjectSchema.parse(request.body);
+      const result = await dependencies.service.createSubject(schoolId, parsed);
+      return { data: result };
+    },
+  );
+
+  // Teacher assignments
+  app.get(
+    "/pedagogy/teacher-assignments",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.assignment.read")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const result = await dependencies.service.listTeacherAssignments(schoolId);
+      return { data: result };
+    },
+  );
+
+  app.post(
+    "/pedagogy/teacher-assignments",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.assignment.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const parsed = createTeacherAssignmentSchema.parse(request.body);
+      const result = await dependencies.service.createTeacherAssignment(schoolId, parsed);
+      return { data: result };
+    },
+  );
+
+  app.delete(
+    "/pedagogy/teacher-assignments/:id",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.assignment.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const { id } = request.params as { id: string };
+      await dependencies.service.deleteTeacherAssignment(schoolId, id);
+      return { success: true };
+    },
+  );
+
+  // Assignments
+  app.get(
+    "/pedagogy/assignments",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.assignment.read")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const query = parseQuery(request);
+      const result = await dependencies.service.listAssignments(schoolId, {
+        classId: query.class_id,
+        subjectId: query.subject_id,
+        teacherId: query.teacher_id,
+      });
+      return { data: result };
+    },
+  );
+
+  app.post(
+    "/pedagogy/assignments",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.assignment.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const parsed = createAssignmentSchema.parse(request.body);
+      const result = await dependencies.service.createAssignment(schoolId, profileId, parsed);
+      return { data: result };
+    },
+  );
+
+  app.patch(
+    "/pedagogy/assignments/:id",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.assignment.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const { id } = request.params as { id: string };
+      const parsed = updateAssignmentSchema.parse(request.body);
+      const result = await dependencies.service.updateAssignment(schoolId, profileId, id, parsed);
+      return { data: result };
+    },
+  );
+
+  app.post(
+    "/pedagogy/assignments/:id/publish",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.assignment.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const { id } = request.params as { id: string };
+      const result = await dependencies.service.publishAssignment(schoolId, profileId, id);
+      return { data: result };
+    },
+  );
+
+  // Grades
+  app.get(
+    "/pedagogy/assignments/:id/grades",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.grade.read")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const { id } = request.params as { id: string };
+      const result = await dependencies.service.getAssignmentGrades(schoolId, id);
+      return { data: result };
+    },
+  );
+
+  app.post(
+    "/pedagogy/assignments/:id/grades",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.grade.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const { id } = request.params as { id: string };
+      const body = request.body as Record<string, unknown>;
+      const grades = z.array(gradeInputSchema).parse(body.grades ?? []);
+      const result = await dependencies.service.saveGrades(schoolId, profileId, id, grades);
+      return { data: result };
+    },
+  );
+
+  app.post(
+    "/pedagogy/assignments/:id/grades/publish",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.grade.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const { id } = request.params as { id: string };
+      const result = await dependencies.service.publishGrades(schoolId, profileId, id);
+      return { data: result };
+    },
+  );
+
+  // Lesson plans
+  app.get(
+    "/pedagogy/lesson-plans",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.lesson-plan.read")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const query = parseQuery(request);
+      const result = await dependencies.service.listLessonPlans(schoolId, {
+        classId: query.class_id,
+        subjectId: query.subject_id,
+        teacherId: query.teacher_id,
+      });
+      return { data: result };
+    },
+  );
+
+  app.post(
+    "/pedagogy/lesson-plans",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.lesson-plan.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const parsed = createLessonPlanSchema.parse(request.body);
+      const result = await dependencies.service.createLessonPlan(schoolId, profileId, parsed);
+      return { data: result };
+    },
+  );
+
+  app.patch(
+    "/pedagogy/lesson-plans/:id",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.lesson-plan.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const { id } = request.params as { id: string };
+      const parsed = updateLessonPlanSchema.parse(request.body);
+      const result = await dependencies.service.updateLessonPlan(schoolId, profileId, id, parsed);
+      return { data: result };
+    },
+  );
+
+  app.delete(
+    "/pedagogy/lesson-plans/:id",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.lesson-plan.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const { id } = request.params as { id: string };
+      await dependencies.service.deleteLessonPlan(schoolId, id);
+      return { success: true };
+    },
+  );
+}
