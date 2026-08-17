@@ -11,6 +11,10 @@ const envSchema = z.object({
   R2_ENDPOINT: z.string().url().optional(),
   R2_ACCESS_KEY_ID: z.string().min(1).optional(),
   R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  R2_BUCKET_CARDS: z.string().min(1).default("cards"),
+  CONTROL_APP_URL: z.string().url().optional(),
+  CONTROL_APP_INSTANCE_ID: z.string().min(1).optional(),
+  CONTROL_APP_HMAC_SECRET: z.string().min(1).optional(),
   VAPID_PRIVATE_KEY: z.string().min(1).optional()
 });
 

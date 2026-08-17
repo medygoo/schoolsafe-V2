@@ -201,6 +201,26 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Tests unitaires : 8/8 passent (`npm test` dans `control-app/`).
 - Serveur lancé localement sur `http://127.0.0.1:4176` ; smoke test réussi (création d'instance + réception HMAC d'une demande de carte).
 
+### Connexion V2 → app centrale pour les cartes
+
+- Endpoint VPS créé : `POST /cards/request-print` dans `server/src/cards/routes.ts`.
+- Service `CardService` dans `server/src/cards/service.ts` :
+  - reçoit les images recto/verso en base64 du front PWA ;
+  - les upload dans R2 (`cards/{school_slug}/{année}/{matricule}/front.png` + `back.png`) ;
+  - génère des URLs signées valables 72h ;
+  - crée un enregistrement dans `card_print_requests` ;
+  - pousse la demande à l'app centrale via HMAC signé ;
+  - met à jour `students.card_printed`, `card_print_date`, `card_print_count`.
+- Client HMAC pour l'app centrale : `server/src/control-app/client.ts`.
+- Service R2 : `server/src/storage/r2.ts` avec `@aws-sdk/client-s3`.
+- Variables d'environnement ajoutées dans `server/src/config/env.ts` :
+  - `CONTROL_APP_URL`, `CONTROL_APP_INSTANCE_ID`, `CONTROL_APP_HMAC_SECRET` ;
+  - `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_CARDS`.
+- Authentification : la route vérifie le bearer token Supabase et résout le `profile_id`.
+- Validation Zod des entrées (`server/src/cards/schema.ts`).
+- Gestion des erreurs Zod transformée en `VALIDATION_INVALID` dans `server/src/app.ts`.
+- Tests serveur : 31/31 passent (`npm test` dans `server/`).
+
 ### Fichiers importants créés ou modifiés
 
 - `supabase/migrations/202608160001_step2_school_configuration.sql`
@@ -213,7 +233,14 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - `server/src/app.ts`
 - `server/src/index.ts`
 - `server/src/http/errors.ts`
+- `server/src/auth/profile.ts`
+- `server/src/cards/schema.ts`
+- `server/src/cards/service.ts`
+- `server/src/cards/routes.ts`
+- `server/src/control-app/client.ts`
+- `server/src/storage/r2.ts`
 - `server/tests/setup.test.ts`
+- `server/tests/cards.test.ts`
 - `app/app.js`
 - `app/index.html`
 - `app/modules/cards/assets/cards.css`
@@ -252,7 +279,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Application de contrôle des tokens d'instance** : squelette créé, routes implémentées, tests passants. Prochaine étape : connecter SchoolSafe V2 à l'app centrale pour l'envoi réel des demandes d'impression de cartes.
+**Connexion SchoolSafe V2 → app centrale terminée côté VPS** : endpoint `/cards/request-print` créé, service de push HMAC implémenté, tests passants. Prochaine étape : intégrer le moteur de cartes dans le front PWA pour générer et envoyer les images.
 
 ### État d'avancement
 
@@ -308,6 +335,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - données design dans `app/modules/cards/assets/card-data.js`.
 - **Test visuel créé** : `app/modules/cards/test-card.html` sert les cartes en local sur `http://127.0.0.1:4175/modules/cards/test-card.html`.
 - **Application de contrôle des tokens créée** : `control-app/` avec routes admin et HMAC, tests 8/8 passants.
+- **Connexion V2 → app centrale côté VPS** : endpoint `/cards/request-print` créé, push HMAC vers l'app centrale, tests serveur 31/31 passants.
 - Sorties : PNG recto+verso, impression navigateur (PDF via print), liste de distribution classe.
 
 ### Synthèse technique du système de cartes
@@ -546,22 +574,27 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Squelette fonctionnel de l'application de contrôle des tokens créé dans `control-app/`. Routes admin et HMAC implémentées, tests passants, smoke test réussi.
+Connexion V2 → app centrale terminée côté VPS. Endpoint `/cards/request-print` fonctionnel, service `CardService` opérationnel, tests serveur 31/31 passants.
 
 ### Ce que j'étais en train de faire
 
-- Créer `control-app/` avec Fastify + TypeScript + Vitest.
-- Implémenter `JsonStore`, `Instance`, `CardPrintRequest` et les routes associées.
-- Implémenter la vérification HMAC signée avec timestamp.
-- Écrire les tests unitaires (8/8 passants).
-- Corriger un problème d'encodage UTF-8 dans le smoke test curl.
+- Créer `server/src/cards/service.ts` pour orchestrer upload R2, enregistrement base et push HMAC.
+- Créer `server/src/cards/routes.ts` et `server/src/cards/schema.ts`.
+- Créer `server/src/control-app/client.ts` pour signer et pousser les demandes.
+- Créer `server/src/storage/r2.ts` pour uploader dans R2.
+- Ajouter les variables d'environnement dans `server/src/config/env.ts`.
+- Connecter les routes dans `server/src/app.ts` et `server/src/index.ts`.
+- Écrire les tests unitaires (`server/tests/cards.test.ts`).
 - Mettre à jour `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
-1. Commiter `control-app/` et `PROJECT-CONTINUITY.md`.
-2. Connecter SchoolSafe V2 à l'app centrale pour l'envoi des demandes d'impression.
-3. Implémenter le endpoint côté VPS école qui pousse les demandes vers l'app centrale.
+1. Commiter les modifications de `server/` et `PROJECT-CONTINUITY.md`.
+2. Intégrer le moteur de cartes dans le front PWA (`app/app.js`) :
+   - sélection d'un élève / d'une classe ;
+   - aperçu recto/verso ;
+   - capture PNG via html2canvas ;
+   - appel de `POST /cards/request-print` sur le VPS.
 
 ### Commandes/tests restants
 
