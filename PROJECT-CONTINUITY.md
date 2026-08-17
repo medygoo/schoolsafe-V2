@@ -403,9 +403,34 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Dépôt principal : `https://github.com/medygoo/schoolsafemm.git`
 - Dépôt app centrale : `https://github.com/medygoo/schoolsafe-control-.git`
 - Commits récents sur `schoolsafemm` :
-  - `e92810c feat(cards): batch student selection and send to control app`
-  - `13ccae0 feat(cards): batch card print with versioning and permission guard`
-  - `fa7fdee feat(access): permission guard with deny-override and scope check`
+  - `b472483 feat(finance): backend controle des frais par QR`
+  - `737399a feat(email): service d'envoi Brevo avec fallback noop`
+  - `cfc34e1 feat(pilotage): moteur d'alertes et tableau de bord`
+  - `171042f feat(security): backend scan QR, lockdown et routes securisees`
+  - `89093a6 feat(pilotage): migrations et decisions pour increment B`
+
+### Incrément B — Backend terminé
+
+- **Sécurité QR** (`server/src/security/`) :
+  - Vérification HMAC du QR `schoolsafe://card/{card_number}/{signature}`.
+  - Routes `POST /security/scan`, `POST /security/lockdown`, `GET /security/events`.
+  - Gestion du lockdown global par école.
+  - Création automatique d’alertes critiques sur sortie refusée et incident.
+- **Moteur d’alertes + Pilotage** (`server/src/pilotage/`) :
+  - Tables `alerts`, `alert_rules`, `alert_notifications` créées par migration.
+  - Routes `GET /pilotage/dashboard`, `GET /pilotage/alerts`, `POST /pilotage/alerts/:id/acknowledge`, `POST /pilotage/alerts/:id/resolve`.
+  - Déduplication via index unique partiel sur les alertes actives.
+- **Email Brevo** (`server/src/email/`) :
+  - Service `createBrevoEmailService` utilisant l’API Brevo v3 avec `fetch`.
+  - Fallback `createNoopEmailService` si `BREVO_API_KEY` n’est pas configuré.
+  - Route `POST /email/send` protégée par permission.
+- **Contrôle des frais par QR** (`server/src/finance/control/`) :
+  - Routes `/finance/fee-structures`, `/finance/student-fees`, `/finance/payments`, `/finance/fee-control/campaigns`, `/finance/fee-control/scans`.
+  - Création de campagnes avec assignation de contrôleurs.
+  - Scan QR pour vérifier le statut financier sans créer de paiement.
+- **Permissions** : toutes les permissions nécessaires ajoutées à `shared/permissions.json`.
+- **Variables d’environnement** : `CARD_HMAC_SECRET`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` ajoutées à `server/src/config/env.ts`.
+- **Tests serveur** : 58/58 passent.
 
 ---
 
@@ -413,36 +438,28 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Incrément B** : implémenter la sécurité QR, le moteur d’alertes et le contrôle des frais par QR.
+**Incrément B — Frontend** : connecter et adapter le front PWA pour le scan QR, les alertes et le contrôle des frais.
 
 ### État d'avancement
 
-- Plan unifié B validé avec le propriétaire.
-- Migrations SQL B1 (sécurité + alertes) et B2 (contrôle des frais) créées.
-- `PROJECT-CONTINUITY.md` en cours de synchronisation.
-- Backend sécurité / alertes / frais non encore implémenté.
+- Backend sécurité / alertes / email / contrôle des frais terminé et poussé sur `main`.
+- Front finance existe déjà en démo locale ; il doit être connecté au backend.
 - Front scan QR / alertes / contrôle frais non encore adapté.
 
 ### Fichiers concernés
 
-- `supabase/migrations/202608170003_security_and_alerts.sql`
-- `supabase/migrations/202608170004_fee_control.sql`
-- `server/src/config/env.ts`
-- `server/src/security/*` (à créer)
-- `server/src/pilotage/alerts/*` (à créer)
-- `server/src/pilotage/dashboard/*` (à créer)
-- `server/src/email/*` (à créer)
-- `server/src/finance/control/*` (à créer)
 - `app/app.js`
-- `PROJECT-CONTINUITY.md` (ce fichier).
+- `app/index.html`
+- `app/modules/security/` (à créer)
+- `app/modules/pilotage/` (à créer)
+- `app/modules/finance/` (à créer ou adapter)
 
 ### Prochaine action immédiate
 
-1. Commiter et pousser les migrations B1/B2 et `PROJECT-CONTINUITY.md` sur `main`.
-2. Implémenter le backend sécurité QR (`service.ts`, `routes.ts`, `schema.ts`).
-3. Implémenter le moteur d’alertes (`server/src/pilotage/alerts/`).
-4. Ajouter le service email Brevo (`server/src/email/`).
-5. Implémenter le backend contrôle des frais (`server/src/finance/control/`).
+1. Lancer le test QA permanent preview.
+2. Adapter le front pour le scan QR et l’affichage des alertes.
+3. Connecter le front finance existant au backend.
+4. Adapter le front pour le contrôle des frais par QR.
 6. Adapter le front PWA.
 7. Lancer `cd server && npm run typecheck && npm test` et `node tests/qa-permanent-preview.cjs`.
 
@@ -452,12 +469,9 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Fonctionnalités non terminées
 
-- Backend sécurité QR (vérification HMAC, scan entrée/sortie, lockdown).
-- Moteur d’alertes (détection, déduplication, routage, cycle de vie).
-- Service email Brevo côté serveur.
-- Backend contrôle des frais par QR (campagnes, assignations, scans).
 - Connexion du front finance existant aux nouvelles tables backend.
 - Front scan QR, alertes et contrôle des frais.
+- Notifications push/Web Push pour les alertes.
 
 ### Améliorations prévues
 
@@ -598,31 +612,27 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Où je me suis arrêté
 
-Incrément B validé avec le propriétaire. Deux migrations SQL créées (`202608170003_security_and_alerts.sql` et `202608170004_fee_control.sql`). `PROJECT-CONTINUITY.md` mis à jour avec les décisions et le constat que le front finance existe déjà en démo locale. Aucun code backend sécurité/alertes/frais n’est encore implémenté. Les fichiers ne sont pas encore commités sur `main`.
+Backend de l’incrément B entièrement implémenté, testé et poussé sur `main`. `PROJECT-CONTINUITY.md` synchronisé. Le front PWA n’est pas encore adapté pour le scan QR, les alertes et le contrôle des frais.
 
 ### Ce que j'étais en train de faire
 
-- Discuter du périmètre de l’incrément B (sécurité QR, alertes, contrôle des frais).
-- Créer les migrations SQL correspondantes.
-- Vérifier l’existant finance et constater que seul le front démo est en place.
+- Implémenter le backend sécurité QR (`server/src/security/`).
+- Implémenter le moteur d’alertes et le tableau de bord (`server/src/pilotage/`).
+- Implémenter le service email Brevo (`server/src/email/`).
+- Implémenter le backend contrôle des frais (`server/src/finance/control/`).
 - Mettre à jour `PROJECT-CONTINUITY.md`.
+- Lancer les tests serveur (58/58 passent).
 
 ### Prochaine action
 
-1. Commiter et pousser les migrations B1/B2 et `PROJECT-CONTINUITY.md` sur `main`.
-2. Implémenter le backend sécurité QR.
-3. Implémenter le moteur d’alertes.
-4. Implémenter le service email Brevo.
-5. Implémenter le backend contrôle des frais.
-6. Connecter le front finance existant au backend.
-7. Adapter le front scan QR, alertes et contrôle frais.
-8. Lancer `cd server && npm run typecheck && npm test` et `node tests/qa-permanent-preview.cjs`.
+1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
+2. Lancer `node tests/qa-permanent-preview.cjs`.
+3. Passer au frontend : scan QR, alertes, contrôle des frais, connexion finance.
 
 ### Commandes/tests restants
 
-- `cd server && npm run typecheck`
-- `cd server && npm test`
 - `node tests/qa-permanent-preview.cjs`
+- Adapter le front PWA.
 
 ---
 
@@ -640,4 +650,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 17 août 2026 — incrément B validé (sécurité QR + moteur d’alertes + contrôle des frais par QR) ; migrations B1/B2 créées ; front finance identifié comme démo locale.*
+*Dernière mise à jour : 17 août 2026 — backend de l’incrément B terminé (sécurité QR, alertes, email Brevo, contrôle des frais par QR) ; 58 tests serveur passent ; front PWA à adapter.*
