@@ -38,7 +38,7 @@
 
 ---
 
-## Task B1 : Backend École — années, cycles et logo
+## Task 1 : Backend École — années, cycles et logo
 
 **Files:**
 - Modify: `server/src/school/schema.ts`
@@ -369,7 +369,7 @@ git push origin main
 
 ---
 
-## Task B2 : Backend Personnel — détail, resend invite, audit
+## Task 2 : Backend Personnel — détail, resend invite, audit
 
 **Files:**
 - Modify: `server/src/school/schema.ts`
@@ -545,7 +545,7 @@ git push origin main
 
 ---
 
-## Task B3 : Tests backend École & Personnel
+## Task 3 : Tests backend École & Personnel
 
 **Files:**
 - Modify: `server/tests/school.test.ts`
@@ -647,7 +647,7 @@ git push origin main
 
 ---
 
-## Task B4 : Frontend École & Personnel
+## Task 4 : Frontend École & Personnel
 
 **Files:**
 - Create: `app/modules/school/school.css`
@@ -856,7 +856,7 @@ git push origin main
 
 ---
 
-## Task B5 : Menu admin conditionné par permissions
+## Task 5 : Menu admin conditionné par permissions
 
 **Files:**
 - Modify: `app/app.js`
@@ -916,7 +916,7 @@ git push origin main
 
 ---
 
-## Task B6 : Validation finale
+## Task 6 : Validation finale
 
 **Files:**
 - All modified files.
