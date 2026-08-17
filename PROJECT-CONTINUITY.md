@@ -154,6 +154,14 @@ Nouvelle feuille de route technique validée (20 phases). Nous sommes en **Phase
 - Tables manquantes identifiées pour les prochaines phases : `system_events`, `notifications`, `notification_templates`, `data_retention_policies`, `approval_requests`, `indicator_snapshots`.
 - Verdict : PostgreSQL stable, pas de réécriture nécessaire, passage à la Phase 2 possible.
 
+### Phase 2 — Migrations du système d'événements et de notifications
+
+- Migration `supabase/migrations/202608180001_system_events.sql` créée : table `system_events` (file d'événements métiers internes).
+- Migration `supabase/migrations/202608180002_notification_service.sql` créée : tables `notifications` et `notification_templates` (file de notifications sortantes + templates paramétrables).
+- Migration `supabase/migrations/202608180003_data_retention_policies.sql` créée : table `data_retention_policies` avec valeurs par défaut système.
+- RLS activées sur les trois nouvelles tables.
+- Pas encore de code serveur ; la Phase 3 implémentera le `NotificationService`.
+
 ### Étape 2 — Configuration mono-école
 
 - Schéma Supabase étendu (`schools`, `academic_years`, `school_cycles`, `school_contacts`, `profiles`).
@@ -497,23 +505,23 @@ Nouvelle feuille de route technique validée (20 phases). Nous sommes en **Phase
 ### État d'avancement
 
 - Phase 1 (audit PostgreSQL) : terminée et documentée.
+- Phase 2 (migrations SQL) : migrations `system_events`, `notifications`, `notification_templates`, `data_retention_policies` créées.
 - `PROJECT-CONTINUITY.md` en cours de synchronisation.
 
 ### Fichiers concernés
 
 - `docs/POSTGRESQL_AUDIT.md`
 - `PROJECT-CONTINUITY.md`
-- (à venir) `supabase/migrations/202608180001_system_events.sql`
-- (à venir) `supabase/migrations/202608180002_notification_service.sql`
+- `supabase/migrations/202608180001_system_events.sql`
+- `supabase/migrations/202608180002_notification_service.sql`
+- `supabase/migrations/202608180003_data_retention_policies.sql`
 - (à venir) `server/src/events/`, `server/src/notifications/`
 
 ### Prochaine action immédiate
 
-1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md` + `docs/POSTGRESQL_AUDIT.md`.
-2. Créer la migration `system_events` avec les colonnes `event_type`, `entity_type`, `entity_id`, `user_id`, `payload`, `status`, `created_at`, `processed_at`.
-3. Créer les tables `notifications` et `notification_templates`.
-4. Implémenter le `NotificationService` côté serveur avec abstraction `EmailProvider` (Brevo) et `SmsProvider`.
-5. Brancher les événements QR (entrée/sortie/refus) sur `system_events` sans attendre Brevo.
+1. Commiter et pousser les migrations Phase 2.
+2. Implémenter le `NotificationService` côté serveur avec abstraction `EmailProvider` (Brevo) et `SmsProvider`.
+3. Brancher les événements QR (entrée/sortie/refus) sur `system_events` sans attendre Brevo.
 
 ---
 
@@ -521,7 +529,7 @@ Nouvelle feuille de route technique validée (20 phases). Nous sommes en **Phase
 
 ### Fonctionnalités non terminées
 
-- **Phase 2 technique** : tables `system_events`, `notifications`, `notification_templates`, `data_retention_policies`.
+- **Phase 2 technique** : migrations SQL créées ; reste à implémenter le `NotificationService` et brancher les événements.
 - **Phase 3 technique** : NotificationService central, Brevo provider, abstraction SMS.
 - **Phase 4 technique** : intégration événements QR/présence/sorties avec queue locale.
 - **Phase 5+ technique** : R2 abstraction, D1 archive, audit central, Cloudflare security, quotas.
@@ -544,14 +552,13 @@ Nouvelle feuille de route technique validée (20 phases). Nous sommes en **Phase
 
 ### Prochaines étapes logiques
 
-1. Phase 2 technique : créer `system_events`, `notifications`, `notification_templates`, `data_retention_policies`.
-2. Phase 3 technique : implémenter NotificationService + Brevo provider + abstraction SMS.
-3. Phase 4 technique : brancher QR/présence/sorties sur le système d'événements (pas d'appel direct Brevo).
-4. Pédagogie Phase 2 : connecter publication des devoirs/cotations et vue parent.
-5. Pédagogie Phase 3 : spécifier puis implémenter le moteur de calcul des moyennes et bulletins.
-6. Notifications push/Web Push pour les alertes de sécurité.
-4. Module Approbations (workflow transactionnel avec audit).
-5. Snapshots historiques et tendances Pilotage.
+1. Phase 3 technique : implémenter NotificationService + Brevo provider + abstraction SMS.
+2. Phase 4 technique : brancher QR/présence/sorties sur le système d'événements (pas d'appel direct Brevo).
+3. Pédagogie Phase 2 : connecter publication des devoirs/cotations et vue parent.
+4. Pédagogie Phase 3 : spécifier puis implémenter le moteur de calcul des moyennes et bulletins.
+5. Notifications push/Web Push pour les alertes de sécurité.
+6. Module Approbations (workflow transactionnel avec audit).
+7. Snapshots historiques et tendances Pilotage.
 6. Gestion avancée du double rôle (affichage contextuel par module).
 
 ---
