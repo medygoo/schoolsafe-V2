@@ -10,6 +10,24 @@ function accessService(mock: { permission?: boolean; scope?: boolean } = {}): Ac
   };
 }
 
+function buildMultipartBody(
+  boundary: string,
+  fields: Array<{ name: string; filename?: string; contentType?: string; value: Buffer | string }>,
+): Buffer {
+  const chunks: Buffer[] = [];
+  for (const field of fields) {
+    let header = `--${boundary}\r\nContent-Disposition: form-data; name="${field.name}"`;
+    if (field.filename) header += `; filename="${field.filename}"`;
+    if (field.contentType) header += `\r\nContent-Type: ${field.contentType}`;
+    header += "\r\n\r\n";
+    chunks.push(Buffer.from(header, "utf-8"));
+    chunks.push(Buffer.isBuffer(field.value) ? field.value : Buffer.from(field.value, "utf-8"));
+    chunks.push(Buffer.from("\r\n", "utf-8"));
+  }
+  chunks.push(Buffer.from(`--${boundary}--\r\n`, "utf-8"));
+  return Buffer.concat(chunks);
+}
+
 function createMockService(): SchoolService {
   return {
     getSettings: vi.fn().mockResolvedValue({
@@ -53,6 +71,19 @@ function createMockService(): SchoolService {
       { id: "perm-1", code: "school.manage", description: "Gérer l'école" },
       { id: "perm-2", code: "staff.manage", description: "Gérer le personnel" },
     ]),
+    listAcademicYears: vi.fn().mockResolvedValue([
+      { id: "year-1", label: "2025-2026", starts_on: "2025-09-01", ends_on: "2026-06-30", periods: "Trimestres", is_active: true },
+    ]),
+    createAcademicYear: vi.fn().mockResolvedValue({ id: "year-2" }),
+    updateAcademicYear: vi.fn().mockResolvedValue(undefined),
+    activateAcademicYear: vi.fn().mockResolvedValue(undefined),
+    listCycles: vi.fn().mockResolvedValue([
+      { cycle_key: "nursery", cycle_name: "Maternelle", is_active: true },
+      { cycle_key: "primary", cycle_name: "Primaire", is_active: true },
+      { cycle_key: "secondary", cycle_name: "Secondaire", is_active: false },
+    ]),
+    toggleCycle: vi.fn().mockResolvedValue(undefined),
+    saveLogoPath: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -182,6 +213,124 @@ describe("School & Staff routes", () => {
     });
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ code: "ACCESS_DENIED" });
+    await app.close();
+  });
+
+  it("GET /school/academic-years returns academic years", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const response = await app.inject({
+      method: "GET",
+      url: "/school/academic-years",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toHaveLength(1);
+    await app.close();
+  });
+
+  it("POST /school/academic-years creates an academic year", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const response = await app.inject({
+      method: "POST",
+      url: "/school/academic-years",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { label: "2026-2027", starts_on: "2026-09-01", ends_on: "2027-06-30", periods: "Trimestres" },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ id: "year-2" });
+    await app.close();
+  });
+
+  it("PUT /school/academic-years/:id updates an academic year", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const response = await app.inject({
+      method: "PUT",
+      url: "/school/academic-years/year-1",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { label: "2025-2026 (updated)" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: "ok" });
+    await app.close();
+  });
+
+  it("POST /school/academic-years/:id/activate activates an academic year", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const response = await app.inject({
+      method: "POST",
+      url: "/school/academic-years/year-1/activate",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: "ok" });
+    await app.close();
+  });
+
+  it("GET /school/cycles returns cycles", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const response = await app.inject({
+      method: "GET",
+      url: "/school/cycles",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toHaveLength(3);
+    await app.close();
+  });
+
+  it("PUT /school/cycles/:key/toggle toggles a cycle", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const response = await app.inject({
+      method: "PUT",
+      url: "/school/cycles/secondary/toggle",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { is_active: true },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: "ok" });
+    await app.close();
+  });
+
+  it("POST /school/logo rejects invalid file type", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const boundary = "----formdata-test";
+    const body = buildMultipartBody(boundary, [
+      { name: "logo", filename: "file.txt", contentType: "text/plain", value: "not an image" },
+    ]);
+    const response = await app.inject({
+      method: "POST",
+      url: "/school/logo",
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: body,
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: "FILE_INVALID" });
+    await app.close();
+  });
+
+  it("POST /school/logo uploads a logo", async () => {
+    const service = createMockService();
+    const app = buildTestApp(service, accessService());
+    const boundary = "----formdata-test";
+    const body = buildMultipartBody(boundary, [
+      { name: "logo", filename: "logo.png", contentType: "image/png", value: Buffer.from("fake-png-bytes") },
+    ]);
+    const response = await app.inject({
+      method: "POST",
+      url: "/school/logo",
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: body,
+    });
+    expect(response.statusCode).toBe(200);
+    const json = response.json();
+    expect(json.logo_path).toMatch(/^\/uploads\/logos\/.+\.png$/);
+    expect(service.saveLogoPath).toHaveBeenCalledWith("school-1", json.logo_path);
     await app.close();
   });
 });
