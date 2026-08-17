@@ -11,6 +11,9 @@ export type ApiErrorCode =
   | "SETUP_SCHOOL_FAILED"
   | "SETUP_ADMIN_FAILED"
   | "SCHOOL_NOT_FOUND"
+  | "FILE_MISSING"
+  | "FILE_INVALID"
+  | "FILE_TOO_LARGE"
   | "INTERNAL_ERROR";
 
 export type ApiErrorBody = {
