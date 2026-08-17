@@ -439,36 +439,71 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - **Variables d’environnement** : `CARD_HMAC_SECRET`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` ajoutées à `server/src/config/env.ts`.
 - **Tests serveur** : 58/58 passent.
 
+### Pédagogie — Phase 1 terminée
+
+- **Décisions validées** :
+  - Deux matières, deux côtés, deux enseignants possibles dans une même classe (parcours FR/EN distincts).
+  - Possibilité de fusionner les côtés à la fin ; un enseignant est titulaire de la salle.
+  - Échelle des cotations laissée libre à l’enseignant (barème, coefficient, mode numérique/qualitatif/libre).
+  - Pas d’approbation requise pour modifier une note publiée, mais traçabilité conservée.
+  - Rattrapage pédagogique ramené dans le module Finance comme surplus.
+  - Épreuves nationales : registre scolaire des candidats + enregistrement des résultats nationaux.
+- **Migration SQL** : `supabase/migrations/202608170005_pedagogy_phase1.sql`.
+  - Tables : `subjects`, `teacher_assignments`, `assignments`, `assignment_questions`, `grades`, `lesson_plans`.
+  - RLS activées sur les 6 nouvelles tables.
+- **Permissions** ajoutées à `shared/permissions.json` :
+  - `pedagogy.subject.read`, `pedagogy.subject.manage`
+  - `pedagogy.assignment.read`, `pedagogy.assignment.manage`
+  - `pedagogy.grade.read`, `pedagogy.grade.manage`
+  - `pedagogy.lesson-plan.read`, `pedagogy.lesson-plan.manage`
+- **Backend** (`server/src/pedagogy/`) :
+  - `schema.ts`, `service.ts`, `routes.ts`.
+  - Endpoints : `/pedagogy/classes`, `/pedagogy/subjects`, `/pedagogy/teacher-assignments`, `/pedagogy/assignments`, `/pedagogy/assignments/:id/publish`, `/pedagogy/assignments/:id/grades`, `/pedagogy/lesson-plans`.
+  - Branchement dans `server/src/app.ts` et `server/src/index.ts`.
+- **Frontend PWA** :
+  - `app/modules/pedagogy/pedagogy-api.js` : client API.
+  - `app/modules/pedagogy/pedagogy-module.js` : module de rendu Phase 1 (matières, devoirs, cahier de préparation).
+  - `app/app.js` et `app/index.html` branchés sur le nouveau module.
+- **Vérifications** :
+  - `cd server && npm run typecheck && npm test` ✅ 58/58.
+  - `node --check app/app.js && node --check app/modules/pedagogy/*.js` ✅.
+  - `node tests/qa-permanent-preview.cjs` ✅ 3/3.
+- **Commits poussés** :
+  - `02bdae6 feat(pedagogy): backend phase 1 - matieres, affectations, devoirs, cotations, cahier`
+  - `2e3f1dd feat(pedagogy): front phase 1 - module matieres, devoirs, cahier`
+
 ---
 
 ## 5. Travail en cours
 
 ### Tâche exacte
 
-**Incrément B terminé** — backend et frontend PWA pour la sécurité QR, le moteur d’alertes, l’email Brevo et le contrôle des frais par QR sont implémentés, testés et poussés sur `main`.
+**Pédagogie Phase 1 terminée** — fondation backend + frontend pour les matières, affectations enseignants, devoirs, cotations et cahier de préparation.
 
 ### État d'avancement
 
-- Backend sécurité / alertes / email / contrôle des frais : terminé et poussé.
-- Front finance connecté au backend.
-- Front scan QR + alertes adapté.
-- Front contrôle des frais par QR adapté.
+- Backend Pédagogie : terminé et poussé.
+- Frontend Pédagogie Phase 1 : terminé et poussé.
 - `PROJECT-CONTINUITY.md` en cours de synchronisation.
 
 ### Fichiers concernés
 
+- `supabase/migrations/202608170005_pedagogy_phase1.sql`
+- `shared/permissions.json`
+- `server/src/pedagogy/schema.ts`
+- `server/src/pedagogy/service.ts`
+- `server/src/pedagogy/routes.ts`
+- `server/src/app.ts`
+- `server/src/index.ts`
+- `app/modules/pedagogy/pedagogy-api.js`
+- `app/modules/pedagogy/pedagogy-module.js`
 - `app/app.js`
 - `app/index.html`
-- `app/modules/security/security-module.js`
-- `app/modules/pilotage/pilotage-module.js`
-- `app/modules/finance/finance-api.js`
-- `app/modules/finance/fee-control-module.js`
 
 ### Prochaine action immédiate
 
 1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Informer l’utilisateur que l’incrément B est terminé.
-3. Attendre la direction pour la prochaine fonctionnalité à étudier en détail ( Pilotage avancé, approbations, notifications push, ou autre module métier).
+2. Poursuivre la Phase 2 de Pédagogie : publication des devoirs/cotations, vue parent, cahier de préparation avancé, ou attaquer le moteur de calcul des moyennes après spécification formelle.
 
 ---
 
@@ -479,6 +514,10 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Notifications push/Web Push pour les alertes.
 - Approbations transactionnelles (annulation financière, modification de note publiée).
 - Snapshots historiques (`indicator_snapshots`) et tendances 7/30 jours.
+- Pédagogie Phase 2 : publication workflow, vue parent, cahier de préparation avancé.
+- Pédagogie Phase 3 : moteur de calcul des moyennes et bulletins (spécification formelle requise).
+- Pédagogie Phase 4 : rattrapage pédagogique lié au module Finance.
+- Pédagogie Phase 5 : registre des épreuves nationales (ENAFEP, TENASOSP, EXETAT).
 
 ### Améliorations prévues
 
@@ -487,14 +526,16 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Documentation de l'interface du systeme de cartes.
 - Gestion des duplicatas et de l'historique d'impression.
 - Fiche de lancement de l'application (`docs/LAUNCH.md` a completer).
+- Synchronisation hors ligne avancée pour les devoirs et cotations.
 
 ### Prochaines étapes logiques
 
-1. Notifications push/Web Push pour les alertes de sécurité.
-2. Module Approbations (workflow transactionnel avec audit).
-3. Snapshots historiques et tendances Pilotage.
-4. Gestion avancée du double rôle (affichage contextuel par module).
-5. Poursuivre l'étude détaillée des fonctionnalités une par une (finance, pédagogie, sécurité, etc.).
+1. Pédagogie Phase 2 : connecter publication des devoirs/cotations et vue parent.
+2. Pédagogie Phase 3 : spécifier puis implémenter le moteur de calcul des moyennes et bulletins.
+3. Notifications push/Web Push pour les alertes de sécurité.
+4. Module Approbations (workflow transactionnel avec audit).
+5. Snapshots historiques et tendances Pilotage.
+6. Gestion avancée du double rôle (affichage contextuel par module).
 
 ---
 
@@ -620,29 +661,32 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Où je me suis arrêté
 
-Incrément B entièrement terminé : backend (sécurité QR, alertes, email Brevo, contrôle des frais) et frontend PWA (scan QR, alertes, contrôle des frais, connexion finance) implémentés, testés et poussés sur `main`. `PROJECT-CONTINUITY.md` synchronisé.
+Pédagogie Phase 1 terminée : backend et frontend PWA pour les matières, affectations enseignants, devoirs, cotations et cahier de préparation sont implémentés, testés et poussés sur `main`. `PROJECT-CONTINUITY.md` en cours de synchronisation.
 
 ### Ce que j'étais en train de faire
 
-- Adapter le front PWA pour le scan QR et les alertes (`app/modules/security/`, `app/modules/pilotage/`).
-- Connecter le module Finance existant au backend (`app/modules/finance/finance-api.js`).
-- Adapter le front pour le contrôle des frais par QR (`app/modules/finance/fee-control-module.js`).
-- Corriger le masquage cohérent de `#feeControlModule` dans toutes les fonctions de navigation.
-- Lancer `node --check app/app.js` et `node tests/qa-permanent-preview.cjs` (3/3 passent).
-- Commiter et pousser : `ac2d32c feat(front): controle des frais par QR`.
+- Créer la migration SQL Pédagogie Phase 1 (`supabase/migrations/202608170005_pedagogy_phase1.sql`).
+- Ajouter les permissions pédagogie à `shared/permissions.json`.
+- Créer le backend Pédagogie (`server/src/pedagogy/schema.ts`, `service.ts`, `routes.ts`).
+- Brancher le backend dans `server/src/app.ts` et `server/src/index.ts`.
+- Créer le client API front (`app/modules/pedagogy/pedagogy-api.js`) et le module de rendu (`app/modules/pedagogy/pedagogy-module.js`).
+- Brancher le module dans `app/app.js` et `app/index.html`.
+- Lancer `cd server && npm run typecheck && npm test` (58/58 passent) et `node tests/qa-permanent-preview.cjs` (3/3 passent).
+- Commiter et pousser :
+  - `02bdae6 feat(pedagogy): backend phase 1 - matieres, affectations, devoirs, cotations, cahier`
+  - `2e3f1dd feat(pedagogy): front phase 1 - module matieres, devoirs, cahier`
 - Mettre à jour `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
 1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Informer l’utilisateur que l’incrément B est terminé.
-3. Attendre la direction pour la prochaine fonctionnalité à étudier en détail.
+2. Poursuivre avec la Phase 2 de Pédagogie (publication workflow + vue parent + cahier avancé), ou attaquer une autre priorité selon la direction.
 
 ### Commandes/tests restants
 
 - Tests serveur : `cd server && npm run typecheck && npm test` (déjà verts 58/58).
 - Test QA preview : `node tests/qa-permanent-preview.cjs` (déjà 3/3).
-- Prochain module à définir avec l’utilisateur.
+- Prochain module : Pédagogie Phase 2, notifications push, approbations, snapshots Pilotage, ou autre selon la direction.
 
 ---
 
