@@ -286,6 +286,40 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - Test QA permanent preview : **3/3**.
 - Commit et push : `ffeaeb6 feat(double-role): selecteur de role actif et deny override dans le bootstrap`.
 
+### Module Finance — démonstration front existante
+
+- Le front PWA dispose déjà d’un espace financier complet en démonstration :
+  - `app/app.js` : état local `financeState`, onglets (vue financière, structure des frais, encaissements, reçus, soldes, rapports, famille), rendu PDF des reçus et rapports de caisse.
+  - `app/index.html` : section `financeModule` avec navigation par rôle.
+  - Rôles couverts : responsable financier, agent de caisse, comptable, parent, chef d’établissement.
+  - Fonctions simulées : structure des frais, encaissements, reçus, soldes, clôture de caisse, contrôle de régularité scolaire sans montant.
+- **Ce qui manque** : backend serveur et tables Supabase pour rendre ces fonctions persistées et multi-utilisateurs.
+- La migration `202608170004_fee_control.sql` apporte les tables de données nécessaires (`fee_structures`, `student_fees`, `fee_payments`) pour remplacer l’état local par du stockage réel.
+
+### Incrément B — Sécurité QR + Moteur d’alertes + Contrôle des frais par QR
+
+- Décision validée : unifier en un seul incrément B les trois briques :
+  1. **Sécurité QR** : scan entrée/sortie, vérification HMAC, personnes autorisées, lockdown global par école, notifications parents à la sortie.
+  2. **Moteur d’alertes** : règles configurables, déduplication, routage par **rôle ET par utilisateur**, sévérité critique/important/attention/information.
+  3. **Contrôle des frais par QR** : campagnes de contrôle créées par l’admin général, assignation de contrôleurs, scan QR pour vérifier le statut financier sans créer de paiement.
+- Règles métier validées :
+  - Le QR contient un numéro de carte + signature HMAC calculée côté serveur (`schoolsafe://card/{card_number}/{signature}`) ; jamais de données personnelles en clair.
+  - Seul le serveur crée les numéros de carte et les signatures.
+  - Le gardien compare physiquement la personne avant d’autoriser une sortie.
+  - Une sortie refusée ou non autorisée déclenche une alerte critique immédiate.
+  - Le lockdown global bloque toutes les sorties, même avec carte et autorisations valides.
+  - Les notifications parents à la sortie ne contiennent que l’essentiel (nom de l’enfant, heure de sortie), jamais de données sensibles dans les pushes.
+  - Les alertes financières ne sont jamais envoyées aux gardiens ; chaque rôle/utilisateur ne voit que les alertes de son domaine.
+  - Les devises supportées sont **USD** et **CDF**.
+  - Plusieurs postes/portes (`locations`) peuvent exister par école.
+- Migrations SQL créées (non commitées) :
+  - `supabase/migrations/202608170003_security_and_alerts.sql` : `locations`, `student_cards`, `security_events`, `alert_rules`, `alerts`, `alert_notifications`, lockdown dans `school_settings`, règles système par défaut.
+  - `supabase/migrations/202608170004_fee_control.sql` : `fee_structures`, `student_fees`, `fee_payments`, `fee_control_campaigns`, `fee_control_assignees`, `fee_control_scans`.
+- Points d’attention :
+  - Brevo doit être ajouté aux variables d’environnement serveur (`server/src/config/env.ts`).
+  - La clé HMAC des cartes (`CARD_HMAC_SECRET`) doit être définie dans les secrets de l’instance.
+  - Le module Finance existait jusqu’ici sous forme de démo front ; les tables backend sont créées par la migration B2.
+
 ### Envoi batch des cartes vers l'app centrale
 
 - Migration Supabase : `supabase/migrations/202608170002_card_print_version.sql`.
@@ -335,6 +369,8 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - `supabase/migrations/202608160001_step2_school_configuration.sql`
 - `supabase/migrations/202608160002_card_system.sql`
 - `supabase/migrations/202608160003_card_design_fields.sql`
+- `supabase/migrations/202608170003_security_and_alerts.sql`
+- `supabase/migrations/202608170004_fee_control.sql`
 - `server/src/setup/schema.ts`
 - `server/src/setup/service.ts`
 - `server/src/setup/routes.ts`
@@ -377,26 +413,38 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Gestion du double rôle** : sélecteur de rôle actif dans le workspace et calcul des permissions avec deny override côté serveur.
+**Incrément B** : implémenter la sécurité QR, le moteur d’alertes et le contrôle des frais par QR.
 
 ### État d'avancement
 
-- Deny override implémenté dans le bootstrap serveur.
-- Sélecteur de rôle actif implémenté dans le front PWA.
-- Tests ajoutés et tous passent (39/39 serveur, 3/3 QA preview).
+- Plan unifié B validé avec le propriétaire.
+- Migrations SQL B1 (sécurité + alertes) et B2 (contrôle des frais) créées.
 - `PROJECT-CONTINUITY.md` en cours de synchronisation.
+- Backend sécurité / alertes / frais non encore implémenté.
+- Front scan QR / alertes / contrôle frais non encore adapté.
 
 ### Fichiers concernés
 
+- `supabase/migrations/202608170003_security_and_alerts.sql`
+- `supabase/migrations/202608170004_fee_control.sql`
+- `server/src/config/env.ts`
+- `server/src/security/*` (à créer)
+- `server/src/pilotage/alerts/*` (à créer)
+- `server/src/pilotage/dashboard/*` (à créer)
+- `server/src/email/*` (à créer)
+- `server/src/finance/control/*` (à créer)
 - `app/app.js`
-- `server/src/bootstrap/service.ts`
-- `server/tests/bootstrap.test.ts`
 - `PROJECT-CONTINUITY.md` (ce fichier).
 
 ### Prochaine action immédiate
 
-1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md` sur `main`.
-2. Passer à la prochaine fonctionnalité selon les priorités du propriétaire (gestion avancée du double rôle, fiche de lancement, etc.).
+1. Commiter et pousser les migrations B1/B2 et `PROJECT-CONTINUITY.md` sur `main`.
+2. Implémenter le backend sécurité QR (`service.ts`, `routes.ts`, `schema.ts`).
+3. Implémenter le moteur d’alertes (`server/src/pilotage/alerts/`).
+4. Ajouter le service email Brevo (`server/src/email/`).
+5. Implémenter le backend contrôle des frais (`server/src/finance/control/`).
+6. Adapter le front PWA.
+7. Lancer `cd server && npm run typecheck && npm test` et `node tests/qa-permanent-preview.cjs`.
 
 ---
 
@@ -404,7 +452,12 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Fonctionnalités non terminées
 
-- (aucune bloquante ; la gestion de base du double rôle est en place).
+- Backend sécurité QR (vérification HMAC, scan entrée/sortie, lockdown).
+- Moteur d’alertes (détection, déduplication, routage, cycle de vie).
+- Service email Brevo côté serveur.
+- Backend contrôle des frais par QR (campagnes, assignations, scans).
+- Connexion du front finance existant aux nouvelles tables backend.
+- Front scan QR, alertes et contrôle des frais.
 
 ### Améliorations prévues
 
@@ -458,7 +511,10 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 - Tables existantes : `school`, `school_settings`, `profiles`, `devices`, `roles`, `permissions`, `profile_roles`, `role_permission_grants`, `scope_assignments`, `audit_events`.
 - Tables ajoutées pour l'Étape 2 : `academic_years`, `school_cycles`, `school_contacts`.
-- Colonnes ajoutées à `school` et `profiles`.
+- Tables ajoutées pour les cartes : `classes`, `students`, `student_guardians`, `card_print_requests`.
+- Tables ajoutées pour l’incrément B (sécurité + alertes) : `locations`, `student_cards`, `security_events`, `alert_rules`, `alerts`, `alert_notifications`.
+- Tables ajoutées pour l’incrément B (contrôle des frais) : `fee_structures`, `student_fees`, `fee_payments`, `fee_control_campaigns`, `fee_control_assignees`, `fee_control_scans`.
+- Colonnes ajoutées à `school`, `profiles`, `school_settings` (lockdown).
 
 ### Authentification
 
@@ -481,6 +537,22 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - `POST /setup/admin` : création de l'administrateur.
 - `POST /auth/lookup-phone` : recherche d'e-mail par téléphone.
 - `POST /cards/request-print` : réception d'une demande d'impression de carte, upload R2, push HMAC vers l'app centrale.
+- `POST /security/scan` : vérification d’un QR scolaire et enregistrement d’un événement de sécurité (entrée/sortie/refus).
+- `GET /security/events` : historique des scans et événements.
+- `POST /security/lockdown` : activation/désactivation du lockdown global.
+- `GET /pilotage/dashboard` : KPI, alertes et approbations du jour.
+- `GET /pilotage/alerts` : file d’alertes.
+- `POST /pilotage/alerts/:id/acknowledge` : prise en charge d’une alerte.
+- `POST /pilotage/alerts/:id/resolve` : résolution d’une alerte.
+- `GET /pilotage/approvals` : demandes d’approbation en attente.
+- `POST /pilotage/approvals/:id/decision` : décision sur une demande d’approbation.
+- `GET /finance/fee-structures` : grille des frais.
+- `POST /finance/fee-structures` : créer un type de frais.
+- `GET /finance/student-fees` : situation financière des élèves.
+- `POST /finance/payments` : enregistrer un paiement.
+- `GET /finance/fee-control/campaigns` : campagnes de contrôle des frais.
+- `POST /finance/fee-control/campaigns` : créer une campagne.
+- `POST /finance/fee-control/scans` : enregistrer un scan de contrôle des frais.
 
 **App centrale (dépôt `schoolsafe-control-`)**
 
@@ -526,27 +598,31 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Où je me suis arrêté
 
-Interface de gestion des écoles ajoutée dans l'app centrale (`schoolsafe-control-`) et poussée sur `main`. Bugs SQLite locaux corrigés. `PROJECT-CONTINUITY.md` synchronisé et en cours de commit/push.
+Incrément B validé avec le propriétaire. Deux migrations SQL créées (`202608170003_security_and_alerts.sql` et `202608170004_fee_control.sql`). `PROJECT-CONTINUITY.md` mis à jour avec les décisions et le constat que le front finance existe déjà en démo locale. Aucun code backend sécurité/alertes/frais n’est encore implémenté. Les fichiers ne sont pas encore commités sur `main`.
 
 ### Ce que j'étais en train de faire
 
-- Modifier `public/index.html`, `public/app.js` et `public/styles.css` pour ajouter l'onglet "Gestion des écoles".
-- Corriger `src/db/index.ts` et `src/db/sqlite.ts` pour créer automatiquement le répertoire `data/` et utiliser le bon chemin SQLite.
-- Tester l'app centrale en local (`npm run dev`, curl, build).
-- Commiter et pousser sur `https://github.com/medygoo/schoolsafe-control-.git`.
+- Discuter du périmètre de l’incrément B (sécurité QR, alertes, contrôle des frais).
+- Créer les migrations SQL correspondantes.
+- Vérifier l’existant finance et constater que seul le front démo est en place.
 - Mettre à jour `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
-1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Vérifier le déploiement automatique de `schoolsafe-control-` sur Render.
-3. Passer à la prochaine fonctionnalité selon les priorités du propriétaire (double rôle, fiche de lancement, etc.).
+1. Commiter et pousser les migrations B1/B2 et `PROJECT-CONTINUITY.md` sur `main`.
+2. Implémenter le backend sécurité QR.
+3. Implémenter le moteur d’alertes.
+4. Implémenter le service email Brevo.
+5. Implémenter le backend contrôle des frais.
+6. Connecter le front finance existant au backend.
+7. Adapter le front scan QR, alertes et contrôle frais.
+8. Lancer `cd server && npm run typecheck && npm test` et `node tests/qa-permanent-preview.cjs`.
 
 ### Commandes/tests restants
 
+- `cd server && npm run typecheck`
 - `cd server && npm test`
 - `node tests/qa-permanent-preview.cjs`
-- Ouvrir `https://medygoo.github.io/schoolsafe-control-/` pour valider l'interface de gestion des écoles après déploiement.
 
 ---
 
@@ -564,4 +640,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 17 août 2026 — gestion de base du double rôle (deny override + sélecteur de rôle actif) ; interface de gestion des écoles dans l’app centrale.*
+*Dernière mise à jour : 17 août 2026 — incrément B validé (sécurité QR + moteur d’alertes + contrôle des frais par QR) ; migrations B1/B2 créées ; front finance identifié comme démo locale.*
