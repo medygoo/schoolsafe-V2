@@ -22,6 +22,12 @@ export type EmitResult = {
   status: string;
 };
 
+export type EventServiceOptions = {
+  dispatcher?: {
+    dispatch: (event: SchoolSafeEvent & { id: string }) => Promise<void>;
+  };
+};
+
 export interface EventService {
   emit(event: SchoolSafeEvent, options?: EmitOptions): Promise<EmitResult>;
 }

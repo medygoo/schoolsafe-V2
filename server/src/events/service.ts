@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { EventService, SchoolSafeEvent, EmitOptions, EmitResult } from "./types.js";
+import type { EventService, SchoolSafeEvent, EmitOptions, EmitResult, EventServiceOptions } from "./types.js";
 
-export function createEventService(client: SupabaseClient): EventService {
+export type { EventService } from "./types.js";
+
+export function createEventService(client: SupabaseClient, options?: EventServiceOptions): EventService {
   return {
-    async emit(event, _options): Promise<EmitResult> {
+    async emit(event, emitOptions): Promise<EmitResult> {
       const { data, error } = await client
         .from("system_events")
         .insert({
@@ -19,6 +21,9 @@ export function createEventService(client: SupabaseClient): EventService {
         .single();
       if (error || !data) {
         throw new Error(`Failed to emit event: ${error?.message ?? "unknown"}`);
+      }
+      if (emitOptions?.dispatchImmediately && options?.dispatcher) {
+        await options.dispatcher.dispatch({ ...event, id: data.id as string });
       }
       return { id: data.id as string, status: data.status as string };
     },

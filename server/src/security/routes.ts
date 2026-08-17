@@ -5,6 +5,7 @@ import type { SecurityService } from "./service.js";
 import { securityScanSchema, lockdownSchema } from "./schema.js";
 import { requirePermission } from "../access/guard.js";
 import type { AccessService } from "../access/service.js";
+import type { EventService } from "../events/service.js";
 
 export type ResolveProfileId = (token: string) => Promise<string | null>;
 
@@ -12,6 +13,7 @@ export type SecurityRouteDependencies = {
   service: SecurityService;
   resolveProfileId: ResolveProfileId;
   access: AccessService;
+  eventService?: EventService;
 };
 
 export function registerSecurityRoutes(app: FastifyInstance, dependencies: SecurityRouteDependencies): void {

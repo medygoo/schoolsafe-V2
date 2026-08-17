@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createHmac, randomUUID } from "node:crypto";
+import type { EventService } from "../events/service.js";
 import type { SecurityScanInput, SecurityScanResult, SecurityEventDecision } from "./schema.js";
 
 export interface SecurityService {
@@ -54,10 +55,22 @@ function parseQrPayload(payload: string): { cardNumber: string; signature: strin
   return { cardNumber: match[1], signature: match[2] };
 }
 
+function mapSecurityEventToBusinessEvent(
+  eventType: string,
+  decision: SecurityEventDecision,
+): "STUDENT_ENTERED" | "STUDENT_EXITED" | "UNAUTHORIZED_EXIT_ATTEMPT" | null {
+  if (eventType === "entry") return "STUDENT_ENTERED";
+  if (eventType === "exit" || eventType === "exit_prepared") {
+    return decision === "allowed" ? "STUDENT_EXITED" : "UNAUTHORIZED_EXIT_ATTEMPT";
+  }
+  return null;
+}
+
 export function createSecurityService(
   supabaseUrl: string,
   serviceRoleKey: string,
   cardHmacSecret?: string,
+  eventService?: EventService,
 ): SecurityService {
   const client = createServiceClient(supabaseUrl, serviceRoleKey);
 
@@ -286,6 +299,30 @@ export function createSecurityService(
         },
       });
 
+      if (eventService) {
+        const businessEventType = mapSecurityEventToBusinessEvent(input.event_type, decision);
+        if (businessEventType) {
+          await eventService.emit({
+            type: businessEventType,
+            schoolId: student.school_id,
+            entityType: "student",
+            entityId: student.id,
+            userId: input.scanned_by,
+            payload: {
+              student_name: `${student.first_name} ${student.last_name}`,
+              matricule: student.matricule,
+              class_name: student.class_name,
+              time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+              date: new Date().toLocaleDateString("fr-FR"),
+              decision,
+              reason: denialReason,
+              authorized_person_id: input.authorized_person_id ?? null,
+              lockdown_active: lockdownActive,
+            },
+          }, { dispatchImmediately: true });
+        }
+      }
+
       if (decision === "denied" && (input.event_type === "exit" || input.event_type === "exit_prepared")) {
         alert = await createAlert({
           school_id: student.school_id,
@@ -355,6 +392,20 @@ export function createSecurityService(
         .select("lockdown_active, lockdown_activated_at, lockdown_activated_by")
         .single();
       if (error || !data) throw new Error(`Failed to update lockdown: ${error?.message}`);
+
+      if (eventService && active) {
+        await eventService.emit({
+          type: "LOCKDOWN_ACTIVATED",
+          schoolId: schoolId,
+          entityType: "school",
+          entityId: schoolId,
+          userId: profileId,
+          payload: {
+            activated_by_name: profileId,
+            time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+          },
+        }, { dispatchImmediately: true });
+      }
 
       return {
         active: data.lockdown_active as boolean,

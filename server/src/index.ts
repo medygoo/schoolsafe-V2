@@ -13,6 +13,15 @@ import { createFeeControlService } from "./finance/control/service.js";
 import { createPedagogyService } from "./pedagogy/service.js";
 import { createSchoolService } from "./school/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
+import { createClient } from "@supabase/supabase-js";
+import { createEventService } from "./events/service.js";
+import { createNotificationService } from "./notifications/service.js";
+import { createNotificationDispatcher } from "./notifications/dispatcher.js";
+import { createBrevoEmailProvider } from "./notifications/providers/brevo.js";
+import { createZohoEmailProvider } from "./notifications/providers/zoho.js";
+import { createInAppProvider } from "./notifications/providers/in-app.js";
+import { createWebPushProvider } from "./notifications/providers/push.js";
+import { createPushSubscriptionService } from "./push/subscriptions.js";
 
 const env = parseEnv(process.env);
 
@@ -35,12 +44,59 @@ const controlAppConfig = env.CONTROL_APP_URL && env.CONTROL_APP_INSTANCE_ID && e
 
 const accessService = createSupabaseAccessService(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
 
+const serviceClient = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    })
+  : undefined;
+
+let notificationService: ReturnType<typeof createNotificationService> | undefined;
+let dispatcher: ReturnType<typeof createNotificationDispatcher> | undefined;
+
+if (serviceClient) {
+  const brevoProvider = env.BREVO_API_KEY
+    ? createBrevoEmailProvider({ apiKey: env.BREVO_API_KEY, senderEmail: env.BREVO_SENDER_EMAIL ?? "schoolsafe1@gmail.com" })
+    : undefined;
+  const zohoProvider = env.ZOHO_MAIL_API_KEY
+    ? createZohoEmailProvider(
+        {
+          apiKey: env.ZOHO_MAIL_API_KEY,
+          senderEmail: env.ZOHO_MAIL_SENDER_EMAIL ?? "schoolsafe@example.com",
+          senderName: env.ZOHO_MAIL_SENDER_NAME,
+          region: env.ZOHO_MAIL_REGION,
+        },
+        brevoProvider,
+      )
+    : brevoProvider;
+  const pushSubscriptionService = createPushSubscriptionService(serviceClient);
+  const pushProvider = env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY
+    ? createWebPushProvider({
+        publicKey: env.VAPID_PUBLIC_KEY,
+        privateKey: env.VAPID_PRIVATE_KEY,
+        subject: env.VAPID_SUBJECT,
+        getSubscriptions: (userId) => pushSubscriptionService.getSubscriptions(userId),
+      })
+    : undefined;
+
+  notificationService = createNotificationService(serviceClient, {
+    EMAIL: zohoProvider,
+    IN_APP: createInAppProvider(),
+    PUSH: pushProvider,
+  });
+
+  dispatcher = createNotificationDispatcher(serviceClient, notificationService);
+}
+
+const eventService = serviceClient
+  ? createEventService(serviceClient, dispatcher ? { dispatcher } : undefined)
+  : undefined;
+
 const cardService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createCardService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, r2Config, controlAppConfig)
   : undefined;
 
 const securityService = env.SUPABASE_SERVICE_ROLE_KEY
-  ? createSecurityService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, env.CARD_HMAC_SECRET)
+  ? createSecurityService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, env.CARD_HMAC_SECRET, eventService)
   : undefined;
 
 const alertService = env.SUPABASE_SERVICE_ROLE_KEY
@@ -96,6 +152,7 @@ const app = buildApp({
         service: securityService,
         resolveProfileId: (token: string) => resolveProfileId(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
+        eventService,
       }
     : undefined,
   alerts: alertService
