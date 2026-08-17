@@ -9,6 +9,7 @@ import { createSecurityService } from "./security/service.js";
 import { createAlertService } from "./pilotage/alerts/service.js";
 import { createDashboardService } from "./pilotage/dashboard/service.js";
 import { createBrevoEmailService, createNoopEmailService } from "./email/service.js";
+import { createFeeControlService } from "./finance/control/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
 
 const env = parseEnv(process.env);
@@ -56,6 +57,10 @@ const emailService = env.BREVO_API_KEY
     })
   : createNoopEmailService();
 
+const feeControlService = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createFeeControlService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  : undefined;
+
 const app = buildApp({
   bootstrap: {
     authVerifier: createSupabaseAuthVerifier(env.SUPABASE_URL, env.SUPABASE_ANON_KEY),
@@ -101,6 +106,13 @@ const app = buildApp({
     service: emailService,
     access: accessService,
   },
+  feeControl: feeControlService
+    ? {
+        service: feeControlService,
+        resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        access: accessService,
+      }
+    : undefined,
   access: accessService,
 });
 

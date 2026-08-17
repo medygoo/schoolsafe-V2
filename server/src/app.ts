@@ -10,6 +10,7 @@ import { registerSecurityRoutes, type SecurityRouteDependencies } from "./securi
 import { registerAlertRoutes, type AlertRouteDependencies } from "./pilotage/alerts/routes.js";
 import { registerDashboardRoutes, type DashboardRouteDependencies } from "./pilotage/dashboard/routes.js";
 import { registerEmailRoutes, type EmailRouteDependencies } from "./email/routes.js";
+import { registerFeeControlRoutes, type FeeControlRouteDependencies } from "./finance/control/routes.js";
 import { requirePermission } from "./access/guard.js";
 import type { AccessService } from "./access/service.js";
 
@@ -23,6 +24,7 @@ export type BuildAppOptions = {
   alerts?: AlertRouteDependencies;
   dashboard?: DashboardRouteDependencies;
   email?: EmailRouteDependencies;
+  feeControl?: FeeControlRouteDependencies;
   access?: AccessService;
 };
 
@@ -93,6 +95,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.email) {
     registerEmailRoutes(app, options.email);
+  }
+
+  if (options.feeControl) {
+    registerFeeControlRoutes(app, options.feeControl);
   }
 
   if (options.testRoutes) {
