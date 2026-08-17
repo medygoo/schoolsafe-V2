@@ -19,6 +19,10 @@
   <script src="./offline-sync.js" defer></script>
   <script type="module" src="./modules/cards/cards-module.js"></script>
   <script src="./modules/finance/finance-api.js" defer></script>
+  <script src="./modules/security/security-api.js" defer></script>
+  <script src="./modules/security/security-module.js" defer></script>
+  <script src="./modules/pilotage/pilotage-api.js" defer></script>
+  <script src="./modules/pilotage/pilotage-module.js" defer></script>
   <script src="./app.js" defer></script>
 </head>
 <body>
@@ -285,6 +289,26 @@
               <button type="button" data-finance-tab="family"><i data-lucide="contact-round"></i><span>Ma famille</span></button>
             </nav>
             <div class="pedagogy-content finance-content" id="financeContent"></div>
+          </section>
+          <section class="pedagogy-module security-module" id="securityModule" hidden>
+            <header class="pedagogy-module-header security-module-header">
+              <button class="secondary-button" id="closeSecurityModule" type="button"><i data-lucide="arrow-left"></i> Tableau de bord</button>
+              <div><span>Sécurité et contrôle</span><h2>Scanner une carte</h2><p>Scannez le QR d’un élève pour enregistrer une entrée, une sortie ou un incident.</p></div>
+              <span class="local-draft"><i data-lucide="shield-check"></i> Contrôle temps réel</span>
+            </header>
+            <div class="pedagogy-content security-content" id="securityContent"></div>
+          </section>
+          <section class="pedagogy-module pilotage-module" id="pilotageModule" hidden>
+            <header class="pedagogy-module-header pilotage-module-header">
+              <button class="secondary-button" id="closePilotageModule" type="button"><i data-lucide="arrow-left"></i> Tableau de bord</button>
+              <div><span>Pilotage</span><h2>Centre de décision</h2><p>Alertes, indicateurs et actions à traiter.</p></div>
+              <span class="local-draft"><i data-lucide="gauge"></i> Vue directrice</span>
+            </header>
+            <nav class="pedagogy-tabs pilotage-tabs" id="pilotageTabs" aria-label="Fonctions de pilotage">
+              <button class="active" type="button" data-pilotage-tab="dashboard"><i data-lucide="layout-dashboard"></i><span>Tableau de bord</span></button>
+              <button type="button" data-pilotage-tab="alerts"><i data-lucide="triangle-alert"></i><span>Alertes</span></button>
+            </nav>
+            <div class="pedagogy-content pilotage-content" id="pilotageContent"></div>
           </section>
           <section class="access-console" id="accessConsole" hidden>
             <header class="access-header"><div><span>Administration des accès</span><h2>Attribuer un rôle et limiter son périmètre</h2><p>Le modèle du rôle active les branches et actions utiles; l’Administrateur principal peut ensuite retirer une permission ou réduire son périmètre.</p></div><button class="secondary-button" id="closeAccessConsole" type="button"><i data-lucide="x"></i> Fermer</button></header>
