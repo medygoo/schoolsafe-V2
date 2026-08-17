@@ -6,6 +6,7 @@ import { defaultReadinessProbe, type ReadinessProbe } from "./health/readiness.j
 import { SchoolSafeError, type ApiErrorBody } from "./http/errors.js";
 import { newRequestId } from "./http/request-id.js";
 import { registerSetupRoutes, type SetupRouteDependencies } from "./setup/routes.js";
+import { registerSecurityRoutes, type SecurityRouteDependencies } from "./security/routes.js";
 import { requirePermission } from "./access/guard.js";
 import type { AccessService } from "./access/service.js";
 
@@ -15,6 +16,7 @@ export type BuildAppOptions = {
   bootstrap?: BootstrapRouteDependencies;
   setup?: SetupRouteDependencies;
   cards?: CardRouteDependencies;
+  security?: SecurityRouteDependencies;
   access?: AccessService;
 };
 
@@ -69,6 +71,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.cards) {
     registerCardRoutes(app, options.cards);
+  }
+
+  if (options.security) {
+    registerSecurityRoutes(app, options.security);
   }
 
   if (options.testRoutes) {

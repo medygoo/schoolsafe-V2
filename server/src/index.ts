@@ -5,6 +5,7 @@ import { createBootstrapService } from "./bootstrap/service.js";
 import { createCardService } from "./cards/service.js";
 import { parseEnv } from "./config/env.js";
 import { createSetupService } from "./setup/service.js";
+import { createSecurityService } from "./security/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
 
 const env = parseEnv(process.env);
@@ -32,6 +33,10 @@ const cardService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createCardService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, r2Config, controlAppConfig)
   : undefined;
 
+const securityService = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createSecurityService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, env.CARD_HMAC_SECRET)
+  : undefined;
+
 const app = buildApp({
   bootstrap: {
     authVerifier: createSupabaseAuthVerifier(env.SUPABASE_URL, env.SUPABASE_ANON_KEY),
@@ -48,6 +53,13 @@ const app = buildApp({
   cards: cardService
     ? {
         service: cardService,
+        resolveProfileId: (token: string) => resolveProfileId(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        access: accessService,
+      }
+    : undefined,
+  security: securityService
+    ? {
+        service: securityService,
         resolveProfileId: (token: string) => resolveProfileId(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
       }
