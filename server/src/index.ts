@@ -126,7 +126,12 @@ const pedagogyService = env.SUPABASE_SERVICE_ROLE_KEY
   : undefined;
 
 const schoolService = env.SUPABASE_SERVICE_ROLE_KEY
-  ? createSchoolService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, env.DEFAULT_STAFF_PASSWORD ?? "SchoolSafe2026!")
+  ? createSchoolService(
+      env.SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
+      env.DEFAULT_STAFF_PASSWORD ?? "SchoolSafe2026!",
+      notificationService,
+    )
   : undefined;
 
 const app = buildApp({

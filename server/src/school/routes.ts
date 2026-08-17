@@ -10,6 +10,7 @@ import type { SchoolService } from "./service.js";
 import {
   createAcademicYearSchema,
   inviteStaffSchema,
+  resendInviteSchema,
   toggleCycleSchema,
   toggleStaffActiveSchema,
   updateAcademicYearSchema,
@@ -68,11 +69,33 @@ export function registerSchoolRoutes(app: FastifyInstance, deps: SchoolRouteDepe
     { preHandler: [requirePermission(access, "staff.manage")] },
     async (request, reply) => {
       const token = request.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
-      const { schoolId } = await resolveProfileAndSchool(token);
+      const { profileId, schoolId } = await resolveProfileAndSchool(token);
       if (!schoolId) throw new SchoolSafeError(403, "SCHOOL_NOT_FOUND", "École introuvable", false);
+      if (!profileId) throw new SchoolSafeError(403, "ACCESS_DENIED", "Profil introuvable", false);
       const payload = inviteStaffSchema.parse(request.body);
-      const result = await service.inviteStaff(schoolId, payload);
+      const result = await service.inviteStaff(schoolId, profileId, payload);
       reply.status(201).send(result);
+    },
+  );
+
+  app.get(
+    "/school/staff/:id",
+    { preHandler: [requirePermission(access, "staff.manage")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const member = await service.getStaffDetail(id);
+      reply.send(member);
+    },
+  );
+
+  app.post(
+    "/school/staff/:id/resend-invite",
+    { preHandler: [requirePermission(access, "staff.manage")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      resendInviteSchema.parse(request.body);
+      await service.resendStaffInvite(id);
+      reply.send({ status: "ok" });
     },
   );
 
@@ -81,8 +104,12 @@ export function registerSchoolRoutes(app: FastifyInstance, deps: SchoolRouteDepe
     { preHandler: [requirePermission(access, "staff.manage")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      const token = request.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+      const { profileId, schoolId } = await resolveProfileAndSchool(token);
+      if (!schoolId) throw new SchoolSafeError(403, "SCHOOL_NOT_FOUND", "École introuvable", false);
+      if (!profileId) throw new SchoolSafeError(403, "ACCESS_DENIED", "Profil introuvable", false);
       const payload = updateStaffRolesSchema.parse(request.body);
-      await service.updateStaffRoles(id, payload);
+      await service.updateStaffRoles(id, schoolId, profileId, payload);
       reply.send({ status: "ok" });
     },
   );
@@ -92,8 +119,12 @@ export function registerSchoolRoutes(app: FastifyInstance, deps: SchoolRouteDepe
     { preHandler: [requirePermission(access, "staff.manage")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      const token = request.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+      const { profileId, schoolId } = await resolveProfileAndSchool(token);
+      if (!schoolId) throw new SchoolSafeError(403, "SCHOOL_NOT_FOUND", "École introuvable", false);
+      if (!profileId) throw new SchoolSafeError(403, "ACCESS_DENIED", "Profil introuvable", false);
       const payload = toggleStaffActiveSchema.parse(request.body);
-      await service.toggleStaffActive(id, payload);
+      await service.toggleStaffActive(id, schoolId, profileId, payload);
       reply.send({ status: "ok" });
     },
   );

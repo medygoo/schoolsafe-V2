@@ -57,10 +57,26 @@ function createMockService(): SchoolService {
         email: "admin@ecole.cd",
         phone: null,
         is_active: true,
+        auth_user_id: "auth-user-1",
+        school_id: "school-1",
         roles: [{ id: "20000000-0000-0000-0000-000000000001", code: "admin", label: "Administrateur" }],
       },
     ]),
+    getStaffDetail: vi.fn().mockResolvedValue({
+      id: "profile-1",
+      first_name: "Jean",
+      last_name: "Admin",
+      display_name: "Jean Admin",
+      email: "admin@ecole.cd",
+      phone: null,
+      is_active: true,
+      auth_user_id: "auth-user-1",
+      school_id: "school-1",
+      roles: [{ id: "20000000-0000-0000-0000-000000000001", code: "admin", label: "Administrateur" }],
+      scopes: [],
+    }),
     inviteStaff: vi.fn().mockResolvedValue({ profile_id: "profile-2", user_id: "user-2" }),
+    resendStaffInvite: vi.fn().mockResolvedValue(undefined),
     updateStaffRoles: vi.fn().mockResolvedValue(undefined),
     toggleStaffActive: vi.fn().mockResolvedValue(undefined),
     listRoles: vi.fn().mockResolvedValue([
@@ -137,7 +153,8 @@ describe("School & Staff routes", () => {
   });
 
   it("POST /school/staff/invite creates a staff member", async () => {
-    const app = buildTestApp(createMockService(), accessService());
+    const service = createMockService();
+    const app = buildTestApp(service, accessService());
     const response = await app.inject({
       method: "POST",
       url: "/school/staff/invite",
@@ -151,11 +168,44 @@ describe("School & Staff routes", () => {
     });
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({ profile_id: "profile-2" });
+    expect(service.inviteStaff).toHaveBeenCalledWith("school-1", "profile-1", {
+      email: "teacher@ecole.cd",
+      first_name: "Marie",
+      last_name: "Enseignante",
+      role_ids: ["20000000-0000-0000-0000-000000000002"],
+    });
+    await app.close();
+  });
+
+  it("GET /school/staff/:id returns staff detail", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const response = await app.inject({
+      method: "GET",
+      url: "/school/staff/profile-1",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: "profile-1", email: "admin@ecole.cd", scopes: [] });
+    await app.close();
+  });
+
+  it("POST /school/staff/:id/resend-invite resends invite", async () => {
+    const service = createMockService();
+    const app = buildTestApp(service, accessService());
+    const response = await app.inject({
+      method: "POST",
+      url: "/school/staff/profile-1/resend-invite",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: "ok" });
+    expect(service.resendStaffInvite).toHaveBeenCalledWith("profile-1");
     await app.close();
   });
 
   it("PUT /school/staff/:id/roles updates roles", async () => {
-    const app = buildTestApp(createMockService(), accessService());
+    const service = createMockService();
+    const app = buildTestApp(service, accessService());
     const response = await app.inject({
       method: "PUT",
       url: "/school/staff/profile-1/roles",
@@ -164,11 +214,18 @@ describe("School & Staff routes", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "ok" });
+    expect(service.updateStaffRoles).toHaveBeenCalledWith(
+      "profile-1",
+      "school-1",
+      "profile-1",
+      { role_ids: ["20000000-0000-0000-0000-000000000001", "20000000-0000-0000-0000-000000000002"] },
+    );
     await app.close();
   });
 
   it("POST /school/staff/:id/toggle toggles active state", async () => {
-    const app = buildTestApp(createMockService(), accessService());
+    const service = createMockService();
+    const app = buildTestApp(service, accessService());
     const response = await app.inject({
       method: "POST",
       url: "/school/staff/profile-1/toggle",
@@ -177,6 +234,7 @@ describe("School & Staff routes", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "ok" });
+    expect(service.toggleStaffActive).toHaveBeenCalledWith("profile-1", "school-1", "profile-1", { is_active: false });
     await app.close();
   });
 

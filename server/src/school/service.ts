@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { NotificationService } from "../notifications/types.js";
 import type {
   CreateAcademicYearPayload,
   InviteStaffPayload,
@@ -46,6 +47,8 @@ export interface StaffMember {
   email: string;
   phone: string | null;
   is_active: boolean;
+  auth_user_id: string | null;
+  school_id: string;
   roles: Array<{ id: string; code: string; label: string }>;
 }
 
@@ -65,9 +68,27 @@ export interface SchoolService {
   getSettings(schoolId: string): Promise<SchoolSettings>;
   updateSettings(schoolId: string, payload: UpdateSchoolSettingsPayload): Promise<SchoolSettings>;
   listStaff(schoolId: string): Promise<StaffMember[]>;
-  inviteStaff(schoolId: string, payload: InviteStaffPayload): Promise<{ profile_id: string; user_id: string }>;
-  updateStaffRoles(profileId: string, payload: UpdateStaffRolesPayload): Promise<void>;
-  toggleStaffActive(profileId: string, payload: ToggleStaffActivePayload): Promise<void>;
+  getStaffDetail(
+    profileId: string,
+  ): Promise<StaffMember & { scopes: Array<{ scope_type: string; scope_id: string | null; label: string | null }> }>;
+  inviteStaff(
+    schoolId: string,
+    actorProfileId: string,
+    payload: InviteStaffPayload,
+  ): Promise<{ profile_id: string; user_id: string }>;
+  resendStaffInvite(profileId: string): Promise<void>;
+  updateStaffRoles(
+    profileId: string,
+    schoolId: string,
+    actorProfileId: string,
+    payload: UpdateStaffRolesPayload,
+  ): Promise<void>;
+  toggleStaffActive(
+    profileId: string,
+    schoolId: string,
+    actorProfileId: string,
+    payload: ToggleStaffActivePayload,
+  ): Promise<void>;
   listRoles(): Promise<Role[]>;
   listPermissions(): Promise<Permission[]>;
   listAcademicYears(schoolId: string): Promise<Array<{ id: string; label: string; starts_on: string; ends_on: string; periods: string; is_active: boolean }>>;
@@ -93,6 +114,7 @@ export function createSchoolService(
   supabaseUrl: string,
   serviceRoleKey: string | undefined,
   defaultPassword: string,
+  notificationService?: NotificationService,
 ): SchoolService {
   if (!serviceRoleKey) {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for school service");
@@ -198,7 +220,7 @@ export function createSchoolService(
     async listStaff(schoolId: string): Promise<StaffMember[]> {
       const { data: profiles, error } = await serviceClient
         .from("profiles")
-        .select("id, first_name, last_name, display_name, phone, is_active, auth_user_id")
+        .select("id, first_name, last_name, display_name, phone, is_active, auth_user_id, school_id")
         .eq("school_id", schoolId)
         .order("display_name");
 
@@ -233,11 +255,81 @@ export function createSchoolService(
         email: userEmails.get(p.auth_user_id) ?? "",
         phone: p.phone,
         is_active: p.is_active,
+        auth_user_id: p.auth_user_id,
+        school_id: p.school_id,
         roles: rolesByProfile.get(p.id) ?? [],
       }));
     },
 
-    async inviteStaff(schoolId: string, payload: InviteStaffPayload): Promise<{ profile_id: string; user_id: string }> {
+    async getStaffDetail(
+      profileId: string,
+    ): Promise<StaffMember & { scopes: Array<{ scope_type: string; scope_id: string | null; label: string | null }> }> {
+      const { data: profile, error } = await serviceClient
+        .from("profiles")
+        .select("id, first_name, last_name, display_name, phone, is_active, auth_user_id, school_id")
+        .eq("id", profileId)
+        .single();
+      if (error || !profile) throw new Error(`Failed to load staff detail: ${JSON.stringify(error)}`);
+
+      const [{ data: profileRoles }, { data: roles }, { data: users }, { data: scopes }] = await Promise.all([
+        serviceClient.from("profile_roles").select("profile_id, role_id").eq("profile_id", profileId),
+        serviceClient.from("roles").select("id, code, label"),
+        serviceClient.auth.admin.listUsers(),
+        serviceClient.from("scope_assignments").select("scope_type, scope_id, label").eq("profile_id", profileId),
+      ]);
+
+      const roleMap = new Map(roles?.map((r) => [r.id, r]) ?? []);
+      const userEmails = new Map(users?.users.map((u) => [u.id, u.email]) ?? []);
+
+      const memberRoles: Array<{ id: string; code: string; label: string }> = [];
+      for (const pr of profileRoles ?? []) {
+        const role = roleMap.get(pr.role_id);
+        if (role) memberRoles.push({ id: role.id, code: role.code, label: role.label });
+      }
+
+      return {
+        id: profile.id,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        display_name: profile.display_name,
+        email: userEmails.get(profile.auth_user_id) ?? "",
+        phone: profile.phone,
+        is_active: profile.is_active,
+        auth_user_id: profile.auth_user_id,
+        school_id: profile.school_id,
+        roles: memberRoles,
+        scopes: scopes ?? [],
+      };
+    },
+
+    async resendStaffInvite(profileId: string): Promise<void> {
+      const detail = await this.getStaffDetail(profileId);
+      if (!detail.email) throw new Error("No email for staff member");
+      if (!detail.auth_user_id) throw new Error("No auth user for staff member");
+
+      const newPassword = defaultPassword;
+      const { error: updateError } = await serviceClient.auth.admin.updateUserById(detail.auth_user_id, {
+        password: newPassword,
+      });
+      if (updateError) throw new Error(`Failed to reset password: ${JSON.stringify(updateError)}`);
+
+      if (notificationService) {
+        await notificationService.queue({
+          schoolId: detail.school_id as string,
+          userId: detail.auth_user_id,
+          channel: "EMAIL",
+          templateKey: "STAFF_INVITED",
+          message: `Bienvenue sur SchoolSafe. Vos identifiants : email ${detail.email}, mot de passe temporaire ${newPassword}.`,
+          recipientEmail: detail.email,
+        });
+      }
+    },
+
+    async inviteStaff(
+      schoolId: string,
+      actorProfileId: string,
+      payload: InviteStaffPayload,
+    ): Promise<{ profile_id: string; user_id: string }> {
       const displayName = `${payload.first_name} ${payload.last_name}`;
 
       const { data: authData, error: authError } = await serviceClient.auth.admin.createUser({
@@ -279,10 +371,25 @@ export function createSchoolService(
         throw new Error(`Failed to assign roles: ${JSON.stringify(rolesError)}`);
       }
 
+      const { error: auditError } = await serviceClient.from("audit_events").insert({
+        school_id: schoolId,
+        actor_profile_id: actorProfileId,
+        event_type: "staff.invited",
+        payload: { invited_profile_id: profile.id, role_ids: payload.role_ids },
+      });
+      if (auditError) {
+        throw new Error(`Failed to record audit event: ${JSON.stringify(auditError)}`);
+      }
+
       return { profile_id: profile.id, user_id: authData.user.id };
     },
 
-    async updateStaffRoles(profileId: string, payload: UpdateStaffRolesPayload): Promise<void> {
+    async updateStaffRoles(
+      profileId: string,
+      schoolId: string,
+      actorProfileId: string,
+      payload: UpdateStaffRolesPayload,
+    ): Promise<void> {
       const { error: deleteError } = await serviceClient
         .from("profile_roles")
         .delete()
@@ -296,14 +403,39 @@ export function createSchoolService(
 
       const { error: insertError } = await serviceClient.from("profile_roles").insert(roleRows);
       if (insertError) throw new Error(`Failed to update roles: ${JSON.stringify(insertError)}`);
+
+      const { error: auditError } = await serviceClient.from("audit_events").insert({
+        school_id: schoolId,
+        actor_profile_id: actorProfileId,
+        event_type: "staff.roles_changed",
+        payload: { new_role_ids: payload.role_ids },
+      });
+      if (auditError) {
+        throw new Error(`Failed to record audit event: ${JSON.stringify(auditError)}`);
+      }
     },
 
-    async toggleStaffActive(profileId: string, payload: ToggleStaffActivePayload): Promise<void> {
+    async toggleStaffActive(
+      profileId: string,
+      schoolId: string,
+      actorProfileId: string,
+      payload: ToggleStaffActivePayload,
+    ): Promise<void> {
       const { error } = await serviceClient
         .from("profiles")
         .update({ is_active: payload.is_active })
         .eq("id", profileId);
       if (error) throw new Error(`Failed to toggle staff active state: ${JSON.stringify(error)}`);
+
+      const { error: auditError } = await serviceClient.from("audit_events").insert({
+        school_id: schoolId,
+        actor_profile_id: actorProfileId,
+        event_type: "staff.toggled",
+        payload: { is_active: payload.is_active },
+      });
+      if (auditError) {
+        throw new Error(`Failed to record audit event: ${JSON.stringify(auditError)}`);
+      }
     },
 
     async listRoles(): Promise<Role[]> {

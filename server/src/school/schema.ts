@@ -51,6 +51,8 @@ export const toggleStaffActiveSchema = z.object({
   is_active: z.boolean(),
 });
 
+export const resendInviteSchema = z.object({}).optional();
+
 export const createAcademicYearSchema = z.object({
   label: z.string().min(1),
   starts_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
