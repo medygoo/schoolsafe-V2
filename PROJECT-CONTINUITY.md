@@ -227,6 +227,11 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Tests visuels automatisés :
   - `app/modules/cards/test-card.html` : rendu badge + carte validé par capture Playwright ;
   - intégration V2 : le studio s'affiche correctement dans le workspace.
+- Ajustements de finalisation des cartes :
+  - logo SchoolSafe en bas des deux faces (recto et verso) via un chemin absolu `/schoolsafe-logo.png` pour fonctionner dans le PWA et la page de test ;
+  - site web de l'école affiché sur le recto de la carte PVC et dans le bloc contact du verso ;
+  - e-mail SchoolSafe `schoolsafe1@gmail.com` affiché sur le verso (badge et carte) ;
+  - suppression du label "Badge élève — Verso" pour ne pas gêner l'impression.
 
 ### Connexion V2 → app centrale pour les cartes
 
@@ -285,9 +290,9 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Dépôt principal : `https://github.com/medygoo/schoolsafemm.git`
 - Dépôt app centrale : `https://github.com/medygoo/schoolsafe-control-.git`
 - Commits récents sur `schoolsafemm` :
+  - `aaf9d36 fix(cards): logo SchoolSafe absolu et suppression du label Verso`
   - `5223993 refactor: move control-app to dedicated repo schoolsafe-control-`
   - `5f12a64 docs: finalize PROJECT-CONTINUITY and add LAUNCH.md`
-  - `92b1230 feat(control-app): finalisation de l'app centrale (Render + Neon)`
 
 ---
 
@@ -295,15 +300,15 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Migration de l'app centrale vers son propre dépôt et mise à jour de la documentation** : déplacer `control-app/` vers `https://github.com/medygoo/schoolsafe-control-.git`, nettoyer le dépôt principal, mettre à jour `docs/LAUNCH.md` et `PROJECT-CONTINUITY.md`.
+**Finalisation des ajustements carte et mise à jour de la documentation** : corriger le chemin du logo SchoolSafe, supprimer le label "Verso", et synchroniser `PROJECT-CONTINUITY.md`.
 
 ### État d'avancement
 
 - Intégration front du moteur de cartes terminée et testée visuellement.
-- Application de contrôle centrale finalisée et poussée sur `origin/main`.
-- App centrale migrée dans le dépôt dédié `schoolsafe-control-`.
+- Application de contrôle centrale finalisée et migrée dans son propre dépôt.
 - Dépôt principal nettoyé (`control-app/` supprimé).
-- Documentation en cours de mise à jour.
+- Ajustements cartes finalisés et poussés sur `origin/main`.
+- Documentation synchronisée.
 - Fichier complet téléchargé localement : `analysis/zalavrai.html` (~2,2 Mo).
 - Analyse technique complète réalisée (section détaillée ci-dessous).
 - Architecture des cartes verrouillée :
@@ -613,19 +618,23 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-App centrale migrée dans son propre dépôt `https://github.com/medygoo/schoolsafe-control-.git`. Le dossier `control-app/` a été supprimé du dépôt principal. La documentation est en cours de mise à jour.
+Finalisation des ajustements des cartes élèves : logo SchoolSafe en chemin absolu sur les deux faces, site de l'école et e-mail `schoolsafe1@gmail.com` présents, label "Verso" supprimé. `PROJECT-CONTINUITY.md` mis à jour.
 
 ### Ce que j'étais en train de faire
 
-- Pousser l'historique de `control-app/` vers le dépôt `schoolsafe-control-`.
-- Supprimer `control-app/` du dépôt principal.
-- Mettre à jour `docs/LAUNCH.md` et `PROJECT-CONTINUITY.md` pour refléter le dépôt séparé.
+- Corriger `app/modules/cards/card-renderer.js` et `app/modules/cards/test-card.html`.
+- Synchroniser `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
-1. Commiter et pousser les mises à jour de documentation sur `origin/main`.
-2. Nettoyer les branches temporaires locales (`control-app-split`, `control-app-to-push`).
-3. Passer à la gestion du double rôle (enseignant + parent).
+1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
+2. Passer à l'étude approfondie de la prochaine fonctionnalité (double rôle, ou autre priorité définie).
+
+### Commandes/tests restants
+
+- `cd server && npm test`
+- `node tests/qa-permanent-preview.cjs`
+- Ouvrir `http://127.0.0.1:4175/modules/cards/test-card.html` pour valider visuellement.
 
 ### Commandes/tests restants
 
@@ -651,4 +660,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 17 août 2026 — app centrale migrée dans le dépôt dédié `schoolsafe-control-` ; dépôt principal nettoyé et documentation mise à jour.*
+*Dernière mise à jour : 17 août 2026 — ajustements cartes finalisés (logo SchoolSafe absolu, site école, e-mail, suppression label Verso) ; app centrale dans son dépôt dédié.*
