@@ -267,6 +267,25 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Tests unitaires : `server/tests/access-guard.test.ts` (5/5 passent).
 - Vérifications : `npm run typecheck` ✅ et `npm test` ✅ 36/36.
 
+### Double rôle — sélecteur de rôle actif et deny override dans le bootstrap
+
+- Décisions validées :
+  - sélecteur de rôle actif dans le workspace ;
+  - comportement contextuel selon le module (ex. enseignant + parent) ;
+  - rôles personnalisables par l’admin principal.
+- Côté serveur (`server/src/bootstrap/service.ts`) :
+  - calcul des permissions effectives par union des rôles avec **deny override** ;
+  - une permission autorisée par un rôle et refusée explicitement par un autre est retirée de la liste envoyée au front.
+- Côté front (`app/app.js`) :
+  - le workspace affiche un sélecteur de rôle actif basé sur les vrais rôles du bootstrap ;
+  - le choix est persisté dans `localStorage` (`schoolsafe-v2-active-role`) ;
+  - si un seul rôle, le sélecteur est masqué/désactivé.
+- Tests :
+  - `server/tests/bootstrap.test.ts` : test multi-rôle avec plusieurs rôles, permissions et scopes.
+  - Tous les tests serveur passent : **39/39**.
+  - Test QA permanent preview : **3/3**.
+- Commit et push : `ffeaeb6 feat(double-role): selecteur de role actif et deny override dans le bootstrap`.
+
 ### Envoi batch des cartes vers l'app centrale
 
 - Migration Supabase : `supabase/migrations/202608170002_card_print_version.sql`.
@@ -358,30 +377,26 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Mise à jour de l’application de contrôle centrale** : ajout de l’interface de gestion des écoles (création, token/HMAC, blocage) et correction des bugs SQLite en local.
+**Gestion du double rôle** : sélecteur de rôle actif dans le workspace et calcul des permissions avec deny override côté serveur.
 
 ### État d'avancement
 
-- Interface de gestion des écoles ajoutée dans l’app centrale (`schoolsafe-control-`) et poussée sur `main`.
-- Bugs SQLite corrigés : création automatique du répertoire `data/` et chemin cohérent `control-app.db`.
-- Build et tests locaux validés.
-- Dépôt principal mis à jour : `PROJECT-CONTINUITY.md` en cours de synchronisation.
+- Deny override implémenté dans le bootstrap serveur.
+- Sélecteur de rôle actif implémenté dans le front PWA.
+- Tests ajoutés et tous passent (39/39 serveur, 3/3 QA preview).
+- `PROJECT-CONTINUITY.md` en cours de synchronisation.
 
 ### Fichiers concernés
 
-- Dépôt `schoolsafe-control-` :
-  - `public/index.html`
-  - `public/app.js`
-  - `public/styles.css`
-  - `src/db/index.ts`
-  - `src/db/sqlite.ts`
-- Dépôt principal : `PROJECT-CONTINUITY.md` (ce fichier).
+- `app/app.js`
+- `server/src/bootstrap/service.ts`
+- `server/tests/bootstrap.test.ts`
+- `PROJECT-CONTINUITY.md` (ce fichier).
 
 ### Prochaine action immédiate
 
 1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md` sur `main`.
-2. Attendre le déploiement automatique de `schoolsafe-control-` sur Render.
-3. Passer à la prochaine fonctionnalité selon les priorités du propriétaire.
+2. Passer à la prochaine fonctionnalité selon les priorités du propriétaire (gestion avancée du double rôle, fiche de lancement, etc.).
 
 ---
 
@@ -389,7 +404,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Fonctionnalités non terminées
 
-- Gestion du double rôle (enseignant + parent).
+- (aucune bloquante ; la gestion de base du double rôle est en place).
 
 ### Améliorations prévues
 
@@ -401,7 +416,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Prochaines étapes logiques
 
-1. Gestion du double rôle (enseignant + parent).
+1. Gestion avancée du double rôle (affichage contextuel par module).
 2. Documenter l'interface d'entrée/sortie du système de cartes.
 3. Créer l'adaptateur versionné avec tests de contrat.
 4. Poursuivre l'étude détaillée des fonctionnalités une par une (finance, pédagogie, sécurité, etc.).
@@ -549,4 +564,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 17 August 2026 — interface de gestion des écoles dans l’app centrale ; correction SQLite local ; push sur `schoolsafe-control-`.*
+*Dernière mise à jour : 17 août 2026 — gestion de base du double rôle (deny override + sélecteur de rôle actif) ; interface de gestion des écoles dans l’app centrale.*
