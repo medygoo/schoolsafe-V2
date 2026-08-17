@@ -15,6 +15,10 @@ const _ssCARDS = {
   PATS: ALL_PATRIMOINS.map(p => ({ v: p.value, n: p.name }))
 };
 
+const SS_LOGO_SRC = 'schoolsafe-logo.png';
+const ssLogoBadge = `<img src="${SS_LOGO_SRC}" alt="SchoolSafe" style="height:18px;width:auto;object-fit:contain;filter:brightness(0) invert(1)">`;
+const ssLogoCarte = `<img src="${SS_LOGO_SRC}" alt="SchoolSafe" style="height:16px;width:auto;object-fit:contain;filter:brightness(0) invert(1)">`;
+
 export function esc(s) {
   const d = document.createElement('div');
   d.textContent = (s == null ? '' : String(s));
@@ -110,7 +114,6 @@ export function ssBuildBadge(s, cl, teacher, year, patB, patStyle, schoolInfo, l
   const rectoOverlay = bottomEl ? `<div style="position:absolute;bottom:58px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none">${bottomEl}</div>` : '';
 
   const recto = `<div class="art badge" id="ss-br">
-  <div class="face-tag">RECTO — BADGE VERTICAL</div>
   <div class="head">
     <div class="arc"><i></i><i></i><i></i><i></i><i></i></div>
     <div class="head-row">${logoH}<div class="school"><div class="rdc">Rép. Démocratique du Congo</div><div class="nm" style="font-size:${sz}">${esc(snm)}</div>${slg ? `<div class="slg">${esc(slg)}</div>` : ''}</div><div class="flag"></div></div>
@@ -140,13 +143,12 @@ export function ssBuildBadge(s, cl, teacher, year, patB, patStyle, schoolInfo, l
     <span class="deco" style="top:4px;right:8px;font-size:20px;transform:rotate(10deg)">A</span>
     <span class="deco" style="top:30px;right:26px;font-size:13px;transform:rotate(-14deg)">b</span>
     <span class="deco" style="bottom:46px;left:8px;font-size:17px;transform:rotate(8deg)">c</span>
-    <div class="foot" style="position:absolute;bottom:0;left:-18px;right:-18px;z-index:20"><div style="height:22px;display:flex;align-items:center;padding:0 4px"><span style="font-size:10px;font-weight:900;letter-spacing:.5px">SchoolSafe</span></div><div><div class="t1">Sécurisé par SchoolSafe</div><div class="t2">un enfant protégé, un parent informé</div></div><span style="margin-left:auto;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.3);border-radius:999px;padding:3px 10px;font-family:'Baloo 2',cursive;font-size:10px;font-weight:900;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">${esc(clNm)}</span></div>
+    <div class="foot" style="position:absolute;bottom:0;left:-18px;right:-18px;z-index:20"><div style="height:22px;display:flex;align-items:center;padding:0 4px">${ssLogoBadge}</div><div><div class="t1">Sécurisé par SchoolSafe</div><div class="t2">un enfant protégé, un parent informé</div></div><span style="margin-left:auto;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.3);border-radius:999px;padding:3px 10px;font-family:'Baloo 2',cursive;font-size:10px;font-weight:900;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">${esc(clNm)}</span></div>
   </div>
   ${rectoOverlay}
 </div>`;
 
   const verso = `<div class="art badge verso" id="ss-bv">
-  <div class="face-tag">VERSO — BADGE VERTICAL</div>
   <div class="head" style="padding-bottom:16px">
     <div class="arc"><i></i><i></i><i></i><i></i><i></i></div>
     <div class="head-row">${logoH}<div class="school"><div class="rdc">Badge élève — Verso</div><div class="nm" style="font-size:${sz}">${esc(snm)}</div></div><div class="flag"></div></div>
@@ -164,11 +166,12 @@ export function ssBuildBadge(s, cl, teacher, year, patB, patStyle, schoolInfo, l
         <div class="v">${esc(phone)}</div>
         ${email && email !== '—' ? `<div class="v">${esc(email)}</div>` : ''}
         ${site ? `<div class="v">${esc(site)}</div>` : ''}
+        <div class="v" style="color:#0b6e4f;font-weight:900">schoolsafe1@gmail.com</div>
       </div></div>
     </div>
     <div class="sec-note"><b>🛡️</b> En cas de perte, contactez la direction de l'école.</div>
     <div class="sign-row"><div class="sg"><div class="line"></div><b>SIGNATURE</b></div><div class="stamp">SCEAU<br>DE<br>L'ÉCOLE</div><div class="sg"><div class="line"></div><b>DIRECTEUR(TRICE)</b></div></div>
-    <div class="foot" style="margin:auto -18px -8px"><div style="height:22px;display:flex;align-items:center;padding:0 4px"><span style="font-size:10px;font-weight:900">SchoolSafe</span></div><div><div class="t1">Sécurisé par SchoolSafe</div><div class="t2">un enfant protégé, un parent informé</div></div></div>
+    <div class="foot" style="margin:auto -18px -8px"><div style="height:22px;display:flex;align-items:center;padding:0 4px">${ssLogoBadge}</div><div><div class="t1">Sécurisé par SchoolSafe</div><div class="t2">un enfant protégé, un parent informé</div></div></div>
   </div>
 </div>`;
   return { recto, verso, qr: 'schoolsafe://student/' + mat };
@@ -196,8 +199,7 @@ export function ssBuildCarte(s, cl, teacher, year, patC, patStyle, schoolInfo, l
   const nmEl = `<div class="pat" style="margin-top:auto;padding:2px 0"><span class="nm2">${esc((px + patC.n).toUpperCase())}</span></div>`;
 
   const recto = `<div class="art carte" id="ss-cr">
-  <div class="face-tag">RECTO — CARTE HORIZONTALE</div>
-  <div class="head"><div class="arc"><i></i><i></i><i></i><i></i><i></i></div>${logoH}<div class="school"><div class="rdc">République Démocratique du Congo</div><div class="nm" style="font-size:${sz}">${esc(snm)}</div>${slg ? `<div class="slg">${esc(slg)}</div>` : ''}</div><div class="flag"></div></div>
+  <div class="head"><div class="arc"><i></i><i></i><i></i><i></i><i></i></div>${logoH}<div class="school"><div class="rdc">République Démocratique du Congo</div><div class="nm" style="font-size:${sz}">${esc(snm)}</div>${slg ? `<div class="slg">${esc(slg)}</div>` : ''}${site ? `<div class="slg" style="font-weight:800">${esc(site)}</div>` : ''}</div><div class="flag"></div></div>
   <div class="titlebar"><span class="tb-type">CARTE D'ÉLÈVE</span><span class="tb-cls">${esc(clNm)}</span></div>
   <div class="bodyz">
     ${showFond ? ssVeil(patC, true) : ''}
@@ -218,11 +220,10 @@ export function ssBuildCarte(s, cl, teacher, year, patC, patStyle, schoolInfo, l
     </div>
     <div class="qr-col"><div class="qr-box" id="ss-qr-cr"></div><b>SCAN ENTRÉE / SORTIE</b></div>
   </div>
-  <div class="foot"><div style="height:20px;display:flex;align-items:center;padding:0 4px"><span style="font-size:9px;font-weight:900">SchoolSafe</span></div><div><div class="t1">SchoolSafe</div><div class="t2">un enfant protégé, un parent informé</div></div><div class="val">VALIDE ${esc(year)}</div></div>
+  <div class="foot"><div style="height:20px;display:flex;align-items:center;padding:0 4px">${ssLogoCarte}</div><div><div class="t1">SchoolSafe</div><div class="t2">un enfant protégé, un parent informé</div></div><div class="val">VALIDE ${esc(year)}</div></div>
 </div>`;
 
   const verso = `<div class="art carte verso" id="ss-cv">
-  <div class="face-tag">VERSO — CARTE HORIZONTALE</div>
   <div class="head" style="padding:10px 18px">${logoSrc ? `<div class="logo-slot" style="width:36px;height:36px;border:none;background:transparent;padding:0"><img src="${logoSrc}" alt=""></div>` : '<div class="logo-slot" style="width:36px;height:36px;font-size:11px"><span>LOGO</span></div>'}<div class="school"><div class="rdc">En cas de perte, merci de restituer à :</div><div class="nm" style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(snm)}${addr ? ' — ' + esc(addr) : ''}</div></div><div class="flag"></div></div>
   <div class="bodyz">
     ${showFond ? ssVeil(patC, true) : ''}
@@ -234,6 +235,8 @@ export function ssBuildCarte(s, cl, teacher, year, patC, patStyle, schoolInfo, l
           <div class="k">Contacter l'école</div>
           <div class="v">${esc(phone)}</div>
           ${email && email !== '—' ? `<div class="v">${esc(email)}</div>` : ''}
+          ${site ? `<div class="v">${esc(site)}</div>` : ''}
+          <div class="v" style="color:#0b6e4f;font-weight:900">schoolsafe1@gmail.com</div>
         </div><div style="flex:none"><div class="k">Année</div><div class="v">${esc(year)}</div></div></div>
       </div>
       <div class="sec-note" style="margin-top:auto"><b>🛡️</b> Accès contrôlé par scan SchoolSafe.</div>
@@ -244,7 +247,7 @@ export function ssBuildCarte(s, cl, teacher, year, patC, patStyle, schoolInfo, l
       <div class="stamp">SCEAU<br>DE<br>L'ÉCOLE</div>
     </div>
   </div>
-  <div class="foot"><div style="height:20px;display:flex;align-items:center;padding:0 4px"><span style="font-size:9px;font-weight:900">SchoolSafe</span></div><div><div class="t1">SchoolSafe</div><div class="t2">${site ? esc(site) : 'www.schoolsafe.cd'}</div></div><div class="val">N° ${esc(mat)}</div></div>
+  <div class="foot"><div style="height:20px;display:flex;align-items:center;padding:0 4px">${ssLogoCarte}</div><div><div class="t1">SchoolSafe</div><div class="t2">${site ? esc(site) : 'www.schoolsafe.cd'}</div></div><div class="val">N° ${esc(mat)}</div></div>
 </div>`;
   return { recto, verso, qr: 'schoolsafe://student/' + mat };
 }
