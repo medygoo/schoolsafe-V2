@@ -74,6 +74,7 @@
   }
 
   global.SchoolSafePedagogyAPI = {
+    listClasses: function () { return apiGet("/pedagogy/classes"); },
     listSubjects: function () { return apiGet("/pedagogy/subjects"); },
     createSubject: function (input) { return apiPost("/pedagogy/subjects", input); },
 

@@ -10,6 +10,7 @@ import type {
 } from "./schema.js";
 
 export interface PedagogyService {
+  listClasses(schoolId: string): Promise<unknown[]>;
   listSubjects(schoolId: string): Promise<unknown[]>;
   createSubject(schoolId: string, input: CreateSubjectInput): Promise<unknown>;
   listTeacherAssignments(schoolId: string): Promise<unknown[]>;
@@ -38,6 +39,16 @@ export function createPedagogyService(supabaseUrl: string, serviceRoleKey: strin
   const client = createServiceClient(supabaseUrl, serviceRoleKey);
 
   return {
+    async listClasses(schoolId) {
+      const { data, error } = await client
+        .from("classes")
+        .select("*")
+        .eq("school_id", schoolId)
+        .order("name", { ascending: true });
+      if (error) throw new Error(`Failed to list classes: ${error.message}`);
+      return data ?? [];
+    },
+
     async listSubjects(schoolId) {
       const { data, error } = await client
         .from("subjects")

@@ -42,6 +42,17 @@ function parseQuery(request: FastifyRequest): Record<string, string> {
 }
 
 export function registerPedagogyRoutes(app: FastifyInstance, dependencies: PedagogyRouteDependencies): void {
+  // Classes
+  app.get(
+    "/pedagogy/classes",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.assignment.read")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const result = await dependencies.service.listClasses(schoolId);
+      return { data: result };
+    },
+  );
+
   // Subjects
   app.get(
     "/pedagogy/subjects",

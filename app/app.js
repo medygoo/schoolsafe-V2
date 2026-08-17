@@ -737,7 +737,13 @@
     document.getElementById("pedagogyModule").hidden = false;
     document.querySelector(".workspace-grid").hidden = true;
     document.getElementById("cardsProtected").hidden = true;
-    renderPedagogyModule();
+    document.getElementById("pedagogyTabs").hidden = true;
+    document.getElementById("pedagogyModuleTitle").textContent = "Pédagogie";
+    if (window.SchoolSafePedagogyModule) {
+      window.SchoolSafePedagogyModule.render("pedagogyContent");
+    } else {
+      renderPedagogyModule();
+    }
     document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
   }
 
