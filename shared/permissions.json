@@ -1,0 +1,15 @@
+[
+  "session.bootstrap",
+  "school.class.read",
+  "school.student.read",
+  "school.guardian.read",
+  "school.guardian.manage",
+  "security.pickup.read",
+  "security.pickup.manage",
+  "finance.status.read",
+  "sync.submit",
+  "file.upload",
+  "file.download",
+  "cards.request.print",
+  "notification.subscribe"
+]

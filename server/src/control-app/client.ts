@@ -31,6 +31,8 @@ export async function pushCardPrintRequest(
     back_signed_url: string;
     signed_url_expires_at: string;
     format: "badge" | "carte";
+    version: number;
+    is_duplicate: boolean;
     metadata?: Record<string, unknown>;
   }
 ): Promise<{ id: string }> {

@@ -5,6 +5,7 @@ import { createBootstrapService } from "./bootstrap/service.js";
 import { createCardService } from "./cards/service.js";
 import { parseEnv } from "./config/env.js";
 import { createSetupService } from "./setup/service.js";
+import { createSupabaseAccessService } from "./access/service.js";
 
 const env = parseEnv(process.env);
 
@@ -24,6 +25,8 @@ const controlAppConfig = env.CONTROL_APP_URL && env.CONTROL_APP_INSTANCE_ID && e
       hmacSecret: env.CONTROL_APP_HMAC_SECRET,
     }
   : undefined;
+
+const accessService = createSupabaseAccessService(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
 
 const cardService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createCardService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, r2Config, controlAppConfig)
@@ -46,8 +49,10 @@ const app = buildApp({
     ? {
         service: cardService,
         resolveProfileId: (token: string) => resolveProfileId(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        access: accessService,
       }
     : undefined,
+  access: accessService,
 });
 
 await app.listen({ host: env.HOST, port: env.PORT });
