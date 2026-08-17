@@ -640,4 +640,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 16 août 2026 — intégration du moteur de cartes dans le front PWA terminée et testée visuellement.*
+*Dernière mise à jour : 16 août 2026 — ajustements visuels des cartes (logo SchoolSafe, email, suppression des tags RECTO/VERSO) et passage à la finalisation de l'app centrale.*
