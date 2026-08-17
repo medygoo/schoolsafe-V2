@@ -249,6 +249,30 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Tests unitaires : `server/tests/access-guard.test.ts` (5/5 passent).
 - Vérifications : `npm run typecheck` ✅ et `npm test` ✅ 36/36.
 
+### Envoi batch des cartes vers l'app centrale
+
+- Migration Supabase : `supabase/migrations/202608170002_card_print_version.sql`.
+  - Ajout de `version` et `is_duplicate` sur `card_print_requests`.
+  - Fonction atomique `increment_card_print_count(student_id)` qui retourne la nouvelle version.
+- Service carte côté serveur (`server/src/cards/service.ts`) :
+  - passage de l’envoi unitaire à l’envoi batch (`requestPrintBatch`) ;
+  - calcul de la version par incrément atomique en base ;
+  - stockage R2 versionné : `cards/{schoolSlug}/{year}/{matricule}/v{version}/{requestId}/front.png` et `back.png` ;
+  - envoi du numéro de version et du flag `is_duplicate` à l’app centrale.
+- Schéma Zod (`server/src/cards/schema.ts`) : accepte un objet unique ou un tableau de 1 à 100 demandes.
+- Route `/cards/request-print` protégée par le guard de permission `cards.request.print`.
+- Permission ajoutée au catalogue : `shared/permissions.json`.
+- Tests serveur : `server/tests/cards.test.ts` étendus avec tests batch et permission denied.
+- Front PWA (`app/modules/cards/cards-module.js`) :
+  - liste d’élèves avec cases à cocher ;
+  - case “Tout sélectionner” ;
+  - indicateur “incomplet” si photo ou tuteur manquant ;
+  - génération séquentielle des aperçus/captures pour chaque élève sélectionné ;
+  - envoi batch au VPS.
+- Styles associés dans `app/modules/cards/assets/cards.css`.
+- HTML mis à jour dans `app/index.html`.
+- Vérifications : `npm run typecheck` ✅ et `npm test` ✅ 38/38.
+
 ### Connexion V2 → app centrale pour les cartes
 
 - Endpoint VPS créé : `POST /cards/request-print` dans `server/src/cards/routes.ts`.
@@ -306,9 +330,9 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Dépôt principal : `https://github.com/medygoo/schoolsafemm.git`
 - Dépôt app centrale : `https://github.com/medygoo/schoolsafe-control-.git`
 - Commits récents sur `schoolsafemm` :
+  - `e92810c feat(cards): batch student selection and send to control app`
+  - `13ccae0 feat(cards): batch card print with versioning and permission guard`
   - `fa7fdee feat(access): permission guard with deny-override and scope check`
-  - `aaf9d36 fix(cards): logo SchoolSafe absolu et suppression du label Verso`
-  - `5223993 refactor: move control-app to dedicated repo schoolsafe-control-`
 
 ---
 
@@ -316,7 +340,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Implémentation du double rôle côté serveur** : logique de permission avec deny qui l’emporte, guard Fastify, vérification des périmètres, tests.
+**Finalisation de l’envoi batch des cartes vers l’app centrale** : versionnement, stockage R2 par école, sélection multiple d’élèves dans le front, envoi batch.
 
 ### État d'avancement
 
@@ -324,7 +348,8 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Application de contrôle centrale finalisée et migrée dans son propre dépôt.
 - Dépôt principal nettoyé (`control-app/` supprimé).
 - Ajustements cartes finalisés et poussés.
-- Logique de permissions double rôle implémentée et testée côté serveur.
+- Logique de permissions double rôle implémentée côté serveur.
+- Envoi batch des cartes implémenté côté serveur et front.
 - Fichier complet téléchargé localement : `analysis/zalavrai.html` (~2,2 Mo).
 - Analyse technique complète réalisée (section détaillée ci-dessous).
 - Architecture des cartes verrouillée :
@@ -634,20 +659,21 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Implémentation du double rôle côté serveur terminée : logique deny-l’emporte dans `has_permission`, service d’accès Supabase, guard Fastify, tests 36/36 passants. `PROJECT-CONTINUITY.md` mis à jour.
+Envoi batch des cartes terminé : versionnement en base, stockage R2 versionné par école, sélection multiple d’élèves dans le front, envoi batch au VPS. Tests serveur 38/38 passants. `PROJECT-CONTINUITY.md` en cours de mise à jour.
 
 ### Ce que j'étais en train de faire
 
-- Créer la migration SQL `202608170001_permission_deny_logic.sql`.
-- Créer `server/src/access/service.ts` et `server/src/access/guard.ts`.
-- Intégrer le guard dans `server/src/app.ts`.
-- Ajouter les tests `server/tests/access-guard.test.ts`.
+- Créer `supabase/migrations/202608170002_card_print_version.sql`.
+- Réécrire `server/src/cards/service.ts` pour le batch et le versionnement.
+- Protéger `/cards/request-print` avec le guard `cards.request.print`.
+- Mettre à jour le front (`cards-module.js`, `cards.css`, `index.html`) pour la sélection multiple.
 - Mettre à jour `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
 1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Appliquer le guard sur des routes métiers concrètes (cartes, finances, pédagogie, etc.) ou passer à la fonctionnalité suivante.
+2. Tester l’envoi batch avec des vraies données ou ajuster l’UX si besoin.
+3. Passer à la fonctionnalité suivante (finance, pédagogie, sécurité, etc.).
 
 ### Commandes/tests restants
 
@@ -679,4 +705,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 17 août 2026 — double rôle : logique deny-l’emporte et guard serveur implémentés et testés ; app centrale fonctionnelle sur Render.*
+*Dernière mise à jour : 17 août 2026 — envoi batch des cartes vers l’app centrale avec versionnement ; sélection multiple d’élèves dans le front ; tests 38/38 passants.*
