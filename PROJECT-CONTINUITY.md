@@ -126,7 +126,6 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Idées en attente de développement
 
-- **Application de contrôle centrale** : générer/révoquer les tokens d'école, bloquer/débloquer une instance, réinitialisation d'urgence admin.
 - **Fiche de lancement** : document expliquant comment démarrer l'application.
 - **Double rôle** : un utilisateur peut avoir plusieurs rôles (ex. enseignant + parent), avec union des permissions et des périmètres.
 - **Production de cartes** : intégrer le système existant via adaptateur.
@@ -211,6 +210,25 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Commit et push sur `origin/main` : `92b1230 feat(control-app): finalisation de l'app centrale (Render + Neon)`.
 - **Migration vers un dépôt dédié** : le dossier `control-app/` a été déplacé dans le dépôt `https://github.com/medygoo/schoolsafe-control-.git` (commit `a1a91f7`).
 - Nettoyage du dépôt principal : suppression du dossier `control-app/` et mise à jour de la documentation.
+
+### Interface de gestion des écoles dans l'app centrale
+
+- Dépôt concerné : `https://github.com/medygoo/schoolsafe-control-.git`.
+- Fichiers modifiés :
+  - `public/index.html` : ajout des onglets **Demandes d’impression** et **Gestion des écoles**, formulaire de création d’école, tableau des instances.
+  - `public/app.js` : logique des onglets, création d’école, copie token/HMAC, régénération token/HMAC, blocage/déblocage.
+  - `public/styles.css` : styles des onglets, du tableau d’instances et du formulaire.
+  - `src/db/index.ts` : correction du chemin SQLite par défaut (`DATA_DIR` est un répertoire, pas un fichier).
+  - `src/db/sqlite.ts` : création automatique du répertoire parent de la base SQLite.
+- Corrections de stabilité :
+  - Le serveur local pouvait planter au premier démarrage si le répertoire `data/` n’existait pas ; il crée désormais le répertoire parent automatiquement.
+  - Le chemin par défaut de la base SQLite est maintenant cohérent : `${DATA_DIR}/control-app.db`.
+- Vérifications effectuées :
+  - `npm run typecheck` ✅
+  - `npm run build` ✅
+  - Tests API locaux : `GET /instances`, `POST /instances`, `POST /instances/:id/block`, `POST /instances/:id/unblock` ✅
+  - Interface web servie correctement sur `http://127.0.0.1:4176` ✅
+- Commit et push sur `main` : `646fdb3 feat(control): interface de gestion des écoles + fix SQLite local`.
 
 ### Intégration front du moteur de cartes dans V2
 
@@ -340,189 +358,30 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Finalisation de l’envoi batch des cartes vers l’app centrale** : versionnement, stockage R2 par école, sélection multiple d’élèves dans le front, envoi batch.
+**Mise à jour de l’application de contrôle centrale** : ajout de l’interface de gestion des écoles (création, token/HMAC, blocage) et correction des bugs SQLite en local.
 
 ### État d'avancement
 
-- Intégration front du moteur de cartes terminée et testée visuellement.
-- Application de contrôle centrale finalisée et migrée dans son propre dépôt.
-- Dépôt principal nettoyé (`control-app/` supprimé).
-- Ajustements cartes finalisés et poussés.
-- Logique de permissions double rôle implémentée côté serveur.
-- Envoi batch des cartes implémenté côté serveur et front.
-- Fichier complet téléchargé localement : `analysis/zalavrai.html` (~2,2 Mo).
-- Analyse technique complète réalisée (section détaillée ci-dessous).
-- Architecture des cartes verrouillée :
-  - V2 génère la carte finie (PNG/PDF) dans le **front PWA** avec `html2canvas`.
-  - V2 n'a pas de bouton "Imprimer" ; seul "Demander l'impression" existe.
-  - Stockage dans R2 (bucket privé `cards/`).
-  - L'app centrale télécharge via URL signée et imprime.
-  - Validation obligatoire avant envoi.
-- **Génération d'image validée** : dans le **front PWA** (Option A).
-- Modèle de double rôle validé : union des permissions et des périmètres.
-- Contraintes métier ajoutées :
-  - le nom "zalavrai" ne doit pas apparaître dans V2 ;
-  - le QR code identifie le tuteur principal et les autres tuteurs pour la récupération des élèves ;
-  - le scan d'entrée/sortie crée automatiquement les listes de présence ;
-  - les scans de plus de 3 mois sont archivés dans R2.
-- Technologies confirmées : `qrcodejs`, `html2canvas`, `jszip`, `html2pdf.js`.
-- Deux formats physiques confirmés :
-  - **Badge vertical** : 340 × 540 px — Maternelle → 4ᵉ Primaire.
-  - **Carte PVC horizontale** : 560 × 353 px — 5ᵉ/6ᵉ Primaire + Humanités/Secondaire.
-- QR code sur la carte (non signé) : `schoolsafe://student/{matricule}`.
-- QR code au scan (signé) : `schoolsafe://student/{matricule}/{YYYYMMDD}/{sig8}` avec HMAC-SHA256.
-- Processus de production : aperçu recto/verso → capture html2canvas scale 2 → assemblage recto+verso → upload Supabase Storage (`photos/cards/`) → marquage élève `card_printed`, `card_print_date`, `card_print_count`.
-- Duplicata géré avec tampon `DUPLICATA` et incrément du compteur.
-- **La création de cartes est déjà fonctionnelle et terminée dans le moteur historique** ; il ne s'agit pas de le réinventer, mais de le brancher proprement dans V2.
-- **V2 possède déjà deux systèmes de scan** :
-  - scan pour contrôle de frais ;
-  - scan pour contrôle d'arrivée et de sortie de classe.
-- **Décision d'architecture prise** : la production physique (téléchargement + impression) se fait dans l'**application de contrôle des tokens**. SchoolSafe V2 prépare et transmet la demande.
-- Mode de transmission validé : **push API directe** avec clé API et file d'attente locale.
-- Choix techniques validés :
-  - authentification HMAC signé avec timestamp ;
-  - URL R2 signées 72 heures ;
-  - retry exponentiel puis `failed` ;
-  - PNG HD, deux fichiers `front.png` + `back.png` ;
-  - dossier R2 nommé par école + élève ;
-  - polices hébergées localement sur le VPS.
-- **Schéma Supabase terminé** : tables `classes`, `students`, `student_guardians`, `card_print_requests` créées avec RLS.
-- **Analyse design/couleur par classe terminée** :
-  - 10 familles de design globales (A-J) avec 4 variantes chacune ;
-  - 60 patrimoines visuels regroupés en 5 thèmes ;
-  - chaque classe peut définir `card_color`, `card_color_soft`, `card_color_dark` ;
-  - chaque classe peut choisir un patrimoine (`card_pat`) ou laisser le mode `auto` ;
-  - le format badge/carte est déterminé par le cycle + le nom de la classe ;
-  - champs déjà présents dans `classes` : `card_color`, `card_color_soft`, `card_color_dark`, `card_pat` ;
-  - champs à ajouter pour reproduire fidèlement : `card_family`, `card_variant`, `card_pat_style`.
-- **Assets extraits** :
-  - migration `202608160003_card_design_fields.sql` avec `card_family`, `card_variant`, `card_pat_style` ;
-  - 60 images PNG dans `app/modules/cards/assets/patrimoine/` ;
-  - CSS dans `app/modules/cards/assets/cards.css` ;
-  - données design dans `app/modules/cards/assets/card-data.js`.
-- **Test visuel créé** : `app/modules/cards/test-card.html` sert les cartes en local sur `http://127.0.0.1:4175/modules/cards/test-card.html`.
-- **Application de contrôle des tokens créée** : `control-app/` avec routes admin et HMAC, tests 8/8 passants.
-- **Connexion V2 → app centrale côté VPS** : endpoint `/cards/request-print` créé, push HMAC vers l'app centrale, tests serveur 31/31 passants.
-- Sorties : PNG recto+verso, impression navigateur (PDF via print), liste de distribution classe.
-
-### Synthèse technique du système de cartes
-
-#### Dépendances externes (CDN)
-- `qrcodejs 1.0.0`
-- `jsqr 1.4.0`
-- `jszip 3.10.1`
-- `html2pdf.js 0.10.1`
-- `html2canvas 1.4.1`
-- Polices Google : `Baloo 2`, `Nunito Sans`, `DM Sans`
-
-#### Fonctions principales identifiées
-| Fonction | Rôle |
-|----------|------|
-| `window.ssClassType(cl)` | Choix badge/carte et index couleur |
-| `window.ssBuildBadge(s,cl,teacher,year,patB,patStyle)` | HTML recto/verso badge |
-| `window.ssBuildCarte(s,cl,teacher,year,patC,patStyle)` | HTML recto/verso carte |
-| `window.ssGenQR(elId,data,size)` | Rendu QR code dans le DOM |
-| `window.ssRenderPreview()` | Mise à jour de l'aperçu studio |
-| `window.exportSSCardPNG()` | Export PNG via html2canvas |
-| `window.ssPrintCard()` | Fenêtre d'impression navigateur |
-| `window.printClassCards(cid)` | Impression d'une classe entière |
-| `window.generateDuplicata(sid)` | Duplicata tamponné |
-| `window.submitCardOrder(sid)` | Capture, upload, marquage impression |
-
-#### Données élève requises
-- `id`, `name`, `mat` (matricule), `dob` (YYYY-MM-DD), `photo`, `cid` (classe), `pid` (parent)
-- `nom_papa` / `nom_maman` (fallback tuteur)
-- `card_printed`, `card_print_date`, `card_print_count`
-
-#### Données école requises
-- `name`, `name_en`, `address`, `phone`, `email`, `motto`/`slogan`, `website`
-- Logo école via `window.SCHOOL_LOGO` (base64 ou URL)
-
-#### Données classe requises
-- `name`, `cycle` (maternelle/primaire/humanites/secondaire), `option`
-- `teacher_id` / `titulaire_id`
-- `card_color`, `card_color_soft`, `card_color_dark`, `card_pat`
-- `card_family` (A-J), `card_variant` (0-3), `card_pat_style` (vignette/fond/both)
-
-#### Design et couleurs par classe
-- **10 familles de design globales** (`A` à `J`) : Arc-en-ciel, Océan ludique, Pop Bento, Prestige Or, Ciel rêveur, Cahier d'écolier, Jungle Safari, Espace Galaxie, Bonbons Pastel, Tableau & Craie.
-- **4 variantes de couleur** par famille (`FVARS`).
-- **60 patrimoines visuels** répartis en 5 thèmes : Animaux de la RDC, Pierres & minerais, Animaux aquatiques, Animaux terrestres, Oiseaux.
-- **Personnalisation par classe** : couleurs `card_color`/`soft`/`dark` + patrimoine `card_pat`.
-- **Mode patrimoine** : `vignette` (image + nom), `fond` (arrière-plan), `both` (les deux).
-- **Format badge/carte** déterminé par `ssClassType` selon le cycle et le nom de la classe :
-  - Maternelle → badge ;
-  - Humanités/Secondaire → carte ;
-  - Primaire 1e-4e → badge ;
-  - Primaire 5e-6e → carte.
-
-#### Stockage et traçabilité
-- Upload vers Supabase Storage : `POST ${SUPA_URL}/storage/v1/object/photos/cards/{filename}`
-- Mise à jour base : `students.card_printed`, `students.card_print_date`, `students.card_print_count`
-
-#### Flux V2 → application de contrôle des tokens (proposé)
-1. Dans V2, l'admin/personne autorisée sélectionne un élève ou une classe et clique sur **"Demander l'impression"**.
-2. V2 affiche un **aperçu final** de la carte recto/verso.
-3. L'utilisateur **valide** l'aperçu.
-4. V2 génère la carte (PNG/PDF) avec le moteur zalavrai via adaptateur.
-5. V2 upload le fichier dans **R2** sous `cards/{school_id}/{academic_year}/{student_id}/{uuid}.png`.
-6. V2 crée un enregistrement dans `card_print_requests` avec statut `pending`.
-7. V2 appelle l'**API de l'app centrale** avec :
-   - `school_id`, `request_id`, `student_id`, `student_name`, `class_name`
-   - URL signée R2 à durée limitée
-   - métadonnées de la carte (format, recto/verso, duplicata ou non)
-8. L'app centrale reçoit la demande, la liste dans son tableau de bord.
-9. L'opérateur dans l'app centrale **télécharge** la carte depuis R2 et **imprime**.
-10. L'app centrale confirme à V2 le statut `printed` + date + référence d'impression.
-11. V2 met à jour `students.card_printed`, `card_print_date`, `card_print_count`.
+- Interface de gestion des écoles ajoutée dans l’app centrale (`schoolsafe-control-`) et poussée sur `main`.
+- Bugs SQLite corrigés : création automatique du répertoire `data/` et chemin cohérent `control-app.db`.
+- Build et tests locaux validés.
+- Dépôt principal mis à jour : `PROJECT-CONTINUITY.md` en cours de synchronisation.
 
 ### Fichiers concernés
 
-- `analysis/zalavrai.html` (analyse temporaire, non versionné pour l'instant).
-- `docs/CARDS_IMMUTABILITY.md` (règles de protection).
-- `PROJECT-CONTINUITY.md` (ce fichier).
+- Dépôt `schoolsafe-control-` :
+  - `public/index.html`
+  - `public/app.js`
+  - `public/styles.css`
+  - `src/db/index.ts`
+  - `src/db/sqlite.ts`
+- Dépôt principal : `PROJECT-CONTINUITY.md` (ce fichier).
 
-### Problèmes rencontrés / Points de décision
+### Prochaine action immédiate
 
-- Le système historique est autosuffisant et contient tout le moteur graphique.
-- `docs/CARDS_IMMUTABILITY.md` interdit formellement de réimplémenter ce moteur.
-- Options d'intégration résolues : génération dans le front PWA, impression dans l'app de contrôle des tokens.
-- Mapping cycle à adapter : `maternelle/humanites/secondaire/''` (historique) → `nursery/primary/secondary` (V2).
-
-### Questions en attente de réponse du propriétaire
-
-#### Cartes élèves (toutes répondues / verrouillées)
-
-1. ✅ **Emplacement de la production de cartes** : dans l'**application de contrôle des tokens** (validé).
-2. ✅ **Qui produit physiquement** : l'app de contrôle des tokens télécharge et imprime (validé).
-3. ✅ **Contenu de la demande** : V2 génère la **carte finie** (image/PDF) et l'envoie à l'app centrale (validé).
-4. ✅ **Stockage intermédiaire** : la carte transite par **R2** dans un bucket privé ; V2 génère des URLs signées pour l'app centrale (validé).
-5. ✅ **Qui déclenche la demande dans V2** : l'**admin principal** ou la personne à qui il a donné accès (validé).
-6. ✅ **Validation avant envoi** : oui (validé).
-7. ✅ **Paiement** : inclus dans l'abonnement (validé).
-8. ✅ **Le moteur historique est-il le système définitif** : oui, c'est le moteur de référence, mais son nom d'origine ne doit pas apparaître dans V2 (validé).
-9. ✅ **Le code source est-il disponible localement** : seul le fichier monolithique est disponible ; il servira de référence pour l'adaptateur (validé).
-10. ✅ **Le format du QR code** `schoolsafe://student/{matricule}` : conservé tel quel (validé).
-11. ✅ **QR signé au scan** (`/{YYYYMMDD}/{sig8}`) : conservé, car le scan crée aussi les listes de présence (validé).
-12. ✅ **Patrimoines visuels** : éléments de design de la carte, extraits dans `app/modules/cards/assets/patrimoine/` (validé).
-13. ✅ **Transmission** : **push API directe** validé, avec file d'attente locale en cas d'échec.
-14. ✅ **Authentification V2 ↔ app centrale** : **HMAC signé avec timestamp** recommandé.
-15. ✅ **Durée de validité de l'URL signée R2** : **72 heures** recommandé.
-16. ✅ **Gestion des échecs** : retry exponentiel (1 min, 5 min, 15 min), puis `failed` ; notification admin principal ; relance manuelle possible.
-17. ✅ **Format de sortie** : **PNG HD** ; deux fichiers séparés `front.png` et `back.png` dans un dossier nommé par école + élève.
-18. ✅ **Polices** : **hébergées localement sur le VPS** recommandé.
-19. ✅ **Génération de l'image** : dans le **front PWA** avec `html2canvas`. Pas de bouton "Imprimer" dans V2 (validé).
-
-#### Application de contrôle des tokens (toutes répondues / verrouillées)
-
-20. ✅ **Dossier / nom du projet** : `control-app/` à la racine (validé).
-21. ✅ **Fonctionnalités minimales pour la première étape** :
-    - tableau de bord des demandes d'impression de cartes reçues de chaque VPS école (validé) ;
-    - téléchargement des PNG `front.png` + `back.png` depuis R2 (validé) ;
-    - bouton "Marquer comme imprimée" pour confirmer le statut (validé) ;
-    - génération/révocation des tokens d'instance (validé) ;
-    - blocage/déblocage d'une instance (validé).
-22. ✅ **Authentification app centrale ↔ VPS école** : clé HMAC signée avec timestamp, échangée hors bande au déploiement (validé).
+1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md` sur `main`.
+2. Attendre le déploiement automatique de `schoolsafe-control-` sur Render.
+3. Passer à la prochaine fonctionnalité selon les priorités du propriétaire.
 
 ---
 
@@ -534,22 +393,15 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Améliorations prévues
 
+- Gestion du double role (enseignant + parent) : union des permissions et des perimetres cote front et API.
 - Tests de contrat pour l'adaptateur cartes.
-- Documentation de l'interface du système de cartes.
+- Documentation de l'interface du systeme de cartes.
 - Gestion des duplicatas et de l'historique d'impression.
-
-### Options d'intégration à valider
-
-1. **Iframe / lien externe** : garder zalavrai déployé tel quel, y accéder depuis V2 via iframe ou lien. Rapide mais fragmente l'expérience et l'authentification.
-2. **Adaptateur front** : embarquer le moteur graphique zalavrai (HTML/CSS/JS) dans V2 et l'alimenter avec les données V2. UX unifiée mais dépend des mêmes contraintes (CDN, html2canvas).
-3. **Adaptateur VPS headless** : générer les cartes côté serveur avec le HTML/CSS de zalavrai rendu par Puppeteer/Playwright. Plus fiable mais nécessite un navigateur headless sur le VPS.
-4. **Service interne API** : exposer le moteur zalavrai comme un micro-service interne que V2 appelle. Séparation propre mais plus complexe.
-
-La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tests de contrat** quelle que soit l'option choisie.
+- Fiche de lancement de l'application (`docs/LAUNCH.md` a completer).
 
 ### Prochaines étapes logiques
 
-1. Gestion du double rôle (enseignant + parent) : union des permissions et des périmètres.
+1. Gestion du double rôle (enseignant + parent).
 2. Documenter l'interface d'entrée/sortie du système de cartes.
 3. Créer l'adaptateur versionné avec tests de contrat.
 4. Poursuivre l'étude détaillée des fonctionnalités une par une (finance, pédagogie, sécurité, etc.).
@@ -659,35 +511,27 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Envoi batch des cartes terminé : versionnement en base, stockage R2 versionné par école, sélection multiple d’élèves dans le front, envoi batch au VPS. Tests serveur 38/38 passants. `PROJECT-CONTINUITY.md` en cours de mise à jour.
+Interface de gestion des écoles ajoutée dans l'app centrale (`schoolsafe-control-`) et poussée sur `main`. Bugs SQLite locaux corrigés. `PROJECT-CONTINUITY.md` synchronisé et en cours de commit/push.
 
 ### Ce que j'étais en train de faire
 
-- Créer `supabase/migrations/202608170002_card_print_version.sql`.
-- Réécrire `server/src/cards/service.ts` pour le batch et le versionnement.
-- Protéger `/cards/request-print` avec le guard `cards.request.print`.
-- Mettre à jour le front (`cards-module.js`, `cards.css`, `index.html`) pour la sélection multiple.
+- Modifier `public/index.html`, `public/app.js` et `public/styles.css` pour ajouter l'onglet "Gestion des écoles".
+- Corriger `src/db/index.ts` et `src/db/sqlite.ts` pour créer automatiquement le répertoire `data/` et utiliser le bon chemin SQLite.
+- Tester l'app centrale en local (`npm run dev`, curl, build).
+- Commiter et pousser sur `https://github.com/medygoo/schoolsafe-control-.git`.
 - Mettre à jour `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
 1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Tester l’envoi batch avec des vraies données ou ajuster l’UX si besoin.
-3. Passer à la fonctionnalité suivante (finance, pédagogie, sécurité, etc.).
+2. Vérifier le déploiement automatique de `schoolsafe-control-` sur Render.
+3. Passer à la prochaine fonctionnalité selon les priorités du propriétaire (double rôle, fiche de lancement, etc.).
 
 ### Commandes/tests restants
 
 - `cd server && npm test`
 - `node tests/qa-permanent-preview.cjs`
-- Ouvrir `http://127.0.0.1:4175/modules/cards/test-card.html` pour valider visuellement.
-
-### Commandes/tests restants
-
-- `cd server && npm test`
-- `node tests/qa-permanent-preview.cjs`
-- `cd ../schoolsafe-control- && npm test` (dépôt séparé)
-- Ouvrir `http://127.0.0.1:4175/modules/cards/test-card.html` pour validation visuelle.
-- Ouvrir `http://127.0.0.1:4175/` pour tester le parcours workspace → Cartes élèves.
+- Ouvrir `https://medygoo.github.io/schoolsafe-control-/` pour valider l'interface de gestion des écoles après déploiement.
 
 ---
 
@@ -705,4 +549,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 17 août 2026 — envoi batch des cartes vers l’app centrale avec versionnement ; sélection multiple d’élèves dans le front ; tests 38/38 passants.*
+*Dernière mise à jour : 17 August 2026 — interface de gestion des écoles dans l’app centrale ; correction SQLite local ; push sur `schoolsafe-control-`.*
