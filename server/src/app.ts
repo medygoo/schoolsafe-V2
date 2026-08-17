@@ -6,6 +6,8 @@ import { defaultReadinessProbe, type ReadinessProbe } from "./health/readiness.j
 import { SchoolSafeError, type ApiErrorBody } from "./http/errors.js";
 import { newRequestId } from "./http/request-id.js";
 import { registerSetupRoutes, type SetupRouteDependencies } from "./setup/routes.js";
+import { requirePermission } from "./access/guard.js";
+import type { AccessService } from "./access/service.js";
 
 export type BuildAppOptions = {
   testRoutes?: boolean;
@@ -13,6 +15,7 @@ export type BuildAppOptions = {
   bootstrap?: BootstrapRouteDependencies;
   setup?: SetupRouteDependencies;
   cards?: CardRouteDependencies;
+  access?: AccessService;
 };
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -72,6 +75,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     app.get("/__test/error", async () => {
       throw new SchoolSafeError(400, "VALIDATION_INVALID", "Donnée invalide", false);
     });
+
+    if (options.access) {
+      app.get(
+        "/__test/protected",
+        { preHandler: [requirePermission(options.access, "test.protected", { type: "school", id: "school-1" })] },
+        async () => ({ status: "ok" as const }),
+      );
+    }
   }
 
   return app;
