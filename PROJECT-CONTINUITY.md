@@ -233,6 +233,22 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - e-mail SchoolSafe `schoolsafe1@gmail.com` affiché sur le verso (badge et carte) ;
   - suppression du label "Badge élève — Verso" pour ne pas gêner l'impression.
 
+### Double rôle — logique de permissions et guard serveur
+
+- Décision validée : **deny l’emporte** en cas de conflit entre rôles.
+- Migration Supabase créée : `supabase/migrations/202608170001_permission_deny_logic.sql`.
+  - Mise à jour de `has_permission(permission_code)` : une permission est accordée si au moins un rôle l’autorise (`allowed = true`) et aucun rôle ne la refuse explicitement (`allowed = false`).
+- Service d’accès côté serveur : `server/src/access/service.ts`.
+  - `hasPermission(token, code)` : appelle la fonction SQL `has_permission` via RPC Supabase.
+  - `hasScope(token, type, id)` : appelle la fonction SQL `has_scope` via RPC Supabase.
+- Guard Fastify : `server/src/access/guard.ts`.
+  - Extraction du bearer token.
+  - Vérification de la permission et du périmètre avant d’exécuter une route.
+  - Codes d’erreur `ACCESS_DENIED` et `SCOPE_DENIED` ajoutés.
+- Intégration dans `server/src/app.ts` : option `access` et route de test protégée `/__test/protected`.
+- Tests unitaires : `server/tests/access-guard.test.ts` (5/5 passent).
+- Vérifications : `npm run typecheck` ✅ et `npm test` ✅ 36/36.
+
 ### Connexion V2 → app centrale pour les cartes
 
 - Endpoint VPS créé : `POST /cards/request-print` dans `server/src/cards/routes.ts`.
@@ -290,9 +306,9 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - Dépôt principal : `https://github.com/medygoo/schoolsafemm.git`
 - Dépôt app centrale : `https://github.com/medygoo/schoolsafe-control-.git`
 - Commits récents sur `schoolsafemm` :
+  - `fa7fdee feat(access): permission guard with deny-override and scope check`
   - `aaf9d36 fix(cards): logo SchoolSafe absolu et suppression du label Verso`
   - `5223993 refactor: move control-app to dedicated repo schoolsafe-control-`
-  - `5f12a64 docs: finalize PROJECT-CONTINUITY and add LAUNCH.md`
 
 ---
 
@@ -300,15 +316,15 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Finalisation des ajustements carte et mise à jour de la documentation** : corriger le chemin du logo SchoolSafe, supprimer le label "Verso", et synchroniser `PROJECT-CONTINUITY.md`.
+**Implémentation du double rôle côté serveur** : logique de permission avec deny qui l’emporte, guard Fastify, vérification des périmètres, tests.
 
 ### État d'avancement
 
 - Intégration front du moteur de cartes terminée et testée visuellement.
 - Application de contrôle centrale finalisée et migrée dans son propre dépôt.
 - Dépôt principal nettoyé (`control-app/` supprimé).
-- Ajustements cartes finalisés et poussés sur `origin/main`.
-- Documentation synchronisée.
+- Ajustements cartes finalisés et poussés.
+- Logique de permissions double rôle implémentée et testée côté serveur.
 - Fichier complet téléchargé localement : `analysis/zalavrai.html` (~2,2 Mo).
 - Analyse technique complète réalisée (section détaillée ci-dessous).
 - Architecture des cartes verrouillée :
@@ -618,17 +634,20 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Finalisation des ajustements des cartes élèves : logo SchoolSafe en chemin absolu sur les deux faces, site de l'école et e-mail `schoolsafe1@gmail.com` présents, label "Verso" supprimé. `PROJECT-CONTINUITY.md` mis à jour.
+Implémentation du double rôle côté serveur terminée : logique deny-l’emporte dans `has_permission`, service d’accès Supabase, guard Fastify, tests 36/36 passants. `PROJECT-CONTINUITY.md` mis à jour.
 
 ### Ce que j'étais en train de faire
 
-- Corriger `app/modules/cards/card-renderer.js` et `app/modules/cards/test-card.html`.
-- Synchroniser `PROJECT-CONTINUITY.md`.
+- Créer la migration SQL `202608170001_permission_deny_logic.sql`.
+- Créer `server/src/access/service.ts` et `server/src/access/guard.ts`.
+- Intégrer le guard dans `server/src/app.ts`.
+- Ajouter les tests `server/tests/access-guard.test.ts`.
+- Mettre à jour `PROJECT-CONTINUITY.md`.
 
 ### Prochaine action
 
 1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Passer à l'étude approfondie de la prochaine fonctionnalité (double rôle, ou autre priorité définie).
+2. Appliquer le guard sur des routes métiers concrètes (cartes, finances, pédagogie, etc.) ou passer à la fonctionnalité suivante.
 
 ### Commandes/tests restants
 
@@ -660,4 +679,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 17 août 2026 — ajustements cartes finalisés (logo SchoolSafe absolu, site école, e-mail, suppression label Verso) ; app centrale dans son dépôt dédié.*
+*Dernière mise à jour : 17 août 2026 — double rôle : logique deny-l’emporte et guard serveur implémentés et testés ; app centrale fonctionnelle sur Render.*
