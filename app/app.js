@@ -1145,6 +1145,35 @@
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
   }
 
+  function schoolTabForAction(actionName) {
+    if (/mon école|paramètres de l’école|configuration école/i.test(actionName)) return "school";
+    if (/mon équipe|personnel|staff/i.test(actionName)) return "staff";
+    return "";
+  }
+
+  function openSchoolModule(tabName) {
+    document.getElementById("pedagogyModule").hidden = true;
+    document.getElementById("financeModule").hidden = true;
+    document.getElementById("securityModule").hidden = true;
+    document.getElementById("pilotageModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
+    document.getElementById("accessConsole").hidden = true;
+    document.getElementById("schoolModule").hidden = false;
+    document.querySelector(".workspace-grid").hidden = true;
+    document.getElementById("cardsProtected").hidden = true;
+    if (window.SchoolSafeSchoolModule) {
+      window.SchoolSafeSchoolModule.render(tabName);
+    }
+    document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeSchoolModule() {
+    document.getElementById("schoolModule").hidden = true;
+    document.querySelector(".workspace-grid").hidden = false;
+    document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
+    document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+  }
+
   function financeTotals() {
     var expected = financeState.students.reduce(function (sum, student) { return sum + student.expected; }, 0);
     var paid = financeState.students.reduce(function (sum, student) { return sum + student.paid; }, 0);
@@ -1926,6 +1955,7 @@
     document.getElementById("pilotageModule").hidden = true;
     document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
+    document.getElementById("schoolModule").hidden = true;
     document.querySelector(".workspace-grid").hidden = false;
     var liveName = sessionDisplayName();
     var liveInitials = sessionInitials();
@@ -2036,6 +2066,10 @@
           openFinanceModule(actionName);
           return;
         }
+        if (schoolTabForAction(actionName)) {
+          openSchoolModule(schoolTabForAction(actionName));
+          return;
+        }
         notify(actionName + " — espace ouvert dans la branche " + branchDefinitions[branchKey].label + ".");
       });
     });
@@ -2060,6 +2094,10 @@
         }
         if (feeControlTabForAction(actionName)) {
           openFeeControlModule(actionName);
+          return;
+        }
+        if (schoolTabForAction(actionName)) {
+          openSchoolModule(schoolTabForAction(actionName));
           return;
         }
         notify(actionName + " — fonction à brancher dans l’étape métier correspondante.");
@@ -2342,6 +2380,7 @@
   document.getElementById("closeSecurityModule").addEventListener("click", closeSecurityModule);
   document.getElementById("closePilotageModule").addEventListener("click", closePilotageModule);
   document.getElementById("closeFeeControlModule").addEventListener("click", closeFeeControlModule);
+  document.getElementById("closeSchoolModule").addEventListener("click", closeSchoolModule);
   document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (button) {
     button.addEventListener("click", function () {
       document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (b) { b.classList.remove("active"); });

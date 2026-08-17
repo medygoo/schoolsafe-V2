@@ -11,6 +11,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./modules/cards/assets/cards.css">
+  <link rel="stylesheet" href="modules/school/school.css">
   <script src="./lucide.min.js" defer></script>
   <script src="./jspdf.umd.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
@@ -26,6 +27,8 @@
   <script src="./modules/pilotage/pilotage-module.js" defer></script>
   <script src="./modules/pedagogy/pedagogy-api.js" defer></script>
   <script src="./modules/pedagogy/pedagogy-module.js" defer></script>
+  <script src="./modules/school/school-api.js" defer></script>
+  <script src="./modules/school/school-module.js" defer></script>
   <script src="./app.js" defer></script>
 </head>
 <body>
@@ -337,6 +340,17 @@
                 <footer class="permission-actions"><span><i data-lucide="info"></i> Démonstration locale uniquement</span><button class="primary-button dark" id="savePermissions" type="button"><i data-lucide="save"></i> Enregistrer le brouillon</button></footer>
               </div>
             </div>
+          </section>
+          <section id="schoolModule" class="module-container" hidden>
+            <header class="module-header">
+              <button class="module-back" type="button" id="closeSchoolModule" aria-label="Retour"><i data-lucide="arrow-left"></i></button>
+              <h2 id="schoolModuleTitle">École & Personnel</h2>
+            </header>
+            <div class="school-tabs" id="schoolTabs">
+              <button type="button" data-school-tab="school">Mon école</button>
+              <button type="button" data-school-tab="staff">Mon équipe</button>
+            </div>
+            <div id="schoolContent"></div>
           </section>
           <section class="cards-studio" id="cardsStudio" hidden>
             <header class="cards-studio-header">
