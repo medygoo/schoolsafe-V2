@@ -1,11 +1,13 @@
 import { buildApp } from "./app.js";
-import { resolveProfileId } from "./auth/profile.js";
+import { resolveProfileId, resolveProfileAndSchool } from "./auth/profile.js";
 import { createSupabaseAuthVerifier } from "./auth/supabase.js";
 import { createBootstrapService } from "./bootstrap/service.js";
 import { createCardService } from "./cards/service.js";
 import { parseEnv } from "./config/env.js";
 import { createSetupService } from "./setup/service.js";
 import { createSecurityService } from "./security/service.js";
+import { createAlertService } from "./pilotage/alerts/service.js";
+import { createDashboardService } from "./pilotage/dashboard/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
 
 const env = parseEnv(process.env);
@@ -37,6 +39,14 @@ const securityService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createSecurityService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, env.CARD_HMAC_SECRET)
   : undefined;
 
+const alertService = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createAlertService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  : undefined;
+
+const dashboardService = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createDashboardService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  : undefined;
+
 const app = buildApp({
   bootstrap: {
     authVerifier: createSupabaseAuthVerifier(env.SUPABASE_URL, env.SUPABASE_ANON_KEY),
@@ -61,6 +71,20 @@ const app = buildApp({
     ? {
         service: securityService,
         resolveProfileId: (token: string) => resolveProfileId(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        access: accessService,
+      }
+    : undefined,
+  alerts: alertService
+    ? {
+        service: alertService,
+        resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        access: accessService,
+      }
+    : undefined,
+  dashboard: dashboardService
+    ? {
+        service: dashboardService,
+        resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
       }
     : undefined,

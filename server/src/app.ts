@@ -7,6 +7,8 @@ import { SchoolSafeError, type ApiErrorBody } from "./http/errors.js";
 import { newRequestId } from "./http/request-id.js";
 import { registerSetupRoutes, type SetupRouteDependencies } from "./setup/routes.js";
 import { registerSecurityRoutes, type SecurityRouteDependencies } from "./security/routes.js";
+import { registerAlertRoutes, type AlertRouteDependencies } from "./pilotage/alerts/routes.js";
+import { registerDashboardRoutes, type DashboardRouteDependencies } from "./pilotage/dashboard/routes.js";
 import { requirePermission } from "./access/guard.js";
 import type { AccessService } from "./access/service.js";
 
@@ -17,6 +19,8 @@ export type BuildAppOptions = {
   setup?: SetupRouteDependencies;
   cards?: CardRouteDependencies;
   security?: SecurityRouteDependencies;
+  alerts?: AlertRouteDependencies;
+  dashboard?: DashboardRouteDependencies;
   access?: AccessService;
 };
 
@@ -75,6 +79,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.security) {
     registerSecurityRoutes(app, options.security);
+  }
+
+  if (options.alerts) {
+    registerAlertRoutes(app, options.alerts);
+  }
+
+  if (options.dashboard) {
+    registerDashboardRoutes(app, options.dashboard);
   }
 
   if (options.testRoutes) {
