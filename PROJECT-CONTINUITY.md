@@ -26,10 +26,13 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Priorités actuelles
 
-1. Terminer et valider l'Étape 2 — Configuration mono-école (**FAIT**).
-2. Intégrer la production de cartes élèves dans V2 (**FAIT**).
-3. Construire l'application de contrôle centrale des tokens d'instance (**FAIT**).
-4. Rédiger la fiche de lancement de l'application (**EN COURS**).
+Nouvelle feuille de route technique validée (20 phases). Nous sommes en **Phase 1**.
+
+1. **Phase 1 — Auditer PostgreSQL existant** (**FAIT**).
+2. **Phase 2 — Séparer données permanentes et temporaires** ; créer `system_events`, `notifications`, `notification_templates`.
+3. **Phase 3+ — Construire les briques modulaires** : NotificationService, Brevo provider, SMS abstraction, QR/présence/sorties, contrôle des frais, R2, audit, archivage D1.
+4. Continuer les modules métiers (Pédagogie Phase 2, approbations, snapshots Pilotage) en parallèle quand cela n'empiète pas sur les fondations.
+5. Rédiger la fiche de lancement de l'application (`docs/LAUNCH.md`).
 
 ---
 
@@ -139,6 +142,17 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 ---
 
 ## 4. Travail terminé
+
+### Phase 1 — Audit PostgreSQL
+
+- Document d'audit créé : `docs/POSTGRESQL_AUDIT.md`.
+- Inventaire complet des 11 migrations et 35 tables.
+- Inventaire des 6 fonctions SQL (`current_profile_id`, `current_school_id`, `has_permission`, `has_scope`, `has_role_id`, `increment_card_print_count`).
+- Inventaire des politiques RLS (40+ politiques sur les tables sensibles).
+- Matrice des relations (FK) et graphe des dépendances critiques.
+- Classification des données permanentes vs temporaires selon la roadmap.
+- Tables manquantes identifiées pour les prochaines phases : `system_events`, `notifications`, `notification_templates`, `data_retention_policies`, `approval_requests`, `indicator_snapshots`.
+- Verdict : PostgreSQL stable, pas de réécriture nécessaire, passage à la Phase 2 possible.
 
 ### Étape 2 — Configuration mono-école
 
@@ -478,32 +492,28 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Pédagogie Phase 1 terminée** — fondation backend + frontend pour les matières, affectations enseignants, devoirs, cotations et cahier de préparation.
+**Phase 2 de la feuille de route technique** — séparer données permanentes et temporaires, puis construire le système d'événements internes et le NotificationService.
 
 ### État d'avancement
 
-- Backend Pédagogie : terminé et poussé.
-- Frontend Pédagogie Phase 1 : terminé et poussé.
+- Phase 1 (audit PostgreSQL) : terminée et documentée.
 - `PROJECT-CONTINUITY.md` en cours de synchronisation.
 
 ### Fichiers concernés
 
-- `supabase/migrations/202608170005_pedagogy_phase1.sql`
-- `shared/permissions.json`
-- `server/src/pedagogy/schema.ts`
-- `server/src/pedagogy/service.ts`
-- `server/src/pedagogy/routes.ts`
-- `server/src/app.ts`
-- `server/src/index.ts`
-- `app/modules/pedagogy/pedagogy-api.js`
-- `app/modules/pedagogy/pedagogy-module.js`
-- `app/app.js`
-- `app/index.html`
+- `docs/POSTGRESQL_AUDIT.md`
+- `PROJECT-CONTINUITY.md`
+- (à venir) `supabase/migrations/202608180001_system_events.sql`
+- (à venir) `supabase/migrations/202608180002_notification_service.sql`
+- (à venir) `server/src/events/`, `server/src/notifications/`
 
 ### Prochaine action immédiate
 
-1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Poursuivre la Phase 2 de Pédagogie : publication des devoirs/cotations, vue parent, cahier de préparation avancé, ou attaquer le moteur de calcul des moyennes après spécification formelle.
+1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md` + `docs/POSTGRESQL_AUDIT.md`.
+2. Créer la migration `system_events` avec les colonnes `event_type`, `entity_type`, `entity_id`, `user_id`, `payload`, `status`, `created_at`, `processed_at`.
+3. Créer les tables `notifications` et `notification_templates`.
+4. Implémenter le `NotificationService` côté serveur avec abstraction `EmailProvider` (Brevo) et `SmsProvider`.
+5. Brancher les événements QR (entrée/sortie/refus) sur `system_events` sans attendre Brevo.
 
 ---
 
@@ -511,6 +521,10 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Fonctionnalités non terminées
 
+- **Phase 2 technique** : tables `system_events`, `notifications`, `notification_templates`, `data_retention_policies`.
+- **Phase 3 technique** : NotificationService central, Brevo provider, abstraction SMS.
+- **Phase 4 technique** : intégration événements QR/présence/sorties avec queue locale.
+- **Phase 5+ technique** : R2 abstraction, D1 archive, audit central, Cloudflare security, quotas.
 - Notifications push/Web Push pour les alertes.
 - Approbations transactionnelles (annulation financière, modification de note publiée).
 - Snapshots historiques (`indicator_snapshots`) et tendances 7/30 jours.
@@ -530,9 +544,12 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Prochaines étapes logiques
 
-1. Pédagogie Phase 2 : connecter publication des devoirs/cotations et vue parent.
-2. Pédagogie Phase 3 : spécifier puis implémenter le moteur de calcul des moyennes et bulletins.
-3. Notifications push/Web Push pour les alertes de sécurité.
+1. Phase 2 technique : créer `system_events`, `notifications`, `notification_templates`, `data_retention_policies`.
+2. Phase 3 technique : implémenter NotificationService + Brevo provider + abstraction SMS.
+3. Phase 4 technique : brancher QR/présence/sorties sur le système d'événements (pas d'appel direct Brevo).
+4. Pédagogie Phase 2 : connecter publication des devoirs/cotations et vue parent.
+5. Pédagogie Phase 3 : spécifier puis implémenter le moteur de calcul des moyennes et bulletins.
+6. Notifications push/Web Push pour les alertes de sécurité.
 4. Module Approbations (workflow transactionnel avec audit).
 5. Snapshots historiques et tendances Pilotage.
 6. Gestion avancée du double rôle (affichage contextuel par module).
