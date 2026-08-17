@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import multipart from "@fastify/multipart";
 import { ZodError } from "zod";
 import { registerBootstrapRoutes, type BootstrapRouteDependencies } from "./bootstrap/routes.js";
 import { registerCardRoutes, type CardRouteDependencies } from "./cards/routes.js";
@@ -35,6 +36,8 @@ export type BuildAppOptions = {
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({ logger: false });
   const readinessProbe = options.readinessProbe ?? defaultReadinessProbe;
+
+  app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 } });
 
   app.setErrorHandler((error, _request, reply) => {
     const requestId = newRequestId();

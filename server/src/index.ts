@@ -14,6 +14,8 @@ import { createPedagogyService } from "./pedagogy/service.js";
 import { createSchoolService } from "./school/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
 import { createClient } from "@supabase/supabase-js";
+import fastifyStatic from "@fastify/static";
+import path from "node:path";
 import { createEventService } from "./events/service.js";
 import { createNotificationService } from "./notifications/service.js";
 import { createNotificationDispatcher } from "./notifications/dispatcher.js";
@@ -195,6 +197,11 @@ const app = buildApp({
       }
     : undefined,
   access: accessService,
+});
+
+await app.register(fastifyStatic, {
+  root: path.resolve(process.cwd(), "server/uploads"),
+  prefix: "/uploads/",
 });
 
 await app.listen({ host: env.HOST, port: env.PORT });
