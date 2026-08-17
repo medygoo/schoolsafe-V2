@@ -28,7 +28,17 @@ function buildMultipartBody(
   return Buffer.concat(chunks);
 }
 
-function createMockService(): SchoolService {
+type AuditEvent = {
+  event_type: string;
+  school_id: string;
+  actor_profile_id: string;
+  payload: unknown;
+};
+
+type MockSchoolService = SchoolService & { auditEvents: AuditEvent[] };
+
+function createMockService(): MockSchoolService {
+  const auditEvents: AuditEvent[] = [];
   return {
     getSettings: vi.fn().mockResolvedValue({
       identity: { name: "École Test", name_en: null, legal_name: null, school_type: "Privée", approval_code: "TEST-001" },
@@ -75,10 +85,33 @@ function createMockService(): SchoolService {
       roles: [{ id: "20000000-0000-0000-0000-000000000001", code: "admin", label: "Administrateur" }],
       scopes: [],
     }),
-    inviteStaff: vi.fn().mockResolvedValue({ profile_id: "profile-2", user_id: "user-2" }),
+    auditEvents,
+    inviteStaff: vi.fn(async (schoolId, actorProfileId, payload) => {
+      auditEvents.push({
+        event_type: "staff.invited",
+        school_id: schoolId,
+        actor_profile_id: actorProfileId,
+        payload,
+      });
+      return { profile_id: "profile-2", user_id: "user-2" };
+    }),
     resendStaffInvite: vi.fn().mockResolvedValue(undefined),
-    updateStaffRoles: vi.fn().mockResolvedValue(undefined),
-    toggleStaffActive: vi.fn().mockResolvedValue(undefined),
+    updateStaffRoles: vi.fn(async (profileId, schoolId, actorProfileId, payload) => {
+      auditEvents.push({
+        event_type: "staff.roles_changed",
+        school_id: schoolId,
+        actor_profile_id: actorProfileId,
+        payload: { profile_id: profileId, ...payload },
+      });
+    }),
+    toggleStaffActive: vi.fn(async (profileId, schoolId, actorProfileId, payload) => {
+      auditEvents.push({
+        event_type: "staff.toggled",
+        school_id: schoolId,
+        actor_profile_id: actorProfileId,
+        payload: { profile_id: profileId, ...payload },
+      });
+    }),
     listRoles: vi.fn().mockResolvedValue([
       { id: "20000000-0000-0000-0000-000000000001", code: "admin", label: "Administrateur" },
       { id: "20000000-0000-0000-0000-000000000002", code: "teacher", label: "Enseignant" },
@@ -100,7 +133,7 @@ function createMockService(): SchoolService {
     ]),
     toggleCycle: vi.fn().mockResolvedValue(undefined),
     saveLogoPath: vi.fn().mockResolvedValue(undefined),
-  };
+  } as MockSchoolService;
 }
 
 function buildTestApp(service: SchoolService, access: AccessService) {
@@ -389,6 +422,130 @@ describe("School & Staff routes", () => {
     const json = response.json();
     expect(json.logo_path).toMatch(/^\/uploads\/logos\/.+\.png$/);
     expect(service.saveLogoPath).toHaveBeenCalledWith("school-1", json.logo_path);
+    await app.close();
+  });
+
+  it("POST /school/staff/invite records staff.invited audit event", async () => {
+    const service = createMockService();
+    const app = buildTestApp(service, accessService());
+    const response = await app.inject({
+      method: "POST",
+      url: "/school/staff/invite",
+      headers: { authorization: "Bearer valid-token" },
+      payload: {
+        email: "teacher@ecole.cd",
+        first_name: "Marie",
+        last_name: "Enseignante",
+        role_ids: ["20000000-0000-0000-0000-000000000002"],
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(service.auditEvents).toHaveLength(1);
+    expect(service.auditEvents[0]).toMatchObject({
+      event_type: "staff.invited",
+      school_id: "school-1",
+      actor_profile_id: "profile-1",
+    });
+    await app.close();
+  });
+
+  it("PUT /school/staff/:id/roles records staff.roles_changed audit event", async () => {
+    const service = createMockService();
+    const app = buildTestApp(service, accessService());
+    const response = await app.inject({
+      method: "PUT",
+      url: "/school/staff/profile-1/roles",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { role_ids: ["20000000-0000-0000-0000-000000000001"] },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(service.auditEvents).toHaveLength(1);
+    expect(service.auditEvents[0]).toMatchObject({
+      event_type: "staff.roles_changed",
+      school_id: "school-1",
+      actor_profile_id: "profile-1",
+    });
+    await app.close();
+  });
+
+  it("POST /school/staff/:id/toggle records staff.toggled audit event", async () => {
+    const service = createMockService();
+    const app = buildTestApp(service, accessService());
+    const response = await app.inject({
+      method: "POST",
+      url: "/school/staff/profile-1/toggle",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { is_active: false },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(service.auditEvents).toHaveLength(1);
+    expect(service.auditEvents[0]).toMatchObject({
+      event_type: "staff.toggled",
+      school_id: "school-1",
+      actor_profile_id: "profile-1",
+    });
+    await app.close();
+  });
+
+  it("GET /school/academic-years rejects without school.manage permission", async () => {
+    const app = buildTestApp(createMockService(), accessService({ permission: false }));
+    const response = await app.inject({
+      method: "GET",
+      url: "/school/academic-years",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ code: "ACCESS_DENIED" });
+    await app.close();
+  });
+
+  it("GET /school/cycles rejects without school.manage permission", async () => {
+    const app = buildTestApp(createMockService(), accessService({ permission: false }));
+    const response = await app.inject({
+      method: "GET",
+      url: "/school/cycles",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ code: "ACCESS_DENIED" });
+    await app.close();
+  });
+
+  it("GET /school/staff/:id rejects without staff.manage permission", async () => {
+    const app = buildTestApp(createMockService(), accessService({ permission: false }));
+    const response = await app.inject({
+      method: "GET",
+      url: "/school/staff/profile-1",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ code: "ACCESS_DENIED" });
+    await app.close();
+  });
+
+  it("POST /school/academic-years rejects invalid payload", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const response = await app.inject({
+      method: "POST",
+      url: "/school/academic-years",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { label: "", starts_on: "not-a-date", ends_on: "2027-06-30", periods: "Invalid" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: "VALIDATION_INVALID" });
+    await app.close();
+  });
+
+  it("POST /school/staff/invite rejects invalid payload", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const response = await app.inject({
+      method: "POST",
+      url: "/school/staff/invite",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { email: "not-an-email", first_name: "", last_name: "Doe", role_ids: [] },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: "VALIDATION_INVALID" });
     await app.close();
   });
 });
