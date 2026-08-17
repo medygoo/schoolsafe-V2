@@ -12,7 +12,7 @@ SchoolSafe V2 est composé de trois blocs :
 |------|---------|------|---------------------|
 | **Front PWA** | `app/` | Interface école (configuration, cartes, workspace) | VPS école (fichiers statiques) |
 | **API école** | `server/` | API Fastify du VPS école | VPS école (Node.js) |
-| **App centrale** | `control-app/` | Contrôle des tokens et impression des cartes | Render.com + Neon |
+| **App centrale** | dépôt [`schoolsafe-control-`](https://github.com/medygoo/schoolsafe-control-) | Contrôle des tokens et impression des cartes | Render.com + Neon |
 
 Chaque école a **son propre VPS** et **sa propre base Supabase**. L'application reste identique ; seules les variables d'environnement changent.
 
@@ -124,15 +124,17 @@ Pour tester le studio de cartes, ouvrir :
 http://127.0.0.1:4175/modules/cards/test-card.html
 ```
 
-### 3.6 Lancer l'app centrale en local (`control-app/`)
+### 3.6 Lancer l'app centrale en local
+
+L'app centrale est dans un dépôt séparé :
 
 ```bash
-cd control-app
-cp ../.env.example .env
+git clone https://github.com/medygoo/schoolsafe-control-.git
+cd schoolsafe-control-
 npm install
 ```
 
-Éditer `control-app/.env` :
+Créer un fichier `.env` :
 
 ```env
 HOST=127.0.0.1
@@ -169,13 +171,15 @@ Le tableau de bord est accessible sur `http://127.0.0.1:4176`.
 
 ## 5. Déployer l'app centrale (Render + Neon)
 
-Suivre le guide détaillé : [`control-app/DEPLOY.md`](../control-app/DEPLOY.md).
+L'app centrale a son propre dépôt : https://github.com/medygoo/schoolsafe-control-
+
+Suivre le guide détaillé : [`DEPLOY.md`](https://github.com/medygoo/schoolsafe-control-/blob/main/DEPLOY.md).
 
 Résumé :
 
 1. Créer une base PostgreSQL sur **Neon** (`schoolsafe_control`).
-2. Créer un **Web Service** sur Render à partir du dépôt GitHub.
-3. Indiquer le répertoire racine `control-app/`.
+2. Créer un **Web Service** sur Render à partir du dépôt `medygoo/schoolsafe-control-`.
+3. Laisser le répertoire racine vide (le `Dockerfile` est à la racine du dépôt).
 4. Ajouter les variables d'environnement :
    - `DATABASE_URL` (URL Neon)
    - `ADMIN_TOKEN` (token fort d'au moins 16 caractères)
@@ -216,8 +220,8 @@ Redémarrer l'API école.
 # API école
 cd server && npm test
 
-# App centrale
-cd control-app && npm test
+# App centrale (dépôt séparé)
+cd ../schoolsafe-control- && npm test
 
 # Vérification du bundle auth-sdk
 npm run check:auth-sdk
@@ -264,7 +268,7 @@ node tests/qa-permanent-preview.cjs
 | `CONTROL_APP_HMAC_SECRET` | non | Secret HMAC pour signer les appels à l'app centrale |
 | `VAPID_PRIVATE_KEY` | non | Clé privée VAPID pour les notifications push |
 
-### `control-app/.env`
+### `schoolsafe-control-/.env`
 
 | Variable | Obligatoire | Description |
 |----------|-------------|-------------|

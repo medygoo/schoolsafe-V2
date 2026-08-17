@@ -209,6 +209,8 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - `cd server && npm test` ✅ 31/31
   - Test visuel Playwright du dashboard : `tmp/card-previews/control-app-dashboard.png` ✅
 - Commit et push sur `origin/main` : `92b1230 feat(control-app): finalisation de l'app centrale (Render + Neon)`.
+- **Migration vers un dépôt dédié** : le dossier `control-app/` a été déplacé dans le dépôt `https://github.com/medygoo/schoolsafe-control-.git` (commit `a1a91f7`).
+- Nettoyage du dépôt principal : suppression du dossier `control-app/` et mise à jour de la documentation.
 
 ### Intégration front du moteur de cartes dans V2
 
@@ -274,43 +276,18 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 - `app/modules/cards/card-renderer.js`
 - `app/modules/cards/cards-module.js`
 - `app/modules/cards/test-card.html`
-- `control-app/package.json`
-- `control-app/tsconfig.json`
-- `control-app/vitest.config.ts`
-- `control-app/src/app.ts`
-- `control-app/src/index.ts`
-- `control-app/src/config/env.ts`
-- `control-app/src/db/types.ts`
-- `control-app/src/db/postgres.ts`
-- `control-app/src/db/sqlite.ts`
-- `control-app/src/db/index.ts`
-- `control-app/src/db/schema.sql`
-- `control-app/src/db/schema.sqlite.sql`
-- `control-app/src/http/errors.ts`
-- `control-app/public/index.html`
-- `control-app/public/styles.css`
-- `control-app/public/app.js`
-- `control-app/public/logo.png`
-- `control-app/Dockerfile`
-- `control-app/render.yaml`
-- `control-app/DEPLOY.md`
-- `control-app/src/http/request-id.ts`
-- `control-app/src/auth/hmac.ts`
-- `control-app/src/auth/admin.ts`
-- `control-app/src/routes/instances.ts`
-- `control-app/src/routes/card-requests.ts`
-- `control-app/tests/control-app.test.ts`
+- `docs/LAUNCH.md`
 - `coordination/STATUS_V2.md`
 
 ### Merges et pushes
 
 - Tout a été poussé sur `origin/main`.
-- Commits récents :
+- Dépôt principal : `https://github.com/medygoo/schoolsafemm.git`
+- Dépôt app centrale : `https://github.com/medygoo/schoolsafe-control-.git`
+- Commits récents sur `schoolsafemm` :
+  - `5223993 refactor: move control-app to dedicated repo schoolsafe-control-`
+  - `5f12a64 docs: finalize PROJECT-CONTINUITY and add LAUNCH.md`
   - `92b1230 feat(control-app): finalisation de l'app centrale (Render + Neon)`
-  - `bd079df docs: update PROJECT-CONTINUITY.md with card visual fixes`
-  - `bfe3def fix(cards): ajustements visuels des cartes élèves`
-  - `5ac6d20 feat(cards): intégrer le studio de cartes élèves dans le workspace V2`
-  - `55791a0 feat(server): connect V2 to control app for card print requests`
 
 ---
 
@@ -318,13 +295,15 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Rédaction de la fiche de lancement de SchoolSafe V2** : documenter pas à pas comment démarrer l'application en local, la connecter à Supabase, lancer l'API VPS, servir le front PWA, et déployer l'app centrale sur Render + Neon.
+**Migration de l'app centrale vers son propre dépôt et mise à jour de la documentation** : déplacer `control-app/` vers `https://github.com/medygoo/schoolsafe-control-.git`, nettoyer le dépôt principal, mettre à jour `docs/LAUNCH.md` et `PROJECT-CONTINUITY.md`.
 
 ### État d'avancement
 
 - Intégration front du moteur de cartes terminée et testée visuellement.
-- Application de contrôle centrale finalisée, testée et poussée sur `origin/main`.
-- Aucun code supplémentaire à produire ; il reste uniquement la documentation de lancement.
+- Application de contrôle centrale finalisée et poussée sur `origin/main`.
+- App centrale migrée dans le dépôt dédié `schoolsafe-control-`.
+- Dépôt principal nettoyé (`control-app/` supprimé).
+- Documentation en cours de mise à jour.
 - Fichier complet téléchargé localement : `analysis/zalavrai.html` (~2,2 Mo).
 - Analyse technique complète réalisée (section détaillée ci-dessous).
 - Architecture des cartes verrouillée :
@@ -505,7 +484,6 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Fonctionnalités non terminées
 
-- Fiche de lancement (**en cours de rédaction**).
 - Gestion du double rôle (enseignant + parent).
 
 ### Améliorations prévues
@@ -525,11 +503,10 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Prochaines étapes logiques
 
-1. Finaliser et commiter la fiche de lancement (`docs/LAUNCH.md`).
-2. Gestion du double rôle (enseignant + parent) : union des permissions et des périmètres.
-3. Documenter l'interface d'entrée/sortie du système de cartes.
-4. Créer l'adaptateur versionné avec tests de contrat.
-5. Poursuivre l'étude détaillée des fonctionnalités une par une (finance, pédagogie, sécurité, etc.).
+1. Gestion du double rôle (enseignant + parent) : union des permissions et des périmètres.
+2. Documenter l'interface d'entrée/sortie du système de cartes.
+3. Créer l'adaptateur versionné avec tests de contrat.
+4. Poursuivre l'étude détaillée des fonctionnalités une par une (finance, pédagogie, sécurité, etc.).
 
 ---
 
@@ -545,10 +522,8 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
   - `offline-sync.js` : synchronisation hors connexion
   - `modules/cards/cards-module.js` : studio de production de cartes élèves
   - `modules/cards/card-renderer.js` : moteur de rendu des cartes (badge + carte PVC)
-- App centrale dans `control-app/public/` :
-  - `index.html`, `styles.css`, `app.js` : tableau de bord opérateur
-  - logo SchoolSafe
 - Serveur local `app/server.mjs` sur `127.0.0.1:4175`.
+- **App centrale** : dans le dépôt séparé `https://github.com/medygoo/schoolsafe-control-.git`.
 
 ### Backend
 
@@ -559,7 +534,7 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
   - `cards/` : gestion des demandes d'impression de cartes
   - `health/` : points de contrôle
   - `http/` : gestion des erreurs
-- **App centrale** : Fastify dans `control-app/src/`, exécutée sur Render :
+- **App centrale** : Fastify dans le dépôt séparé `schoolsafe-control-`, exécutée sur Render :
   - `db/` : abstraction PostgreSQL (Neon) / SQLite
   - `routes/instances.ts` : gestion des écoles et tokens
   - `routes/card-requests.ts` : réception et traitement des demandes d'impression
@@ -594,7 +569,7 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 - `POST /auth/lookup-phone` : recherche d'e-mail par téléphone.
 - `POST /cards/request-print` : réception d'une demande d'impression de carte, upload R2, push HMAC vers l'app centrale.
 
-**App centrale (`control-app/src/`)**
+**App centrale (dépôt `schoolsafe-control-`)**
 
 - `POST /instances` : créer une école/instance.
 - `GET /instances` / `GET /instances/:id` : lister / détail.
@@ -638,26 +613,25 @@ La règle `docs/CARDS_IMMUTABILITY.md` exige un **adaptateur versionné avec tes
 
 ### Où je me suis arrêté
 
-Application de contrôle centrale finalisée et poussée sur `origin/main` (commit `92b1230`). `PROJECT-CONTINUITY.md` est en cours de mise à jour pour refléter cet état.
+App centrale migrée dans son propre dépôt `https://github.com/medygoo/schoolsafe-control-.git`. Le dossier `control-app/` a été supprimé du dépôt principal. La documentation est en cours de mise à jour.
 
 ### Ce que j'étais en train de faire
 
-- Mettre à jour `PROJECT-CONTINUITY.md` : sections 4 (travail terminé), 5 (travail en cours), 6 (travail restant), 7 (architecture), 9 (point de reprise).
-- Préparer la rédaction de la fiche de lancement `docs/LAUNCH.md`.
+- Pousser l'historique de `control-app/` vers le dépôt `schoolsafe-control-`.
+- Supprimer `control-app/` du dépôt principal.
+- Mettre à jour `docs/LAUNCH.md` et `PROJECT-CONTINUITY.md` pour refléter le dépôt séparé.
 
 ### Prochaine action
 
-1. Terminer la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Rédiger `docs/LAUNCH.md`.
-3. Relancer les tests critiques (`server/`, `control-app/`, preview PWA).
-4. Commiter et pousser `PROJECT-CONTINUITY.md` + `docs/LAUNCH.md`.
+1. Commiter et pousser les mises à jour de documentation sur `origin/main`.
+2. Nettoyer les branches temporaires locales (`control-app-split`, `control-app-to-push`).
+3. Passer à la gestion du double rôle (enseignant + parent).
 
 ### Commandes/tests restants
 
-- `cd control-app && npm run typecheck`
-- `cd control-app && npm test`
 - `cd server && npm test`
 - `node tests/qa-permanent-preview.cjs`
+- `cd ../schoolsafe-control- && npm test` (dépôt séparé)
 - Ouvrir `http://127.0.0.1:4175/modules/cards/test-card.html` pour validation visuelle.
 - Ouvrir `http://127.0.0.1:4175/` pour tester le parcours workspace → Cartes élèves.
 
@@ -677,4 +651,4 @@ Si tu reprends ce projet dans une nouvelle session Kimi Code :
 
 ---
 
-*Dernière mise à jour : 17 août 2026 — application de contrôle centrale finalisée et poussée sur `origin/main` ; en cours de rédaction de la fiche de lancement.*
+*Dernière mise à jour : 17 août 2026 — app centrale migrée dans le dépôt dédié `schoolsafe-control-` ; dépôt principal nettoyé et documentation mise à jour.*
