@@ -15,7 +15,7 @@ const _ssCARDS = {
   PATS: ALL_PATRIMOINS.map(p => ({ v: p.value, n: p.name }))
 };
 
-const SS_LOGO_SRC = 'schoolsafe-logo.png';
+const SS_LOGO_SRC = '/schoolsafe-logo.png';
 const ssLogoBadge = `<img src="${SS_LOGO_SRC}" alt="SchoolSafe" style="height:18px;width:auto;object-fit:contain;filter:brightness(0) invert(1)">`;
 const ssLogoCarte = `<img src="${SS_LOGO_SRC}" alt="SchoolSafe" style="height:16px;width:auto;object-fit:contain;filter:brightness(0) invert(1)">`;
 
@@ -151,7 +151,7 @@ export function ssBuildBadge(s, cl, teacher, year, patB, patStyle, schoolInfo, l
   const verso = `<div class="art badge verso" id="ss-bv">
   <div class="head" style="padding-bottom:16px">
     <div class="arc"><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="head-row">${logoH}<div class="school"><div class="rdc">Badge élève — Verso</div><div class="nm" style="font-size:${sz}">${esc(snm)}</div></div><div class="flag"></div></div>
+    <div class="head-row">${logoH}<div class="school"><div class="rdc">République Démocratique du Congo</div><div class="nm" style="font-size:${sz}">${esc(snm)}</div></div><div class="flag"></div></div>
   </div>
   <div class="bodyz">
     ${showFond ? ssVeil(patB, true) : ''}
