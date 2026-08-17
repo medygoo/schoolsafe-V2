@@ -409,7 +409,7 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - `171042f feat(security): backend scan QR, lockdown et routes securisees`
   - `89093a6 feat(pilotage): migrations et decisions pour increment B`
 
-### Incrément B — Backend terminé
+### Incrément B — Terminé
 
 - **Sécurité QR** (`server/src/security/`) :
   - Vérification HMAC du QR `schoolsafe://card/{card_number}/{signature}`.
@@ -428,6 +428,13 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
   - Routes `/finance/fee-structures`, `/finance/student-fees`, `/finance/payments`, `/finance/fee-control/campaigns`, `/finance/fee-control/scans`.
   - Création de campagnes avec assignation de contrôleurs.
   - Scan QR pour vérifier le statut financier sans créer de paiement.
+- **Frontend PWA** :
+  - Connexion du module Finance existant au backend : `app/modules/finance/finance-api.js`, chargement des vraies données, envoi des paiements/frais.
+  - Module scan QR + alertes : `app/modules/security/security-module.js`, `app/modules/pilotage/pilotage-module.js`, intégration dans `app/index.html` et `app/app.js`.
+  - Module contrôle des frais par QR : `app/modules/finance/fee-control-module.js`, section `#feeControlModule` dans `app/index.html`, navigation branchée dans `app/app.js`.
+  - Masquage cohérent de `#feeControlModule` dans toutes les fonctions de navigation.
+  - Vérifications : `node --check app/app.js` ✅, `node tests/qa-permanent-preview.cjs` ✅ 3/3.
+  - Commit et push : `ac2d32c feat(front): controle des frais par QR`.
 - **Permissions** : toutes les permissions nécessaires ajoutées à `shared/permissions.json`.
 - **Variables d’environnement** : `CARD_HMAC_SECRET`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` ajoutées à `server/src/config/env.ts`.
 - **Tests serveur** : 58/58 passent.
@@ -438,30 +445,30 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Tâche exacte
 
-**Incrément B — Frontend** : connecter et adapter le front PWA pour le scan QR, les alertes et le contrôle des frais.
+**Incrément B terminé** — backend et frontend PWA pour la sécurité QR, le moteur d’alertes, l’email Brevo et le contrôle des frais par QR sont implémentés, testés et poussés sur `main`.
 
 ### État d'avancement
 
-- Backend sécurité / alertes / email / contrôle des frais terminé et poussé sur `main`.
-- Front finance existe déjà en démo locale ; il doit être connecté au backend.
-- Front scan QR / alertes / contrôle frais non encore adapté.
+- Backend sécurité / alertes / email / contrôle des frais : terminé et poussé.
+- Front finance connecté au backend.
+- Front scan QR + alertes adapté.
+- Front contrôle des frais par QR adapté.
+- `PROJECT-CONTINUITY.md` en cours de synchronisation.
 
 ### Fichiers concernés
 
 - `app/app.js`
 - `app/index.html`
-- `app/modules/security/` (à créer)
-- `app/modules/pilotage/` (à créer)
-- `app/modules/finance/` (à créer ou adapter)
+- `app/modules/security/security-module.js`
+- `app/modules/pilotage/pilotage-module.js`
+- `app/modules/finance/finance-api.js`
+- `app/modules/finance/fee-control-module.js`
 
 ### Prochaine action immédiate
 
-1. Lancer le test QA permanent preview.
-2. Adapter le front pour le scan QR et l’affichage des alertes.
-3. Connecter le front finance existant au backend.
-4. Adapter le front pour le contrôle des frais par QR.
-6. Adapter le front PWA.
-7. Lancer `cd server && npm run typecheck && npm test` et `node tests/qa-permanent-preview.cjs`.
+1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
+2. Informer l’utilisateur que l’incrément B est terminé.
+3. Attendre la direction pour la prochaine fonctionnalité à étudier en détail ( Pilotage avancé, approbations, notifications push, ou autre module métier).
 
 ---
 
@@ -469,9 +476,9 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Fonctionnalités non terminées
 
-- Connexion du front finance existant aux nouvelles tables backend.
-- Front scan QR, alertes et contrôle des frais.
 - Notifications push/Web Push pour les alertes.
+- Approbations transactionnelles (annulation financière, modification de note publiée).
+- Snapshots historiques (`indicator_snapshots`) et tendances 7/30 jours.
 
 ### Améliorations prévues
 
@@ -483,10 +490,11 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Prochaines étapes logiques
 
-1. Gestion avancée du double rôle (affichage contextuel par module).
-2. Documenter l'interface d'entrée/sortie du système de cartes.
-3. Créer l'adaptateur versionné avec tests de contrat.
-4. Poursuivre l'étude détaillée des fonctionnalités une par une (finance, pédagogie, sécurité, etc.).
+1. Notifications push/Web Push pour les alertes de sécurité.
+2. Module Approbations (workflow transactionnel avec audit).
+3. Snapshots historiques et tendances Pilotage.
+4. Gestion avancée du double rôle (affichage contextuel par module).
+5. Poursuivre l'étude détaillée des fonctionnalités une par une (finance, pédagogie, sécurité, etc.).
 
 ---
 
@@ -612,27 +620,29 @@ SchoolSafe V2 est une application de gestion scolaire complète, déployée **un
 
 ### Où je me suis arrêté
 
-Backend de l’incrément B entièrement implémenté, testé et poussé sur `main`. `PROJECT-CONTINUITY.md` synchronisé. Le front PWA n’est pas encore adapté pour le scan QR, les alertes et le contrôle des frais.
+Incrément B entièrement terminé : backend (sécurité QR, alertes, email Brevo, contrôle des frais) et frontend PWA (scan QR, alertes, contrôle des frais, connexion finance) implémentés, testés et poussés sur `main`. `PROJECT-CONTINUITY.md` synchronisé.
 
 ### Ce que j'étais en train de faire
 
-- Implémenter le backend sécurité QR (`server/src/security/`).
-- Implémenter le moteur d’alertes et le tableau de bord (`server/src/pilotage/`).
-- Implémenter le service email Brevo (`server/src/email/`).
-- Implémenter le backend contrôle des frais (`server/src/finance/control/`).
+- Adapter le front PWA pour le scan QR et les alertes (`app/modules/security/`, `app/modules/pilotage/`).
+- Connecter le module Finance existant au backend (`app/modules/finance/finance-api.js`).
+- Adapter le front pour le contrôle des frais par QR (`app/modules/finance/fee-control-module.js`).
+- Corriger le masquage cohérent de `#feeControlModule` dans toutes les fonctions de navigation.
+- Lancer `node --check app/app.js` et `node tests/qa-permanent-preview.cjs` (3/3 passent).
+- Commiter et pousser : `ac2d32c feat(front): controle des frais par QR`.
 - Mettre à jour `PROJECT-CONTINUITY.md`.
-- Lancer les tests serveur (58/58 passent).
 
 ### Prochaine action
 
 1. Commiter et pousser la mise à jour de `PROJECT-CONTINUITY.md`.
-2. Lancer `node tests/qa-permanent-preview.cjs`.
-3. Passer au frontend : scan QR, alertes, contrôle des frais, connexion finance.
+2. Informer l’utilisateur que l’incrément B est terminé.
+3. Attendre la direction pour la prochaine fonctionnalité à étudier en détail.
 
 ### Commandes/tests restants
 
-- `node tests/qa-permanent-preview.cjs`
-- Adapter le front PWA.
+- Tests serveur : `cd server && npm run typecheck && npm test` (déjà verts 58/58).
+- Test QA preview : `node tests/qa-permanent-preview.cjs` (déjà 3/3).
+- Prochain module à définir avec l’utilisateur.
 
 ---
 
