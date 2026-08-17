@@ -15,6 +15,7 @@
   "pilotage.alerts.manage",
   "pilotage.approvals.read",
   "pilotage.approvals.manage",
+  "email.send",
   "finance.status.read",
   "sync.submit",
   "file.upload",

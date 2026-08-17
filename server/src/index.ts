@@ -8,6 +8,7 @@ import { createSetupService } from "./setup/service.js";
 import { createSecurityService } from "./security/service.js";
 import { createAlertService } from "./pilotage/alerts/service.js";
 import { createDashboardService } from "./pilotage/dashboard/service.js";
+import { createBrevoEmailService, createNoopEmailService } from "./email/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
 
 const env = parseEnv(process.env);
@@ -46,6 +47,14 @@ const alertService = env.SUPABASE_SERVICE_ROLE_KEY
 const dashboardService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createDashboardService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   : undefined;
+
+const emailService = env.BREVO_API_KEY
+  ? createBrevoEmailService({
+      apiKey: env.BREVO_API_KEY,
+      senderEmail: env.BREVO_SENDER_EMAIL ?? "schoolsafe1@gmail.com",
+      senderName: "SchoolSafe",
+    })
+  : createNoopEmailService();
 
 const app = buildApp({
   bootstrap: {
@@ -88,6 +97,10 @@ const app = buildApp({
         access: accessService,
       }
     : undefined,
+  email: {
+    service: emailService,
+    access: accessService,
+  },
   access: accessService,
 });
 

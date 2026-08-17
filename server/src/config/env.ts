@@ -17,6 +17,7 @@ const envSchema = z.object({
   CONTROL_APP_HMAC_SECRET: z.string().min(1).optional(),
   CARD_HMAC_SECRET: z.string().min(1).optional(),
   BREVO_API_KEY: z.string().min(1).optional(),
+  BREVO_SENDER_EMAIL: z.string().email().optional(),
   VAPID_PRIVATE_KEY: z.string().min(1).optional()
 });
 
