@@ -1,7 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
+  CreateAcademicYearPayload,
   InviteStaffPayload,
+  ToggleCyclePayload,
   ToggleStaffActivePayload,
+  UpdateAcademicYearPayload,
   UpdateSchoolSettingsPayload,
   UpdateStaffRolesPayload,
 } from "./schema.js";
@@ -67,6 +70,13 @@ export interface SchoolService {
   toggleStaffActive(profileId: string, payload: ToggleStaffActivePayload): Promise<void>;
   listRoles(): Promise<Role[]>;
   listPermissions(): Promise<Permission[]>;
+  listAcademicYears(schoolId: string): Promise<Array<{ id: string; label: string; starts_on: string; ends_on: string; periods: string; is_active: boolean }>>;
+  createAcademicYear(schoolId: string, payload: CreateAcademicYearPayload): Promise<{ id: string }>;
+  updateAcademicYear(schoolId: string, yearId: string, payload: UpdateAcademicYearPayload): Promise<void>;
+  activateAcademicYear(schoolId: string, yearId: string): Promise<void>;
+  listCycles(schoolId: string): Promise<Array<{ cycle_key: string; cycle_name: string; is_active: boolean }>>;
+  toggleCycle(schoolId: string, cycleKey: string, payload: ToggleCyclePayload): Promise<void>;
+  saveLogoPath(schoolId: string, logoPath: string): Promise<void>;
 }
 
 function createServiceClient(supabaseUrl: string, serviceRoleKey: string): SupabaseClient {
@@ -312,6 +322,85 @@ export function createSchoolService(
         .order("code");
       if (error || !data) throw new Error(`Failed to list permissions: ${JSON.stringify(error)}`);
       return data;
+    },
+
+    async listAcademicYears(schoolId: string) {
+      const { data, error } = await serviceClient
+        .from("academic_years")
+        .select("id, label, starts_on, ends_on, periods, is_active")
+        .eq("school_id", schoolId)
+        .order("starts_on", { ascending: false });
+      if (error || !data) throw new Error(`Failed to list academic years: ${JSON.stringify(error)}`);
+      return data.map((y) => ({ ...y, starts_on: String(y.starts_on), ends_on: String(y.ends_on) }));
+    },
+
+    async createAcademicYear(schoolId: string, payload: CreateAcademicYearPayload) {
+      const { data, error } = await serviceClient
+        .from("academic_years")
+        .insert({ school_id: schoolId, ...payload })
+        .select("id")
+        .single();
+      if (error || !data) throw new Error(`Failed to create academic year: ${JSON.stringify(error)}`);
+      return { id: data.id };
+    },
+
+    async updateAcademicYear(schoolId: string, yearId: string, payload: UpdateAcademicYearPayload) {
+      const { error } = await serviceClient
+        .from("academic_years")
+        .update(payload)
+        .eq("id", yearId)
+        .eq("school_id", schoolId);
+      if (error) throw new Error(`Failed to update academic year: ${JSON.stringify(error)}`);
+    },
+
+    async activateAcademicYear(schoolId: string, yearId: string) {
+      await serviceClient.rpc("deactivate_other_academic_years", {
+        p_school_id: schoolId,
+        p_active_year_id: yearId,
+      });
+      const { error } = await serviceClient
+        .from("academic_years")
+        .update({ is_active: true })
+        .eq("id", yearId)
+        .eq("school_id", schoolId);
+      if (error) throw new Error(`Failed to activate academic year: ${JSON.stringify(error)}`);
+    },
+
+    async listCycles(schoolId: string) {
+      const { data, error } = await serviceClient
+        .from("school_cycles")
+        .select("cycle_key, cycle_name, is_active")
+        .eq("school_id", schoolId)
+        .order("cycle_key");
+      if (error || !data) throw new Error(`Failed to list cycles: ${JSON.stringify(error)}`);
+      if (data.length === 0) {
+        const defaults = [
+          { school_id: schoolId, cycle_key: "nursery", cycle_name: "Maternelle", is_active: true },
+          { school_id: schoolId, cycle_key: "primary", cycle_name: "Primaire", is_active: true },
+          { school_id: schoolId, cycle_key: "secondary", cycle_name: "Secondaire", is_active: true },
+        ];
+        const { data: inserted, error: insertError } = await serviceClient
+          .from("school_cycles")
+          .insert(defaults)
+          .select("cycle_key, cycle_name, is_active");
+        if (insertError || !inserted) throw new Error(`Failed to seed cycles: ${JSON.stringify(insertError)}`);
+        return inserted;
+      }
+      return data;
+    },
+
+    async toggleCycle(schoolId: string, cycleKey: string, payload: ToggleCyclePayload) {
+      const { error } = await serviceClient
+        .from("school_cycles")
+        .update({ is_active: payload.is_active })
+        .eq("school_id", schoolId)
+        .eq("cycle_key", cycleKey);
+      if (error) throw new Error(`Failed to toggle cycle: ${JSON.stringify(error)}`);
+    },
+
+    async saveLogoPath(schoolId: string, logoPath: string) {
+      const { error } = await serviceClient.from("school").update({ logo_path: logoPath }).eq("id", schoolId);
+      if (error) throw new Error(`Failed to save logo path: ${JSON.stringify(error)}`);
     },
   };
 }

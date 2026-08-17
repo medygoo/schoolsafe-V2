@@ -51,7 +51,23 @@ export const toggleStaffActiveSchema = z.object({
   is_active: z.boolean(),
 });
 
+export const createAcademicYearSchema = z.object({
+  label: z.string().min(1),
+  starts_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  ends_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  periods: z.enum(["Trimestres", "Semestres"]),
+});
+
+export const updateAcademicYearSchema = createAcademicYearSchema.partial();
+
+export const toggleCycleSchema = z.object({
+  is_active: z.boolean(),
+});
+
 export type UpdateSchoolSettingsPayload = z.infer<typeof updateSchoolSettingsSchema>;
 export type InviteStaffPayload = z.infer<typeof inviteStaffSchema>;
 export type UpdateStaffRolesPayload = z.infer<typeof updateStaffRolesSchema>;
 export type ToggleStaffActivePayload = z.infer<typeof toggleStaffActiveSchema>;
+export type CreateAcademicYearPayload = z.infer<typeof createAcademicYearSchema>;
+export type UpdateAcademicYearPayload = z.infer<typeof updateAcademicYearSchema>;
+export type ToggleCyclePayload = z.infer<typeof toggleCycleSchema>;
