@@ -731,6 +731,9 @@
     pedagogyState.activeTab = requestedTab;
     document.getElementById("accessConsole").hidden = true;
     document.getElementById("financeModule").hidden = true;
+    document.getElementById("securityModule").hidden = true;
+    document.getElementById("pilotageModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
     document.getElementById("pedagogyModule").hidden = false;
     document.querySelector(".workspace-grid").hidden = true;
     document.getElementById("cardsProtected").hidden = true;
@@ -740,6 +743,7 @@
 
   function closePedagogyModule() {
     document.getElementById("pedagogyModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
     document.querySelector(".workspace-grid").hidden = false;
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
@@ -1028,6 +1032,9 @@
     var allowedTabs = financeTabsForRole();
     financeState.activeTab = allowedTabs.indexOf(requestedTab) === -1 ? allowedTabs[0] : requestedTab;
     document.getElementById("pedagogyModule").hidden = true;
+    document.getElementById("securityModule").hidden = true;
+    document.getElementById("pilotageModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.getElementById("financeModule").hidden = false;
     document.querySelector(".workspace-grid").hidden = true;
@@ -1038,6 +1045,7 @@
 
   function closeFinanceModule() {
     document.getElementById("financeModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
     document.querySelector(".workspace-grid").hidden = false;
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
@@ -1058,6 +1066,7 @@
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("financeModule").hidden = true;
     document.getElementById("pilotageModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.getElementById("securityModule").hidden = false;
     document.querySelector(".workspace-grid").hidden = true;
@@ -1068,6 +1077,7 @@
 
   function closeSecurityModule() {
     document.getElementById("securityModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
     document.querySelector(".workspace-grid").hidden = false;
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
@@ -1078,6 +1088,7 @@
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("financeModule").hidden = true;
     document.getElementById("securityModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.getElementById("pilotageModule").hidden = false;
     document.querySelector(".workspace-grid").hidden = true;
@@ -1091,6 +1102,7 @@
 
   function closePilotageModule() {
     document.getElementById("pilotageModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
     document.querySelector(".workspace-grid").hidden = false;
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
@@ -1100,6 +1112,31 @@
     if (!window.SchoolSafePilotageModule) return;
     if (tab === "dashboard") window.SchoolSafePilotageModule.renderDashboard("pilotageContent");
     else if (tab === "alerts") window.SchoolSafePilotageModule.renderAlerts("pilotageContent");
+  }
+
+  function feeControlTabForAction(actionName) {
+    if (/contrôle des frais|contrôle par qr|vérifier le statut financier/i.test(actionName)) return "scan";
+    return "";
+  }
+
+  function openFeeControlModule(actionName) {
+    document.getElementById("pedagogyModule").hidden = true;
+    document.getElementById("financeModule").hidden = true;
+    document.getElementById("securityModule").hidden = true;
+    document.getElementById("pilotageModule").hidden = true;
+    document.getElementById("accessConsole").hidden = true;
+    document.getElementById("feeControlModule").hidden = false;
+    document.querySelector(".workspace-grid").hidden = true;
+    document.getElementById("cardsProtected").hidden = true;
+    if (window.SchoolSafeFeeControlModule) window.SchoolSafeFeeControlModule.render("feeControlContent");
+    document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeFeeControlModule() {
+    document.getElementById("feeControlModule").hidden = true;
+    document.querySelector(".workspace-grid").hidden = false;
+    document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
+    document.getElementById("workspaceTitle").textContent = "Tableau de bord";
   }
 
   function financeTotals() {
@@ -1881,6 +1918,7 @@
     document.getElementById("financeModule").hidden = true;
     document.getElementById("securityModule").hidden = true;
     document.getElementById("pilotageModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.querySelector(".workspace-grid").hidden = false;
     var liveName = sessionDisplayName();
@@ -2012,6 +2050,10 @@
         }
         if (pilotageTabForAction(actionName)) {
           openPilotageModule(actionName);
+          return;
+        }
+        if (feeControlTabForAction(actionName)) {
+          openFeeControlModule(actionName);
           return;
         }
         notify(actionName + " — fonction à brancher dans l’étape métier correspondante.");
@@ -2293,6 +2335,7 @@
   });
   document.getElementById("closeSecurityModule").addEventListener("click", closeSecurityModule);
   document.getElementById("closePilotageModule").addEventListener("click", closePilotageModule);
+  document.getElementById("closeFeeControlModule").addEventListener("click", closeFeeControlModule);
   document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (button) {
     button.addEventListener("click", function () {
       document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (b) { b.classList.remove("active"); });

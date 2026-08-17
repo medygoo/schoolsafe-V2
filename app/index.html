@@ -19,6 +19,7 @@
   <script src="./offline-sync.js" defer></script>
   <script type="module" src="./modules/cards/cards-module.js"></script>
   <script src="./modules/finance/finance-api.js" defer></script>
+  <script src="./modules/finance/fee-control-module.js" defer></script>
   <script src="./modules/security/security-api.js" defer></script>
   <script src="./modules/security/security-module.js" defer></script>
   <script src="./modules/pilotage/pilotage-api.js" defer></script>
@@ -297,6 +298,14 @@
               <span class="local-draft"><i data-lucide="shield-check"></i> Contrôle temps réel</span>
             </header>
             <div class="pedagogy-content security-content" id="securityContent"></div>
+          </section>
+          <section class="pedagogy-module fee-control-module" id="feeControlModule" hidden>
+            <header class="pedagogy-module-header fee-control-module-header">
+              <button class="secondary-button" id="closeFeeControlModule" type="button"><i data-lucide="arrow-left"></i> Tableau de bord</button>
+              <div><span>Contrôle des frais</span><h2>Contrôle par QR</h2><p>Vérifiez le statut financier d’un élève lors d’un contrôle.</p></div>
+              <span class="local-draft"><i data-lucide="badge-check"></i> Contrôle financier</span>
+            </header>
+            <div class="pedagogy-content fee-control-content" id="feeControlContent"></div>
           </section>
           <section class="pedagogy-module pilotage-module" id="pilotageModule" hidden>
             <header class="pedagogy-module-header pilotage-module-header">
