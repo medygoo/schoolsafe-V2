@@ -311,8 +311,13 @@
               <aside class="cards-studio-panel">
                 <label for="cardsClassSelect">Classe</label>
                 <select id="cardsClassSelect"><option value="">Choisir une classe</option></select>
-                <label for="cardsStudentSelect">Élève</label>
-                <select id="cardsStudentSelect" disabled><option value="">Choisir un élève</option></select>
+                <label>Élèves</label>
+                <div class="cards-student-list" id="cardsStudentList">
+                  <div style="padding:10px;color:#888;font-size:13px">Sélectionnez une classe.</div>
+                </div>
+                <label class="cards-select-all">
+                  <input type="checkbox" id="cardsSelectAll"> Tout sélectionner
+                </label>
                 <label for="cardsPatStyle">Style du patrimoine</label>
                 <select id="cardsPatStyle">
                   <option value="vignette">Vignette</option>
@@ -321,7 +326,7 @@
                 </select>
                 <div class="cards-actions">
                   <button class="primary-button dark" id="cardsRenderBtn" type="button" disabled><i data-lucide="eye"></i> Générer l'aperçu</button>
-                  <button class="primary-button" id="cardsRequestPrintBtn" type="button" disabled><i data-lucide="send"></i> Demander l'impression</button>
+                  <button class="primary-button" id="cardsRequestPrintBtn" type="button" disabled><i data-lucide="send"></i> Envoyer la sélection</button>
                 </div>
                 <div class="cards-status" id="cardsStatus"></div>
               </aside>
