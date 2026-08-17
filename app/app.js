@@ -2248,6 +2248,8 @@
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(function () { toast.classList.remove("show"); }, 3200);
   }
+  window.SchoolSafeApp = window.SchoolSafeApp || {};
+  window.SchoolSafeApp.notify = notify;
 
   function renderGuardianGallery(immediate) {
     var activeMedia = schoolMediaLibrary.filter(function (media) { return media.active; }).sort(function (a, b) { return a.order - b.order; });

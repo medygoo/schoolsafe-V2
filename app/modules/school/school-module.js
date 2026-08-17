@@ -6,6 +6,7 @@
   var staffData = [];
   var rolesData = [];
   var permissionsData = [];
+  var tabsBound = false;
 
   function escapeMarkup(text) {
     if (text == null) return "";
@@ -278,7 +279,7 @@
     if (!container) return;
 
     var rows = staffData.map(function (person) {
-      var roleBadges = person.roles
+      var roleBadges = (person.roles || [])
         .map(function (r) {
           return '<span class="school-role-badge">' + escapeMarkup(r.label) + "</span>";
         })
@@ -487,8 +488,10 @@
   }
 
   function bindTabs() {
+    if (tabsBound) return;
     var container = document.getElementById("schoolTabs");
     if (!container) return;
+    tabsBound = true;
     container.addEventListener("click", function (e) {
       var btn = e.target.closest("[data-school-tab]");
       if (!btn) return;
