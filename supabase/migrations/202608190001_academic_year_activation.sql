@@ -15,3 +15,4 @@ $$;
 
 revoke all on function public.deactivate_other_academic_years(uuid, uuid) from public;
 grant execute on function public.deactivate_other_academic_years(uuid, uuid) to authenticated;
+grant execute on function public.deactivate_other_academic_years(uuid, uuid) to service_role;

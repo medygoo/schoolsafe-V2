@@ -232,6 +232,10 @@
         '<label>Libellé<input name="label" required value="' + (year ? escapeMarkup(year.label) : "") + '"></label>' +
         '<label>Date de début<input name="starts_on" type="date" required value="' + (year ? escapeMarkup(year.starts_on) : "") + '"></label>' +
         '<label>Date de fin<input name="ends_on" type="date" required value="' + (year ? escapeMarkup(year.ends_on) : "") + '"></label>' +
+        '<label>Périodes<select name="periods" required>' +
+        '<option value="Trimestres"' + (year && year.periods === "Trimestres" ? " selected" : "") + '>Trimestres</option>' +
+        '<option value="Semestres"' + (year && year.periods === "Semestres" ? " selected" : "") + '>Semestres</option>' +
+        '</select></label>' +
         '<div class="form-actions"><button class="secondary-button" type="button" id="cancelYear">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div>' +
         "</form></div></div>"
     );
@@ -247,6 +251,7 @@
         label: form.label.value,
         starts_on: form.starts_on.value,
         ends_on: form.ends_on.value,
+        periods: form.periods.value,
       };
       try {
         if (yearId) {
@@ -295,7 +300,7 @@
         '<button class="icon-button" type="button" data-action="view-staff" title="Détails"><i data-lucide="eye"></i></button>' +
         '<button class="icon-button" type="button" data-action="edit-roles" title="Modifier les rôles"><i data-lucide="shield"></i></button>' +
         '<button class="icon-button" type="button" data-action="toggle-active" title="Activer/Désactiver"><i data-lucide="power"></i></button>' +
-        (person.invite_pending ? '<button class="icon-button" type="button" data-action="resend-invite" title="Renvoyer l\'invitation"><i data-lucide="mail"></i></button>' : "") +
+        '<button class="icon-button" type="button" data-action="resend-invite" title="Renvoyer l\'invitation"><i data-lucide="mail"></i></button>' +
         "</td></tr>"
       );
     }).join("");

@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
 import type { NotificationService } from "../notifications/types.js";
 import type {
   CreateAcademicYearPayload,
@@ -70,13 +71,14 @@ export interface SchoolService {
   listStaff(schoolId: string): Promise<StaffMember[]>;
   getStaffDetail(
     profileId: string,
+    schoolId: string,
   ): Promise<StaffMember & { scopes: Array<{ scope_type: string; scope_id: string | null; label: string | null }> }>;
   inviteStaff(
     schoolId: string,
     actorProfileId: string,
     payload: InviteStaffPayload,
   ): Promise<{ profile_id: string; user_id: string }>;
-  resendStaffInvite(profileId: string): Promise<void>;
+  resendStaffInvite(profileId: string, schoolId: string): Promise<void>;
   updateStaffRoles(
     profileId: string,
     schoolId: string,
@@ -175,6 +177,13 @@ export function createSchoolService(
     },
 
     async updateSettings(schoolId: string, payload: UpdateSchoolSettingsPayload): Promise<SchoolSettings> {
+      const { data: schoolRow } = await serviceClient
+        .from("school")
+        .select("setup_completed_at")
+        .eq("id", schoolId)
+        .maybeSingle();
+      let setupCompletedAt: string | null = schoolRow?.setup_completed_at ?? null;
+
       if (payload.identity) {
         const { error } = await serviceClient
           .from("school")
@@ -212,6 +221,14 @@ export function createSchoolService(
           .update(updatePayload)
           .eq("school_id", schoolId);
         if (error) throw new Error(`Failed to update school contact: ${JSON.stringify(error)}`);
+      }
+
+      if ((payload.identity || payload.brand || payload.contact) && setupCompletedAt === null) {
+        const { error } = await serviceClient
+          .from("school")
+          .update({ setup_completed_at: new Date().toISOString() })
+          .eq("id", schoolId);
+        if (error) throw new Error(`Failed to set setup completed at: ${JSON.stringify(error)}`);
       }
 
       return this.getSettings(schoolId);
@@ -263,6 +280,7 @@ export function createSchoolService(
 
     async getStaffDetail(
       profileId: string,
+      schoolId: string,
     ): Promise<StaffMember & { scopes: Array<{ scope_type: string; scope_id: string | null; label: string | null }> }> {
       const { data: profile, error } = await serviceClient
         .from("profiles")
@@ -270,6 +288,9 @@ export function createSchoolService(
         .eq("id", profileId)
         .single();
       if (error || !profile) throw new Error(`Failed to load staff detail: ${JSON.stringify(error)}`);
+      if (profile.school_id !== schoolId) {
+        throw new Error("Staff member does not belong to this school");
+      }
 
       const [{ data: profileRoles }, { data: roles }, { data: users }, { data: scopes }] = await Promise.all([
         serviceClient.from("profile_roles").select("profile_id, role_id").eq("profile_id", profileId),
@@ -302,12 +323,12 @@ export function createSchoolService(
       };
     },
 
-    async resendStaffInvite(profileId: string): Promise<void> {
-      const detail = await this.getStaffDetail(profileId);
+    async resendStaffInvite(profileId: string, schoolId: string): Promise<void> {
+      const detail = await this.getStaffDetail(profileId, schoolId);
       if (!detail.email) throw new Error("No email for staff member");
       if (!detail.auth_user_id) throw new Error("No auth user for staff member");
 
-      const newPassword = defaultPassword;
+      const newPassword = randomUUID().replace(/-/g, "").slice(0, 12);
       const { error: updateError } = await serviceClient.auth.admin.updateUserById(detail.auth_user_id, {
         password: newPassword,
       });
@@ -379,6 +400,17 @@ export function createSchoolService(
       });
       if (auditError) {
         throw new Error(`Failed to record audit event: ${JSON.stringify(auditError)}`);
+      }
+
+      if (notificationService) {
+        await notificationService.queue({
+          schoolId,
+          userId: authData.user.id,
+          channel: "EMAIL",
+          templateKey: "STAFF_INVITED",
+          message: `Bienvenue sur SchoolSafe. Vos identifiants : email ${payload.email}, mot de passe temporaire ${defaultPassword}.`,
+          recipientEmail: payload.email,
+        });
       }
 
       return { profile_id: profile.id, user_id: authData.user.id };
@@ -486,16 +518,19 @@ export function createSchoolService(
     },
 
     async activateAcademicYear(schoolId: string, yearId: string) {
+      const { error, count } = await serviceClient
+        .from("academic_years")
+        .update({ is_active: true }, { count: "exact" })
+        .eq("id", yearId)
+        .eq("school_id", schoolId);
+      if (error) throw new Error(`Failed to activate academic year: ${JSON.stringify(error)}`);
+      if (count === 0) {
+        throw new Error("Academic year not found or does not belong to this school");
+      }
       await serviceClient.rpc("deactivate_other_academic_years", {
         p_school_id: schoolId,
         p_active_year_id: yearId,
       });
-      const { error } = await serviceClient
-        .from("academic_years")
-        .update({ is_active: true })
-        .eq("id", yearId)
-        .eq("school_id", schoolId);
-      if (error) throw new Error(`Failed to activate academic year: ${JSON.stringify(error)}`);
     },
 
     async listCycles(schoolId: string) {

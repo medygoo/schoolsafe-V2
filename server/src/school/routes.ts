@@ -82,8 +82,11 @@ export function registerSchoolRoutes(app: FastifyInstance, deps: SchoolRouteDepe
     "/school/staff/:id",
     { preHandler: [requirePermission(access, "staff.manage")] },
     async (request, reply) => {
+      const token = request.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+      const { schoolId } = await resolveProfileAndSchool(token);
+      if (!schoolId) throw new SchoolSafeError(403, "SCHOOL_NOT_FOUND", "École introuvable", false);
       const { id } = request.params as { id: string };
-      const member = await service.getStaffDetail(id);
+      const member = await service.getStaffDetail(id, schoolId);
       reply.send(member);
     },
   );
@@ -92,9 +95,12 @@ export function registerSchoolRoutes(app: FastifyInstance, deps: SchoolRouteDepe
     "/school/staff/:id/resend-invite",
     { preHandler: [requirePermission(access, "staff.manage")] },
     async (request, reply) => {
+      const token = request.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+      const { schoolId } = await resolveProfileAndSchool(token);
+      if (!schoolId) throw new SchoolSafeError(403, "SCHOOL_NOT_FOUND", "École introuvable", false);
       const { id } = request.params as { id: string };
       resendInviteSchema.parse(request.body);
-      await service.resendStaffInvite(id);
+      await service.resendStaffInvite(id, schoolId);
       reply.send({ status: "ok" });
     },
   );
@@ -241,7 +247,12 @@ export function registerSchoolRoutes(app: FastifyInstance, deps: SchoolRouteDepe
         throw new SchoolSafeError(400, "FILE_INVALID", "Format non supporté (PNG, JPG, WEBP)", false);
       }
 
-      const ext = file.filename.split(".").pop() || "png";
+      const mimeToExt: Record<string, string> = {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/webp": "webp",
+      };
+      const ext = mimeToExt[file.mimetype] ?? "png";
       const filename = `${randomUUID()}.${ext}`;
       const uploadDir = path.resolve(process.cwd(), "server/uploads/logos");
       mkdirSync(uploadDir, { recursive: true });

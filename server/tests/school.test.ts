@@ -211,7 +211,8 @@ describe("School & Staff routes", () => {
   });
 
   it("GET /school/staff/:id returns staff detail", async () => {
-    const app = buildTestApp(createMockService(), accessService());
+    const service = createMockService();
+    const app = buildTestApp(service, accessService());
     const response = await app.inject({
       method: "GET",
       url: "/school/staff/profile-1",
@@ -219,6 +220,7 @@ describe("School & Staff routes", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ id: "profile-1", email: "admin@ecole.cd", scopes: [] });
+    expect(service.getStaffDetail).toHaveBeenCalledWith("profile-1", "school-1");
     await app.close();
   });
 
@@ -232,7 +234,20 @@ describe("School & Staff routes", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "ok" });
-    expect(service.resendStaffInvite).toHaveBeenCalledWith("profile-1");
+    expect(service.resendStaffInvite).toHaveBeenCalledWith("profile-1", "school-1");
+    await app.close();
+  });
+
+  it("GET /school/staff/:id rejects cross-school access", async () => {
+    const service = createMockService();
+    service.getStaffDetail = vi.fn().mockRejectedValue(new Error("Staff member does not belong to this school"));
+    const app = buildTestApp(service, accessService());
+    const response = await app.inject({
+      method: "GET",
+      url: "/school/staff/profile-2",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(500);
     await app.close();
   });
 
@@ -520,6 +535,19 @@ describe("School & Staff routes", () => {
     });
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ code: "ACCESS_DENIED" });
+    await app.close();
+  });
+
+  it("POST /school/academic-years rejects missing periods", async () => {
+    const app = buildTestApp(createMockService(), accessService());
+    const response = await app.inject({
+      method: "POST",
+      url: "/school/academic-years",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { label: "2026-2027", starts_on: "2026-09-01", ends_on: "2027-06-30" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: "VALIDATION_INVALID" });
     await app.close();
   });
 
