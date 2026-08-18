@@ -12,6 +12,7 @@ import { registerAlertRoutes, type AlertRouteDependencies } from "./pilotage/ale
 import { registerDashboardRoutes, type DashboardRouteDependencies } from "./pilotage/dashboard/routes.js";
 import { registerEmailRoutes, type EmailRouteDependencies } from "./email/routes.js";
 import { registerFeeControlRoutes, type FeeControlRouteDependencies } from "./finance/control/routes.js";
+import { registerFinancePaymentsRoutes, type FinancePaymentsRouteDependencies } from "./finance/payments/routes.js";
 import { registerPedagogyRoutes, type PedagogyRouteDependencies } from "./pedagogy/routes.js";
 import { registerSchoolRoutes, type SchoolRouteDependencies } from "./school/routes.js";
 import { requirePermission } from "./access/guard.js";
@@ -28,6 +29,7 @@ export type BuildAppOptions = {
   dashboard?: DashboardRouteDependencies;
   email?: EmailRouteDependencies;
   feeControl?: FeeControlRouteDependencies;
+  financePayments?: FinancePaymentsRouteDependencies;
   pedagogy?: PedagogyRouteDependencies;
   school?: SchoolRouteDependencies;
   access?: AccessService;
@@ -106,6 +108,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.feeControl) {
     registerFeeControlRoutes(app, options.feeControl);
+  }
+
+  if (options.financePayments) {
+    registerFinancePaymentsRoutes(app, options.financePayments);
   }
 
   if (options.pedagogy) {
