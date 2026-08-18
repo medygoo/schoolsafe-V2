@@ -1612,6 +1612,27 @@
       var url = URL.createObjectURL(blob);
       window.open(url, "_blank");
       notify("Reçu PDF ouvert dans un nouvel onglet.");
+
+      var auditClient = getSupabaseClient();
+      if (auditClient && schoolId) {
+        var auditStudentId = transaction.student_id || (studentRecord && studentRecord.student_id) || null;
+        auditClient.from("audit_events").insert({
+          school_id: schoolId,
+          event_type: "finance.receipt.generated",
+          actor_profile_id: (currentSession && currentSession.profile && currentSession.profile.id) || (currentSession && currentSession.user && currentSession.user.id) || null,
+          payload: {
+            document_type: "receipt",
+            document_number: receiptNumber,
+            generated_at: new Date().toISOString(),
+            entity_type: "student",
+            entity_id: auditStudentId
+          }
+        }).then(function () {
+          // Audit event logged successfully.
+        }).catch(function (auditErr) {
+          console.warn("[Finance] audit event insert failed", auditErr);
+        });
+      }
     } catch (e) {
       console.error("[Finance] receipt generation failed", e);
       notify("Erreur lors de la génération du reçu : " + (e.message || "erreur inconnue"));

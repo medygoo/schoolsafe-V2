@@ -26,6 +26,7 @@ export function renderPaymentBlock(doc, payment, x, y, maxWidth) {
   row("Montant payé", formatCurrency(payment.amountPaid, payment.currency), true);
   row("Solde", formatCurrency(payment.remaining, payment.currency));
   row("Mode de paiement", payment.paymentMode || "-");
+  row("Caissier", payment.cashierName || "-");
   row("Référence", payment.reference || "-");
   row("Date", formatDate(payment.paidAt ? new Date(payment.paidAt) : new Date()));
 
