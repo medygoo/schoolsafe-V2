@@ -238,7 +238,7 @@
         branch("finance","Contrôler la situation financière",[group("Frais et caisse",[["Structure des frais","settings"],["Encaissements","wallet"],["Reçus PDF","receipt-text"],["Impayés et soldes","badge-alert"]]),group("Trésorerie",[["Recettes et dépenses","arrow-left-right"],["Rapports de caisse","file-chart-column"],["Clôtures","lock-keyhole"],["Exports financiers","file-down"]])]),
         branch("accounting","Tenir et contrôler la comptabilité",[group("Écritures",[["Plan comptable","list-tree"],["Journal comptable","notebook-tabs"],["Grand livre","book-copy"],["Écritures comptables","file-pen-line"]]),group("États",[["Balance","scale"],["Rapprochements","list-checks"],["États financiers","file-chart-column"],["Rapports SYSCOHADA","landmark"]])]),
         branch("communication","Informer la communauté scolaire",[group("Échanges",[["Messages","messages-square"],["Notifications","bell"],["Annonces","megaphone"],["Convocations","mail-plus"]]),group("Publication",[["Site public et WebSync","globe-2"],["Événements","calendar-days"]])]),
-        branch("administration","Gouverner et conserver les preuves",[group("Administration",[["Documents R2","files"],["Archives","archive"],["Paramètres","settings"],["Comptes et droits","shield-ellipsis"]]),group("Plateforme",[["Français et anglais","languages"],["Mode hors ligne","cloud-off"],["Séparation public et privé","shield-check"]])]),
+        branch("administration","Gouverner et conserver les preuves",[group("Configuration",[["École & Personnel","school","execute"]]),group("Administration",[["Documents R2","files"],["Archives","archive"],["Paramètres","settings"],["Comptes et droits","shield-ellipsis"]]),group("Plateforme",[["Français et anglais","languages"],["Mode hors ligne","cloud-off"],["Séparation public et privé","shield-check"]])]),
         branch("reports","Contrôler l’activité",[group("Traçabilité",[["Historiques","history"],["Audit des actions","list-checks"],["Rapports administratifs","file-chart-column"],["Exports PDF et Excel","file-down"]])])
       ]
     },
@@ -1146,7 +1146,7 @@
   }
 
   function schoolTabForAction(actionName) {
-    if (/mon école|paramètres de l’école|configuration école/i.test(actionName)) return "school";
+    if (/mon école|paramètres de l’école|configuration école|école & personnel/i.test(actionName)) return "school";
     if (/mon équipe|personnel|staff/i.test(actionName)) return "staff";
     return "";
   }
@@ -1984,7 +1984,13 @@
     roleSwitch.hidden = userRoles.length <= 1;
     roleSwitch.disabled = userRoles.length <= 1;
 
-    document.getElementById("workspaceNav").innerHTML = profile.branches.map(function (item, index) {
+    var visibleBranches = profile.branches.filter(function (item) {
+      if (item.key !== "administration") return true;
+      var perms = (currentSession && currentSession.permissions) || [];
+      return perms.indexOf("school.manage") >= 0 || perms.indexOf("staff.manage") >= 0;
+    });
+
+    document.getElementById("workspaceNav").innerHTML = visibleBranches.map(function (item, index) {
       var definition = branchDefinitions[item.key];
       var mobileGroups = item.groups.map(function (workGroup) {
         var mobileActions = workGroup.actions.map(function (action) {
@@ -1994,7 +2000,7 @@
       }).join("");
       return '<div class="nav-branch-item' + (index === 0 ? " active" : "") + '"><button class="nav-branch-button' + (index === 0 ? " active" : "") + '" type="button" data-branch="' + item.key + '" aria-expanded="false"><i data-lucide="' + definition.icon + '"></i><span>' + definition.label + '</span><i class="nav-chevron" data-lucide="chevron-down"></i></button><div class="nav-submenu" hidden>' + mobileGroups + "</div></div>";
     }).join("");
-    document.getElementById("statusBranchList").innerHTML = profile.branches.map(function (item) {
+    document.getElementById("statusBranchList").innerHTML = visibleBranches.map(function (item) {
       return "<span>" + branchDefinitions[item.key].label + "</span>";
     }).join("");
 
@@ -2007,7 +2013,7 @@
       return '<div class="today-item" style="--item-color:' + colors[0] + ';--item-bg:' + colors[1] + '"><span><i data-lucide="' + item[2] + '"></i></span><div><b>' + item[0] + "</b><small>" + item[1] + "</small></div></div>";
     }).join("");
 
-    document.getElementById("workspaceBranches").innerHTML = profile.branches.map(function (item) {
+    document.getElementById("workspaceBranches").innerHTML = visibleBranches.map(function (item) {
       var definition = branchDefinitions[item.key];
       var groups = item.groups.map(function (workGroup) {
         var actions = workGroup.actions.map(function (action) {
