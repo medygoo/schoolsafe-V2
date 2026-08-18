@@ -14,6 +14,8 @@ import { createFinanceService } from "./services/finance.js";
 import { createFinanceRouter } from "./routes/finance.js";
 import { createPilotageService } from "./services/pilotage.js";
 import { createPilotageRouter } from "./routes/pilotage.js";
+import { createPedagogyService } from "./services/pedagogy.js";
+import { createPedagogyRouter } from "./routes/pedagogy.js";
 
 export default {
   async fetch(request: Request, env: AppEnv): Promise<Response> {
@@ -34,6 +36,7 @@ export default {
     const schoolService = createSchoolService(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_SERVICE_ROLE_KEY);
     const financeService = createFinanceService(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_SERVICE_ROLE_KEY);
     const pilotageService = createPilotageService(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_SERVICE_ROLE_KEY);
+    const pedagogyService = createPedagogyService(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_SERVICE_ROLE_KEY);
 
     const app = new Hono();
     app.use(errorHandler);
@@ -56,6 +59,10 @@ export default {
     app.use("/pilotage/*", authMiddleware());
     app.use("/pilotage/*", schoolContextMiddleware(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_ANON_KEY));
     app.route("/", createPilotageRouter(pilotageService, accessService));
+
+    app.use("/pedagogy/*", authMiddleware());
+    app.use("/pedagogy/*", schoolContextMiddleware(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_ANON_KEY));
+    app.route("/", createPedagogyRouter(pedagogyService, accessService));
 
     return app.fetch(request, env);
   },
