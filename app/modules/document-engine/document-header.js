@@ -1,5 +1,5 @@
 // app/modules/document-engine/document-header.js
-import { A4_WIDTH_PT, MM_TO_PT } from "./print-layout.js";
+import { A4_WIDTH_PT, MM_TO_PT, MARGINS } from "./print-layout.js";
 
 /**
  * @param {import("jspdf").jsPDF} doc
@@ -38,13 +38,15 @@ export async function renderDocumentHeader(doc, identity, title, subtitle, yOffs
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text(identity.name, logoX, yOffset + 11 * MM_TO_PT, { align: "left" });
+  const textX = logoX;
+  const maxTextWidth = A4_WIDTH_PT - textX - MARGINS.right;
+  doc.text(identity.name, textX, yOffset + 11 * MM_TO_PT, { align: "left", maxWidth: maxTextWidth });
 
   // Contact line
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   const contactParts = [identity.address, identity.city, identity.phone, identity.email, identity.website].filter(Boolean);
-  doc.text(contactParts.join(" · "), logoX, yOffset + 16 * MM_TO_PT, { align: "left" });
+  doc.text(contactParts.join(" · "), textX, yOffset + 16 * MM_TO_PT, { align: "left", maxWidth: maxTextWidth });
 
   // Title block
   const titleY = yOffset + 36 * MM_TO_PT;

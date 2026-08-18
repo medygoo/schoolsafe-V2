@@ -9,12 +9,14 @@ export function renderPaymentBlock(doc, payment, x, y, maxWidth) {
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(60, 60, 60);
-    doc.text(label, x, cy);
+    const labelMaxWidth = maxWidth * 0.55 - 2 * MM_TO_PT;
+    doc.text(label, x, cy, { maxWidth: labelMaxWidth });
 
     const valueX = x + maxWidth * 0.55;
+    const valueMaxWidth = maxWidth * 0.45 - 2 * MM_TO_PT;
     doc.setFont("helvetica", highlight ? "bold" : "normal");
     doc.setTextColor(highlight ? 0 : 30, highlight ? 0 : 30, highlight ? 0 : 30);
-    doc.text(String(value), valueX, cy);
+    doc.text(String(value), valueX, cy, { maxWidth: valueMaxWidth });
     cy += lineHeight;
   }
 

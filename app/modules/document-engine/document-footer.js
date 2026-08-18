@@ -19,7 +19,8 @@ export function renderDocumentFooter(doc, identity, options = {}) {
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   const parts = [identity.name, identity.address, identity.city, identity.phone, identity.email, identity.website].filter(Boolean);
-  doc.text(parts.join(" · "), A4_WIDTH_PT / 2, footerY, { align: "center" });
+  const footerMaxWidth = A4_WIDTH_PT - 30 * MM_TO_PT;
+  doc.text(parts.join(" · "), A4_WIDTH_PT / 2, footerY, { align: "center", maxWidth: footerMaxWidth });
 
   // Page number
   doc.text(`Page ${page} / ${totalPages}`, A4_WIDTH_PT - 15 * MM_TO_PT, footerY + 4 * MM_TO_PT, { align: "right" });
@@ -27,9 +28,10 @@ export function renderDocumentFooter(doc, identity, options = {}) {
   // Document date
   doc.text(formatDate(generatedAt), 15 * MM_TO_PT, footerY + 4 * MM_TO_PT, { align: "left" });
 
-  // SchoolSafe branding (secondary)
-  const footerText = identity.documentFooter || `Document généré par SchoolSafe — ${formatDate(generatedAt)}`;
+  // SchoolSafe branding (secondary) — always present; custom documentFooter is prepended when set
+  const schoolSafeText = `Document généré par SchoolSafe — ${formatDate(generatedAt)}`;
+  const footerText = identity.documentFooter ? `${identity.documentFooter} · ${schoolSafeText}` : schoolSafeText;
   doc.setTextColor(120, 120, 120);
   doc.setFontSize(7);
-  doc.text(footerText, A4_WIDTH_PT / 2, footerY + 5 * MM_TO_PT, { align: "center" });
+  doc.text(footerText, A4_WIDTH_PT / 2, footerY + 5 * MM_TO_PT, { align: "center", maxWidth: footerMaxWidth });
 }
