@@ -1504,66 +1504,118 @@
   }
 
   async function exportReceiptPdf(transactionIndex) {
-    var JsPdf = pdfLibrary();
-    if (!JsPdf) { notify("Le générateur PDF n’est pas disponible."); return; }
     var transaction = financeState.transactions[transactionIndex];
     if (!transaction) { notify("Ce reçu est introuvable."); return; }
     if (transaction.status !== "Validé") { notify("Le reçu officiel sera disponible après confirmation de la synchronisation."); return; }
-    var identity = pdfSchoolIdentity();
-    var logo = await loadPdfLogo();
-    var doc = configurePdfLanguage(new JsPdf({ unit: "mm", format: "a4" }));
-    pdfHeader(doc, identity, logo, "Reçu de paiement", transaction.receipt + " · " + transaction.date);
-    doc.setFillColor(244, 248, 253);
-    doc.roundedRect(14, 65, 182, 34, 2, 2, "F");
-    doc.setTextColor(7, 48, 112);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("Montant reçu et enregistré", 22, 77);
-    doc.setFontSize(23);
-    doc.text(money(transaction.amount), 188, 86, { align: "right" });
-    doc.setTextColor(55, 67, 88);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("Statut : " + transaction.status, 22, 91);
-    var details = [
-      ["Élève", transaction.student],
-      ["Classe", transaction.className],
-      ["Type de frais", transaction.fee],
-      ["Mode constaté", transaction.mode],
-      ["Référence", transaction.reference],
-      ["Agent de caisse", transaction.cashier]
-    ];
-    var y = 113;
-    details.forEach(function (detail) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(83, 96, 119);
-      doc.text(detail[0], 18, y);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(24, 42, 72);
-      doc.text(String(detail[1] || "À renseigner"), 67, y);
-      doc.setDrawColor(226, 231, 239);
-      doc.line(18, y + 4, 192, y + 4);
-      y += 13;
-    });
-    doc.setFillColor(255, 248, 225);
-    doc.roundedRect(14, y + 2, 182, 24, 2, 2, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(117, 75, 0);
-    doc.text("Traçabilité SchoolSafe", 20, y + 11);
-    doc.setFont("helvetica", "normal");
-    doc.text(doc.splitTextToSize("Ce reçu confirme une opération reçue par l’école et enregistrée dans SchoolSafe. Aucun argent ne transite dans l’application.", 164), 20, y + 17);
-    y += 46;
-    doc.setTextColor(55, 67, 88);
-    doc.text("Signature de l’agent de caisse", 25, y);
-    doc.text("Signature du payeur", 132, y);
-    doc.setDrawColor(120, 130, 145);
-    doc.line(18, y + 22, 82, y + 22);
-    doc.line(121, y + 22, 189, y + 22);
-    pdfFooter(doc, identity);
-    doc.save(sanitizeFilename("recu-" + transaction.receipt + "-" + transaction.student) + ".pdf");
-    notify("Reçu PDF téléchargé avec le logo de l’école.");
+
+    function fallbackCanViewReceipt() {
+      if (currentDemoRole === "admin" || currentDemoRole === "finance" || currentDemoRole === "cashier" || currentDemoRole === "school_head") return true;
+      if (currentDemoRole === "parent") {
+        var children = financeState.students.filter(function (s) { return s.guardian === "Mme Sophie Martin"; });
+        var childNames = children.map(function (s) { return s.name; });
+        return childNames.indexOf(transaction.student) !== -1;
+      }
+      return false;
+    }
+
+    async function checkAuthorization() {
+      var client = getSupabaseClient();
+      if (!client) return fallbackCanViewReceipt();
+      try {
+        var permResult = await client.rpc("has_permission", { permission_code: "finance.receipts.view" });
+        if (permResult.error || !permResult.data) return false;
+        var studentRecord = financeState.students.find(function (s) { return s.name === transaction.student; });
+        var studentId = transaction.student_id || (studentRecord && studentRecord.student_id) || null;
+        var scopeResult = await client.rpc("has_scope", {
+          requested_scope_type: "student",
+          requested_scope_id: studentId,
+        });
+        return scopeResult.data === true;
+      } catch (e) {
+        return fallbackCanViewReceipt();
+      }
+    }
+
+    var authorized = await checkAuthorization();
+    if (!authorized) {
+      notify("Vous n’avez pas le droit de consulter ce reçu.");
+      return;
+    }
+
+    try {
+      var engine = await import("./modules/document-engine/index.js");
+      var identity = await engine.createSchoolIdentityProvider(window.SchoolSafeSchoolAPI).load();
+
+      function deriveSchoolId() {
+        if (currentSession && currentSession.school && currentSession.school.id) return currentSession.school.id;
+        return "";
+      }
+      var schoolId = deriveSchoolId();
+
+      var receiptNumber;
+      var client = getSupabaseClient();
+      if (client && schoolId) {
+        try {
+          receiptNumber = await engine.createDocumentNumberingService(client, schoolId).nextNumber("receipt", "REC-");
+        } catch (numErr) {
+          console.warn("[Finance] document numbering failed, using existing receipt number", numErr);
+          receiptNumber = transaction.receipt;
+        }
+      } else {
+        receiptNumber = transaction.receipt;
+      }
+
+      function parseStudentName(fullName) {
+        var parts = String(fullName || "").trim().split(/\s+/);
+        if (parts.length <= 1) return { firstName: parts[0] || "", lastName: "" };
+        return { firstName: parts.slice(0, -1).join(" "), lastName: parts[parts.length - 1] };
+      }
+
+      function parseTransactionDate(dateStr) {
+        if (!dateStr) return new Date();
+        var match = String(dateStr).match(/(\d{1,2})\s+([a-zA-Zàâäéèêëïîôöùûüç\s]+)\s+(\d{4})/);
+        if (!match) return new Date();
+        var monthMap = { janvier: 0, février: 1, mars: 2, avril: 3, mai: 4, juin: 5, juillet: 6, août: 7, septembre: 8, octobre: 9, novembre: 10, décembre: 11 };
+        var month = monthMap[match[2].toLowerCase().trim()];
+        if (month == null) return new Date();
+        return new Date(Number(match[3]), month, Number(match[1]));
+      }
+
+      var nameParts = parseStudentName(transaction.student);
+      var studentRecord = financeState.students.find(function (s) { return s.name === transaction.student; });
+      var amountExpected = studentRecord ? studentRecord.expected : transaction.amount;
+      var amountPaid = transaction.amount;
+      var remaining = Math.max(0, amountExpected - amountPaid);
+
+      var payment = {
+        student: {
+          firstName: nameParts.firstName,
+          lastName: nameParts.lastName,
+          matricule: (studentRecord && studentRecord.matricule) || null,
+          className: transaction.className || null,
+        },
+        feeLabel: transaction.fee || "",
+        period: "",
+        amountExpected: amountExpected,
+        amountPaid: amountPaid,
+        remaining: remaining,
+        currency: identity.currency || "USD",
+        paymentMode: transaction.mode || "",
+        reference: transaction.reference || "",
+        paidAt: parseTransactionDate(transaction.date),
+        cashierName: transaction.cashier || "",
+        verificationCode: receiptNumber,
+      };
+
+      var doc = await engine.renderReceipt(identity, payment, receiptNumber);
+      var blob = doc.output("blob");
+      var url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      notify("Reçu PDF ouvert dans un nouvel onglet.");
+    } catch (e) {
+      console.error("[Finance] receipt generation failed", e);
+      notify("Erreur lors de la génération du reçu : " + (e.message || "erreur inconnue"));
+    }
   }
 
   async function exportCashReportPdf() {
