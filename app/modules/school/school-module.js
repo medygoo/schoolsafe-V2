@@ -113,6 +113,13 @@
       '<label>Nom légal<input name="legal_name" value="' + escapeMarkup(s.identity.legal_name || "") + '"></label>' +
       '<label>Type<input name="school_type" value="' + escapeMarkup(s.identity.school_type || "") + '"></label>' +
       '<label>Code d\'agrément<input name="approval_code" value="' + escapeMarkup(s.identity.approval_code || "") + '"></label>' +
+      '<label>Devise<input name="currency" value="' + escapeMarkup(s.identity.currency || "USD") + '"></label>' +
+      '<label>Devise<input name="motto" value="' + escapeMarkup(s.identity.motto || "") + '"></label>' +
+      '<label>Nom de la banque<input name="bank_name" value="' + escapeMarkup(s.identity.bank_name || "") + '"></label>' +
+      '<label>Compte bancaire<input name="bank_account" value="' + escapeMarkup(s.identity.bank_account || "") + '"></label>' +
+      '<label>Numéro d\'identification fiscale<input name="tax_id" value="' + escapeMarkup(s.identity.tax_id || "") + '"></label>' +
+      '<label>Nom du directeur<input name="director_name" value="' + escapeMarkup(s.identity.director_name || "") + '"></label>' +
+      '<label>Langue officielle<input name="official_language" value="' + escapeMarkup(s.identity.official_language || "FR") + '"></label>' +
       "</div>" +
       '<div class="form-section"><h3>Coordonnées</h3>' +
       '<label>Pays<input name="country" value="' + escapeMarkup(s.contact.country || "") + '"></label>' +
@@ -152,6 +159,13 @@
             legal_name: form.legal_name.value || null,
             school_type: form.school_type.value || null,
             approval_code: form.approval_code.value || null,
+            currency: form.currency.value || "USD",
+            motto: form.motto.value || null,
+            bank_name: form.bank_name.value || null,
+            bank_account: form.bank_account.value || null,
+            tax_id: form.tax_id.value || null,
+            director_name: form.director_name.value || null,
+            official_language: form.official_language.value || "FR",
           },
           contact: {
             country: form.country.value || null,
