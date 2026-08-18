@@ -20,7 +20,7 @@ describe("permission catalog", () => {
   it("contient des identifiants uniques et stables", () => {
     const catalog = loadPermissionCatalog();
     expect(catalog.size).toBeGreaterThanOrEqual(minimum.length);
-    for (const code of catalog) expect(code).toMatch(/^[a-z][a-z0-9.-]+$/);
+    for (const code of catalog) expect(code).toMatch(/^[a-z][a-z0-9._-]+$/);
     for (const code of minimum) expect(catalog.has(code)).toBe(true);
   });
 });

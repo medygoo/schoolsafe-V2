@@ -25,7 +25,7 @@
   "finance.payment.cancel",
   "finance.receipt.read",
   "finance.report.read",
-  "finance.cash-register.close",
+  "finance.cash_register.close",
   "finance.control.read",
   "finance.control.manage",
   "finance.control.scan",

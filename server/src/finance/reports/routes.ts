@@ -49,14 +49,14 @@ export function registerFinanceReportsRoutes(app: FastifyInstance, dependencies:
     async (request: FastifyRequest, _reply: FastifyReply) => {
       const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
       const parsed = dailyReportQuerySchema.parse(request.query);
-      const result = await dependencies.service.getDailyReport(schoolId, parsed.date, parsed.currency);
+      const result = await dependencies.service.getDailyReport(schoolId, parsed.date);
       return { data: result };
     },
   );
 
   app.post(
     "/finance/cash-register/close",
-    { preHandler: [requirePermission(dependencies.access, "finance.cash-register.close")] },
+    { preHandler: [requirePermission(dependencies.access, "finance.cash_register.close")] },
     async (request: FastifyRequest, _reply: FastifyReply) => {
       const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
       const parsed = closeCashRegisterSchema.parse(request.body);

@@ -31,7 +31,7 @@ create table if not exists public.cash_register_closures (
 comment on table public.cash_register_closures is 'Clotures de caisse journalieres';
 
 -- Index
- create index if not exists cash_register_closures_school_date_idx on public.cash_register_closures(school_id, closure_date desc);
+create index if not exists cash_register_closures_school_date_idx on public.cash_register_closures(school_id, closure_date desc);
 
 -- RLS
 alter table public.cash_register_closures enable row level security;

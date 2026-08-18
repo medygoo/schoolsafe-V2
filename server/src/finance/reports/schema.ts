@@ -1,9 +1,7 @@
 import { z } from "zod";
-import { currencySchema } from "../control/schema.js";
 
 export const dailyReportQuerySchema = z.object({
   date: z.string().date(),
-  currency: currencySchema.optional(),
 });
 
 export type DailyReportQuery = z.infer<typeof dailyReportQuerySchema>;

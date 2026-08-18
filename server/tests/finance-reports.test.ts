@@ -69,8 +69,8 @@ const mockService: FinanceReportsService = {
   async getReceiptData(schoolId, paymentId) {
     return paymentId === "missing-payment-id" ? null : { ...mockReceipt, payment: { ...mockReceipt.payment, id: paymentId } };
   },
-  async getDailyReport(schoolId, date, currency) {
-    return { ...mockDailyReport, date, currency: currency ?? mockDailyReport.currency };
+  async getDailyReport(schoolId, date) {
+    return { ...mockDailyReport, date };
   },
   async closeCashRegister(schoolId, profileId, input) {
     return {
@@ -206,5 +206,42 @@ describe("POST /finance/cash-register/close", () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe("VALIDATION_INVALID");
+  });
+
+  it("returns existing closure when cash register is already closed", async () => {
+    const existingClosure = {
+      id: "closure-existing",
+      school_id: "school-1",
+      closure_date: "2026-08-17",
+      closed_by: "resolved-profile-id",
+      total_amount: 200,
+      expected_amount: 200,
+      difference: 0,
+      notes: null,
+      status: "closed",
+    };
+    const serviceWithExistingClosure: FinanceReportsService = {
+      ...mockService,
+      async closeCashRegister(schoolId, profileId, input) {
+        return { closure: existingClosure, alreadyClosed: true };
+      },
+    };
+    const app = buildApp({
+      financeReports: {
+        service: serviceWithExistingClosure,
+        resolveProfileAndSchool: mockResolve,
+        access: mockAccess,
+      },
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/finance/cash-register/close",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { date: "2026-08-17" },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.data.alreadyClosed).toBe(true);
+    expect(body.data.closure.closure_date).toBe("2026-08-17");
   });
 });
