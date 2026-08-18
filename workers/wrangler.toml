@@ -7,7 +7,7 @@ ALLOWED_ORIGINS = "https://schoolsafe-v2.pages.dev,http://127.0.0.1:4175,http://
 
 [[kv_namespaces]]
 binding = "SCHOOLSAFE_CACHE"
-id = "<KV_NAMESPACE_ID>"
+id = "1366fb62812040a4892077fbe9b71993"
 
 [[r2_buckets]]
 binding = "SCHOOLSAFE_FILES"
@@ -15,7 +15,7 @@ bucket_name = "schoolsafe-v2-files"
 
 [[d1_databases]]
 binding = "SCHOOLSAFE_ARCHIVE"
-database_id = "<D1_DATABASE_ID>"
+database_id = "fe10587c-e9c4-4aea-a34c-dfba055f3adc"
 
 [[queues.producers]]
 binding = "SCHOOLSAFE_QUEUE"
