@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import worker from "../../src/index.js";
+import type { AppEnv } from "../../src/env.js";
 
 describe("health", () => {
   it("returns ok", async () => {
@@ -9,7 +10,7 @@ describe("health", () => {
       SUPABASE_ANON_KEY: "anon",
       SUPABASE_SERVICE_ROLE_KEY: "service",
       ALLOWED_ORIGINS: "http://localhost:4175",
-    } as unknown as Record<string, unknown>);
+    } as unknown as AppEnv);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: "ok" });
   });

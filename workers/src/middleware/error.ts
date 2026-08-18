@@ -1,4 +1,5 @@
 import type { Context, Next } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { SchoolSafeError } from "../lib/errors.js";
 import { newRequestId } from "../lib/request-id.js";
 
@@ -10,7 +11,7 @@ export async function errorHandler(c: Context, next: Next) {
     if (error instanceof SchoolSafeError) {
       return c.json(
         { code: error.code, message: error.publicMessage, request_id: requestId, retryable: error.retryable },
-        error.statusCode,
+        error.statusCode as ContentfulStatusCode,
       );
     }
     return c.json(

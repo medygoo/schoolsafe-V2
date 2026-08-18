@@ -10,6 +10,10 @@ import { createBootstrapRouter } from "./routes/bootstrap.js";
 import { createAccessService } from "./services/access.js";
 import { createSchoolService } from "./services/school.js";
 import { createSchoolRouter } from "./routes/school.js";
+import { createFinanceService } from "./services/finance.js";
+import { createFinanceRouter } from "./routes/finance.js";
+import { createPilotageService } from "./services/pilotage.js";
+import { createPilotageRouter } from "./routes/pilotage.js";
 
 export default {
   async fetch(request: Request, env: AppEnv): Promise<Response> {
@@ -28,6 +32,8 @@ export default {
     );
     const accessService = createAccessService(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_ANON_KEY);
     const schoolService = createSchoolService(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_SERVICE_ROLE_KEY);
+    const financeService = createFinanceService(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_SERVICE_ROLE_KEY);
+    const pilotageService = createPilotageService(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_SERVICE_ROLE_KEY);
 
     const app = new Hono();
     app.use(errorHandler);
@@ -42,6 +48,14 @@ export default {
     app.use("/school/*", authMiddleware());
     app.use("/school/*", schoolContextMiddleware(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_ANON_KEY));
     app.route("/", createSchoolRouter(schoolService, accessService));
+
+    app.use("/finance/*", authMiddleware());
+    app.use("/finance/*", schoolContextMiddleware(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_ANON_KEY));
+    app.route("/", createFinanceRouter(financeService, accessService));
+
+    app.use("/pilotage/*", authMiddleware());
+    app.use("/pilotage/*", schoolContextMiddleware(parsedEnv.SUPABASE_URL, parsedEnv.SUPABASE_ANON_KEY));
+    app.route("/", createPilotageRouter(pilotageService, accessService));
 
     return app.fetch(request, env);
   },

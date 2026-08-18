@@ -22,8 +22,11 @@ export function schoolContextMiddleware(supabaseUrl: string, supabaseAnonKey: st
     const token = c.get("token") as string | undefined;
     if (!token) return await next();
     const client = createUserClient(supabaseUrl, supabaseAnonKey, token);
-    const { data } = await client.from("profiles").select("school_id").single();
-    if (data?.school_id) c.set("schoolId", data.school_id);
+    const { data } = await client.from("profiles").select("id, school_id").single();
+    if (data) {
+      c.set("profileId", data.id);
+      c.set("schoolId", data.school_id);
+    }
     await next();
   };
 }

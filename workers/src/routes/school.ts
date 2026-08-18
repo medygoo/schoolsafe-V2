@@ -53,7 +53,7 @@ export function createSchoolRouter(service: SchoolService, access: AccessService
 
   router.post("/school/academic-years/:id/activate", requirePermission(access, "school.manage"), async (c) => {
     const schoolId = c.get("schoolId") as string;
-    await service.activateAcademicYear(schoolId, c.req.param("id"));
+    await service.activateAcademicYear(schoolId, c.req.param("id")!);
     return c.json({ status: "ok" });
   });
 
@@ -66,7 +66,7 @@ export function createSchoolRouter(service: SchoolService, access: AccessService
     const schoolId = c.get("schoolId") as string;
     const body = toggleCycleSchema.safeParse(await c.req.json());
     if (!body.success) throw new SchoolSafeError(400, "VALIDATION_INVALID", "Données invalides", false);
-    await service.toggleCycle(schoolId, c.req.param("key"), body.data.is_active);
+    await service.toggleCycle(schoolId, c.req.param("key")!, body.data.is_active);
     return c.json({ status: "ok" });
   });
 
