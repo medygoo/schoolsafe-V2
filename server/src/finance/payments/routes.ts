@@ -23,19 +23,19 @@ async function authenticate(request: FastifyRequest, resolve: ResolveProfileIdAn
   }
   const { profileId, schoolId } = await resolve(token);
   if (!profileId || !schoolId) {
-    throw new SchoolSafeError(401, "AUTH_REQUIRED", "Profil ou ecole non trouve", false);
+    throw new SchoolSafeError(401, "AUTH_REQUIRED", "Profil ou école non trouvé", false);
   }
   return { profileId, schoolId };
 }
 
 export function registerFinancePaymentsRoutes(app: FastifyInstance, dependencies: FinancePaymentsRouteDependencies): void {
   app.get(
-    "/finance/student-fees/:studentId",
+    "/finance/student-fees/:studentFeeId",
     { preHandler: [requirePermission(dependencies.access, "finance.fee.read")] },
     async (request: FastifyRequest, _reply: FastifyReply) => {
       const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
-      const { studentId } = request.params as { studentId: string };
-      const result = await dependencies.service.getStudentFeeWithPayments(schoolId, studentId);
+      const { studentFeeId } = request.params as { studentFeeId: string };
+      const result = await dependencies.service.getStudentFeeWithPayments(schoolId, studentFeeId);
       return { data: result };
     },
   );
