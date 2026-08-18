@@ -4,6 +4,7 @@
 !.env.example
 *.pem
 *.key
+workers/.dev.vars
 
 # Dependencies and builds
 node_modules/

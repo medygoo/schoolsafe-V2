@@ -1,0 +1,28 @@
+name = "schoolsafe-v2-api"
+main = "src/index.ts"
+compatibility_date = "2026-08-18"
+
+[vars]
+ALLOWED_ORIGINS = "https://schoolsafe-v2.pages.dev,http://127.0.0.1:4175,http://localhost:4175"
+
+[[kv_namespaces]]
+binding = "SCHOOLSAFE_CACHE"
+id = "<KV_NAMESPACE_ID>"
+
+[[r2_buckets]]
+binding = "SCHOOLSAFE_FILES"
+bucket_name = "schoolsafe-v2-files"
+
+[[d1_databases]]
+binding = "SCHOOLSAFE_ARCHIVE"
+database_id = "<D1_DATABASE_ID>"
+
+[[queues.producers]]
+binding = "SCHOOLSAFE_QUEUE"
+queue = "schoolsafe-v2-notifications"
+
+[[queues.consumers]]
+queue = "schoolsafe-v2-notifications"
+
+[observability]
+enabled = true
