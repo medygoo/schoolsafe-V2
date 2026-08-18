@@ -11,6 +11,7 @@ import { createDashboardService } from "./pilotage/dashboard/service.js";
 import { createBrevoEmailService, createNoopEmailService } from "./email/service.js";
 import { createFeeControlService } from "./finance/control/service.js";
 import { createFinancePaymentService } from "./finance/payments/service.js";
+import { createFinanceReportsService } from "./finance/reports/service.js";
 import { createPedagogyService } from "./pedagogy/service.js";
 import { createSchoolService } from "./school/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
@@ -126,6 +127,10 @@ const financePaymentService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createFinancePaymentService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   : undefined;
 
+const financeReportsService = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createFinanceReportsService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  : undefined;
+
 const pedagogyService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createPedagogyService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   : undefined;
@@ -195,6 +200,13 @@ const app = buildApp({
   financePayments: financePaymentService
     ? {
         service: financePaymentService,
+        resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        access: accessService,
+      }
+    : undefined,
+  financeReports: financeReportsService
+    ? {
+        service: financeReportsService,
         resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
       }

@@ -14,6 +14,7 @@ export type ApiErrorCode =
   | "FILE_MISSING"
   | "FILE_INVALID"
   | "FILE_TOO_LARGE"
+  | "NOT_FOUND"
   | "INTERNAL_ERROR";
 
 export type ApiErrorBody = {
