@@ -21,6 +21,7 @@ app/tmp/
 tmp/
 playwright-report/
 test-results/
+server/server/
 
 # Context exports
 repomix-output.*
