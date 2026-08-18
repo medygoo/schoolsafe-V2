@@ -1,14 +1,14 @@
 // app/modules/document-engine/document-footer.js
-import { A4_WIDTH_PT, A4_HEIGHT_PT, MM_TO_PT, formatDate } from "./print-layout.js";
+import { A4_WIDTH_PT, HALF_A4_HEIGHT_PT, MM_TO_PT, formatDate } from "./print-layout.js";
 
 /**
  * @param {import("jspdf").jsPDF} doc
  * @param {import("./school-identity-provider.js").SchoolIdentity} identity
- * @param {{page?:number,totalPages?:number,generatedAt?:Date}} [options]
+ * @param {{page?:number,totalPages?:number,generatedAt?:Date,yOffset?:number}} [options]
  */
 export function renderDocumentFooter(doc, identity, options = {}) {
-  const { page = doc.internal.getNumberOfPages(), totalPages = page, generatedAt = new Date() } = options;
-  const footerY = A4_HEIGHT_PT - 12 * MM_TO_PT;
+  const { page = doc.internal.getNumberOfPages(), totalPages = page, generatedAt = new Date(), yOffset = 0 } = options;
+  const footerY = yOffset + HALF_A4_HEIGHT_PT - 12 * MM_TO_PT;
 
   // Horizontal line
   doc.setDrawColor(200, 200, 200);
