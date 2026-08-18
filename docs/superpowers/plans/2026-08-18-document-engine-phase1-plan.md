@@ -18,6 +18,7 @@
 - Receipt numbering unique per school.
 - A4 portrait default; receipt template uses half-A4 vertical split.
 - Financial documents move server-side in Phase 2; Phase 1 includes audit metadata only.
+- **Authorization (locked rule):** every document action requires a `Permission + Scope` check; explicit `DENY` overrides `ALLOW`. Receipt generation must verify `finance.receipts.view` and the user’s scope over the target student before rendering.
 - No Supabase CLI push; SQL is written to `supabase/migrations/` for manual application via SQL Editor.
 - One task = one commit, pushed to GitHub.
 
@@ -1056,20 +1057,44 @@ git push origin main
 - Modify: `app/modules/finance/finance-api.js` if needed
 
 **Interfaces:**
-- Consumes: `renderReceipt`, `createSchoolIdentityProvider`, `createDocumentNumberingService`.
-- Produces: clicking a receipt button opens a preview and allows download/print.
+- Consumes: `renderReceipt`, `createSchoolIdentityProvider`, `createDocumentNumberingService`, existing access-check helper.
+- Produces: clicking a receipt button opens a preview and allows download/print, only if authorized.
 
 - [ ] **Step 1: Locate existing receipt button**
 
 Find the receipt export button in `app/modules/finance/finance-module.js` (likely using `data-export-receipt` or similar).
 
-- [ ] **Step 2: Add a generateReceipt handler**
+- [ ] **Step 2: Add an authorization check helper**
+
+Before rendering, verify the user has `finance.receipts.view` permission and the appropriate scope over the student.
+
+```js
+async function canViewReceiptForStudent(studentId) {
+  // Prefer calling the existing access service if available in the frontend.
+  // Fallback: check via Supabase RPC has_permission / has_scope.
+  const { data: hasPermission } = await window.SchoolSafeSupabase.rpc("has_permission", { permission_code: "finance.receipts.view" });
+  if (!hasPermission) return false;
+  const { data: hasScope } = await window.SchoolSafeSupabase.rpc("has_scope", {
+    requested_scope_type: "student",
+    requested_scope_id: studentId,
+  });
+  return hasScope === true;
+}
+```
+
+- [ ] **Step 3: Add a generateReceipt handler**
 
 ```js
 import { renderReceipt, createSchoolIdentityProvider, createDocumentNumberingService } from "../document-engine/index.js";
 import { SchoolSafeSchoolAPI } from "../school/school-api.js";
 
 async function generateReceipt(payment) {
+  const authorized = await canViewReceiptForStudent(payment.student_id);
+  if (!authorized) {
+    alert("Vous n’avez pas le droit de consulter ce reçu.");
+    return;
+  }
+
   const identityProvider = createSchoolIdentityProvider(SchoolSafeSchoolAPI);
   const identity = await identityProvider.load();
 
@@ -1098,23 +1123,24 @@ async function generateReceipt(payment) {
 }
 ```
 
-- [ ] **Step 3: Attach handler to receipt buttons**
+- [ ] **Step 4: Attach handler to receipt buttons**
 
 Replace the old `exportReceiptPdf(index)` call with `generateReceipt(payment)`.
 
-- [ ] **Step 4: Test in browser**
+- [ ] **Step 5: Test in browser**
 
 - Navigate to finance / payments.
 - Click a receipt button.
 - Verify a new tab opens with the PDF preview.
 - Verify two receipts on one A4.
 - Verify today’s date, school name, and receipt number.
+- Test with a parent account: only receipts for their own children should open.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add app/modules/finance/finance-module.js
-git commit -m "feat(finance): wire Document Engine receipt generation"
+git commit -m "feat(finance): wire Document Engine receipt generation with auth check"
 git push origin main
 ```
 

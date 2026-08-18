@@ -34,6 +34,26 @@
 5. **Security by default.** Financial documents move to backend generation in Phase 2; Phase 1 marks them with traceability metadata.
 6. **Print-first design.** A4 portrait default, correct margins, readable fonts, black-and-white safe.
 
+## 2.5 Authorization (locked rule)
+
+The SchoolSafe global authorization model applies to the Document Engine:
+
+```
+Utilisateur → Rôle → Permission → Portée → Exception
+```
+
+- Every document action requires a **permission** (what the user can do) and a **scope** (on which data).
+- Explicit `DENY` always overrides `ALLOW`.
+- Examples:
+  - `finance.receipts.view + scope=school` → staff can view all receipts.
+  - `finance.receipts.view + scope=own_children` → parent can view receipts for their own children only.
+- Authorization must be checked in three layers:
+  1. **Frontend UI** — hide buttons/actions the user cannot perform.
+  2. **Cloudflare Worker / API** — reject unauthorized requests.
+  3. **Supabase RLS** — enforce data access at the database level.
+- Every permission/scope/role change must be recorded in `public.audit_events`.
+- For Phase 1, receipt generation must verify `finance.receipts.view` and the user’s scope over the target student before rendering.
+
 ---
 
 ## 3. Architecture
