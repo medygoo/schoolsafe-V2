@@ -25,7 +25,8 @@ export async function renderDocumentHeader(doc, identity, title, subtitle) {
       const aspect = img.width / img.height;
       const h = 16 * MM_TO_PT;
       const w = h * aspect;
-      doc.addImage(img.src, "JPEG", logoX, 5 * MM_TO_PT, w, h);
+      const format = detectImageFormat(img.src);
+      doc.addImage(img.src, format, logoX, 5 * MM_TO_PT, w, h);
       logoX += w + 5 * MM_TO_PT;
     } catch {
       // ignore missing logo
@@ -78,4 +79,24 @@ function loadImage(url) {
     img.onerror = reject;
     img.src = url;
   });
+}
+
+function detectImageFormat(src) {
+  if (src.startsWith("data:")) {
+    const match = src.match(/^data:image\/([^;]+);/);
+    if (match) {
+      const mime = match[1].toLowerCase();
+      if (mime === "jpeg" || mime === "jpg") return "JPEG";
+      if (mime === "png") return "PNG";
+      if (mime === "webp") return "WEBP";
+    }
+    return "PNG";
+  }
+
+  const clean = src.split("?")[0].split("#")[0];
+  const ext = clean.slice(clean.lastIndexOf(".") + 1).toLowerCase();
+  if (ext === "jpg" || ext === "jpeg") return "JPEG";
+  if (ext === "png") return "PNG";
+  if (ext === "webp") return "WEBP";
+  return "PNG";
 }
