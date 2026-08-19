@@ -12,6 +12,9 @@
     profiles: [],
     selectedAssignmentId: null,
     selectedLessonPlanId: null,
+    assignmentStudents: [],
+    assignmentGrades: [],
+    gradeDrafts: {},
     loading: false,
     error: null,
   };
@@ -56,12 +59,98 @@
       state.assignments = results[2] || [];
       state.lessonPlans = results[3] || [];
       state.teacherAssignments = results[4] || [];
+      if (state.selectedAssignmentId) {
+        await loadAssignmentStudentsAndGrades(state.selectedAssignmentId);
+      }
     } catch (e) {
       state.error = e.message || "Erreur de chargement";
       notify(state.error);
     }
     state.loading = false;
     render();
+  }
+
+  async function loadAssignmentStudentsAndGrades(assignmentId) {
+    var assignment = state.assignments.find(function (a) { return a.id === assignmentId; });
+    if (!assignment || !assignment.class_id) {
+      state.assignmentStudents = [];
+      state.assignmentGrades = [];
+      state.gradeDrafts = {};
+      return;
+    }
+    try {
+      var results = await Promise.all([
+        global.SchoolSafeSchoolAPI.listStudentsByClass(assignment.class_id),
+        global.SchoolSafePedagogyAPI.getAssignmentGrades(assignmentId),
+      ]);
+      state.assignmentStudents = results[0] || [];
+      state.assignmentGrades = results[1] || [];
+      state.gradeDrafts = {};
+    } catch (e) {
+      notify(e.message || "Erreur de chargement des élèves/cotes");
+      state.assignmentStudents = [];
+      state.assignmentGrades = [];
+      state.gradeDrafts = {};
+    }
+  }
+
+  function getExistingGrade(studentId) {
+    return state.assignmentGrades.find(function (g) { return g.student_id === studentId; });
+  }
+
+  function getGradeValue(studentId) {
+    if (state.gradeDrafts[studentId] && state.gradeDrafts[studentId].value !== undefined) {
+      return state.gradeDrafts[studentId].value;
+    }
+    var existing = getExistingGrade(studentId);
+    if (!existing) return "";
+    return existing.value_numeric !== null && existing.value_numeric !== undefined
+      ? String(existing.value_numeric)
+      : (existing.value_text || "");
+  }
+
+  async function submitGrades(assignmentId, publish) {
+    var assignment = state.assignments.find(function (a) { return a.id === assignmentId; });
+    if (!assignment) return;
+
+    var grades = [];
+    for (var i = 0; i < state.assignmentStudents.length; i++) {
+      var student = state.assignmentStudents[i];
+      var draft = state.gradeDrafts[student.id] || {};
+      var existing = getExistingGrade(student.id);
+      var rawValue = draft.value !== undefined ? draft.value : getGradeValue(student.id);
+      if (rawValue === "" && !existing) continue;
+      if (rawValue === "" && existing) continue;
+
+      var grade = { student_id: student.id };
+      if (assignment.scale_mode === "numeric") {
+        grade.value_numeric = Number(rawValue);
+        grade.normalized_value = Number(rawValue);
+      } else {
+        grade.value_text = String(rawValue);
+      }
+      if (draft.comment !== undefined) grade.comment = draft.comment;
+      else if (existing && existing.comment) grade.comment = existing.comment;
+      if (draft.change_reason !== undefined) grade.change_reason = draft.change_reason;
+      else if (existing && existing.change_reason) grade.change_reason = existing.change_reason;
+      if (publish) grade.status = "published";
+
+      grades.push(grade);
+    }
+
+    try {
+      await global.SchoolSafePedagogyAPI.saveGrades(assignmentId, grades);
+      if (publish) {
+        await global.SchoolSafePedagogyAPI.publishGrades(assignmentId);
+        notify("Cotes publiées.");
+      } else {
+        notify("Cotes enregistrées.");
+      }
+      await loadAssignmentStudentsAndGrades(assignmentId);
+      render();
+    } catch (e) {
+      notify(e.message || "Erreur d’enregistrement des cotes");
+    }
   }
 
   function assignmentTypeLabel(type) {
@@ -115,11 +204,11 @@
         '<div><dt>Coefficient</dt><dd>' + escapeMarkup(String(selected.coefficient || 1)) + '</dd></div>' +
         '<div><dt>Publication</dt><dd>' + (selected.status === "published" ? "Visible" : "Brouillon") + '</dd></div>' +
         '</dl><div class="assignment-detail-actions">' +
-        (selected.status === "draft" ? '<button class="primary-button" type="button" data-publish-assignment="' + selected.id + '"><i data-lucide="send"></i> Publier</button>' : '') +
+        (selected.status === "draft" ? '<button class="primary-button" type="button" data-publish-assignment="' + selected.id + '"><i data-lucide="send"></i> Publier le devoir</button>' : '') +
         '</div></article>';
     }
 
-    var form = '<form class="pedagogy-form assignment-composer" id="assignmentForm"><div class="form-section-title"><span><i data-lucide="file-pen-line"></i></span><div><h3>Composer un devoir</h3></div></div><div class="pedagogy-form-grid">' +
+    var composer = '<form class="pedagogy-form assignment-composer" id="assignmentForm"><div class="form-section-title"><span><i data-lucide="file-pen-line"></i></span><div><h3>Composer un devoir</h3></div></div><div class="pedagogy-form-grid">' +
       '<label>Titre<input name="title" required placeholder="Titre du devoir"></label>' +
       '<label>Classe<select name="class_id" id="assignmentClassSelect">' + state.classes.map(function (c) { return '<option value="' + c.id + '">' + escapeMarkup(c.name) + '</option>'; }).join("") + '</select></label>' +
       '<label>Matière<select name="subject_id" id="assignmentSubjectSelect">' + state.subjects.map(function (s) { return '<option value="' + s.id + '">' + escapeMarkup(s.name) + '</option>'; }).join("") + '</select></label>' +
@@ -133,7 +222,44 @@
       '<label class="wide">Consignes<textarea name="instructions" rows="3"></textarea></label>' +
       '</div><footer><button class="secondary-button" type="submit" data-draft="true"><i data-lucide="save"></i> Enregistrer en brouillon</button><button class="primary-button dark" type="submit" data-publish="true"><i data-lucide="send"></i> Publier</button></footer></form>';
 
-    return '<div class="pedagogy-two-column assignment-layout"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Travaux</span><h3>Devoirs et évaluations</h3></div><b>' + state.assignments.length + '</b></header><div class="assignment-list">' + (list || '<p class="empty-list">Aucun devoir.</p>') + '</div>' + detail + '</section>' + form + '</div>';
+    var gradingPanel = "";
+    if (selected) {
+      gradingPanel = renderGradingPanel(selected);
+    }
+
+    return '<div class="pedagogy-two-column assignment-layout"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Travaux</span><h3>Devoirs et évaluations</h3></div><b>' + state.assignments.length + '</b></header><div class="assignment-list">' + (list || '<p class="empty-list">Aucun devoir.</p>') + '</div>' + detail + '</section>' + (gradingPanel || composer) + '</div>';
+  }
+
+  function renderGradingPanel(selected) {
+    var rows = state.assignmentStudents.map(function (s) {
+      var existing = getExistingGrade(s.id);
+      var isPublished = existing && existing.status === "published";
+      var value = getGradeValue(s.id);
+      var draft = state.gradeDrafts[s.id] || {};
+      var inputType = selected.scale_mode === "numeric" ? "number" : "text";
+      var step = selected.scale_mode === "numeric" ? ' step="0.01"' : "";
+      var maxAttr = selected.scale_max ? ' max="' + selected.scale_max + '"' : "";
+      var commentValue = draft.comment !== undefined ? draft.comment : (existing && existing.comment ? existing.comment : "");
+      var reasonValue = draft.change_reason !== undefined ? draft.change_reason : "";
+
+      return '<tr data-student-id="' + s.id + '">' +
+        '<td><b>' + escapeMarkup(s.last_name || "") + '</b> ' + escapeMarkup(s.first_name || "") + '</td>' +
+        '<td>' + escapeMarkup(s.matricule || "—") + '</td>' +
+        '<td><input type="' + inputType + '"' + step + maxAttr + ' value="' + escapeMarkup(value) + '" data-grade-input="' + s.id + '"' + (isPublished ? ' data-published="true"' : "") + '></td>' +
+        '<td><input type="text" placeholder="Commentaire" value="' + escapeMarkup(commentValue) + '" data-grade-comment="' + s.id + '"></td>' +
+        '<td>' + (isPublished ? '<input type="text" placeholder="Motif de modification" value="' + escapeMarkup(reasonValue) + '" data-grade-reason="' + s.id + '" required>' : '—') + '</td>' +
+        '<td>' + (isPublished ? '<span class="pedagogy-badge published">Publié</span>' : (existing ? '<span class="pedagogy-badge draft">Brouillon</span>' : '<span class="pedagogy-badge">—</span>')) + '</td>' +
+        '</tr>';
+    }).join("");
+
+    return '<section class="pedagogy-panel grading-panel"><header class="panel-heading"><div><span>Cotation</span><h3>Saisir les cotes · ' + escapeMarkup(selected.title) + '</h3></div><b>' + state.assignmentStudents.length + '</b></header>' +
+      '<div class="table-scroll"><table class="grade-table"><thead><tr><th>Élève</th><th>Matricule</th><th>Cote</th><th>Commentaire</th><th>Motif</th><th>Statut</th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="6">Aucun élève dans cette classe.</td></tr>') +
+      '</tbody></table></div>' +
+      '<footer class="grading-actions">' +
+      '<button class="secondary-button" type="button" data-save-grades="' + selected.id + '"><i data-lucide="save"></i> Enregistrer les cotes</button>' +
+      '<button class="primary-button dark" type="button" data-publish-grades="' + selected.id + '"><i data-lucide="send"></i> Publier les cotes</button>' +
+      '</footer></section>';
   }
 
   function renderLessonPlans() {
@@ -177,8 +303,9 @@
     });
 
     document.querySelectorAll("#pedagogyContent [data-assignment-id]").forEach(function (button) {
-      button.addEventListener("click", function () {
+      button.addEventListener("click", async function () {
         state.selectedAssignmentId = button.getAttribute("data-assignment-id");
+        await loadAssignmentStudentsAndGrades(state.selectedAssignmentId);
         render();
       });
     });
@@ -193,6 +320,44 @@
         } catch (e) {
           notify(e.message || "Erreur de publication");
         }
+      });
+    });
+
+    document.querySelectorAll("#pedagogyContent [data-grade-input]").forEach(function (input) {
+      input.addEventListener("input", function () {
+        var studentId = input.getAttribute("data-grade-input");
+        if (!state.gradeDrafts[studentId]) state.gradeDrafts[studentId] = {};
+        state.gradeDrafts[studentId].value = input.value;
+      });
+    });
+
+    document.querySelectorAll("#pedagogyContent [data-grade-comment]").forEach(function (input) {
+      input.addEventListener("input", function () {
+        var studentId = input.getAttribute("data-grade-comment");
+        if (!state.gradeDrafts[studentId]) state.gradeDrafts[studentId] = {};
+        state.gradeDrafts[studentId].comment = input.value;
+      });
+    });
+
+    document.querySelectorAll("#pedagogyContent [data-grade-reason]").forEach(function (input) {
+      input.addEventListener("input", function () {
+        var studentId = input.getAttribute("data-grade-reason");
+        if (!state.gradeDrafts[studentId]) state.gradeDrafts[studentId] = {};
+        state.gradeDrafts[studentId].change_reason = input.value;
+      });
+    });
+
+    document.querySelectorAll("#pedagogyContent [data-save-grades]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        var assignmentId = button.getAttribute("data-save-grades");
+        await submitGrades(assignmentId, false);
+      });
+    });
+
+    document.querySelectorAll("#pedagogyContent [data-publish-grades]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        var assignmentId = button.getAttribute("data-publish-grades");
+        await submitGrades(assignmentId, true);
       });
     });
 

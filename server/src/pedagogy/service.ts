@@ -243,41 +243,71 @@ export function createPedagogyService(supabaseUrl: string, serviceRoleKey: strin
     async saveGrades(schoolId, profileId, assignmentId, grades) {
       const { data: existing, error: lookupError } = await client
         .from("grades")
-        .select("id, assignment_id, student_id")
+        .select("id, assignment_id, student_id, status, value_numeric, value_text, normalized_value")
         .eq("assignment_id", assignmentId)
         .eq("school_id", schoolId);
       if (lookupError) throw new Error(`Failed to lookup grades: ${lookupError.message}`);
-      const existingMap = new Map((existing ?? []).map((g) => [`${g.assignment_id}:${g.student_id}`, g.id]));
+      const existingMap = new Map(
+        (existing ?? []).map((g) => [
+          `${g.assignment_id}:${g.student_id}`,
+          { id: g.id as string, status: g.status as string, value_numeric: g.value_numeric, value_text: g.value_text, normalized_value: g.normalized_value },
+        ]),
+      );
 
       const now = new Date().toISOString();
       const inserts: Record<string, unknown>[] = [];
       const updates: { id: string; values: Record<string, unknown> }[] = [];
 
+      function valueChanged(existing: unknown, incoming: number | string | undefined | null) {
+        if (existing === null && (incoming === undefined || incoming === null)) return false;
+        if (incoming === undefined) return false;
+        return String(existing) !== String(incoming);
+      }
+
       for (const grade of grades) {
         const key = `${assignmentId}:${grade.student_id}`;
+        const previous = existingMap.get(key);
+
         const values: Record<string, unknown> = {
           value_numeric: grade.value_numeric ?? null,
           value_text: grade.value_text ?? null,
           normalized_value: grade.normalized_value ?? null,
           comment: grade.comment ?? null,
-          change_reason: grade.change_reason ?? null,
           updated_by: profileId,
           updated_at: now,
         };
+
+        if (previous?.status === "published") {
+          const hasChange =
+            valueChanged(previous.value_numeric, grade.value_numeric) ||
+            valueChanged(previous.value_text, grade.value_text) ||
+            valueChanged(previous.normalized_value, grade.normalized_value);
+          if (hasChange) {
+            if (!grade.change_reason || String(grade.change_reason).trim() === "") {
+              throw new Error(
+                `Modification refusée : une cote publiée ne peut être changée sans motif (élève ${grade.student_id}).`,
+              );
+            }
+            values.change_reason = grade.change_reason;
+          }
+        } else {
+          values.change_reason = grade.change_reason ?? null;
+        }
+
         if (grade.status !== undefined) {
           values.status = grade.status;
           if (grade.status === "published") values.published_at = now;
         }
 
-        const existingId = existingMap.get(key);
-        if (existingId) {
-          updates.push({ id: existingId, values });
+        if (previous) {
+          updates.push({ id: previous.id, values });
         } else {
           inserts.push({
             school_id: schoolId,
             assignment_id: assignmentId,
             student_id: grade.student_id,
             ...values,
+            change_reason: grade.change_reason ?? null,
             created_by: profileId,
             created_at: now,
           });

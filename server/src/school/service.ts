@@ -100,6 +100,18 @@ export interface SchoolService {
   listCycles(schoolId: string): Promise<Array<{ cycle_key: string; cycle_name: string; is_active: boolean }>>;
   toggleCycle(schoolId: string, cycleKey: string, payload: ToggleCyclePayload): Promise<void>;
   saveLogoPath(schoolId: string, logoPath: string): Promise<void>;
+  listStudentsByClass(
+    schoolId: string,
+    classId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      matricule: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      photo_path: string | null;
+    }>
+  >;
 }
 
 function createServiceClient(supabaseUrl: string, serviceRoleKey: string): SupabaseClient {
@@ -568,6 +580,18 @@ export function createSchoolService(
     async saveLogoPath(schoolId: string, logoPath: string) {
       const { error } = await serviceClient.from("school").update({ logo_path: logoPath }).eq("id", schoolId);
       if (error) throw new Error(`Failed to save logo path: ${JSON.stringify(error)}`);
+    },
+
+    async listStudentsByClass(schoolId: string, classId: string) {
+      const { data, error } = await serviceClient
+        .from("students")
+        .select("id, matricule, first_name, last_name, photo_path")
+        .eq("school_id", schoolId)
+        .eq("class_id", classId)
+        .order("last_name", { ascending: true })
+        .order("first_name", { ascending: true });
+      if (error) throw new Error(`Failed to list students: ${JSON.stringify(error)}`);
+      return data ?? [];
     },
   };
 }

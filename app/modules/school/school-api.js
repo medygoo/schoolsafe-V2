@@ -105,5 +105,8 @@
     resendInvite: function (profileId) {
       return request("POST", "/school/staff/" + profileId + "/resend-invite");
     },
+    listStudentsByClass: function (classId) {
+      return request("GET", "/school/classes/" + classId + "/students");
+    },
   };
 })();

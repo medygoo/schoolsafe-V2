@@ -231,6 +231,19 @@ export function registerSchoolRoutes(app: FastifyInstance, deps: SchoolRouteDepe
     },
   );
 
+  app.get(
+    "/school/classes/:id/students",
+    { preHandler: [requirePermission(access, "school.student.read")] },
+    async (request, reply) => {
+      const token = request.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+      const { schoolId } = await resolveProfileAndSchool(token);
+      if (!schoolId) throw new SchoolSafeError(403, "SCHOOL_NOT_FOUND", "École introuvable", false);
+      const { id } = request.params as { id: string };
+      const students = await service.listStudentsByClass(schoolId, id);
+      reply.send(students);
+    },
+  );
+
   app.post(
     "/school/logo",
     { preHandler: [requirePermission(access, "school.manage")] },

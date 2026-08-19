@@ -133,6 +133,9 @@ function createMockService(): MockSchoolService {
     ]),
     toggleCycle: vi.fn().mockResolvedValue(undefined),
     saveLogoPath: vi.fn().mockResolvedValue(undefined),
+    listStudentsByClass: vi.fn().mockResolvedValue([
+      { id: "student-1", matricule: "MAT001", first_name: "Alice", last_name: "Mukendi", photo_path: null },
+    ]),
   } as MockSchoolService;
 }
 
@@ -574,6 +577,20 @@ describe("School & Staff routes", () => {
     });
     expect(response.statusCode).toBe(400);
     expect(response.json()).toMatchObject({ code: "VALIDATION_INVALID" });
+    await app.close();
+  });
+
+  it("GET /school/classes/:id/students returns students", async () => {
+    const service = createMockService();
+    const app = buildTestApp(service, accessService());
+    const response = await app.inject({
+      method: "GET",
+      url: "/school/classes/class-1/students",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toHaveLength(1);
+    expect(service.listStudentsByClass).toHaveBeenCalledWith("school-1", "class-1");
     await app.close();
   });
 });
