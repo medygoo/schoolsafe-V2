@@ -5,6 +5,7 @@ import type { AlertService } from "./service.js";
 import { listAlertsSchema, acknowledgeAlertSchema, resolveAlertSchema } from "./schema.js";
 import { requirePermission } from "../../access/guard.js";
 import type { AccessService } from "../../access/service.js";
+import { evaluateRulesSchema } from "./rules-schema.js";
 
 export type ResolveProfileIdAndSchool = (token: string) => Promise<{ profileId: string | null; schoolId: string | null }>;
 
@@ -79,6 +80,33 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: AlertRou
       const alertId = (request.params as Record<string, string>).id;
       const parsed = resolveAlertSchema.parse(request.body);
       const result = await dependencies.service.resolve(alertId, { ...parsed, profileId });
+      return { data: result };
+    },
+  );
+
+  app.post(
+    "/pilotage/alerts/evaluate",
+    { preHandler: [requirePermission(dependencies.access, "pilotage.alerts.manage")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      let token: string;
+      try {
+        token = extractBearerToken(request.headers.authorization);
+      } catch {
+        throw new SchoolSafeError(401, "AUTH_REQUIRED", "Authentification requise", false);
+      }
+
+      const { schoolId } = await dependencies.resolveProfileAndSchool(token);
+      if (!schoolId) {
+        throw new SchoolSafeError(401, "AUTH_REQUIRED", "École non trouvée", false);
+      }
+
+      const parsed = evaluateRulesSchema.parse(request.body);
+      const result = await dependencies.service.evaluateRules({
+        schoolId,
+        studentId: parsed.student_id,
+        eventType: parsed.event_type,
+        payload: parsed.payload as Record<string, unknown>,
+      });
       return { data: result };
     },
   );

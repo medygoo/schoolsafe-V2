@@ -1,10 +1,12 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ListAlertsInput, AcknowledgeAlertInput, ResolveAlertInput } from "./schema.js";
+import { evaluateAlertRules, type AlertRuleContext } from "./rules.js";
 
 export interface AlertService {
   list(input: ListAlertsInput & { schoolId: string }): Promise<{ data: unknown[]; count: number }>;
   acknowledge(alertId: string, input: AcknowledgeAlertInput & { profileId: string }): Promise<unknown>;
   resolve(alertId: string, input: ResolveAlertInput & { profileId: string }): Promise<unknown>;
+  evaluateRules(context: AlertRuleContext): Promise<import("./rules.js").AlertRuleResult[]>;
 }
 
 function createServiceClient(supabaseUrl: string, serviceRoleKey: string): SupabaseClient {
@@ -65,6 +67,10 @@ export function createAlertService(supabaseUrl: string, serviceRoleKey: string):
         .single();
       if (error || !data) throw new Error(`Failed to resolve alert: ${error?.message}`);
       return data;
+    },
+
+    async evaluateRules(context) {
+      return evaluateAlertRules(client, context);
     },
   };
 }

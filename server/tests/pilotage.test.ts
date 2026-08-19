@@ -14,6 +14,9 @@ const mockAlertService: AlertService = {
   async resolve(alertId, input) {
     return { id: alertId, status: "resolved" };
   },
+  async evaluateRules(context) {
+    return [{ created: true, alertId: "alert-eval-1", title: "Règle déclenchée", severity: "important" }];
+  },
 };
 
 const mockDashboardService: DashboardService = {
@@ -103,5 +106,19 @@ describe("POST /pilotage/alerts/:id/resolve", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().data.status).toBe("resolved");
+  });
+});
+
+describe("POST /pilotage/alerts/evaluate", () => {
+  it("evaluates alert rules for an event", async () => {
+    const app = makeApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/pilotage/alerts/evaluate",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { event_type: "FEE_OVERDUE_CHECK", student_id: "00000000-0000-0000-0000-000000000001" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual([{ created: true, alertId: "alert-eval-1", title: "Règle déclenchée", severity: "important" }]);
   });
 });
