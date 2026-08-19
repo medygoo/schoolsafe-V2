@@ -45,11 +45,11 @@ function createServiceClient(supabaseUrl: string, serviceRoleKey: string): Supab
   });
 }
 
-function signCardNumber(cardNumber: string, secret: string): string {
+export function signCardNumber(cardNumber: string, secret: string): string {
   return createHmac("sha256", secret).update(cardNumber).digest("base64url").slice(0, 32);
 }
 
-function parseQrPayload(payload: string): { cardNumber: string; signature: string } | null {
+export function parseQrPayload(payload: string): { cardNumber: string; signature: string } | null {
   const match = payload.match(/^schoolsafe:\/\/card\/([^/]+)\/([^/]+)$/);
   if (!match) return null;
   return { cardNumber: match[1], signature: match[2] };

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { buildApp } from "../src/app.js";
 import type { SecurityService } from "../src/security/service.js";
+import type { SecurityScanResult } from "../src/security/schema.js";
 import type { AccessService } from "../src/access/service.js";
 
 const mockService: SecurityService = {
@@ -152,5 +153,69 @@ describe("GET /security/events", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().data).toEqual([]);
     expect(res.json().count).toBe(0);
+  });
+});
+
+describe("Security scan business cases", () => {
+  function makeAppWithScanResult(result: Partial<SecurityScanResult>) {
+    const service: SecurityService = {
+      ...mockService,
+      async scan(input) {
+        return {
+          decision: result.decision ?? "allowed",
+          reason: result.reason,
+          student: result.student ?? null,
+          authorized_persons: result.authorized_persons ?? [],
+          event: result.event ?? { id: "evt-1", event_type: input.event_type, decision: "allowed", occurred_at: new Date().toISOString() },
+          alert: result.alert,
+        };
+      },
+    };
+    return buildApp({
+      security: {
+        service,
+        resolveProfileId: mockResolve,
+        access: mockAccess,
+      },
+    });
+  }
+
+  it("returns denied with reason when exit is not authorized", async () => {
+    const app = makeAppWithScanResult({
+      decision: "denied",
+      reason: "no_authorized_person",
+      student: { id: "student-1", matricule: "MAT-001", first_name: "Grâce", last_name: "Kabamba", class_name: "4e primaire", photo_path: null },
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/security/scan",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { qr_payload: "schoolsafe://card/SS-SCH-MAT-123456789/sig", event_type: "exit" },
+    });
+    expect(res.statusCode).toBe(200);
+    const json = res.json();
+    expect(json.data.decision).toBe("denied");
+    expect(json.data.reason).toBe("no_authorized_person");
+    expect(json.data.student).toBeDefined();
+    await app.close();
+  });
+
+  it("returns allowed for a valid entry scan", async () => {
+    const app = makeAppWithScanResult({
+      decision: "allowed",
+      student: { id: "student-1", matricule: "MAT-001", first_name: "Grâce", last_name: "Kabamba", class_name: "4e primaire", photo_path: null },
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/security/scan",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { qr_payload: "schoolsafe://card/SS-SCH-MAT-123456789/sig", event_type: "entry" },
+    });
+    expect(res.statusCode).toBe(200);
+    const json = res.json();
+    expect(json.data.decision).toBe("allowed");
+    expect(json.data.reason).toBeUndefined();
+    expect(json.data.event).toBeDefined();
+    await app.close();
   });
 });
