@@ -19,6 +19,28 @@ const mockService: FinancePaymentService = {
       ],
     };
   },
+  async recordPayment(schoolId, profileId, input) {
+    return {
+      payment: {
+        id: "pay-new",
+        school_id: schoolId,
+        student_fee_id: input.student_fee_id,
+        amount: input.amount,
+        currency: input.currency,
+        received_by: profileId,
+        mode: input.mode,
+        reference: input.reference,
+        status: "valid",
+      },
+      student_fee: {
+        id: input.student_fee_id,
+        amount_expected: 300,
+        amount_paid: 200,
+        amount_remaining: 100,
+        status: "partial",
+      },
+    };
+  },
   async cancelPayment(schoolId, profileId, paymentId, reason) {
     return {
       payment: {
@@ -56,6 +78,30 @@ function makeApp() {
     },
   });
 }
+
+describe("POST /finance/payments", () => {
+  it("records a payment and returns payment plus updated student fee", async () => {
+    const app = makeApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/finance/payments",
+      headers: { authorization: "Bearer valid-token" },
+      payload: {
+        student_fee_id: "550e8400-e29b-41d4-a716-446655440000",
+        amount: 100,
+        currency: "USD",
+        mode: "cash",
+        reference: "Deuxième tranche",
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.data.payment.amount).toBe(100);
+    expect(body.data.payment.mode).toBe("cash");
+    expect(body.data.payment.reference).toBe("Deuxième tranche");
+    expect(body.data.student_fee.status).toBe("partial");
+  });
+});
 
 describe("GET /finance/student-fees/:studentFeeId", () => {
   it("returns a student fee with payment history", async () => {
@@ -179,5 +225,64 @@ describe("createFinancePaymentService.cancelPayment", () => {
     expect(result.student_fee.status).toBe("pending");
     expect(result.student_fee.amount_paid).toBe(0);
     expect(result.student_fee.amount_remaining).toBe(300);
+  });
+});
+
+describe("createFinancePaymentService.recordPayment", () => {
+  it("calls the record_payment RPC with the correct parameters", async () => {
+    const client = makeRpcClient({
+      payment: {
+        id: "pay-new",
+        school_id: "school-1",
+        student_fee_id: "sf-1",
+        amount: 100,
+        currency: "USD",
+        received_by: "profile-1",
+        received_at: "2026-08-18T10:00:00.000Z",
+        receipt_no: null,
+        mode: "cash",
+        reference: "Deuxième tranche",
+        status: "valid",
+      },
+      student_fee: {
+        id: "sf-1",
+        amount_expected: 300,
+        amount_paid: 200,
+        amount_remaining: 100,
+        status: "partial",
+      },
+    });
+    const service = createFinancePaymentService(client);
+
+    const result = (await service.recordPayment("school-1", "profile-1", {
+      student_fee_id: "sf-1",
+      amount: 100,
+      currency: "USD",
+      received_at: "2026-08-18T10:00:00.000Z",
+      mode: "cash",
+      reference: "Deuxième tranche",
+      metadata: { note: "test" },
+    })) as {
+      payment: { amount: number; mode: string; reference: string };
+      student_fee: { amount_paid: number; amount_remaining: number; status: string };
+    };
+
+    expect(client.rpc).toHaveBeenCalledWith("record_payment", {
+      p_school_id: "school-1",
+      p_profile_id: "profile-1",
+      p_student_fee_id: "sf-1",
+      p_amount: 100,
+      p_currency: "USD",
+      p_received_at: "2026-08-18T10:00:00.000Z",
+      p_receipt_no: null,
+      p_mode: "cash",
+      p_reference: "Deuxième tranche",
+      p_metadata: { note: "test" },
+    });
+    expect(result.payment.amount).toBe(100);
+    expect(result.payment.mode).toBe("cash");
+    expect(result.student_fee.status).toBe("partial");
+    expect(result.student_fee.amount_paid).toBe(200);
+    expect(result.student_fee.amount_remaining).toBe(100);
   });
 });

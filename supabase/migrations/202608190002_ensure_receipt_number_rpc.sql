@@ -37,3 +37,7 @@ begin
   return v_receipt_no;
 end;
 $$;
+
+revoke all on function public.ensure_receipt_number(uuid, uuid) from public;
+grant execute on function public.ensure_receipt_number(uuid, uuid) to authenticated;
+grant execute on function public.ensure_receipt_number(uuid, uuid) to service_role;

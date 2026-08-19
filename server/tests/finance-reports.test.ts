@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { buildApp } from "../src/app.js";
+import { createFinanceReportsService } from "../src/finance/reports/service.js";
 import type { FinanceReportsService, ReceiptData, DailyReport } from "../src/finance/reports/service.js";
 import type { AccessService } from "../src/access/service.js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const mockReceipt: ReceiptData = {
   receiptNumber: "REC-2026-00001",

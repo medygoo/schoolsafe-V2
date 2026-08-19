@@ -1,7 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { CreatePaymentInput } from "../control/schema.js";
 
 export interface FinancePaymentService {
   getStudentFeeWithPayments(schoolId: string, studentFeeId: string): Promise<unknown>;
+  recordPayment(schoolId: string, profileId: string, input: CreatePaymentInput): Promise<unknown>;
   cancelPayment(schoolId: string, profileId: string, paymentId: string, reason: string): Promise<unknown>;
 }
 
@@ -36,6 +38,27 @@ export function createFinancePaymentService(
       if (paymentsError) throw new Error(`Échec du chargement des paiements : ${paymentsError.message}`);
 
       return { ...studentFee, payments: payments ?? [] };
+    },
+
+    async recordPayment(schoolId, profileId, input) {
+      const { data, error } = await client.rpc("record_payment", {
+        p_school_id: schoolId,
+        p_profile_id: profileId,
+        p_student_fee_id: input.student_fee_id,
+        p_amount: input.amount,
+        p_currency: input.currency,
+        p_received_at: input.received_at ?? new Date().toISOString(),
+        p_receipt_no: input.receipt_no ?? null,
+        p_mode: input.mode,
+        p_reference: input.reference,
+        p_metadata: input.metadata,
+      });
+
+      if (error || !data) {
+        throw new Error(`Échec de l'enregistrement du paiement : ${error?.message ?? "inconnu"}`);
+      }
+
+      return data;
     },
 
     async cancelPayment(schoolId, profileId, paymentId, reason) {

@@ -1,7 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
   CreateFeeStructureInput,
-  CreatePaymentInput,
   CreateFeeControlCampaignInput,
   CreateFeeControlScanInput,
 } from "./schema.js";
@@ -10,7 +9,6 @@ export interface FeeControlService {
   listFeeStructures(schoolId: string): Promise<unknown[]>;
   createFeeStructure(schoolId: string, profileId: string, input: CreateFeeStructureInput): Promise<unknown>;
   listStudentFees(schoolId: string, options: { studentId?: string; status?: string }): Promise<unknown[]>;
-  createPayment(schoolId: string, profileId: string, input: CreatePaymentInput): Promise<unknown>;
   listCampaigns(schoolId: string): Promise<unknown[]>;
   createCampaign(schoolId: string, profileId: string, input: CreateFeeControlCampaignInput): Promise<unknown>;
   createScan(schoolId: string, profileId: string, input: CreateFeeControlScanInput): Promise<unknown>;
@@ -62,46 +60,6 @@ export function createFeeControlService(supabaseUrl: string, serviceRoleKey: str
       const { data, error } = await query.order("created_at", { ascending: false });
       if (error) throw new Error(`Failed to list student fees: ${error.message}`);
       return data ?? [];
-    },
-
-    async createPayment(schoolId, profileId, input) {
-      const { data: studentFee, error: feeError } = await client
-        .from("student_fees")
-        .select("id, amount_paid, amount_expected, amount_remaining, status")
-        .eq("id", input.student_fee_id)
-        .eq("school_id", schoolId)
-        .single();
-      if (feeError || !studentFee) throw new Error(`Student fee not found: ${feeError?.message}`);
-
-      const { data: payment, error } = await client
-        .from("fee_payments")
-        .insert({
-          school_id: schoolId,
-          student_fee_id: input.student_fee_id,
-          amount: input.amount,
-          currency: input.currency,
-          received_by: profileId,
-          received_at: input.received_at ?? new Date().toISOString(),
-          receipt_no: input.receipt_no ?? null,
-          metadata: input.metadata,
-        })
-        .select("*")
-        .single();
-      if (error || !payment) throw new Error(`Failed to create payment: ${error?.message}`);
-
-      const newPaid = Number(studentFee.amount_paid) + Number(input.amount);
-      const newRemaining = Math.max(Number(studentFee.amount_expected) - newPaid, 0);
-      let newStatus: string = studentFee.status;
-      if (newRemaining <= 0) newStatus = "paid";
-      else if (newPaid > 0) newStatus = "partial";
-
-      const { error: updateError } = await client
-        .from("student_fees")
-        .update({ amount_paid: newPaid, amount_remaining: newRemaining, status: newStatus })
-        .eq("id", input.student_fee_id);
-      if (updateError) throw new Error(`Failed to update student fee: ${updateError.message}`);
-
-      return payment;
     },
 
     async listCampaigns(schoolId) {

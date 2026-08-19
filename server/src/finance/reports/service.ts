@@ -209,7 +209,8 @@ export function createFinanceReportsService(
         const amount = Number(row.amount ?? 0);
         const studentFee = (row.student_fees ?? {}) as Record<string, unknown>;
         const feeStructure = (studentFee.fee_structures ?? {}) as Record<string, unknown>;
-        const mode = ((row.mode as string) ?? "unknown").toLowerCase();
+        const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+        const mode = (((row.mode as string) ?? (metadata.mode as string)) ?? "unknown").toLowerCase();
         const feeLabel = (feeStructure.label as string) ?? "Non spécifié";
 
         const nextByMode = new Map(acc.byMode);
@@ -234,6 +235,7 @@ export function createFinanceReportsService(
       const studentFee = (row.student_fees ?? {}) as Record<string, unknown>;
       const feeStructure = (studentFee.fee_structures ?? {}) as Record<string, unknown>;
       const student = (row.students ?? {}) as Record<string, unknown>;
+      const metadata = (row.metadata ?? {}) as Record<string, unknown>;
       const feeLabel = (feeStructure.label as string) ?? "Non spécifié";
 
       return {
@@ -241,8 +243,8 @@ export function createFinanceReportsService(
         amount,
         currency: (row.currency as string) ?? currencyCode,
         received_at: (row.received_at as string) ?? "",
-        mode: (row.mode as string) ?? undefined,
-        reference: (row.reference as string) ?? undefined,
+        mode: ((row.mode as string) ?? (metadata.mode as string)) || undefined,
+        reference: ((row.reference as string) ?? (metadata.reference as string)) || undefined,
         student: {
           id: (student.id as string) ?? "",
           matricule: (student.matricule as string) ?? "",

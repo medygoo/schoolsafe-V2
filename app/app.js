@@ -485,7 +485,15 @@
 
   function modeLabel(mode) {
     if (!mode) return "—";
-    var map = { cash: "Espèces", bank_transfer: "Virement constaté", other: "Autre moyen constaté", unknown: "—" };
+    var map = {
+      cash: "Espèces",
+      card: "Carte bancaire",
+      check: "Chèque",
+      bank_transfer: "Virement constaté",
+      mobile_money: "Mobile money",
+      other: "Autre moyen constaté",
+      unknown: "—"
+    };
     return map[mode] || mode;
   }
 
@@ -548,13 +556,14 @@
   }
 
   function mapFeeStructure(fee) {
+    var metadata = fee.metadata || {};
     return {
       id: fee.id,
       name: fee.label || "Frais",
       cycle: cycleLabel(fee.cycle_key),
       amount: Number(fee.amount || 0),
       currency: fee.currency || "CDF",
-      frequency: "Trimestre",
+      frequency: metadata.frequency || "Trimestre",
       due: fee.due_date ? formatIsoDateFr(fee.due_date) : "À définir",
       active: fee.is_active !== false
     };
@@ -617,12 +626,18 @@
     var api = window.SchoolSafeFinanceAPI;
     financeState.loading = true;
     try {
-      var [feeStructures, studentFees, pendingFees, report] = await Promise.all([
+      var [feeStructures, studentFees, pendingFees, partialFees, report] = await Promise.all([
         api.listFeeStructures().catch(function () { return []; }),
         api.listStudentFees({}).catch(function () { return []; }),
         api.listStudentFees({ status: "pending" }).catch(function () { return []; }),
+        api.listStudentFees({ status: "partial" }).catch(function () { return []; }),
         api.getDailyReport(financeState.reportDate).catch(function () { return null; })
       ]);
+      var pendingById = {};
+      (pendingFees || []).concat(partialFees || []).forEach(function (sf) {
+        pendingById[sf.id] = sf;
+      });
+      var pendingFeesMerged = Object.values(pendingById);
       if (feeStructures && feeStructures.length) {
         financeState.feeTypes = feeStructures.map(mapFeeStructure);
       }
@@ -634,8 +649,8 @@
           return mapped;
         });
       }
-      if (pendingFees) {
-        financeState.pendingStudents = pendingFees.map(mapStudentFee);
+      if (pendingFeesMerged) {
+        financeState.pendingStudents = pendingFeesMerged.map(mapStudentFee);
         if (financeState.selectedPendingStudent >= financeState.pendingStudents.length) {
           financeState.selectedPendingStudent = 0;
         }
@@ -1321,7 +1336,7 @@
       var pdfAction = transaction.status === "Validé" ? '<button class="icon-button light" type="button" data-export-receipt-id="' + escapeMarkup(transaction.id) + '" title="Télécharger le reçu PDF"><i data-lucide="file-down"></i></button>' : '<span class="receipt-waiting"><i data-lucide="clock-3"></i> Après synchronisation</span>';
       return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(String(transaction.date).split(" · ").pop()) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td><td><span class="case-status ' + certificationStatusClass(transaction.status) + '">' + escapeMarkup(transaction.status) + '</span></td><td>' + pdfAction + '</td></tr>';
     }).join("") || '<tr><td colspan="6">Aucune opération enregistrée aujourd’hui.</td></tr>';
-    var paymentForm = canRecord && student ? '<form class="payment-form" id="paymentForm"><header><span><i data-lucide="hand-coins"></i></span><div><h3>Enregistrer une tranche</h3><p>L’argent est reçu hors de SchoolSafe; cette action consigne uniquement l’opération.</p></div></header><div><label>Type de frais<select name="fee" required>' + feeOptions + '</select></label><label>Montant reçu en FC<input name="amount" type="number" min="1000" max="' + student.balance + '" step="1000" required placeholder="Montant"></label><label>Mode constaté<select name="mode"><option value="cash">Espèces</option><option value="bank_transfer">Virement constaté</option><option value="other">Autre moyen constaté</option></select></label><label>Référence ou observation<input name="reference" required placeholder="Ex. Deuxième tranche"></label></div><button class="primary-button dark" type="submit"' + (student.balance <= 0 ? " disabled" : "") + '><i data-lucide="badge-check"></i> Enregistrer et préparer le reçu</button></form>' : '<aside class="finance-readonly"><i data-lucide="' + (financeState.dayStatus === "Ouverte" ? "eye" : "lock-keyhole") + '"></i><p>' + (financeState.dayStatus === "Ouverte" ? "Consultation et contrôle uniquement. Les encaissements sont exécutés par l’Agent de caisse autorisé." : "La journée a été soumise. Aucun nouvel encaissement ne peut être ajouté dans cet aperçu.") + '</p></aside>';
+    var paymentForm = canRecord && student ? '<form class="payment-form" id="paymentForm"><header><span><i data-lucide="hand-coins"></i></span><div><h3>Enregistrer une tranche</h3><p>L’argent est reçu hors de SchoolSafe; cette action consigne uniquement l’opération.</p></div></header><div><label>Type de frais<select name="fee" required>' + feeOptions + '</select></label><label>Montant reçu en FC<input name="amount" type="number" min="1000" max="' + student.balance + '" step="1000" required placeholder="Montant"></label><label>Mode constaté<select name="mode"><option value="cash">Espèces</option><option value="card">Carte bancaire</option><option value="check">Chèque</option><option value="bank_transfer">Virement constaté</option><option value="mobile_money">Mobile money</option><option value="other">Autre moyen constaté</option></select></label><label>Référence ou observation<input name="reference" required placeholder="Ex. Deuxième tranche"></label></div><button class="primary-button dark" type="submit"' + (student.balance <= 0 ? " disabled" : "") + '><i data-lucide="badge-check"></i> Enregistrer et préparer le reçu</button></form>' : '<aside class="finance-readonly"><i data-lucide="' + (financeState.dayStatus === "Ouverte" ? "eye" : "lock-keyhole") + '"></i><p>' + (financeState.dayStatus === "Ouverte" ? "Consultation et contrôle uniquement. Les encaissements sont exécutés par l’Agent de caisse autorisé." : "La journée a été soumise. Aucun nouvel encaissement ne peut être ajouté dans cet aperçu.") + '</p></aside>';
     var studentPanel = student ? '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div><span class="case-status ' + certificationStatusClass(student.status) + '">' + escapeMarkup(student.status) + '</span></header><label class="finance-student-picker">Élève<select id="financeStudentSelect">' + studentOptions + '</select></label><article class="student-finance-card"><span class="student-avatar large">' + student.initials + '</span><div><small>' + escapeMarkup(student.className + " · " + student.sex) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.guardian) + '</p></div></article><dl class="student-finance-facts"><div><dt>Frais attendus</dt><dd>' + money(student.expected) + '</dd></div><div><dt>Enregistré</dt><dd>' + money(student.paid) + '</dd></div><div><dt>Solde</dt><dd>' + money(student.balance) + '</dd></div></dl></section>' : '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div></header><p class="finance-empty">Aucun dossier avec solde à encaisser.</p></section>';
     return '<div class="cash-workspace"><section class="cashier-layout">' + studentPanel + paymentForm + '</section><section class="finance-panel"><header><div><span>Journal de caisse</span><h3>Opérations du jour</h3></div><b>' + money(financeTotals().todayTotal) + '</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode constaté</th><th>Montant</th><th>Statut</th><th>PDF</th></tr></thead><tbody>' + todayRows + '</tbody></table></div></section></div>';
   }
@@ -1361,7 +1376,7 @@
     }).join("") || '<tr><td colspan="4">Aucune opération enregistrée pour cette date.</td></tr>';
     var canClose = currentDemoRole === "cashier" || currentDemoRole === "admin";
     var closureNotice = financeState.reportClosure ? '<span class="closure-chip"><i data-lucide="lock-keyhole"></i> Caisse clôturée le ' + escapeMarkup(formatIsoDateFr(financeState.reportClosure.closure_date)) + '</span>' : '<span class="closure-chip"><i data-lucide="eye"></i> Caisse ouverte</span>';
-    return '<div class="finance-reports"><header class="finance-report-head"><div><span>Contrôle et clôture</span><h3>Rapport de caisse du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3><p>État préparé pour contrôle à partir des opérations enregistrées sur le serveur.</p></div><div><label class="finance-report-date">Date<input type="date" id="financeReportDate" value="' + escapeMarkup(financeState.reportDate) + '"></label>' + (canClose ? '<button class="primary-button dark" type="button" id="closeCashRegister"><i data-lucide="lock-keyhole"></i> Clôturer la caisse</button>' : '') + closureNotice + '</div></header><div class="finance-kpis report-kpis"><article class="blue"><small>Encaissements</small><b>' + money(report.total_amount) + '</b><span>' + Number(report.transaction_count || 0) + ' opérations</span></article><article class="green"><small>Espèces constatées</small><b>' + money(cashTotal) + '</b><span>À rapprocher physiquement</span></article><article class="purple"><small>Autres moyens constatés</small><b>' + money(otherTotal) + '</b><span>Références conservées</span></article><article class="gold"><small>Dévise</small><b>' + escapeMarkup(report.currency || "-") + '</b><span>Rapport journalier</span></article></div><div class="finance-two-column"><section class="finance-panel"><header><div><span>Répartition par mode</span><h3>Modes de paiement</h3></div></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Mode</th><th>Montant</th><th>Opérations</th></tr></thead><tbody>' + modeRows + '</tbody></table></div></section><section class="finance-panel"><header><div><span>Répartition par frais</span><h3>Types de frais</h3></div></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Frais</th><th>Montant</th><th>Opérations</th></tr></thead><tbody>' + feeRows + '</tbody></table></div></section></div><section class="finance-panel"><header><div><span>Pièces de la journée</span><h3>Opérations du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3></div><b>' + payments.length + ' opération(s)</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode</th><th>Montant</th></tr></thead><tbody>' + paymentRows + '</tbody></table></div></section><aside class="finance-audit-note"><i data-lucide="list-checks"></i><p>La clôture fige le rapport pour contrôle. Une clôture définitive devra suivre les permissions, validations et règles comptables de l’école.</p></aside></div>';
+    return '<div class="finance-reports"><header class="finance-report-head"><div><span>Contrôle et clôture</span><h3>Rapport de caisse du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3><p>État préparé pour contrôle à partir des opérations enregistrées sur le serveur.</p></div><div><label class="finance-report-date">Date<input type="date" id="financeReportDate" value="' + escapeMarkup(financeState.reportDate) + '"></label>' + (canClose ? '<label class="finance-report-expected">Montant constaté (FC)<input type="number" id="closeExpectedAmount" min="0" step="1000" value="' + Number(report.total_amount || 0) + '"></label><button class="primary-button dark" type="button" id="closeCashRegister"><i data-lucide="lock-keyhole"></i> Clôturer la caisse</button>' : '') + closureNotice + '</div></header><div class="finance-kpis report-kpis"><article class="blue"><small>Encaissements</small><b>' + money(report.total_amount) + '</b><span>' + Number(report.transaction_count || 0) + ' opérations</span></article><article class="green"><small>Espèces constatées</small><b>' + money(cashTotal) + '</b><span>À rapprocher physiquement</span></article><article class="purple"><small>Autres moyens constatés</small><b>' + money(otherTotal) + '</b><span>Références conservées</span></article><article class="gold"><small>Dévise</small><b>' + escapeMarkup(report.currency || "-") + '</b><span>Rapport journalier</span></article></div><div class="finance-two-column"><section class="finance-panel"><header><div><span>Répartition par mode</span><h3>Modes de paiement</h3></div></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Mode</th><th>Montant</th><th>Opérations</th></tr></thead><tbody>' + modeRows + '</tbody></table></div></section><section class="finance-panel"><header><div><span>Répartition par frais</span><h3>Types de frais</h3></div></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Frais</th><th>Montant</th><th>Opérations</th></tr></thead><tbody>' + feeRows + '</tbody></table></div></section></div><section class="finance-panel"><header><div><span>Pièces de la journée</span><h3>Opérations du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3></div><b>' + payments.length + ' opération(s)</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode</th><th>Montant</th></tr></thead><tbody>' + paymentRows + '</tbody></table></div></section><aside class="finance-audit-note"><i data-lucide="list-checks"></i><p>La clôture fige le rapport pour contrôle. Une clôture définitive devra suivre les permissions, validations et règles comptables de l’école.</p></aside></div>';
   }
   function renderFamilyFinance() {
     var children = financeState.students.filter(function (student) { return student.guardian === "Mme Sophie Martin"; });
@@ -1457,6 +1472,8 @@
         student_fee_id: student.id,
         amount: amount,
         currency: student.currency || "CDF",
+        mode: mode,
+        reference: reference,
         metadata: { mode: mode, reference: reference }
       }) : Promise.reject(new Error("API indisponible"))).then(function (res) {
         notify("Paiement enregistré sur le serveur.");
@@ -1529,7 +1546,9 @@
       var api = window.SchoolSafeFinanceAPI;
       if (!api) { notify("API finance non disponible."); return; }
       var report = financeState.dailyReport || { total_amount: 0 };
-      api.closeCashRegister({ date: financeState.reportDate, expected_amount: Number(report.total_amount || 0), notes: "Clôture depuis le frontend" }).then(function (res) {
+      var expectedInput = document.getElementById("closeExpectedAmount");
+      var expectedAmount = expectedInput && expectedInput.value !== "" ? Number(expectedInput.value) : Number(report.total_amount || 0);
+      api.closeCashRegister({ date: financeState.reportDate, expected_amount: expectedAmount, notes: "Clôture depuis le frontend" }).then(function (res) {
         financeState.reportClosure = res && res.closure ? res.closure : null;
         notify(res && res.alreadyClosed ? "La caisse était déjà clôturée pour cette date." : "Caisse clôturée pour le " + formatIsoDateFr(financeState.reportDate) + ".");
         renderFinanceModule();

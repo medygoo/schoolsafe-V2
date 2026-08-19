@@ -21,6 +21,8 @@ export const createPaymentSchema = z.object({
   currency: currencySchema.default("USD"),
   received_at: z.string().datetime().optional(),
   receipt_no: z.string().max(100).optional(),
+  mode: z.string().max(50).default("cash"),
+  reference: z.string().max(200).default(""),
   metadata: z.record(z.unknown()).default({}),
 });
 

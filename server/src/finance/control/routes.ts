@@ -4,7 +4,6 @@ import { extractBearerToken } from "../../auth/session.js";
 import type { FeeControlService } from "./service.js";
 import {
   createFeeStructureSchema,
-  createPaymentSchema,
   createFeeControlCampaignSchema,
   createFeeControlScanSchema,
 } from "./schema.js";
@@ -65,17 +64,6 @@ export function registerFeeControlRoutes(app: FastifyInstance, dependencies: Fee
         studentId: query.student_id,
         status: query.status,
       });
-      return { data: result };
-    },
-  );
-
-  app.post(
-    "/finance/payments",
-    { preHandler: [requirePermission(dependencies.access, "finance.payment.record")] },
-    async (request: FastifyRequest, _reply: FastifyReply) => {
-      const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
-      const parsed = createPaymentSchema.parse(request.body);
-      const result = await dependencies.service.createPayment(schoolId, profileId, parsed);
       return { data: result };
     },
   );

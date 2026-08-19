@@ -13,9 +13,6 @@ const mockService: FeeControlService = {
   async listStudentFees() {
     return [{ id: "sf-1", status: "pending" }];
   },
-  async createPayment(schoolId, profileId, input) {
-    return { id: "pay-1", ...input };
-  },
   async listCampaigns() {
     return [{ id: "camp-1", label: "Contrôle 2e tranche" }];
   },
@@ -74,24 +71,6 @@ describe("POST /finance/fee-structures", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().data.label).toBe("Frais scolaires");
-  });
-});
-
-describe("POST /finance/payments", () => {
-  it("creates a payment", async () => {
-    const app = makeApp();
-    const res = await app.inject({
-      method: "POST",
-      url: "/finance/payments",
-      headers: { authorization: "Bearer valid-token" },
-      payload: {
-        student_fee_id: "550e8400-e29b-41d4-a716-446655440000",
-        amount: 100,
-        currency: "USD",
-      },
-    });
-    expect(res.statusCode).toBe(200);
-    expect(res.json().data.amount).toBe(100);
   });
 });
 
