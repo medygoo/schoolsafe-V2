@@ -5,6 +5,7 @@ import type { FinancePaymentService } from "../../../../server/src/finance/payme
 import type { SecurityService } from "../../../../server/src/security/service.js";
 import type { PedagogyService } from "../../../../server/src/pedagogy/service.js";
 import type { ApprovalService } from "../../../../server/src/pilotage/approvals/service.js";
+import type { AuditService } from "../../../../server/src/audit/service.js";
 import { vi } from "vitest";
 
 export type TokenClaims = {
@@ -20,11 +21,13 @@ export type HarnessOptions = {
   security?: Partial<SecurityService>;
   pedagogy?: Partial<PedagogyService>;
   approvals?: Partial<ApprovalService>;
+  audit?: AuditService;
 };
 
 export type IntegrationHarness = {
   app: FastifyInstance;
   access: AccessService;
+  auditLog: Array<{ schoolId: string; actorProfileId: string; eventType: string; payload: Record<string, unknown> }>;
   request(options: {
     method: "GET" | "POST" | "PATCH" | "DELETE";
     url: string;
@@ -61,6 +64,15 @@ export function buildIntegrationHarness(options: HarnessOptions): IntegrationHar
   const resolveProfileId = async (token: string) => {
     return options.tokens[token]?.profileId ?? null;
   };
+
+  const auditLog: IntegrationHarness["auditLog"] = [];
+  const auditService: AuditService =
+    options.audit ??
+    ({
+      async insert(event) {
+        auditLog.push(event);
+      },
+    } as AuditService);
 
   const defaultFinancePayments: FinancePaymentService = {
     async getStudentFeeWithPayments() {
@@ -229,6 +241,7 @@ export function buildIntegrationHarness(options: HarnessOptions): IntegrationHar
       service: financePaymentsService,
       resolveProfileAndSchool,
       access,
+      audit: auditService,
     },
     security: {
       service: securityService,
@@ -250,6 +263,7 @@ export function buildIntegrationHarness(options: HarnessOptions): IntegrationHar
   return {
     app,
     access,
+    auditLog,
     async request({ method, url, token, payload }) {
       const res = await app.inject({
         method,

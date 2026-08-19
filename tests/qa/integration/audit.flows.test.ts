@@ -6,7 +6,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 const financeManagerToken = "finance-manager-token";
 
-function createMockSupabaseClient(auditLog: Array<Record<string, unknown>>) {
+function createMockSupabaseClient(auditLog: Array<Record<string, unknown>>, createdAt?: string) {
+  const paymentCreatedAt = createdAt ?? new Date().toISOString();
   return {
     from: vi.fn((table: string) => {
       if (table === "fee_payments") {
@@ -16,7 +17,7 @@ function createMockSupabaseClient(auditLog: Array<Record<string, unknown>>) {
               eq: vi.fn(() => ({
                 single: vi.fn(() =>
                   Promise.resolve({
-                    data: { id: "pay-recent", created_at: new Date().toISOString() },
+                    data: { id: "pay-recent", created_at: paymentCreatedAt },
                     error: null,
                   }),
                 ),
@@ -81,8 +82,9 @@ describe("Audit — payment cancellation", () => {
   });
 
   it("refused cancellation (outside window) is logged in audit_events with reason code", async () => {
-    const auditLog: Array<Record<string, unknown>> = [];
-    const client = createMockSupabaseClient(auditLog);
+    const serviceAuditLog: Array<Record<string, unknown>> = [];
+    const oldCreatedAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    const client = createMockSupabaseClient(serviceAuditLog, oldCreatedAt);
     const financeService = createFinancePaymentService(client);
 
     const { request } = buildIntegrationHarness({
@@ -93,11 +95,7 @@ describe("Audit — payment cancellation", () => {
           permissions: ["finance.payment.cancel"],
         },
       },
-      financePayments: {
-        async cancelPayment() {
-          throw new SchoolSafeError(403, "CONDITION_DENIED", "Délai d'annulation dépassé", false);
-        },
-      },
+      financePayments: financeService,
     });
 
     const res = await request({
@@ -110,5 +108,11 @@ describe("Audit — payment cancellation", () => {
     expect(res.statusCode).toBe(403);
     const body = res.json() as { code: string };
     expect(body.code).toBe("CONDITION_DENIED");
+
+    const deniedEntries = serviceAuditLog.filter((e) => e.event_type === "finance.payment.cancel.denied");
+    expect(deniedEntries).toHaveLength(1);
+    expect(deniedEntries[0].actor_profile_id).toBe("profile-finance-manager");
+    expect((deniedEntries[0].payload as Record<string, unknown>).payment_id).toBe("pay-old");
+    expect((deniedEntries[0].payload as Record<string, unknown>).reason).toBe("outside_cancellation_window");
   });
 });

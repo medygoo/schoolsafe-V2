@@ -58,8 +58,8 @@ describe("Finance — payment cancellation", () => {
     expect(body.code).toBe("CONDITION_DENIED");
   });
 
-  it("cashier cannot cancel → 403 ACCESS_DENIED", async () => {
-    const { request } = buildIntegrationHarness({
+  it("cashier cannot cancel → 403 ACCESS_DENIED and audit event is logged", async () => {
+    const { request, auditLog } = buildIntegrationHarness({
       tokens: baseTokens,
     });
 
@@ -73,6 +73,13 @@ describe("Finance — payment cancellation", () => {
     expect(res.statusCode).toBe(403);
     const body = res.json() as { code: string };
     expect(body.code).toBe("ACCESS_DENIED");
+
+    const deniedEntries = auditLog.filter((e) => e.eventType === "access.denied");
+    expect(deniedEntries).toHaveLength(1);
+    expect(deniedEntries[0].actorProfileId).toBe("profile-cashier");
+    expect(deniedEntries[0].payload.permission).toBe("finance.payment.cancel");
+    expect(deniedEntries[0].payload.reason).toBe("ACCESS_DENIED");
+    expect(deniedEntries[0].payload.resource_id).toBe("pay-1");
   });
 });
 

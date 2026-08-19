@@ -57,6 +57,7 @@ describe("POST /security/scan", () => {
   const validPayload = {
     qr_payload: "schoolsafe://card/SS-SCH-MAT-123456789/sig",
     event_type: "entry",
+    location_id: "550e8400-e29b-41d4-a716-446655440000",
   };
 
   it("returns 401 without authorization header", async () => {
@@ -190,7 +191,7 @@ describe("Security scan business cases", () => {
       method: "POST",
       url: "/security/scan",
       headers: { authorization: "Bearer valid-token" },
-      payload: { qr_payload: "schoolsafe://card/SS-SCH-MAT-123456789/sig", event_type: "exit" },
+      payload: { qr_payload: "schoolsafe://card/SS-SCH-MAT-123456789/sig", event_type: "exit", location_id: "550e8400-e29b-41d4-a716-446655440000" },
     });
     expect(res.statusCode).toBe(200);
     const json = res.json();
@@ -209,7 +210,7 @@ describe("Security scan business cases", () => {
       method: "POST",
       url: "/security/scan",
       headers: { authorization: "Bearer valid-token" },
-      payload: { qr_payload: "schoolsafe://card/SS-SCH-MAT-123456789/sig", event_type: "entry" },
+      payload: { qr_payload: "schoolsafe://card/SS-SCH-MAT-123456789/sig", event_type: "entry", location_id: "550e8400-e29b-41d4-a716-446655440000" },
     });
     expect(res.statusCode).toBe(200);
     const json = res.json();

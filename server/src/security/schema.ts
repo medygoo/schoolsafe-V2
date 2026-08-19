@@ -5,7 +5,7 @@ export const qrPayloadPattern = /^schoolsafe:\/\/card\/([^/]+)\/([^/]+)$/;
 export const securityScanSchema = z.object({
   qr_payload: z.string().min(1),
   event_type: z.enum(["entry", "exit", "exit_prepared", "incident"]),
-  location_id: z.string().uuid().optional(),
+  location_id: z.string().uuid(),
   authorized_person_id: z.string().uuid().optional(),
   manual_override: z.boolean().default(false),
   note: z.string().max(500).optional(),

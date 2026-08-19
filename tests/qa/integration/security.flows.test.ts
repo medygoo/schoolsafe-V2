@@ -59,6 +59,21 @@ describe("Security — QR scan", () => {
     expect(body.code).toBe("SCOPE_DENIED");
   });
 
+  it("scan without location_id → 400 VALIDATION_INVALID", async () => {
+    const { request } = buildIntegrationHarness({ tokens: baseTokens });
+
+    const res = await request({
+      method: "POST",
+      url: "/security/scan",
+      token: guardAssignedToken,
+      payload: { qr_payload: "schoolsafe://card/SS-TEST-001/sig", event_type: "entry" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = res.json() as { code: string };
+    expect(body.code).toBe("VALIDATION_INVALID");
+  });
+
   it("scan without security.scan permission → 403 ACCESS_DENIED", async () => {
     const { request } = buildIntegrationHarness({
       tokens: {

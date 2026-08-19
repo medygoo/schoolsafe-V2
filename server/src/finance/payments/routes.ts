@@ -6,6 +6,7 @@ import { createPaymentSchema } from "../control/schema.js";
 import { cancelPaymentSchema } from "./schema.js";
 import { requirePermission } from "../../access/guard.js";
 import type { AccessService } from "../../access/service.js";
+import type { AuditService } from "../../audit/service.js";
 
 export type ResolveProfileIdAndSchool = (token: string) => Promise<{ profileId: string | null; schoolId: string | null }>;
 
@@ -13,6 +14,7 @@ export type FinancePaymentsRouteDependencies = {
   service: FinancePaymentService;
   resolveProfileAndSchool: ResolveProfileIdAndSchool;
   access: AccessService;
+  audit?: AuditService;
 };
 
 async function authenticate(request: FastifyRequest, resolve: ResolveProfileIdAndSchool) {
@@ -54,7 +56,22 @@ export function registerFinancePaymentsRoutes(app: FastifyInstance, dependencies
 
   app.post(
     "/finance/payments/:id/cancel",
-    { preHandler: [requirePermission(dependencies.access, "finance.payment.cancel")] },
+    {
+      preHandler: [
+        requirePermission(
+          dependencies.access,
+          "finance.payment.cancel",
+          undefined,
+          dependencies.audit
+            ? {
+                service: dependencies.audit,
+                resolveProfileAndSchool: dependencies.resolveProfileAndSchool,
+                resource: { type: "payment", id: (request: FastifyRequest) => (request.params as { id: string }).id },
+              }
+            : undefined,
+        ),
+      ],
+    },
     async (request: FastifyRequest, _reply: FastifyReply) => {
       const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
       const { id } = request.params as { id: string };

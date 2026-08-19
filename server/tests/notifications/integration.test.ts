@@ -49,7 +49,7 @@ describe("Integration: scan emits event and creates notifications", () => {
       method: "POST",
       url: "/security/scan",
       headers: { authorization: "Bearer valid-token" },
-      payload: { qr_payload: "schoolsafe://card/X/Y", event_type: "entry" },
+      payload: { qr_payload: "schoolsafe://card/X/Y", event_type: "entry", location_id: "550e8400-e29b-41d4-a716-446655440000" },
     });
 
     expect(res.statusCode).toBe(200);

@@ -17,6 +17,7 @@ import { createFinanceReportsService } from "./finance/reports/service.js";
 import { createPedagogyService } from "./pedagogy/service.js";
 import { createSchoolService } from "./school/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
+import { createSupabaseAuditService } from "./audit/service.js";
 import { createClient } from "@supabase/supabase-js";
 import fastifyStatic from "@fastify/static";
 import path from "node:path";
@@ -135,6 +136,10 @@ const feeControlService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createFeeControlService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   : undefined;
 
+const auditService = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createSupabaseAuditService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  : undefined;
+
 const financePaymentService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createFinancePaymentService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   : undefined;
@@ -228,6 +233,7 @@ const app = buildApp({
         service: financePaymentService,
         resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
+        audit: auditService,
       }
     : undefined,
   financeReports: financeReportsService

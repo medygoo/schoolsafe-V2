@@ -28,7 +28,7 @@ async function insertAuditEvent(
     payload,
   });
   if (error) {
-    console.error(`[FinancePaymentService] failed to insert audit event ${eventType}:`, error);
+    throw new Error(`Failed to insert audit event ${eventType}: ${JSON.stringify(error)}`);
   }
 }
 
