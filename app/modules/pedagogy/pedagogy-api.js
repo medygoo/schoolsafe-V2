@@ -98,5 +98,6 @@
 
     getParentChildren: function () { return apiGet("/pedagogy/parent/children"); },
     getStudentGradesForParent: function (studentId) { return apiGet("/pedagogy/parent/grades/" + studentId); },
+    computeStudentAverages: function (studentId) { return apiGet("/pedagogy/students/" + studentId + "/averages"); },
   };
 })(window);

@@ -18,6 +18,7 @@
     parentChildren: [],
     selectedParentChildId: null,
     parentGrades: [],
+    parentAverages: null,
     loading: false,
     error: null,
   };
@@ -122,15 +123,19 @@
         state.selectedParentChildId = state.parentChildren[0].students.id;
       }
       if (state.selectedParentChildId) {
-        var result = await global.SchoolSafePedagogyAPI.getStudentGradesForParent(state.selectedParentChildId);
-        state.parentGrades = result.grades || [];
+        var gradesResult = await global.SchoolSafePedagogyAPI.getStudentGradesForParent(state.selectedParentChildId);
+        state.parentGrades = gradesResult.grades || [];
+        var averagesResult = await global.SchoolSafePedagogyAPI.computeStudentAverages(state.selectedParentChildId);
+        state.parentAverages = averagesResult.averages || null;
       } else {
         state.parentGrades = [];
+        state.parentAverages = null;
       }
     } catch (e) {
       notify(e.message || "Erreur de chargement de la vue parent");
       state.parentChildren = [];
       state.parentGrades = [];
+      state.parentAverages = null;
     }
   }
 
@@ -301,11 +306,25 @@
       return '<tr><td><b>' + escapeMarkup(assignment.title || "—") + '</b></td><td>' + escapeMarkup(subject.name || "—") + '</td><td>' + escapeMarkup(assignment.type || "—") + '</td><td>' + escapeMarkup(String(value)) + '</td><td>' + escapeMarkup(g.comment || "—") + '</td></tr>';
     }).join("");
 
+    var averagesSection = "";
+    if (state.parentAverages) {
+      var avgRows = state.parentAverages.subjects.map(function (s) {
+        return '<tr><td><b>' + escapeMarkup(s.subject_name) + '</b></td><td>' + escapeMarkup(String(s.average !== null ? s.average : "—")) + '</td><td>' + escapeMarkup(String(s.grade_count)) + '</td></tr>';
+      }).join("");
+      averagesSection = '<section class="pedagogy-panel"><header class="panel-heading"><div><span>Moyennes</span><h3>Bulletin simplifié</h3></div><b>' + (state.parentAverages.overall_average !== null ? escapeMarkup(String(state.parentAverages.overall_average)) : "—") + '</b></header>' +
+        '<div class="table-scroll"><table class="grade-table"><thead><tr><th>Matière</th><th>Moyenne</th><th>Nb cotes</th></tr></thead><tbody>' +
+        (avgRows || '<tr><td colspan="3">Aucune moyenne calculable.</td></tr>') +
+        '</tbody></table></div></section>';
+    }
+
     return '<div class="pedagogy-two-column assignment-layout"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Enfants</span><h3>Mes enfants</h3></div><b>' + state.parentChildren.length + '</b></header><div class="assignment-list">' + (childrenList || '<p class="empty-list">Aucun enfant lié à ce compte.</p>') + '</div></section>' +
+      '<div class="pedagogy-stack">' +
       '<section class="pedagogy-panel"><header class="panel-heading"><div><span>Cotes publiées</span><h3>Devoirs et évaluations</h3></div><b>' + state.parentGrades.length + '</b></header>' +
       '<div class="table-scroll"><table class="grade-table"><thead><tr><th>Devoir</th><th>Matière</th><th>Type</th><th>Cote</th><th>Commentaire</th></tr></thead><tbody>' +
       (gradesRows || '<tr><td colspan="5">Aucune cote publiée pour cet élève.</td></tr>') +
-      '</tbody></table></div></section></div>';
+      '</tbody></table></div></section>' +
+      averagesSection +
+      '</div></div>';
   }
 
   function renderLessonPlans() {

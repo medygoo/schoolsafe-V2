@@ -8,6 +8,7 @@ import type {
   CreateLessonPlanInput,
   UpdateLessonPlanInput,
 } from "./schema.js";
+import { computeStudentAverages, type SubjectInfo } from "./averages.js";
 
 export interface PedagogyService {
   listClasses(schoolId: string): Promise<unknown[]>;
@@ -29,6 +30,7 @@ export interface PedagogyService {
   deleteLessonPlan(schoolId: string, lessonPlanId: string): Promise<void>;
   getParentChildren(schoolId: string, profileId: string): Promise<unknown[]>;
   getStudentGradesForParent(schoolId: string, profileId: string, studentId: string): Promise<unknown>;
+  computeStudentAverages(schoolId: string, studentId: string): Promise<unknown>;
 }
 
 function createServiceClient(supabaseUrl: string, serviceRoleKey: string): SupabaseClient {
@@ -446,6 +448,33 @@ export function createPedagogyService(supabaseUrl: string, serviceRoleKey: strin
       if (gradesError) throw new Error(`Failed to list grades: ${gradesError.message}`);
 
       return { student, grades: grades ?? [] };
+    },
+
+    async computeStudentAverages(schoolId, studentId) {
+      const { data: student, error: studentError } = await client
+        .from("students")
+        .select("id, matricule, first_name, last_name, class_id, classes(name)")
+        .eq("id", studentId)
+        .eq("school_id", schoolId)
+        .single();
+      if (studentError || !student) throw new Error("Élève introuvable.");
+
+      const { data: subjects, error: subjectsError } = await client
+        .from("subjects")
+        .select("id, name, code, cycle_key")
+        .eq("school_id", schoolId);
+      if (subjectsError) throw new Error(`Failed to list subjects: ${subjectsError.message}`);
+
+      const { data: grades, error: gradesError } = await client
+        .from("grades")
+        .select("*, assignments(id, subject_id, coefficient, scale_max, type)")
+        .eq("student_id", studentId)
+        .eq("school_id", schoolId)
+        .eq("status", "published");
+      if (gradesError) throw new Error(`Failed to list grades: ${gradesError.message}`);
+
+      const averages = computeStudentAverages(studentId, grades ?? [], (subjects ?? []) as SubjectInfo[]);
+      return { student, averages };
     },
   };
 }

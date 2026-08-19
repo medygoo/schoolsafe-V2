@@ -265,4 +265,15 @@ export function registerPedagogyRoutes(app: FastifyInstance, dependencies: Pedag
       return { data: result };
     },
   );
+
+  app.get(
+    "/pedagogy/students/:id/averages",
+    { preHandler: [requirePermission(dependencies.access, "pedagogy.grade.read")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const { id } = request.params as { id: string };
+      const result = await dependencies.service.computeStudentAverages(schoolId, id);
+      return { data: result };
+    },
+  );
 }
