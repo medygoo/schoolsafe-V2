@@ -27,6 +27,8 @@ export interface PedagogyService {
   createLessonPlan(schoolId: string, profileId: string, input: CreateLessonPlanInput): Promise<unknown>;
   updateLessonPlan(schoolId: string, profileId: string, lessonPlanId: string, input: UpdateLessonPlanInput): Promise<unknown>;
   deleteLessonPlan(schoolId: string, lessonPlanId: string): Promise<void>;
+  getParentChildren(schoolId: string, profileId: string): Promise<unknown[]>;
+  getStudentGradesForParent(schoolId: string, profileId: string, studentId: string): Promise<unknown>;
 }
 
 function createServiceClient(supabaseUrl: string, serviceRoleKey: string): SupabaseClient {
@@ -401,6 +403,49 @@ export function createPedagogyService(supabaseUrl: string, serviceRoleKey: strin
     async deleteLessonPlan(schoolId, lessonPlanId) {
       const { error } = await client.from("lesson_plans").delete().eq("id", lessonPlanId).eq("school_id", schoolId);
       if (error) throw new Error(`Failed to delete lesson plan: ${error.message}`);
+    },
+
+    async getParentChildren(schoolId, profileId) {
+      const { data, error } = await client
+        .from("student_guardians")
+        .select("id, guardian_type, is_primary, students(id, matricule, first_name, last_name, photo_path, class_id, classes(name))")
+        .eq("profile_id", profileId)
+        .eq("students.school_id", schoolId);
+      if (error) throw new Error(`Failed to list parent children: ${error.message}`);
+      return data ?? [];
+    },
+
+    async getStudentGradesForParent(schoolId, profileId, studentId) {
+      const { data: guardians, error: guardianError } = await client
+        .from("student_guardians")
+        .select("id")
+        .eq("profile_id", profileId)
+        .eq("student_id", studentId)
+        .eq("school_id", schoolId)
+        .limit(1);
+      if (guardianError) throw new Error(`Failed to verify guardian: ${guardianError.message}`);
+      if (!guardians || guardians.length === 0) {
+        throw new Error("Vous n’êtes pas autorisé à consulter les cotes de cet élève.");
+      }
+
+      const { data: student, error: studentError } = await client
+        .from("students")
+        .select("id, matricule, first_name, last_name, photo_path, class_id, classes(name)")
+        .eq("id", studentId)
+        .eq("school_id", schoolId)
+        .single();
+      if (studentError || !student) throw new Error("Élève introuvable.");
+
+      const { data: grades, error: gradesError } = await client
+        .from("grades")
+        .select("*, assignments(*, subjects(*))")
+        .eq("student_id", studentId)
+        .eq("school_id", schoolId)
+        .eq("status", "published")
+        .order("created_at", { ascending: false });
+      if (gradesError) throw new Error(`Failed to list grades: ${gradesError.message}`);
+
+      return { student, grades: grades ?? [] };
     },
   };
 }

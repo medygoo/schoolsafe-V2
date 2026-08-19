@@ -95,5 +95,8 @@
     createLessonPlan: function (input) { return apiPost("/pedagogy/lesson-plans", input); },
     updateLessonPlan: function (id, input) { return apiPatch("/pedagogy/lesson-plans/" + id, input); },
     deleteLessonPlan: function (id) { return apiDelete("/pedagogy/lesson-plans/" + id); },
+
+    getParentChildren: function () { return apiGet("/pedagogy/parent/children"); },
+    getStudentGradesForParent: function (studentId) { return apiGet("/pedagogy/parent/grades/" + studentId); },
   };
 })(window);

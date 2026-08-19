@@ -243,4 +243,26 @@ export function registerPedagogyRoutes(app: FastifyInstance, dependencies: Pedag
       return { success: true };
     },
   );
+
+  // Parent view
+  app.get(
+    "/pedagogy/parent/children",
+    { preHandler: [requirePermission(dependencies.access, "school.guardian.read")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const result = await dependencies.service.getParentChildren(schoolId, profileId);
+      return { data: result };
+    },
+  );
+
+  app.get(
+    "/pedagogy/parent/grades/:studentId",
+    { preHandler: [requirePermission(dependencies.access, "school.guardian.read")] },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const { profileId, schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const { studentId } = request.params as { studentId: string };
+      const result = await dependencies.service.getStudentGradesForParent(schoolId, profileId, studentId);
+      return { data: result };
+    },
+  );
 }

@@ -15,6 +15,9 @@
     assignmentStudents: [],
     assignmentGrades: [],
     gradeDrafts: {},
+    parentChildren: [],
+    selectedParentChildId: null,
+    parentGrades: [],
     loading: false,
     error: null,
   };
@@ -62,6 +65,9 @@
       if (state.selectedAssignmentId) {
         await loadAssignmentStudentsAndGrades(state.selectedAssignmentId);
       }
+      if (state.activeTab === "parent-view") {
+        await loadParentView();
+      }
     } catch (e) {
       state.error = e.message || "Erreur de chargement";
       notify(state.error);
@@ -107,6 +113,25 @@
     return existing.value_numeric !== null && existing.value_numeric !== undefined
       ? String(existing.value_numeric)
       : (existing.value_text || "");
+  }
+
+  async function loadParentView() {
+    try {
+      state.parentChildren = await global.SchoolSafePedagogyAPI.getParentChildren();
+      if (state.parentChildren.length > 0 && !state.selectedParentChildId) {
+        state.selectedParentChildId = state.parentChildren[0].students.id;
+      }
+      if (state.selectedParentChildId) {
+        var result = await global.SchoolSafePedagogyAPI.getStudentGradesForParent(state.selectedParentChildId);
+        state.parentGrades = result.grades || [];
+      } else {
+        state.parentGrades = [];
+      }
+    } catch (e) {
+      notify(e.message || "Erreur de chargement de la vue parent");
+      state.parentChildren = [];
+      state.parentGrades = [];
+    }
   }
 
   async function submitGrades(assignmentId, publish) {
@@ -166,6 +191,7 @@
       { key: "subjects", label: "Matières", icon: "book-open" },
       { key: "assignments", label: "Devoirs", icon: "notebook-pen" },
       { key: "lesson-plans", label: "Cahier de préparation", icon: "book-open-check" },
+      { key: "parent-view", label: "Vue parent", icon: "users" },
     ];
     return '<nav class="pedagogy-tabs" aria-label="Fonctions pédagogiques">' +
       tabs.map(function (tab) {
@@ -262,6 +288,26 @@
       '</footer></section>';
   }
 
+  function renderParentView() {
+    var childrenList = state.parentChildren.map(function (g) {
+      var s = g.students;
+      return '<button class="assignment-row' + (state.selectedParentChildId === s.id ? " active" : "") + '" type="button" data-parent-child-id="' + s.id + '"><span><b>' + escapeMarkup(s.last_name || "") + '</b> ' + escapeMarkup(s.first_name || "") + '</span><small>' + escapeMarkup(s.matricule || "") + '</small></button>';
+    }).join("");
+
+    var gradesRows = state.parentGrades.map(function (g) {
+      var assignment = g.assignments || {};
+      var subject = assignment.subjects || {};
+      var value = g.value_numeric !== null && g.value_numeric !== undefined ? g.value_numeric : (g.value_text || "—");
+      return '<tr><td><b>' + escapeMarkup(assignment.title || "—") + '</b></td><td>' + escapeMarkup(subject.name || "—") + '</td><td>' + escapeMarkup(assignment.type || "—") + '</td><td>' + escapeMarkup(String(value)) + '</td><td>' + escapeMarkup(g.comment || "—") + '</td></tr>';
+    }).join("");
+
+    return '<div class="pedagogy-two-column assignment-layout"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Enfants</span><h3>Mes enfants</h3></div><b>' + state.parentChildren.length + '</b></header><div class="assignment-list">' + (childrenList || '<p class="empty-list">Aucun enfant lié à ce compte.</p>') + '</div></section>' +
+      '<section class="pedagogy-panel"><header class="panel-heading"><div><span>Cotes publiées</span><h3>Devoirs et évaluations</h3></div><b>' + state.parentGrades.length + '</b></header>' +
+      '<div class="table-scroll"><table class="grade-table"><thead><tr><th>Devoir</th><th>Matière</th><th>Type</th><th>Cote</th><th>Commentaire</th></tr></thead><tbody>' +
+      (gradesRows || '<tr><td colspan="5">Aucune cote publiée pour cet élève.</td></tr>') +
+      '</tbody></table></div></section></div>';
+  }
+
   function renderLessonPlans() {
     var rows = state.lessonPlans.map(function (p) {
       return '<tr data-lesson-plan-id="' + p.id + '"><td><b>' + escapeMarkup(p.title) + '</b></td><td>' + escapeMarkup(p.lesson_date) + '</td><td>' + escapeMarkup((p.classes ? p.classes.name : p.class_id)) + '</td><td>' + escapeMarkup((p.subjects ? p.subjects.name : p.subject_id)) + '</td><td>' + escapeMarkup((p.profiles ? p.profiles.display_name : p.teacher_id)) + '</td></tr>';
@@ -288,6 +334,7 @@
       if (state.activeTab === "subjects") content = renderSubjects();
       else if (state.activeTab === "assignments") content = renderAssignments();
       else if (state.activeTab === "lesson-plans") content = renderLessonPlans();
+      else if (state.activeTab === "parent-view") content = renderParentView();
     }
     container.innerHTML = content;
     bindEvents();
@@ -296,8 +343,19 @@
 
   function bindEvents() {
     document.querySelectorAll("#pedagogyContent [data-pedagogy-tab]").forEach(function (button) {
-      button.addEventListener("click", function () {
+      button.addEventListener("click", async function () {
         state.activeTab = button.getAttribute("data-pedagogy-tab");
+        if (state.activeTab === "parent-view") {
+          await loadParentView();
+        }
+        render();
+      });
+    });
+
+    document.querySelectorAll("#pedagogyContent [data-parent-child-id]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        state.selectedParentChildId = button.getAttribute("data-parent-child-id");
+        await loadParentView();
         render();
       });
     });
