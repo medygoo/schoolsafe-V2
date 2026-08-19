@@ -9,6 +9,7 @@ import { createSecurityService } from "./security/service.js";
 import { createAlertService } from "./pilotage/alerts/service.js";
 import { createApprovalService } from "./pilotage/approvals/service.js";
 import { createDashboardService } from "./pilotage/dashboard/service.js";
+import { createSnapshotService } from "./pilotage/snapshots/service.js";
 import { createBrevoEmailService, createNoopEmailService } from "./email/service.js";
 import { createFeeControlService } from "./finance/control/service.js";
 import { createFinancePaymentService } from "./finance/payments/service.js";
@@ -116,6 +117,10 @@ const dashboardService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createDashboardService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   : undefined;
 
+const snapshotService = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createSnapshotService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  : undefined;
+
 const emailService = env.BREVO_API_KEY
   ? createBrevoEmailService({
       apiKey: env.BREVO_API_KEY,
@@ -194,6 +199,13 @@ const app = buildApp({
   dashboard: dashboardService
     ? {
         service: dashboardService,
+        resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        access: accessService,
+      }
+    : undefined,
+  snapshots: snapshotService
+    ? {
+        service: snapshotService,
         resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
       }

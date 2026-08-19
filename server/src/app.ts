@@ -11,6 +11,7 @@ import { registerSecurityRoutes, type SecurityRouteDependencies } from "./securi
 import { registerAlertRoutes, type AlertRouteDependencies } from "./pilotage/alerts/routes.js";
 import { registerApprovalRoutes, type ApprovalRouteDependencies } from "./pilotage/approvals/routes.js";
 import { registerDashboardRoutes, type DashboardRouteDependencies } from "./pilotage/dashboard/routes.js";
+import { registerSnapshotRoutes, type SnapshotRouteDependencies } from "./pilotage/snapshots/routes.js";
 import { registerEmailRoutes, type EmailRouteDependencies } from "./email/routes.js";
 import { registerFeeControlRoutes, type FeeControlRouteDependencies } from "./finance/control/routes.js";
 import { registerFinancePaymentsRoutes, type FinancePaymentsRouteDependencies } from "./finance/payments/routes.js";
@@ -31,6 +32,7 @@ export type BuildAppOptions = {
   approvals?: ApprovalRouteDependencies;
   dashboard?: DashboardRouteDependencies;
   email?: EmailRouteDependencies;
+  snapshots?: SnapshotRouteDependencies;
   feeControl?: FeeControlRouteDependencies;
   financePayments?: FinancePaymentsRouteDependencies;
   financeReports?: FinanceReportsRouteDependencies;
@@ -108,6 +110,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.dashboard) {
     registerDashboardRoutes(app, options.dashboard);
+  }
+
+  if (options.snapshots) {
+    registerSnapshotRoutes(app, options.snapshots);
   }
 
   if (options.email) {
