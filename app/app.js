@@ -465,6 +465,36 @@
     }
   };
 
+  function todayIsoDate() {
+    return new Date().toISOString().split("T")[0];
+  }
+
+  function formatIsoDateFr(isoString) {
+    if (!isoString) return "—";
+    var d = new Date(isoString);
+    if (isNaN(d.getTime())) return String(isoString);
+    return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  }
+
+  function formatIsoDateTimeFr(isoString) {
+    if (!isoString) return "—";
+    var d = new Date(isoString);
+    if (isNaN(d.getTime())) return String(isoString);
+    return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) + " · " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function modeLabel(mode) {
+    if (!mode) return "—";
+    var map = { cash: "Espèces", bank_transfer: "Virement constaté", other: "Autre moyen constaté", unknown: "—" };
+    return map[mode] || mode;
+  }
+
+  function cycleLabel(cycleKey) {
+    if (!cycleKey) return "—";
+    var map = { primary: "Primaire", secondary: "Secondaire", kindergarten: "Maternelle", all: "Tous les cycles" };
+    return map[cycleKey] || cycleKey;
+  }
+
   var financeState = {
     activeTab: "overview",
     selectedStudent: 0,
@@ -473,6 +503,9 @@
     dayStatus: "Ouverte",
     loaded: false,
     loading: false,
+    pendingStudents: [],
+    selectedPendingStudent: 0,
+    reportClosure: null,
     feeTypes: [
       { id: "demo-1", name: "Frais scolaires", cycle: "Primaire", amount: 300000, frequency: "Trimestre", due: "30 septembre 2026", active: true },
       { id: "demo-2", name: "Frais scolaires", cycle: "Humanités", amount: 450000, frequency: "Trimestre", due: "30 septembre 2026", active: true },
@@ -481,24 +514,27 @@
     ],
     studentFeeMap: {},
     students: [
-      { id: "demo-s1", name: "Lucas Martin", initials: "LM", sex: "Garçon", className: "6e A", guardian: "Mme Sophie Martin", expected: 450000, paid: 350000, balance: 100000, status: "À régulariser" },
-      { id: "demo-s2", name: "Emma Martin", initials: "EM", sex: "Fille", className: "Maternelle 3", guardian: "Mme Sophie Martin", expected: 300000, paid: 300000, balance: 0, status: "En ordre" },
-      { id: "demo-s3", name: "Ethan Leroy", initials: "EL", sex: "Garçon", className: "1re A", guardian: "M. Paul Leroy", expected: 450000, paid: 150000, balance: 300000, status: "À régulariser" },
-      { id: "demo-s4", name: "Chloé Bernard", initials: "CB", sex: "Fille", className: "2e B", guardian: "Mme Julie Bernard", expected: 450000, paid: 450000, balance: 0, status: "En ordre" },
-      { id: "demo-s5", name: "Aline Martin", initials: "AM", sex: "Fille", className: "4e Humanités A", guardian: "Mme Sophie Martin", expected: 600000, paid: 600000, balance: 0, status: "En ordre" }
+      { id: "demo-s1", name: "Lucas Martin", initials: "LM", sex: "Garçon", className: "6e A", guardian: "Mme Sophie Martin", expected: 450000, paid: 350000, balance: 100000, status: "À régulariser", currency: "CDF" },
+      { id: "demo-s2", name: "Emma Martin", initials: "EM", sex: "Fille", className: "Maternelle 3", guardian: "Mme Sophie Martin", expected: 300000, paid: 300000, balance: 0, status: "En ordre", currency: "CDF" },
+      { id: "demo-s3", name: "Ethan Leroy", initials: "EL", sex: "Garçon", className: "1re A", guardian: "M. Paul Leroy", expected: 450000, paid: 150000, balance: 300000, status: "À régulariser", currency: "CDF" },
+      { id: "demo-s4", name: "Chloé Bernard", initials: "CB", sex: "Fille", className: "2e B", guardian: "Mme Julie Bernard", expected: 450000, paid: 450000, balance: 0, status: "En ordre", currency: "CDF" },
+      { id: "demo-s5", name: "Aline Martin", initials: "AM", sex: "Fille", className: "4e Humanités A", guardian: "Mme Sophie Martin", expected: 600000, paid: 600000, balance: 0, status: "En ordre", currency: "CDF" }
     ],
     transactions: [
-      { receipt: "REC-2026-0587", date: "14 août 2026 · 10:20", day: "14 août 2026", student: "Ethan Leroy", className: "1re A", fee: "Frais scolaires", amount: 150000, mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
-      { receipt: "REC-2026-0586", date: "14 août 2026 · 09:15", day: "14 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 150000, mode: "Espèces", cashier: "Mme K", reference: "Deuxième tranche", status: "Validé" },
-      { receipt: "REC-2026-0585", date: "13 août 2026 · 14:40", day: "13 août 2026", student: "Emma Martin", className: "Maternelle 3", fee: "Frais scolaires", amount: 300000, mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
-      { receipt: "REC-2026-0584", date: "12 août 2026 · 11:05", day: "12 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 200000, mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
-      { receipt: "REC-2026-0583", date: "11 août 2026 · 08:55", day: "11 août 2026", student: "Chloé Bernard", className: "2e B", fee: "Frais scolaires", amount: 450000, mode: "Espèces", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
-      { receipt: "REC-2026-0582", date: "10 août 2026 · 13:10", day: "10 août 2026", student: "Aline Martin", className: "4e Humanités A", fee: "Frais scolaires", amount: 600000, mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" }
+      { id: "demo-p1", receipt: "REC-2026-0587", date: "14 août 2026 · 10:20", day: "14 août 2026", student: "Ethan Leroy", className: "1re A", fee: "Frais scolaires", amount: 150000, mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
+      { id: "demo-p2", receipt: "REC-2026-0586", date: "14 août 2026 · 09:15", day: "14 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 150000, mode: "Espèces", cashier: "Mme K", reference: "Deuxième tranche", status: "Validé" },
+      { id: "demo-p3", receipt: "REC-2026-0585", date: "13 août 2026 · 14:40", day: "13 août 2026", student: "Emma Martin", className: "Maternelle 3", fee: "Frais scolaires", amount: 300000, mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
+      { id: "demo-p4", receipt: "REC-2026-0584", date: "12 août 2026 · 11:05", day: "12 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 200000, mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
+      { id: "demo-p5", receipt: "REC-2026-0583", date: "11 août 2026 · 08:55", day: "11 août 2026", student: "Chloé Bernard", className: "2e B", fee: "Frais scolaires", amount: 450000, mode: "Espèces", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
+      { id: "demo-p6", receipt: "REC-2026-0582", date: "10 août 2026 · 13:10", day: "10 août 2026", student: "Aline Martin", className: "4e Humanités A", fee: "Frais scolaires", amount: 600000, mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" }
     ],
     expenses: [
       { reference: "DEP-2026-011", date: "14 août 2026", label: "Fournitures administratives", amount: 120000, status: "Validée" },
       { reference: "DEP-2026-012", date: "14 août 2026", label: "Entretien du groupe électrogène", amount: 75000, status: "À approuver" }
-    ]
+    ],
+    dailyReport: null,
+    reportDate: todayIsoDate(),
+    reportLoading: false
   };
 
   function initialsFromName(name) {
@@ -512,52 +548,106 @@
     return "À régulariser";
   }
 
-  async function loadFinanceData() {
+  function mapFeeStructure(fee) {
+    return {
+      id: fee.id,
+      name: fee.label || "Frais",
+      cycle: cycleLabel(fee.cycle_key),
+      amount: Number(fee.amount || 0),
+      currency: fee.currency || "CDF",
+      frequency: "Trimestre",
+      due: fee.due_date ? formatIsoDateFr(fee.due_date) : "À définir",
+      active: fee.is_active !== false
+    };
+  }
+
+  function mapStudentFee(sf) {
+    var student = sf.students || {};
+    var name = [student.first_name, student.last_name].filter(Boolean).join(" ") || "Élève";
+    return {
+      id: sf.id,
+      student_id: sf.student_id,
+      name: name,
+      initials: initialsFromName(name),
+      sex: student.gender === "F" ? "Fille" : "Garçon",
+      className: sf.class_name || student.class_name || "Classe",
+      guardian: sf.guardian_name || student.guardian_name || "—",
+      expected: Number(sf.amount_expected || 0),
+      paid: Number(sf.amount_paid || 0),
+      balance: Number(sf.amount_remaining || 0),
+      status: statusLabelFromFeeStatus(sf.status),
+      currency: sf.currency || "CDF"
+    };
+  }
+
+  function mapDailyPayment(payment) {
+    var student = payment.student || {};
+    var name = [student.first_name, student.last_name].filter(Boolean).join(" ") || "Élève";
+    return {
+      id: payment.id,
+      receipt: payment.id,
+      date: formatIsoDateTimeFr(payment.received_at),
+      day: formatIsoDateFr(payment.received_at),
+      student: name,
+      student_id: student.id,
+      className: "",
+      fee: payment.fee_label || "Frais",
+      amount: Number(payment.amount || 0),
+      mode: modeLabel(payment.mode),
+      reference: payment.reference || "",
+      status: "Validé",
+      currency: payment.currency || "CDF"
+    };
+  }
+
+  async function loadDailyReport(date) {
+    if (!window.SchoolSafeFinanceAPI) return;
+    financeState.reportLoading = true;
+    try {
+      var report = await window.SchoolSafeFinanceAPI.getDailyReport(date);
+      financeState.reportDate = date;
+      financeState.dailyReport = report || null;
+    } catch (e) {
+      console.warn("[Finance] rapport journalier échoué", e);
+      financeState.dailyReport = null;
+    } finally {
+      financeState.reportLoading = false;
+    }
+  }
+
+    async function loadFinanceData() {
     if (financeState.loading || financeState.loaded) return;
     if (!window.SchoolSafeFinanceAPI) return;
+    var api = window.SchoolSafeFinanceAPI;
     financeState.loading = true;
     try {
-      var api = window.SchoolSafeFinanceAPI;
-      var feeStructures = await api.listFeeStructures();
+      var [feeStructures, studentFees, pendingFees, report] = await Promise.all([
+        api.listFeeStructures().catch(function () { return []; }),
+        api.listStudentFees({}).catch(function () { return []; }),
+        api.listStudentFees({ status: "pending" }).catch(function () { return []; }),
+        api.getDailyReport(financeState.reportDate).catch(function () { return null; })
+      ]);
       if (feeStructures && feeStructures.length) {
-        financeState.feeTypes = feeStructures.map(function (fee) {
-          return {
-            id: fee.id,
-            name: fee.label,
-            cycle: fee.cycle_key,
-            amount: Number(fee.amount),
-            currency: fee.currency,
-            frequency: "Trimestre",
-            due: fee.due_date || "À définir",
-            active: fee.is_active
-          };
-        });
+        financeState.feeTypes = feeStructures.map(mapFeeStructure);
       }
-
-      var studentFees = await api.listStudentFees({});
       if (studentFees && studentFees.length) {
         financeState.studentFeeMap = {};
         financeState.students = studentFees.map(function (sf, index) {
-          var student = sf.students || {};
-          var name = [student.first_name, student.last_name].filter(Boolean).join(" ") || "Élève";
-          var mapped = {
-            id: sf.id,
-            student_id: sf.student_id,
-            name: name,
-            initials: initialsFromName(name),
-            sex: student.gender === "F" ? "Fille" : "Garçon",
-            className: "Classe",
-            guardian: "—",
-            expected: Number(sf.amount_expected),
-            paid: Number(sf.amount_paid),
-            balance: Number(sf.amount_remaining),
-            status: statusLabelFromFeeStatus(sf.status)
-          };
+          var mapped = mapStudentFee(sf);
           financeState.studentFeeMap[index] = sf.id;
           return mapped;
         });
       }
-
+      if (pendingFees) {
+        financeState.pendingStudents = pendingFees.map(mapStudentFee);
+        if (financeState.selectedPendingStudent >= financeState.pendingStudents.length) {
+          financeState.selectedPendingStudent = 0;
+        }
+      }
+      if (report) {
+        financeState.dailyReport = report;
+        financeState.transactions = (report.payments || []).map(mapDailyPayment);
+      }
       financeState.loaded = true;
     } catch (e) {
       console.warn("[Finance] chargement backend échoué, démo locale conservée", e);
@@ -565,7 +655,6 @@
       financeState.loading = false;
     }
   }
-
   function escapeMarkup(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character];
@@ -1178,19 +1267,22 @@
     var expected = financeState.students.reduce(function (sum, student) { return sum + student.expected; }, 0);
     var paid = financeState.students.reduce(function (sum, student) { return sum + student.paid; }, 0);
     var balance = financeState.students.reduce(function (sum, student) { return sum + student.balance; }, 0);
-    var today = financeState.transactions.filter(function (transaction) { return transaction.day === "14 août 2026" && transaction.status !== "Annulé"; });
+    var today = financeState.transactions.filter(function (transaction) { return transaction.status !== "Annulé"; });
     return { expected: expected, paid: paid, balance: balance, rate: expected ? Math.round(paid / expected * 100) : 0, today: today, todayTotal: today.reduce(function (sum, transaction) { return sum + transaction.amount; }, 0) };
   }
 
-  function renderFinanceOverview() {
+  function cashStudents() {
+    return financeState.students.filter(function (student) { return student.balance > 0; });
+  }
+
+    function renderFinanceOverview() {
     var totals = financeTotals();
     var recent = financeState.transactions.slice(0, 5).map(function (transaction) {
       return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td><td><span class="case-status ' + certificationStatusClass(transaction.status) + '">' + escapeMarkup(transaction.status) + '</span></td></tr>';
     }).join("");
-    return '<section class="finance-overview"><header><div><span>Pilotage financier</span><h3>Situation enregistrée par l’école</h3><p>Les chiffres proviennent des opérations consignées dans cette démonstration locale.</p></div><span class="recording-only"><i data-lucide="hand-coins"></i> Aucun paiement en ligne</span></header><div class="finance-kpis"><article class="blue"><small>Frais attendus</small><b>' + money(totals.expected) + '</b><span>' + financeState.students.length + ' élèves suivis</span></article><article class="green"><small>Montants enregistrés</small><b>' + money(totals.paid) + '</b><span>' + totals.rate + ' % de recouvrement</span></article><article class="gold"><small>Soldes à régulariser</small><b>' + money(totals.balance) + '</b><span>' + financeState.students.filter(function (student) { return student.balance > 0; }).length + ' dossiers</span></article><article class="purple"><small>Encaissements du jour</small><b>' + money(totals.todayTotal) + '</b><span>' + totals.today.length + ' opérations</span></article></div><div class="finance-overview-grid"><section class="finance-panel"><header><div><span>Activité récente</span><h3>Derniers enregistrements</h3></div><button class="icon-button light" type="button" data-finance-open="receipts" title="Voir les reçus"><i data-lucide="arrow-right"></i></button></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode constaté</th><th>Montant</th><th>Statut</th></tr></thead><tbody>' + recent + '</tbody></table></div></section><aside class="finance-control"><span><i data-lucide="shield-check"></i></span><h3>Contrôle de la journée</h3><dl><div><dt>Caisse</dt><dd>' + escapeMarkup(financeState.dayStatus) + '</dd></div><div><dt>Dépenses à approuver</dt><dd>' + financeState.expenses.filter(function (expense) { return expense.status === "À approuver"; }).length + '</dd></div><div><dt>Annulations demandées</dt><dd>' + financeState.transactions.filter(function (transaction) { return transaction.status === "Annulation demandée"; }).length + '</dd></div></dl><button class="secondary-button" type="button" data-finance-open="reports"><i data-lucide="file-chart-column"></i> Ouvrir les rapports</button></aside></div></section>';
+    return '<section class="finance-overview"><header><div><span>Pilotage financier</span><h3>Situation enregistrée par l’école</h3><p>Les chiffres proviennent des opérations consignées sur le serveur.</p></div><span class="recording-only"><i data-lucide="hand-coins"></i> Aucun paiement en ligne</span></header><div class="finance-kpis"><article class="blue"><small>Frais attendus</small><b>' + money(totals.expected) + '</b><span>' + financeState.students.length + ' élèves suivis</span></article><article class="green"><small>Montants enregistrés</small><b>' + money(totals.paid) + '</b><span>' + totals.rate + ' % de recouvrement</span></article><article class="gold"><small>Soldes à régulariser</small><b>' + money(totals.balance) + '</b><span>' + financeState.students.filter(function (student) { return student.balance > 0; }).length + ' dossiers</span></article><article class="purple"><small>Encaissements du jour</small><b>' + money(totals.todayTotal) + '</b><span>' + totals.today.length + ' opérations</span></article></div><div class="finance-overview-grid"><section class="finance-panel"><header><div><span>Activité récente</span><h3>Derniers enregistrements</h3></div><button class="icon-button light" type="button" data-finance-open="receipts" title="Voir les reçus"><i data-lucide="arrow-right"></i></button></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode constaté</th><th>Montant</th><th>Statut</th></tr></thead><tbody>' + recent + '</tbody></table></div></section><aside class="finance-control"><span><i data-lucide="shield-check"></i></span><h3>Contrôle de la journée</h3><dl><div><dt>Caisse</dt><dd>' + escapeMarkup(financeState.dayStatus) + '</dd></div><div><dt>Dépenses à approuver</dt><dd>' + financeState.expenses.filter(function (expense) { return expense.status === "À approuver"; }).length + '</dd></div><div><dt>Annulations demandées</dt><dd>' + financeState.transactions.filter(function (transaction) { return transaction.status === "Annulation demandée"; }).length + '</dd></div></dl></aside></div></section>';
   }
-
-  function renderFeeStructure() {
+    function renderFeeStructure() {
     var canEdit = currentDemoRole === "admin" || currentDemoRole === "finance";
     var rows = financeState.feeTypes.map(function (fee, index) {
       return '<tr><td><b>' + escapeMarkup(fee.name) + '</b></td><td>' + escapeMarkup(fee.cycle) + '</td><td><b>' + money(fee.amount) + '</b></td><td>' + escapeMarkup(fee.frequency) + '</td><td>' + escapeMarkup(fee.due) + '</td><td><span class="case-status ' + (fee.active ? "done" : "pending") + '">' + (fee.active ? "Actif" : "Désactivé") + '</span></td><td>' + (canEdit ? '<button class="icon-button light" type="button" data-toggle-fee="' + index + '" title="Activer ou désactiver"><i data-lucide="power"></i></button>' : "") + '</td></tr>';
@@ -1198,35 +1290,34 @@
     var form = canEdit ? '<form class="finance-fee-form" id="financeFeeForm"><header><span><i data-lucide="circle-plus"></i></span><div><h3>Ajouter un type de frais</h3><p>Le montant est configuré par l’école. Aucun prélèvement n’est effectué.</p></div></header><div><label>Libellé<input name="name" required placeholder="Ex. Frais scolaires"></label><label>Cycle ou service<input name="cycle" required placeholder="Ex. Primaire"></label><label>Montant en FC<input name="amount" required type="number" min="0" step="1000"></label><label>Périodicité<select name="frequency"><option>Une fois</option><option>Mois</option><option>Trimestre</option><option>Semestre</option><option>Année</option></select></label><label class="wide">Échéance<input name="due" required placeholder="Date ou règle d’échéance"></label></div><button class="primary-button dark" type="submit"><i data-lucide="save"></i> Enregistrer le type de frais</button></form>' : '<aside class="finance-readonly"><i data-lucide="eye"></i><p>Consultation uniquement. La structure des frais est modifiée par le Responsable financier ou l’Administrateur principal.</p></aside>';
     return '<div class="finance-two-column"><section class="finance-panel"><header><div><span>Paramétrage</span><h3>Structure des frais</h3></div><b>' + financeState.feeTypes.length + '</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Frais</th><th>Cycle</th><th>Montant</th><th>Périodicité</th><th>Échéance</th><th>Statut</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' + form + '</div>';
   }
-
-  function renderCash() {
-    var student = financeState.students[financeState.selectedStudent] || financeState.students[0];
+    function renderCash() {
+    var pending = financeState.pendingStudents;
+    var student = pending[financeState.selectedPendingStudent] || pending[0] || null;
     var canRecord = (currentDemoRole === "cashier" || currentDemoRole === "admin") && financeState.dayStatus === "Ouverte";
-    var studentOptions = financeState.students.map(function (item, index) {
-      return '<option value="' + index + '"' + (index === financeState.selectedStudent ? " selected" : "") + '>' + escapeMarkup(item.name + " · " + item.className) + '</option>';
+    var studentOptions = pending.map(function (item, index) {
+      return '<option value="' + index + '"' + (index === financeState.selectedPendingStudent ? " selected" : "") + '>' + escapeMarkup(item.name + " · " + item.className) + '</option>';
     }).join("");
     var feeOptions = financeState.feeTypes.filter(function (fee) { return fee.active; }).map(function (fee) {
       return '<option>' + escapeMarkup(fee.name + " · " + fee.cycle) + '</option>';
     }).join("");
-    var todayRows = financeTotals().today.map(function (transaction, index) {
-      var pdfAction = transaction.status === "Validé" ? '<button class="icon-button light" type="button" data-export-receipt="' + financeState.transactions.indexOf(transaction) + '" title="Télécharger le reçu PDF"><i data-lucide="file-down"></i></button>' : '<span class="receipt-waiting"><i data-lucide="clock-3"></i> Après synchronisation</span>';
-      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date.split(" · ").pop()) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td><td><span class="case-status ' + certificationStatusClass(transaction.status) + '">' + escapeMarkup(transaction.status) + '</span></td><td>' + pdfAction + '</td></tr>';
+    var todayRows = financeTotals().today.map(function (transaction) {
+      var pdfAction = transaction.status === "Validé" ? '<button class="icon-button light" type="button" data-export-receipt-id="' + escapeMarkup(transaction.id) + '" title="Télécharger le reçu PDF"><i data-lucide="file-down"></i></button>' : '<span class="receipt-waiting"><i data-lucide="clock-3"></i> Après synchronisation</span>';
+      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(String(transaction.date).split(" · ").pop()) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td><td><span class="case-status ' + certificationStatusClass(transaction.status) + '">' + escapeMarkup(transaction.status) + '</span></td><td>' + pdfAction + '</td></tr>';
     }).join("") || '<tr><td colspan="6">Aucune opération enregistrée aujourd’hui.</td></tr>';
-    var paymentForm = canRecord ? '<form class="payment-form" id="paymentForm"><header><span><i data-lucide="hand-coins"></i></span><div><h3>Enregistrer une tranche</h3><p>L’argent est reçu hors de SchoolSafe; cette action consigne uniquement l’opération.</p></div></header><div><label>Type de frais<select name="fee" required>' + feeOptions + '</select></label><label>Montant reçu en FC<input name="amount" type="number" min="1000" max="' + student.balance + '" step="1000" required placeholder="Montant"></label><label>Mode constaté<select name="mode"><option>Espèces</option><option>Virement constaté</option><option>Autre moyen constaté</option></select></label><label>Référence ou observation<input name="reference" required placeholder="Ex. Deuxième tranche"></label></div><button class="primary-button dark" type="submit"' + (student.balance <= 0 ? " disabled" : "") + '><i data-lucide="badge-check"></i> Enregistrer et préparer le reçu</button></form>' : '<aside class="finance-readonly"><i data-lucide="' + (financeState.dayStatus === "Ouverte" ? "eye" : "lock-keyhole") + '"></i><p>' + (financeState.dayStatus === "Ouverte" ? "Consultation et contrôle uniquement. Les encaissements sont exécutés par l’Agent de caisse autorisé." : "La journée a été soumise. Aucun nouvel encaissement ne peut être ajouté dans cet aperçu.") + '</p></aside>';
-    return '<div class="cash-workspace"><section class="cashier-layout"><section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div><span class="case-status ' + certificationStatusClass(student.status) + '">' + escapeMarkup(student.status) + '</span></header><label class="finance-student-picker">Élève<select id="financeStudentSelect">' + studentOptions + '</select></label><article class="student-finance-card"><span class="student-avatar large">' + student.initials + '</span><div><small>' + escapeMarkup(student.className + " · " + student.sex) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.guardian) + '</p></div></article><dl class="student-finance-facts"><div><dt>Frais attendus</dt><dd>' + money(student.expected) + '</dd></div><div><dt>Enregistré</dt><dd>' + money(student.paid) + '</dd></div><div><dt>Solde</dt><dd>' + money(student.balance) + '</dd></div></dl></section>' + paymentForm + '</section><section class="finance-panel"><header><div><span>Journal de caisse</span><h3>Opérations du jour</h3></div><b>' + money(financeTotals().todayTotal) + '</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode constaté</th><th>Montant</th><th>Statut</th><th>PDF</th></tr></thead><tbody>' + todayRows + '</tbody></table></div></section></div>';
+    var paymentForm = canRecord && student ? '<form class="payment-form" id="paymentForm"><header><span><i data-lucide="hand-coins"></i></span><div><h3>Enregistrer une tranche</h3><p>L’argent est reçu hors de SchoolSafe; cette action consigne uniquement l’opération.</p></div></header><div><label>Type de frais<select name="fee" required>' + feeOptions + '</select></label><label>Montant reçu en FC<input name="amount" type="number" min="1000" max="' + student.balance + '" step="1000" required placeholder="Montant"></label><label>Mode constaté<select name="mode"><option value="cash">Espèces</option><option value="bank_transfer">Virement constaté</option><option value="other">Autre moyen constaté</option></select></label><label>Référence ou observation<input name="reference" required placeholder="Ex. Deuxième tranche"></label></div><button class="primary-button dark" type="submit"' + (student.balance <= 0 ? " disabled" : "") + '><i data-lucide="badge-check"></i> Enregistrer et préparer le reçu</button></form>' : '<aside class="finance-readonly"><i data-lucide="' + (financeState.dayStatus === "Ouverte" ? "eye" : "lock-keyhole") + '"></i><p>' + (financeState.dayStatus === "Ouverte" ? "Consultation et contrôle uniquement. Les encaissements sont exécutés par l’Agent de caisse autorisé." : "La journée a été soumise. Aucun nouvel encaissement ne peut être ajouté dans cet aperçu.") + '</p></aside>';
+    var studentPanel = student ? '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div><span class="case-status ' + certificationStatusClass(student.status) + '">' + escapeMarkup(student.status) + '</span></header><label class="finance-student-picker">Élève<select id="financeStudentSelect">' + studentOptions + '</select></label><article class="student-finance-card"><span class="student-avatar large">' + student.initials + '</span><div><small>' + escapeMarkup(student.className + " · " + student.sex) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.guardian) + '</p></div></article><dl class="student-finance-facts"><div><dt>Frais attendus</dt><dd>' + money(student.expected) + '</dd></div><div><dt>Enregistré</dt><dd>' + money(student.paid) + '</dd></div><div><dt>Solde</dt><dd>' + money(student.balance) + '</dd></div></dl></section>' : '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div></header><p class="finance-empty">Aucun dossier avec solde à encaisser.</p></section>';
+    return '<div class="cash-workspace"><section class="cashier-layout">' + studentPanel + paymentForm + '</section><section class="finance-panel"><header><div><span>Journal de caisse</span><h3>Opérations du jour</h3></div><b>' + money(financeTotals().todayTotal) + '</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode constaté</th><th>Montant</th><th>Statut</th><th>PDF</th></tr></thead><tbody>' + todayRows + '</tbody></table></div></section></div>';
   }
-
-  function renderReceipts() {
+    function renderReceipts() {
     var canRequestCancellation = currentDemoRole === "cashier" || currentDemoRole === "admin";
-    var rows = financeState.transactions.map(function (transaction, index) {
-      var cancellationButton = canRequestCancellation && transaction.status === "Validé" ? '<button class="icon-button light danger" type="button" data-request-cancel="' + index + '" title="Demander l’annulation"><i data-lucide="circle-x"></i></button>' : "";
-      var receiptAction = transaction.status === "Validé" ? '<button class="icon-button light" type="button" data-export-receipt="' + index + '" title="Télécharger le reçu PDF"><i data-lucide="file-down"></i></button>' : '<span class="receipt-waiting"><i data-lucide="clock-3"></i> PDF après synchronisation</span>';
+    var rows = financeState.transactions.map(function (transaction) {
+      var cancellationButton = canRequestCancellation && transaction.status === "Validé" ? '<button class="icon-button light danger" type="button" data-cancel-payment-id="' + escapeMarkup(transaction.id) + '" title="Demander l’annulation"><i data-lucide="circle-x"></i></button>' : "";
+      var receiptAction = transaction.status === "Validé" ? '<button class="icon-button light" type="button" data-export-receipt-id="' + escapeMarkup(transaction.id) + '" title="Télécharger le reçu PDF"><i data-lucide="file-down"></i></button>' : '<span class="receipt-waiting"><i data-lucide="clock-3"></i> PDF après synchronisation</span>';
       return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td><b>' + escapeMarkup(transaction.student) + '</b><small>' + escapeMarkup(transaction.className) + '</small></td><td>' + escapeMarkup(transaction.fee) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td><td><span class="case-status ' + certificationStatusClass(transaction.status) + '">' + escapeMarkup(transaction.status) + '</span></td><td><div class="finance-row-actions">' + receiptAction + cancellationButton + '</div></td></tr>';
     }).join("");
     return '<section class="finance-panel receipt-register"><header><div><span>Documents financiers</span><h3>Reçus et opérations</h3><p>Un reçu reste traçable même lorsqu’une annulation est demandée.</p></div><span class="recording-only"><i data-lucide="shield-check"></i> PDF avec logo</span></header><aside class="finance-audit-note"><i data-lucide="history"></i><p>Une demande d’annulation ne supprime jamais l’écriture. Elle doit être contrôlée et approuvée dans le circuit financier.</p></aside><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Frais</th><th>Mode constaté</th><th>Montant</th><th>Statut</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
   }
-
-  function renderBalances() {
+    function renderBalances() {
     var statusOnly = currentDemoRole === "pedagogy";
     var inOrder = financeState.students.filter(function (student) { return student.balance === 0; }).length;
     var rows = financeState.students.map(function (student) {
@@ -1237,34 +1328,37 @@
     var tableHead = statusOnly ? '<tr><th>Élève</th><th>Classe</th><th>Sexe</th><th>Statut administratif</th></tr>' : '<tr><th>Élève</th><th>Classe</th><th>Frais attendus</th><th>Enregistré</th><th>Solde</th><th>Statut</th></tr>';
     return '<section class="finance-panel balance-register"><header><div><span>' + (statusOnly ? "Suivi scolaire autorisé" : "Recouvrement") + '</span><h3>' + (statusOnly ? "Régularité des élèves" : "Impayés et soldes") + '</h3><p>' + (statusOnly ? "Aucun chiffre financier n’est exposé dans ce profil." : "Situation calculée à partir des opérations enregistrées par l’école.") + '</p></div><b>' + financeState.students.length + ' dossiers</b></header>' + heading + '<div class="table-scroll"><table class="finance-table' + (statusOnly ? " status-only-table" : "") + '"><thead>' + tableHead + '</thead><tbody>' + rows + '</tbody></table></div></section>';
   }
-
-  function renderReports() {
-    var totals = financeTotals();
-    var validatedExpenses = financeState.expenses.filter(function (expense) { return expense.status === "Validée"; });
-    var expenseTotal = validatedExpenses.reduce(function (sum, expense) { return sum + expense.amount; }, 0);
-    var cashTotal = totals.today.filter(function (transaction) { return transaction.mode === "Espèces"; }).reduce(function (sum, transaction) { return sum + transaction.amount; }, 0);
-    var otherTotal = totals.todayTotal - cashTotal;
-    var expenses = financeState.expenses.map(function (expense) {
-      return '<tr><td><b>' + escapeMarkup(expense.reference) + '</b></td><td>' + escapeMarkup(expense.date) + '</td><td>' + escapeMarkup(expense.label) + '</td><td><b>' + money(expense.amount) + '</b></td><td><span class="case-status ' + certificationStatusClass(expense.status) + '">' + escapeMarkup(expense.status) + '</span></td></tr>';
-    }).join("");
-    var canSubmit = currentDemoRole === "cashier" && financeState.dayStatus === "Ouverte";
-    return '<div class="finance-reports"><header class="finance-report-head"><div><span>Contrôle et clôture</span><h3>Rapport de caisse du 14 août 2026</h3><p>État local préparé pour contrôle; il ne prouve aucun déploiement comptable ou bancaire.</p></div><div><button class="secondary-button" type="button" id="exportCashReport"><i data-lucide="file-down"></i> Télécharger le rapport PDF</button>' + (canSubmit ? '<button class="primary-button dark" type="button" id="submitCashDay"><i data-lucide="send"></i> Soumettre la journée</button>' : '<span class="closure-chip"><i data-lucide="' + (financeState.dayStatus === "Soumise" ? "lock-keyhole" : "eye") + '"></i>' + escapeMarkup(financeState.dayStatus) + '</span>') + '</div></header><div class="finance-kpis report-kpis"><article class="blue"><small>Encaissements</small><b>' + money(totals.todayTotal) + '</b><span>' + totals.today.length + ' opérations</span></article><article class="green"><small>Espèces constatées</small><b>' + money(cashTotal) + '</b><span>À rapprocher physiquement</span></article><article class="purple"><small>Autres moyens constatés</small><b>' + money(otherTotal) + '</b><span>Références conservées</span></article><article class="gold"><small>Net après dépenses validées</small><b>' + money(totals.todayTotal - expenseTotal) + '</b><span>' + money(expenseTotal) + ' de dépenses</span></article></div><section class="finance-panel"><header><div><span>Pièces de la journée</span><h3>Recettes et dépenses</h3></div><b>' + financeState.expenses.length + ' dépenses</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Référence</th><th>Date</th><th>Libellé</th><th>Montant</th><th>Statut</th></tr></thead><tbody>' + expenses + '</tbody></table></div></section><aside class="finance-audit-note"><i data-lucide="list-checks"></i><p>La soumission fige cet aperçu local pour contrôle. Une clôture définitive devra suivre les permissions, validations et règles comptables de l’école.</p></aside></div>';
+    function renderReports() {
+    var report = financeState.dailyReport || { total_amount: 0, transaction_count: 0, by_mode: [], by_fee_type: [], payments: [], currency: "USD" };
+    var payments = (report.payments || []).map(mapDailyPayment);
+    var cashTotal = (report.by_mode || []).reduce(function (sum, item) { return sum + (String(item.mode).toLowerCase() === "cash" ? Number(item.amount || 0) : 0); }, 0);
+    var otherTotal = Number(report.total_amount || 0) - cashTotal;
+    var modeRows = (report.by_mode || []).map(function (item) {
+      return '<tr><td>' + escapeMarkup(modeLabel(item.mode)) + '</td><td><b>' + money(item.amount) + '</b></td><td>' + Number(item.count || 0) + '</td></tr>';
+    }).join("") || '<tr><td colspan="3">Aucune opération</td></tr>';
+    var feeRows = (report.by_fee_type || []).map(function (item) {
+      return '<tr><td>' + escapeMarkup(item.fee_label || "-") + '</td><td><b>' + money(item.amount) + '</b></td><td>' + Number(item.count || 0) + '</td></tr>';
+    }).join("") || '<tr><td colspan="3">Aucune opération</td></tr>';
+    var paymentRows = payments.map(function (transaction) {
+      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td></tr>';
+    }).join("") || '<tr><td colspan="4">Aucune opération enregistrée pour cette date.</td></tr>';
+    var canClose = currentDemoRole === "cashier" || currentDemoRole === "admin";
+    var closureNotice = financeState.reportClosure ? '<span class="closure-chip"><i data-lucide="lock-keyhole"></i> Caisse clôturée le ' + escapeMarkup(formatIsoDateFr(financeState.reportClosure.closure_date)) + '</span>' : '<span class="closure-chip"><i data-lucide="eye"></i> Caisse ouverte</span>';
+    return '<div class="finance-reports"><header class="finance-report-head"><div><span>Contrôle et clôture</span><h3>Rapport de caisse du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3><p>État préparé pour contrôle à partir des opérations enregistrées sur le serveur.</p></div><div><label class="finance-report-date">Date<input type="date" id="financeReportDate" value="' + escapeMarkup(financeState.reportDate) + '"></label>' + (canClose ? '<button class="primary-button dark" type="button" id="closeCashRegister"><i data-lucide="lock-keyhole"></i> Clôturer la caisse</button>' : '') + closureNotice + '</div></header><div class="finance-kpis report-kpis"><article class="blue"><small>Encaissements</small><b>' + money(report.total_amount) + '</b><span>' + Number(report.transaction_count || 0) + ' opérations</span></article><article class="green"><small>Espèces constatées</small><b>' + money(cashTotal) + '</b><span>À rapprocher physiquement</span></article><article class="purple"><small>Autres moyens constatés</small><b>' + money(otherTotal) + '</b><span>Références conservées</span></article><article class="gold"><small>Dévise</small><b>' + escapeMarkup(report.currency || "-") + '</b><span>Rapport journalier</span></article></div><div class="finance-two-column"><section class="finance-panel"><header><div><span>Répartition par mode</span><h3>Modes de paiement</h3></div></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Mode</th><th>Montant</th><th>Opérations</th></tr></thead><tbody>' + modeRows + '</tbody></table></div></section><section class="finance-panel"><header><div><span>Répartition par frais</span><h3>Types de frais</h3></div></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Frais</th><th>Montant</th><th>Opérations</th></tr></thead><tbody>' + feeRows + '</tbody></table></div></section></div><section class="finance-panel"><header><div><span>Pièces de la journée</span><h3>Opérations du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3></div><b>' + payments.length + ' opération(s)</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode</th><th>Montant</th></tr></thead><tbody>' + paymentRows + '</tbody></table></div></section><aside class="finance-audit-note"><i data-lucide="list-checks"></i><p>La clôture fige le rapport pour contrôle. Une clôture définitive devra suivre les permissions, validations et règles comptables de l’école.</p></aside></div>';
   }
-
-  function renderFamilyFinance() {
+    function renderFamilyFinance() {
     var children = financeState.students.filter(function (student) { return student.guardian === "Mme Sophie Martin"; });
     if (financeState.selectedFamilyStudent >= children.length) financeState.selectedFamilyStudent = 0;
     var student = children[financeState.selectedFamilyStudent];
     var options = children.map(function (item, index) { return '<option value="' + index + '"' + (index === financeState.selectedFamilyStudent ? " selected" : "") + '>' + escapeMarkup(item.name + " · " + item.className) + '</option>'; }).join("");
-    var receipts = financeState.transactions.map(function (transaction, index) { return { transaction: transaction, index: index }; }).filter(function (entry) { return entry.transaction.student === student.name; });
+    var receipts = financeState.transactions.map(function (transaction) { return { transaction: transaction }; }).filter(function (entry) { return entry.transaction.student === student.name; });
     var receiptCards = receipts.map(function (entry) {
       var transaction = entry.transaction;
-      var receiptButton = transaction.status === "Validé" ? '<button class="icon-button light" type="button" data-export-receipt="' + entry.index + '" title="Télécharger le reçu PDF"><i data-lucide="file-down"></i></button>' : '<span class="receipt-waiting"><i data-lucide="clock-3"></i></span>';
+      var receiptButton = transaction.status === "Validé" ? '<button class="icon-button light" type="button" data-export-receipt-id="' + escapeMarkup(transaction.id) + '" title="Télécharger le reçu PDF"><i data-lucide="file-down"></i></button>' : '<span class="receipt-waiting"><i data-lucide="clock-3"></i></span>';
       return '<article class="family-receipt"><span><i data-lucide="receipt-text"></i></span><div><small>' + escapeMarkup(transaction.date) + '</small><b>' + escapeMarkup(transaction.receipt) + '</b><p>' + escapeMarkup(transaction.fee + " · " + transaction.mode) + '</p></div><strong>' + money(transaction.amount) + '</strong>' + receiptButton + '</article>';
     }).join("") || '<p class="finance-empty">Aucun reçu n’est encore rattaché à cet enfant.</p>';
     return '<div class="family-finance"><header><div><span>Situation familiale</span><h3>Frais scolaires et reçus</h3><p>Vous voyez uniquement les enfants rattachés à votre profil.</p></div><span class="recording-only"><i data-lucide="shield-check"></i> Aucun paiement en ligne</span></header><label class="family-student-picker">Enfant suivi<select id="familyFinanceStudent">' + options + '</select></label><section class="family-finance-summary"><div><span class="student-avatar large">' + student.initials + '</span><div><small>' + escapeMarkup(student.className) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.status) + '</p></div></div><article><small>Frais attendus</small><b>' + money(student.expected) + '</b></article><article><small>Montants enregistrés</small><b>' + money(student.paid) + '</b></article><article><small>Solde restant</small><b>' + money(student.balance) + '</b></article></section><aside class="family-result-status ' + (student.balance === 0 ? "ready" : "pending") + '"><i data-lucide="' + (student.balance === 0 ? "badge-check" : "file-lock-2") + '"></i><div><b>Résultat officiel de fin de période</b><p>' + (student.balance === 0 ? "Situation en ordre. La publication reste soumise à la validation pédagogique et à la décision de la Direction." : "Le suivi quotidien reste visible. Le résultat officiel de fin de période reste suspendu jusqu’à la décision administrative.") + '</p></div></aside><section class="family-receipts"><header><h3>Reçus disponibles</h3><span>' + receipts.length + ' document(s)</span></header>' + receiptCards + '</section></div>';
   }
-
   function renderFinanceModule() {
     var allowedTabs = financeTabsForRole();
     if (allowedTabs.indexOf(financeState.activeTab) === -1) financeState.activeTab = allowedTabs[0];
@@ -1282,27 +1376,30 @@
     icons();
   }
 
-  function bindFinanceEvents() {
+    function bindFinanceEvents() {
     document.querySelectorAll("[data-finance-open]").forEach(function (button) {
       button.addEventListener("click", function () { financeState.activeTab = button.getAttribute("data-finance-open"); renderFinanceModule(); });
     });
     var studentSelect = document.getElementById("financeStudentSelect");
-    if (studentSelect) studentSelect.addEventListener("change", function () { financeState.selectedStudent = Number(this.value); renderFinanceModule(); });
+    if (studentSelect) studentSelect.addEventListener("change", function () { financeState.selectedPendingStudent = Number(this.value); renderFinanceModule(); });
     var familySelect = document.getElementById("familyFinanceStudent");
     if (familySelect) familySelect.addEventListener("change", function () { financeState.selectedFamilyStudent = Number(this.value); renderFinanceModule(); });
     var feeForm = document.getElementById("financeFeeForm");
     if (feeForm) feeForm.addEventListener("submit", function (event) {
       event.preventDefault();
       var data = new FormData(feeForm);
+      var cycle = String(data.get("cycle") || "").toLowerCase();
+      var cycleKey = cycle.indexOf("mater") !== -1 || cycle.indexOf("nurs") !== -1 ? "nursery" : cycle.indexOf("second") !== -1 || cycle.indexOf("human") !== -1 ? "secondary" : "primary";
       var input = {
-        cycle_key: data.get("cycle") === "Primaire" ? "primary" : data.get("cycle") === "Humanités" ? "secondary" : "primary",
+        cycle_key: cycleKey,
         label: data.get("name"),
         amount: Number(data.get("amount")),
         currency: "CDF",
         due_date: data.get("due") || undefined,
         is_active: true
       };
-      apiPostAuth("/finance/fee-structures", input).then(function () {
+      var api = window.SchoolSafeFinanceAPI;
+      (api ? api.createFeeStructure(input) : Promise.reject(new Error("API indisponible"))).then(function () {
         notify("Type de frais enregistré sur le serveur.");
         financeState.loaded = false;
         return loadFinanceData();
@@ -1322,19 +1419,20 @@
     var paymentForm = document.getElementById("paymentForm");
     if (paymentForm) paymentForm.addEventListener("submit", function (event) {
       event.preventDefault();
-      var student = financeState.students[financeState.selectedStudent];
+      var student = financeState.pendingStudents[financeState.selectedPendingStudent];
+      if (!student) { notify("Aucun dossier sélectionné."); return; }
       var data = new FormData(paymentForm);
       var amount = Number(data.get("amount"));
       if (!amount || amount <= 0 || amount > student.balance) { notify("Le montant doit être positif et ne pas dépasser le solde de l’élève."); return; }
-      var studentFeeId = student.id;
       var mode = data.get("mode");
       var reference = data.get("reference");
-      apiPostAuth("/finance/payments", {
-        student_fee_id: studentFeeId,
+      var api = window.SchoolSafeFinanceAPI;
+      (api ? api.createPayment({
+        student_fee_id: student.id,
         amount: amount,
         currency: student.currency || "CDF",
         metadata: { mode: mode, reference: reference }
-      }).then(function (res) {
+      }) : Promise.reject(new Error("API indisponible"))).then(function (res) {
         notify("Paiement enregistré sur le serveur.");
         financeState.loaded = false;
         return loadFinanceData();
@@ -1346,8 +1444,14 @@
         student.paid += amount;
         student.balance = Math.max(0, student.expected - student.paid);
         student.status = student.balance === 0 ? "En ordre" : "À régulariser";
+        var fullStudent = financeState.students.find(function (s) { return s.id === student.id; });
+        if (fullStudent) {
+          fullStudent.paid = student.paid;
+          fullStudent.balance = student.balance;
+          fullStudent.status = student.status;
+        }
         var localReference = "PAY-LOCAL-" + Date.now();
-        financeState.transactions.unshift({ receipt: "Après synchronisation", date: "14 août 2026 · enregistré sur cet appareil", day: "14 août 2026", student: student.name, className: student.className, fee: String(data.get("fee")).split(" · ")[0], amount: amount, mode: mode, cashier: "Mme K", reference: reference, status: "En attente de synchronisation", localReference: localReference });
+        financeState.transactions.unshift({ id: "local-" + Date.now(), receipt: "Après synchronisation", date: formatIsoDateTimeFr(new Date().toISOString()), day: formatIsoDateFr(new Date().toISOString()), student: student.name, className: student.className, fee: String(data.get("fee")).split(" · ")[0], amount: amount, mode: modeLabel(mode), cashier: "—", reference: reference, status: "En attente de synchronisation", localReference: localReference });
         queueOfflineOperation("finance", "Paiement de " + student.name, {
           kind: "payment",
           localReference: localReference,
@@ -1362,16 +1466,49 @@
         renderFinanceModule();
       });
     });
-    document.querySelectorAll("[data-export-receipt]").forEach(function (button) {
-      button.addEventListener("click", function () { exportReceiptPdf(Number(button.getAttribute("data-export-receipt"))); });
+    document.querySelectorAll("[data-export-receipt-id]").forEach(function (button) {
+      button.addEventListener("click", function () { exportReceiptPdf(button.getAttribute("data-export-receipt-id")); });
     });
-    document.querySelectorAll("[data-request-cancel]").forEach(function (button) {
+    document.querySelectorAll("[data-cancel-payment-id]").forEach(function (button) {
       button.addEventListener("click", function () {
-        var transaction = financeState.transactions[Number(button.getAttribute("data-request-cancel"))];
-        if (transaction && transaction.status === "Validé") transaction.status = "Annulation demandée";
-        if (transaction) queueOfflineOperation("finance", "Demande d’annulation " + transaction.receipt, { kind: "cancellation-request", receipt: transaction.receipt, reasonRequired: true });
-        notify("Demande d’annulation enregistrée sans suppression de l’écriture.");
+        var paymentId = button.getAttribute("data-cancel-payment-id");
+        var reason = window.prompt("Motif de l’annulation ?");
+        if (!reason) return;
+        var api = window.SchoolSafeFinanceAPI;
+        (api ? api.cancelPayment(paymentId, reason) : Promise.reject(new Error("API indisponible"))).then(function () {
+          notify("Annulation enregistrée sur le serveur.");
+          financeState.loaded = false;
+          return loadFinanceData();
+        }).then(function () {
+          renderFinanceModule();
+        }).catch(function (err) {
+          console.warn("[Finance] annulation backend échouée", err);
+          var transaction = financeState.transactions.find(function (t) { return t.id === paymentId; });
+          if (transaction && transaction.status === "Validé") {
+            transaction.status = "Annulation demandée";
+            queueOfflineOperation("finance", "Demande d’annulation " + transaction.receipt, { kind: "cancellation-request", receipt: transaction.receipt, reason: reason, paymentId: paymentId });
+          }
+          notify("Demande d’annulation conservée localement.");
+          renderFinanceModule();
+        });
+      });
+    });
+    var reportDateInput = document.getElementById("financeReportDate");
+    if (reportDateInput) reportDateInput.addEventListener("change", function () {
+      loadDailyReport(this.value).then(function () { renderFinanceModule(); });
+    });
+    var closeRegister = document.getElementById("closeCashRegister");
+    if (closeRegister) closeRegister.addEventListener("click", function () {
+      var api = window.SchoolSafeFinanceAPI;
+      if (!api) { notify("API finance non disponible."); return; }
+      var report = financeState.dailyReport || { total_amount: 0 };
+      api.closeCashRegister({ date: financeState.reportDate, expected_amount: Number(report.total_amount || 0), notes: "Clôture depuis le frontend" }).then(function (res) {
+        financeState.reportClosure = res && res.closure ? res.closure : null;
+        notify(res && res.alreadyClosed ? "La caisse était déjà clôturée pour cette date." : "Caisse clôturée pour le " + formatIsoDateFr(financeState.reportDate) + ".");
         renderFinanceModule();
+      }).catch(function (err) {
+        console.warn("[Finance] clôture échouée", err);
+        notify("Clôture impossible : " + (err.message || "erreur"));
       });
     });
     var exportReport = document.getElementById("exportCashReport");
@@ -1379,7 +1516,6 @@
     var submitDay = document.getElementById("submitCashDay");
     if (submitDay) submitDay.addEventListener("click", function () { financeState.dayStatus = "Soumise"; queueOfflineOperation("finance", "Soumission de la journée de caisse", { kind: "cash-day-submission" }); notify("Journée soumise localement pour contrôle."); renderFinanceModule(); });
   }
-
   function pdfLibrary() {
     return window.jspdf && window.jspdf.jsPDF ? window.jspdf.jsPDF : null;
   }
@@ -1503,142 +1639,70 @@
     return y + 10;
   }
 
-  async function exportReceiptPdf(transactionIndex) {
-    var transaction = financeState.transactions[transactionIndex];
-    if (!transaction) { notify("Ce reçu est introuvable."); return; }
-    if (transaction.status !== "Validé") { notify("Le reçu officiel sera disponible après confirmation de la synchronisation."); return; }
-
-    function fallbackCanViewReceipt() {
-      if (currentDemoRole === "admin" || currentDemoRole === "finance" || currentDemoRole === "cashier" || currentDemoRole === "school_head") return true;
-      if (currentDemoRole === "parent") {
-        var children = financeState.students.filter(function (s) { return s.guardian === "Mme Sophie Martin"; });
-        var childNames = children.map(function (s) { return s.name; });
-        return childNames.indexOf(transaction.student) !== -1;
-      }
-      return false;
-    }
-
-    async function checkAuthorization() {
-      var client = getSupabaseClient();
-      if (!client) return fallbackCanViewReceipt();
-      try {
-        var permResult = await client.rpc("has_permission", { permission_code: "finance.receipts.view" });
-        if (permResult.error || !permResult.data) return false;
-        var studentRecord = financeState.students.find(function (s) { return s.name === transaction.student; });
-        var studentId = transaction.student_id || (studentRecord && studentRecord.student_id) || null;
-        var scopeResult = await client.rpc("has_scope", {
-          requested_scope_type: "student",
-          requested_scope_id: studentId,
-        });
-        return scopeResult.data === true;
-      } catch (e) {
-        return fallbackCanViewReceipt();
-      }
-    }
-
-    var authorized = await checkAuthorization();
-    if (!authorized) {
-      notify("Vous n’avez pas le droit de consulter ce reçu.");
-      return;
-    }
-
+    async function exportReceiptPdf(paymentId) {
+    if (!paymentId) { notify("Reçu introuvable."); return; }
     try {
-      var engine = await import("./modules/document-engine/index.js");
-      var identity = await engine.createSchoolIdentityProvider(window.SchoolSafeSchoolAPI).load();
-
-      function deriveSchoolId() {
-        if (currentSession && currentSession.school && currentSession.school.id) return currentSession.school.id;
-        return "";
-      }
-      var schoolId = deriveSchoolId();
-
-      var receiptNumber;
-      var client = getSupabaseClient();
-      if (client && schoolId) {
-        try {
-          receiptNumber = await engine.createDocumentNumberingService(client, schoolId).nextNumber("receipt", "REC-");
-        } catch (numErr) {
-          console.warn("[Finance] document numbering failed, using existing receipt number", numErr);
-          receiptNumber = transaction.receipt;
-        }
-      } else {
-        receiptNumber = transaction.receipt;
-      }
-
-      function parseStudentName(fullName) {
-        var parts = String(fullName || "").trim().split(/\s+/);
-        if (parts.length <= 1) return { firstName: parts[0] || "", lastName: "" };
-        return { firstName: parts.slice(0, -1).join(" "), lastName: parts[parts.length - 1] };
-      }
-
-      function parseTransactionDate(dateStr) {
-        if (!dateStr) return new Date();
-        var match = String(dateStr).match(/(\d{1,2})\s+([a-zA-Zàâäéèêëïîôöùûüç\s]+)\s+(\d{4})/);
-        if (!match) return new Date();
-        var monthMap = { janvier: 0, février: 1, mars: 2, avril: 3, mai: 4, juin: 5, juillet: 6, août: 7, septembre: 8, octobre: 9, novembre: 10, décembre: 11 };
-        var month = monthMap[match[2].toLowerCase().trim()];
-        if (month == null) return new Date();
-        return new Date(Number(match[3]), month, Number(match[1]));
-      }
-
-      var nameParts = parseStudentName(transaction.student);
-      var studentRecord = financeState.students.find(function (s) { return s.name === transaction.student; });
-      var amountExpected = studentRecord ? studentRecord.expected : transaction.amount;
-      var amountPaid = transaction.amount;
-      var remaining = Math.max(0, amountExpected - amountPaid);
-
+      var api = window.SchoolSafeFinanceAPI;
+      if (!api) { notify("API finance non disponible."); return; }
+      var data = await api.getReceiptData(paymentId);
+      if (!data) { notify("Reçu introuvable."); return; }
+      var mod = await import("./modules/document-engine/templates/receipt-template.js");
+      var school = data.school || {};
+      var identity = {
+        name: school.name || "",
+        nameEn: null,
+        legalName: school.name || "",
+        address: school.address || null,
+        city: null,
+        province: null,
+        country: null,
+        phone: school.phone || null,
+        email: school.email || null,
+        website: school.website || null,
+        primaryColor: "#071a3d",
+        accentColor: "#e9a515",
+        logoUrl: school.logo_url || null,
+        documentFooter: null,
+        officialSealUrl: null,
+        currency: school.currency || "USD",
+        bankName: null,
+        bankAccount: null,
+        taxId: null,
+        directorName: null,
+        directorSignatureUrl: null,
+        activeAcademicYear: school.activeAcademicYear || null,
+        activeCycles: []
+      };
+      var p = data.payment || {};
+      var s = data.student || {};
       var payment = {
         student: {
-          firstName: nameParts.firstName,
-          lastName: nameParts.lastName,
-          matricule: (studentRecord && studentRecord.matricule) || null,
-          className: transaction.className || null,
+          firstName: s.first_name || "",
+          lastName: s.last_name || "",
+          matricule: s.matricule || "",
+          className: s.class_name || ""
         },
-        feeLabel: transaction.fee || "",
+        feeLabel: p.fee_label || "",
         period: "",
-        amountExpected: amountExpected,
-        amountPaid: amountPaid,
-        remaining: remaining,
-        currency: identity.currency || "USD",
-        paymentMode: transaction.mode || "",
-        reference: transaction.reference || "",
-        paidAt: parseTransactionDate(transaction.date),
-        cashierName: transaction.cashier || "",
-        verificationCode: receiptNumber,
+        amountExpected: Number(p.expected_amount || 0),
+        amountPaid: Number(p.amount || 0),
+        remaining: Number(p.remaining_amount || 0),
+        currency: p.currency || identity.currency,
+        paymentMode: modeLabel(p.mode),
+        reference: p.reference || "",
+        paidAt: p.received_at || data.generatedAt,
+        cashierName: p.cashier_name || "",
+        verificationCode: p.verification_code || data.receiptNumber || ""
       };
-
-      var doc = await engine.renderReceipt(identity, payment, receiptNumber);
-      var blob = doc.output("blob");
-      var url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      notify("Reçu PDF ouvert dans un nouvel onglet.");
-
-      var auditClient = getSupabaseClient();
-      if (auditClient && schoolId) {
-        var auditStudentId = transaction.student_id || (studentRecord && studentRecord.student_id) || null;
-        auditClient.from("audit_events").insert({
-          school_id: schoolId,
-          event_type: "finance.receipt.generated",
-          actor_profile_id: (currentSession && currentSession.profile && currentSession.profile.id) || (currentSession && currentSession.user && currentSession.user.id) || null,
-          payload: {
-            document_type: "receipt",
-            document_number: receiptNumber,
-            generated_at: new Date().toISOString(),
-            entity_type: "student",
-            entity_id: auditStudentId
-          }
-        }).then(function () {
-          // Audit event logged successfully.
-        }).catch(function (auditErr) {
-          console.warn("[Finance] audit event insert failed", auditErr);
-        });
-      }
+      var doc = await mod.renderReceipt(identity, payment, data.receiptNumber || "");
+      var filename = "recu-" + sanitizeFilename(data.receiptNumber || "schoolsafe") + ".pdf";
+      doc.save(filename);
+      notify("Reçu PDF téléchargé.");
     } catch (e) {
       console.error("[Finance] receipt generation failed", e);
       notify("Erreur lors de la génération du reçu : " + (e.message || "erreur inconnue"));
     }
   }
-
   async function exportCashReportPdf() {
     var JsPdf = pdfLibrary();
     if (!JsPdf) { notify("Le générateur PDF n’est pas disponible."); return; }

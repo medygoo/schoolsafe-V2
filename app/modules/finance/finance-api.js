@@ -72,6 +72,26 @@
       return apiPost("/finance/payments", input).then(function (res) { return res.data; });
     },
 
+    getReceiptData: function (paymentId) {
+      return apiGet("/finance/receipts/" + encodeURIComponent(paymentId)).then(function (res) { return res.data; });
+    },
+
+    getDailyReport: function (date) {
+      return apiGet("/finance/reports/daily?date=" + encodeURIComponent(date)).then(function (res) { return res.data; });
+    },
+
+    closeCashRegister: function (input) {
+      return apiPost("/finance/cash-register/close", input).then(function (res) { return res.data; });
+    },
+
+    cancelPayment: function (paymentId, reason) {
+      return apiPost("/finance/payments/" + encodeURIComponent(paymentId) + "/cancel", { reason: reason }).then(function (res) { return res.data; });
+    },
+
+    getStudentFee: function (studentFeeId) {
+      return apiGet("/finance/student-fees/" + encodeURIComponent(studentFeeId)).then(function (res) { return res.data; });
+    },
+
     listCampaigns: function () {
       return apiGet("/finance/fee-control/campaigns").then(function (res) { return res.data; });
     },
