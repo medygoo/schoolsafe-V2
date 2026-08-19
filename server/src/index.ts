@@ -7,6 +7,7 @@ import { parseEnv } from "./config/env.js";
 import { createSetupService } from "./setup/service.js";
 import { createSecurityService } from "./security/service.js";
 import { createAlertService } from "./pilotage/alerts/service.js";
+import { createApprovalService } from "./pilotage/approvals/service.js";
 import { createDashboardService } from "./pilotage/dashboard/service.js";
 import { createBrevoEmailService, createNoopEmailService } from "./email/service.js";
 import { createFeeControlService } from "./finance/control/service.js";
@@ -107,6 +108,10 @@ const alertService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createAlertService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   : undefined;
 
+const approvalService = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createApprovalService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  : undefined;
+
 const dashboardService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createDashboardService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   : undefined;
@@ -175,6 +180,13 @@ const app = buildApp({
   alerts: alertService
     ? {
         service: alertService,
+        resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        access: accessService,
+      }
+    : undefined,
+  approvals: approvalService
+    ? {
+        service: approvalService,
         resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
       }

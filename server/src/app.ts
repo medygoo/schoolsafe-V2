@@ -9,6 +9,7 @@ import { newRequestId } from "./http/request-id.js";
 import { registerSetupRoutes, type SetupRouteDependencies } from "./setup/routes.js";
 import { registerSecurityRoutes, type SecurityRouteDependencies } from "./security/routes.js";
 import { registerAlertRoutes, type AlertRouteDependencies } from "./pilotage/alerts/routes.js";
+import { registerApprovalRoutes, type ApprovalRouteDependencies } from "./pilotage/approvals/routes.js";
 import { registerDashboardRoutes, type DashboardRouteDependencies } from "./pilotage/dashboard/routes.js";
 import { registerEmailRoutes, type EmailRouteDependencies } from "./email/routes.js";
 import { registerFeeControlRoutes, type FeeControlRouteDependencies } from "./finance/control/routes.js";
@@ -27,6 +28,7 @@ export type BuildAppOptions = {
   cards?: CardRouteDependencies;
   security?: SecurityRouteDependencies;
   alerts?: AlertRouteDependencies;
+  approvals?: ApprovalRouteDependencies;
   dashboard?: DashboardRouteDependencies;
   email?: EmailRouteDependencies;
   feeControl?: FeeControlRouteDependencies;
@@ -98,6 +100,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.alerts) {
     registerAlertRoutes(app, options.alerts);
+  }
+
+  if (options.approvals) {
+    registerApprovalRoutes(app, options.approvals);
   }
 
   if (options.dashboard) {
