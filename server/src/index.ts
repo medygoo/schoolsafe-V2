@@ -28,6 +28,7 @@ import { createZohoEmailProvider } from "./notifications/providers/zoho.js";
 import { createInAppProvider } from "./notifications/providers/in-app.js";
 import { createWebPushProvider } from "./notifications/providers/push.js";
 import { createPushSubscriptionService } from "./push/subscriptions.js";
+import { registerPushRoutes } from "./push/routes.js";
 
 const env = parseEnv(process.env);
 
@@ -58,8 +59,10 @@ const serviceClient = env.SUPABASE_SERVICE_ROLE_KEY
 
 let notificationService: ReturnType<typeof createNotificationService> | undefined;
 let dispatcher: ReturnType<typeof createNotificationDispatcher> | undefined;
+let pushSubscriptionService: ReturnType<typeof createPushSubscriptionService> | undefined;
 
 if (serviceClient) {
+  pushSubscriptionService = createPushSubscriptionService(serviceClient);
   const brevoProvider = env.BREVO_API_KEY
     ? createBrevoEmailProvider({ apiKey: env.BREVO_API_KEY, senderEmail: env.BREVO_SENDER_EMAIL ?? "schoolsafe1@gmail.com" })
     : undefined;
@@ -74,13 +77,12 @@ if (serviceClient) {
         brevoProvider,
       )
     : brevoProvider;
-  const pushSubscriptionService = createPushSubscriptionService(serviceClient);
   const pushProvider = env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY
     ? createWebPushProvider({
         publicKey: env.VAPID_PUBLIC_KEY,
         privateKey: env.VAPID_PRIVATE_KEY,
         subject: env.VAPID_SUBJECT,
-        getSubscriptions: (userId) => pushSubscriptionService.getSubscriptions(userId),
+        getSubscriptions: (userId) => pushSubscriptionService!.getSubscriptions(userId),
       })
     : undefined;
 
@@ -247,6 +249,14 @@ const app = buildApp({
         service: schoolService,
         resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
+      }
+    : undefined,
+  push: pushSubscriptionService
+    ? {
+        subscriptionService: pushSubscriptionService,
+        resolveProfileId: (token: string) => resolveProfileId(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        access: accessService,
+        vapidPublicKey: env.VAPID_PUBLIC_KEY,
       }
     : undefined,
   access: accessService,

@@ -8,6 +8,7 @@ export type PushSubscription = {
 export interface PushSubscriptionService {
   saveSubscription(userId: string, subscription: PushSubscription): Promise<void>;
   getSubscriptions(userId: string): Promise<PushSubscription[]>;
+  removeSubscription(userId: string, endpoint: string): Promise<void>;
 }
 
 export function createPushSubscriptionService(client: SupabaseClient): PushSubscriptionService {
@@ -25,6 +26,14 @@ export function createPushSubscriptionService(client: SupabaseClient): PushSubsc
         .eq("user_id", userId);
       if (error) throw new Error(`Failed to load push subscriptions: ${error.message}`);
       return (data ?? []).map((row) => row.subscription as PushSubscription);
+    },
+    async removeSubscription(userId, endpoint) {
+      const { error } = await client
+        .from("push_subscriptions")
+        .delete()
+        .eq("user_id", userId)
+        .eq("endpoint", endpoint);
+      if (error) throw new Error(`Failed to remove push subscription: ${error.message}`);
     },
   };
 }

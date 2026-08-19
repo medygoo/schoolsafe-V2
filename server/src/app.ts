@@ -18,6 +18,7 @@ import { registerFinancePaymentsRoutes, type FinancePaymentsRouteDependencies } 
 import { registerFinanceReportsRoutes, type FinanceReportsRouteDependencies } from "./finance/reports/routes.js";
 import { registerPedagogyRoutes, type PedagogyRouteDependencies } from "./pedagogy/routes.js";
 import { registerSchoolRoutes, type SchoolRouteDependencies } from "./school/routes.js";
+import { registerPushRoutes, type PushRouteDependencies } from "./push/routes.js";
 import { requirePermission } from "./access/guard.js";
 import type { AccessService } from "./access/service.js";
 
@@ -38,6 +39,7 @@ export type BuildAppOptions = {
   financeReports?: FinanceReportsRouteDependencies;
   pedagogy?: PedagogyRouteDependencies;
   school?: SchoolRouteDependencies;
+  push?: PushRouteDependencies;
   access?: AccessService;
 };
 
@@ -138,6 +140,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.school) {
     registerSchoolRoutes(app, options.school);
+  }
+
+  if (options.push) {
+    registerPushRoutes(app, options.push);
   }
 
   if (options.testRoutes) {
