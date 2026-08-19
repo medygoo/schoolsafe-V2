@@ -34,6 +34,35 @@ class FakeCancelPaymentDatabase {
     this.payments = new Map(seed.payments.map((payment) => [payment.id, payment]));
   }
 
+  from(table: string) {
+    if (table === "fee_payments") {
+      return {
+        select: () => ({
+          eq: (_column: string, paymentId: string) => ({
+            eq: (_column: string, _schoolId: string) => ({
+              single: () => {
+                const payment = this.payments.get(paymentId);
+                if (!payment) {
+                  return Promise.resolve({ data: null, error: { message: "Paiement introuvable" } });
+                }
+                return Promise.resolve({
+                  data: { id: payment.id, created_at: payment.created_at ?? new Date().toISOString() },
+                  error: null,
+                });
+              },
+            }),
+          }),
+        }),
+      };
+    }
+    if (table === "audit_events") {
+      return {
+        insert: () => ({ error: null }),
+      };
+    }
+    throw new Error(`Unexpected table: ${table}`);
+  }
+
   async rpc(name: string, args: Record<string, unknown>) {
     if (name !== "cancel_payment") {
       throw new Error(`Unexpected RPC: ${name}`);

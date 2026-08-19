@@ -34,6 +34,13 @@ export function registerSecurityRoutes(app: FastifyInstance, dependencies: Secur
       }
 
       const parsed = securityScanSchema.parse(request.body);
+      if (parsed.location_id) {
+        const inScope = await dependencies.access.hasScope(token, "assigned_portal", parsed.location_id);
+        if (!inScope) {
+          throw new SchoolSafeError(403, "SCOPE_DENIED", "Portail non assigné", false);
+        }
+      }
+
       const result = await dependencies.service.scan({ ...parsed, scanned_by: profileId });
       return { data: result };
     },

@@ -9,6 +9,7 @@ import type {
   UpdateLessonPlanInput,
 } from "./schema.js";
 import { computeStudentAverages, type SubjectInfo } from "./averages.js";
+import { SchoolSafeError } from "../http/errors.js";
 
 export interface PedagogyService {
   listClasses(schoolId: string): Promise<unknown[]>;
@@ -288,8 +289,11 @@ export function createPedagogyService(supabaseUrl: string, serviceRoleKey: strin
             valueChanged(previous.normalized_value, grade.normalized_value);
           if (hasChange) {
             if (!grade.change_reason || String(grade.change_reason).trim() === "") {
-              throw new Error(
+              throw new SchoolSafeError(
+                403,
+                "CONDITION_DENIED",
                 `Modification refusée : une cote publiée ne peut être changée sans motif (élève ${grade.student_id}).`,
+                false,
               );
             }
             values.change_reason = grade.change_reason;

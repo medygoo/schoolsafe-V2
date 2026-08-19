@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { CreatePaymentInput } from "../control/schema.js";
+import { SchoolSafeError } from "../../http/errors.js";
 
 export interface FinancePaymentService {
   getStudentFeeWithPayments(schoolId: string, studentFeeId: string): Promise<unknown>;
@@ -11,6 +12,24 @@ function createServiceClient(supabaseUrl: string, serviceRoleKey: string): Supab
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
+}
+
+async function insertAuditEvent(
+  client: SupabaseClient,
+  schoolId: string,
+  actorProfileId: string,
+  eventType: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await client.from("audit_events").insert({
+    school_id: schoolId,
+    actor_profile_id: actorProfileId,
+    event_type: eventType,
+    payload,
+  });
+  if (error) {
+    console.error(`[FinancePaymentService] failed to insert audit event ${eventType}:`, error);
+  }
 }
 
 export function createFinancePaymentService(
@@ -62,6 +81,25 @@ export function createFinancePaymentService(
     },
 
     async cancelPayment(schoolId, profileId, paymentId, reason) {
+      const CANCELLATION_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+      const { data: payment, error: paymentError } = await client
+        .from("fee_payments")
+        .select("id, created_at")
+        .eq("id", paymentId)
+        .eq("school_id", schoolId)
+        .single();
+      if (paymentError || !payment) throw new Error(`Paiement introuvable : ${paymentError?.message ?? "inconnu"}`);
+
+      const createdAt = new Date(payment.created_at as string).getTime();
+      if (Date.now() - createdAt > CANCELLATION_WINDOW_MS) {
+        await insertAuditEvent(client, schoolId, profileId, "finance.payment.cancel.denied", {
+          payment_id: paymentId,
+          reason: "outside_cancellation_window",
+        });
+        throw new SchoolSafeError(403, "CONDITION_DENIED", "Délai d'annulation dépassé", false);
+      }
+
       const { data, error } = await client.rpc("cancel_payment", {
         p_school_id: schoolId,
         p_profile_id: profileId,
@@ -69,6 +107,11 @@ export function createFinancePaymentService(
         p_reason: reason,
       });
       if (error || !data) throw new Error(`Échec de l'annulation : ${error?.message ?? "inconnu"}`);
+
+      await insertAuditEvent(client, schoolId, profileId, "finance.payment.cancelled", {
+        payment_id: paymentId,
+        cancellation_reason: reason,
+      });
 
       return data;
     },

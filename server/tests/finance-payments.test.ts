@@ -151,6 +151,32 @@ describe("POST /finance/payments/:id/cancel", () => {
 function makeRpcClient(rpcResult: unknown) {
   return {
     rpc: vi.fn().mockResolvedValue({ data: rpcResult, error: null }),
+    from: vi.fn((table: string) => {
+      if (table === "fee_payments") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                single: vi.fn(() =>
+                  Promise.resolve({
+                    data: { id: "pay-1", created_at: new Date().toISOString() },
+                    error: null,
+                  }),
+                ),
+              })),
+            })),
+          })),
+        };
+      }
+      if (table === "audit_events") {
+        return {
+          insert: vi.fn(() => ({ error: null })),
+        };
+      }
+      return {
+        select: vi.fn(() => ({ eq: vi.fn(() => ({ single: vi.fn(() => Promise.resolve({ data: null, error: null })) })) })),
+      };
+    }),
   } as unknown as SupabaseClient;
 }
 

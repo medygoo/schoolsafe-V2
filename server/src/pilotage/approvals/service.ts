@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { CreateApprovalRequestInput, DecideApprovalInput } from "./schema.js";
+import { SchoolSafeError } from "../../http/errors.js";
 
 export interface ApprovalRequest {
   id: string;
@@ -75,7 +76,9 @@ export function createApprovalService(supabaseUrl: string, serviceRoleKey: strin
         .eq("school_id", schoolId)
         .single();
       if (lookupError || !existing) throw new Error("Approval request not found");
-      if (existing.status !== "pending") throw new Error(`Request is already ${existing.status}`);
+      if (existing.status !== "pending") {
+        throw new SchoolSafeError(403, "CONDITION_DENIED", `La demande est déjà ${existing.status}`, false);
+      }
 
       const { data, error } = await client
         .from("approval_requests")
