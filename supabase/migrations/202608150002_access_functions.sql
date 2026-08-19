@@ -19,14 +19,26 @@ stable
 security definer
 set search_path = public, auth, pg_temp
 as $$
-  select exists (
-    select 1
-    from public.profile_roles pr
-    join public.role_permission_grants rpg on rpg.role_id = pr.role_id and rpg.allowed = true
-    join public.permissions perm on perm.id = rpg.permission_id
-    where pr.profile_id = public.current_profile_id()
-      and perm.code = permission_code
-  )
+  select
+    -- at least one assigned role grants the permission
+    exists (
+      select 1
+      from public.profile_roles pr
+      join public.role_permission_grants rpg on rpg.role_id = pr.role_id and rpg.allowed = true
+      join public.permissions perm on perm.id = rpg.permission_id
+      where pr.profile_id = public.current_profile_id()
+        and perm.code = permission_code
+    )
+    and
+    -- no assigned role explicitly denies the permission
+    not exists (
+      select 1
+      from public.profile_roles pr
+      join public.role_permission_grants rpg on rpg.role_id = pr.role_id and rpg.allowed = false
+      join public.permissions perm on perm.id = rpg.permission_id
+      where pr.profile_id = public.current_profile_id()
+        and perm.code = permission_code
+    )
 $$;
 
 create or replace function public.has_scope(requested_scope_type text, requested_scope_id uuid)
