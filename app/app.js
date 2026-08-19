@@ -491,7 +491,7 @@
 
   function cycleLabel(cycleKey) {
     if (!cycleKey) return "—";
-    var map = { primary: "Primaire", secondary: "Secondaire", kindergarten: "Maternelle", all: "Tous les cycles" };
+    var map = { nursery: "Maternelle", primary: "Primaire", secondary: "Secondaire", kindergarten: "Maternelle", all: "Tous les cycles" };
     return map[cycleKey] || cycleKey;
   }
 
@@ -533,8 +533,7 @@
       { reference: "DEP-2026-012", date: "14 août 2026", label: "Entretien du groupe électrogène", amount: 75000, status: "À approuver" }
     ],
     dailyReport: null,
-    reportDate: todayIsoDate(),
-    reportLoading: false
+    reportDate: todayIsoDate()
   };
 
   function initialsFromName(name) {
@@ -602,7 +601,6 @@
 
   async function loadDailyReport(date) {
     if (!window.SchoolSafeFinanceAPI) return;
-    financeState.reportLoading = true;
     try {
       var report = await window.SchoolSafeFinanceAPI.getDailyReport(date);
       financeState.reportDate = date;
@@ -610,12 +608,10 @@
     } catch (e) {
       console.warn("[Finance] rapport journalier échoué", e);
       financeState.dailyReport = null;
-    } finally {
-      financeState.reportLoading = false;
     }
   }
 
-    async function loadFinanceData() {
+  async function loadFinanceData() {
     if (financeState.loading || financeState.loaded) return;
     if (!window.SchoolSafeFinanceAPI) return;
     var api = window.SchoolSafeFinanceAPI;
@@ -1122,6 +1118,30 @@
     return ["overview"];
   }
 
+  function checkAuthorization(permission, options) {
+    options = options || {};
+    var allowed = false;
+    if (currentSession && Array.isArray(currentSession.permissions)) {
+      allowed = currentSession.permissions.indexOf(permission) !== -1;
+      if (!allowed && permission === "finance.receipts.view") {
+        allowed = currentSession.permissions.indexOf("finance.receipt.read") !== -1;
+      }
+    }
+    if (!allowed) {
+      if (permission === "finance.receipts.view") {
+        allowed = currentDemoRole === "admin" || currentDemoRole === "finance" || currentDemoRole === "cashier" || currentDemoRole === "school_head";
+        if (options.scope === "own_children" || currentDemoRole === "parent") {
+          allowed = allowed || currentDemoRole === "parent";
+        }
+      } else if (permission === "finance.fee.manage") {
+        allowed = currentDemoRole === "admin" || currentDemoRole === "finance";
+      } else {
+        allowed = currentDemoRole === "admin";
+      }
+    }
+    return allowed;
+  }
+
   function openFinanceModule(actionName) {
     var requestedTab = financeTabForAction(actionName || "") || "overview";
     var allowedTabs = financeTabsForRole();
@@ -1271,18 +1291,15 @@
     return { expected: expected, paid: paid, balance: balance, rate: expected ? Math.round(paid / expected * 100) : 0, today: today, todayTotal: today.reduce(function (sum, transaction) { return sum + transaction.amount; }, 0) };
   }
 
-  function cashStudents() {
-    return financeState.students.filter(function (student) { return student.balance > 0; });
-  }
 
-    function renderFinanceOverview() {
+  function renderFinanceOverview() {
     var totals = financeTotals();
     var recent = financeState.transactions.slice(0, 5).map(function (transaction) {
       return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td><td><span class="case-status ' + certificationStatusClass(transaction.status) + '">' + escapeMarkup(transaction.status) + '</span></td></tr>';
     }).join("");
     return '<section class="finance-overview"><header><div><span>Pilotage financier</span><h3>Situation enregistrée par l’école</h3><p>Les chiffres proviennent des opérations consignées sur le serveur.</p></div><span class="recording-only"><i data-lucide="hand-coins"></i> Aucun paiement en ligne</span></header><div class="finance-kpis"><article class="blue"><small>Frais attendus</small><b>' + money(totals.expected) + '</b><span>' + financeState.students.length + ' élèves suivis</span></article><article class="green"><small>Montants enregistrés</small><b>' + money(totals.paid) + '</b><span>' + totals.rate + ' % de recouvrement</span></article><article class="gold"><small>Soldes à régulariser</small><b>' + money(totals.balance) + '</b><span>' + financeState.students.filter(function (student) { return student.balance > 0; }).length + ' dossiers</span></article><article class="purple"><small>Encaissements du jour</small><b>' + money(totals.todayTotal) + '</b><span>' + totals.today.length + ' opérations</span></article></div><div class="finance-overview-grid"><section class="finance-panel"><header><div><span>Activité récente</span><h3>Derniers enregistrements</h3></div><button class="icon-button light" type="button" data-finance-open="receipts" title="Voir les reçus"><i data-lucide="arrow-right"></i></button></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode constaté</th><th>Montant</th><th>Statut</th></tr></thead><tbody>' + recent + '</tbody></table></div></section><aside class="finance-control"><span><i data-lucide="shield-check"></i></span><h3>Contrôle de la journée</h3><dl><div><dt>Caisse</dt><dd>' + escapeMarkup(financeState.dayStatus) + '</dd></div><div><dt>Dépenses à approuver</dt><dd>' + financeState.expenses.filter(function (expense) { return expense.status === "À approuver"; }).length + '</dd></div><div><dt>Annulations demandées</dt><dd>' + financeState.transactions.filter(function (transaction) { return transaction.status === "Annulation demandée"; }).length + '</dd></div></dl></aside></div></section>';
   }
-    function renderFeeStructure() {
+  function renderFeeStructure() {
     var canEdit = currentDemoRole === "admin" || currentDemoRole === "finance";
     var rows = financeState.feeTypes.map(function (fee, index) {
       return '<tr><td><b>' + escapeMarkup(fee.name) + '</b></td><td>' + escapeMarkup(fee.cycle) + '</td><td><b>' + money(fee.amount) + '</b></td><td>' + escapeMarkup(fee.frequency) + '</td><td>' + escapeMarkup(fee.due) + '</td><td><span class="case-status ' + (fee.active ? "done" : "pending") + '">' + (fee.active ? "Actif" : "Désactivé") + '</span></td><td>' + (canEdit ? '<button class="icon-button light" type="button" data-toggle-fee="' + index + '" title="Activer ou désactiver"><i data-lucide="power"></i></button>' : "") + '</td></tr>';
@@ -1290,7 +1307,7 @@
     var form = canEdit ? '<form class="finance-fee-form" id="financeFeeForm"><header><span><i data-lucide="circle-plus"></i></span><div><h3>Ajouter un type de frais</h3><p>Le montant est configuré par l’école. Aucun prélèvement n’est effectué.</p></div></header><div><label>Libellé<input name="name" required placeholder="Ex. Frais scolaires"></label><label>Cycle ou service<input name="cycle" required placeholder="Ex. Primaire"></label><label>Montant en FC<input name="amount" required type="number" min="0" step="1000"></label><label>Périodicité<select name="frequency"><option>Une fois</option><option>Mois</option><option>Trimestre</option><option>Semestre</option><option>Année</option></select></label><label class="wide">Échéance<input name="due" required placeholder="Date ou règle d’échéance"></label></div><button class="primary-button dark" type="submit"><i data-lucide="save"></i> Enregistrer le type de frais</button></form>' : '<aside class="finance-readonly"><i data-lucide="eye"></i><p>Consultation uniquement. La structure des frais est modifiée par le Responsable financier ou l’Administrateur principal.</p></aside>';
     return '<div class="finance-two-column"><section class="finance-panel"><header><div><span>Paramétrage</span><h3>Structure des frais</h3></div><b>' + financeState.feeTypes.length + '</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Frais</th><th>Cycle</th><th>Montant</th><th>Périodicité</th><th>Échéance</th><th>Statut</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' + form + '</div>';
   }
-    function renderCash() {
+  function renderCash() {
     var pending = financeState.pendingStudents;
     var student = pending[financeState.selectedPendingStudent] || pending[0] || null;
     var canRecord = (currentDemoRole === "cashier" || currentDemoRole === "admin") && financeState.dayStatus === "Ouverte";
@@ -1308,7 +1325,7 @@
     var studentPanel = student ? '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div><span class="case-status ' + certificationStatusClass(student.status) + '">' + escapeMarkup(student.status) + '</span></header><label class="finance-student-picker">Élève<select id="financeStudentSelect">' + studentOptions + '</select></label><article class="student-finance-card"><span class="student-avatar large">' + student.initials + '</span><div><small>' + escapeMarkup(student.className + " · " + student.sex) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.guardian) + '</p></div></article><dl class="student-finance-facts"><div><dt>Frais attendus</dt><dd>' + money(student.expected) + '</dd></div><div><dt>Enregistré</dt><dd>' + money(student.paid) + '</dd></div><div><dt>Solde</dt><dd>' + money(student.balance) + '</dd></div></dl></section>' : '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div></header><p class="finance-empty">Aucun dossier avec solde à encaisser.</p></section>';
     return '<div class="cash-workspace"><section class="cashier-layout">' + studentPanel + paymentForm + '</section><section class="finance-panel"><header><div><span>Journal de caisse</span><h3>Opérations du jour</h3></div><b>' + money(financeTotals().todayTotal) + '</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode constaté</th><th>Montant</th><th>Statut</th><th>PDF</th></tr></thead><tbody>' + todayRows + '</tbody></table></div></section></div>';
   }
-    function renderReceipts() {
+  function renderReceipts() {
     var canRequestCancellation = currentDemoRole === "cashier" || currentDemoRole === "admin";
     var rows = financeState.transactions.map(function (transaction) {
       var cancellationButton = canRequestCancellation && transaction.status === "Validé" ? '<button class="icon-button light danger" type="button" data-cancel-payment-id="' + escapeMarkup(transaction.id) + '" title="Demander l’annulation"><i data-lucide="circle-x"></i></button>' : "";
@@ -1317,7 +1334,7 @@
     }).join("");
     return '<section class="finance-panel receipt-register"><header><div><span>Documents financiers</span><h3>Reçus et opérations</h3><p>Un reçu reste traçable même lorsqu’une annulation est demandée.</p></div><span class="recording-only"><i data-lucide="shield-check"></i> PDF avec logo</span></header><aside class="finance-audit-note"><i data-lucide="history"></i><p>Une demande d’annulation ne supprime jamais l’écriture. Elle doit être contrôlée et approuvée dans le circuit financier.</p></aside><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Frais</th><th>Mode constaté</th><th>Montant</th><th>Statut</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
   }
-    function renderBalances() {
+  function renderBalances() {
     var statusOnly = currentDemoRole === "pedagogy";
     var inOrder = financeState.students.filter(function (student) { return student.balance === 0; }).length;
     var rows = financeState.students.map(function (student) {
@@ -1328,7 +1345,7 @@
     var tableHead = statusOnly ? '<tr><th>Élève</th><th>Classe</th><th>Sexe</th><th>Statut administratif</th></tr>' : '<tr><th>Élève</th><th>Classe</th><th>Frais attendus</th><th>Enregistré</th><th>Solde</th><th>Statut</th></tr>';
     return '<section class="finance-panel balance-register"><header><div><span>' + (statusOnly ? "Suivi scolaire autorisé" : "Recouvrement") + '</span><h3>' + (statusOnly ? "Régularité des élèves" : "Impayés et soldes") + '</h3><p>' + (statusOnly ? "Aucun chiffre financier n’est exposé dans ce profil." : "Situation calculée à partir des opérations enregistrées par l’école.") + '</p></div><b>' + financeState.students.length + ' dossiers</b></header>' + heading + '<div class="table-scroll"><table class="finance-table' + (statusOnly ? " status-only-table" : "") + '"><thead>' + tableHead + '</thead><tbody>' + rows + '</tbody></table></div></section>';
   }
-    function renderReports() {
+  function renderReports() {
     var report = financeState.dailyReport || { total_amount: 0, transaction_count: 0, by_mode: [], by_fee_type: [], payments: [], currency: "USD" };
     var payments = (report.payments || []).map(mapDailyPayment);
     var cashTotal = (report.by_mode || []).reduce(function (sum, item) { return sum + (String(item.mode).toLowerCase() === "cash" ? Number(item.amount || 0) : 0); }, 0);
@@ -1346,7 +1363,7 @@
     var closureNotice = financeState.reportClosure ? '<span class="closure-chip"><i data-lucide="lock-keyhole"></i> Caisse clôturée le ' + escapeMarkup(formatIsoDateFr(financeState.reportClosure.closure_date)) + '</span>' : '<span class="closure-chip"><i data-lucide="eye"></i> Caisse ouverte</span>';
     return '<div class="finance-reports"><header class="finance-report-head"><div><span>Contrôle et clôture</span><h3>Rapport de caisse du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3><p>État préparé pour contrôle à partir des opérations enregistrées sur le serveur.</p></div><div><label class="finance-report-date">Date<input type="date" id="financeReportDate" value="' + escapeMarkup(financeState.reportDate) + '"></label>' + (canClose ? '<button class="primary-button dark" type="button" id="closeCashRegister"><i data-lucide="lock-keyhole"></i> Clôturer la caisse</button>' : '') + closureNotice + '</div></header><div class="finance-kpis report-kpis"><article class="blue"><small>Encaissements</small><b>' + money(report.total_amount) + '</b><span>' + Number(report.transaction_count || 0) + ' opérations</span></article><article class="green"><small>Espèces constatées</small><b>' + money(cashTotal) + '</b><span>À rapprocher physiquement</span></article><article class="purple"><small>Autres moyens constatés</small><b>' + money(otherTotal) + '</b><span>Références conservées</span></article><article class="gold"><small>Dévise</small><b>' + escapeMarkup(report.currency || "-") + '</b><span>Rapport journalier</span></article></div><div class="finance-two-column"><section class="finance-panel"><header><div><span>Répartition par mode</span><h3>Modes de paiement</h3></div></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Mode</th><th>Montant</th><th>Opérations</th></tr></thead><tbody>' + modeRows + '</tbody></table></div></section><section class="finance-panel"><header><div><span>Répartition par frais</span><h3>Types de frais</h3></div></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Frais</th><th>Montant</th><th>Opérations</th></tr></thead><tbody>' + feeRows + '</tbody></table></div></section></div><section class="finance-panel"><header><div><span>Pièces de la journée</span><h3>Opérations du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3></div><b>' + payments.length + ' opération(s)</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode</th><th>Montant</th></tr></thead><tbody>' + paymentRows + '</tbody></table></div></section><aside class="finance-audit-note"><i data-lucide="list-checks"></i><p>La clôture fige le rapport pour contrôle. Une clôture définitive devra suivre les permissions, validations et règles comptables de l’école.</p></aside></div>';
   }
-    function renderFamilyFinance() {
+  function renderFamilyFinance() {
     var children = financeState.students.filter(function (student) { return student.guardian === "Mme Sophie Martin"; });
     if (financeState.selectedFamilyStudent >= children.length) financeState.selectedFamilyStudent = 0;
     var student = children[financeState.selectedFamilyStudent];
@@ -1376,7 +1393,7 @@
     icons();
   }
 
-    function bindFinanceEvents() {
+  function bindFinanceEvents() {
     document.querySelectorAll("[data-finance-open]").forEach(function (button) {
       button.addEventListener("click", function () { financeState.activeTab = button.getAttribute("data-finance-open"); renderFinanceModule(); });
     });
@@ -1396,7 +1413,8 @@
         amount: Number(data.get("amount")),
         currency: "CDF",
         due_date: data.get("due") || undefined,
-        is_active: true
+        is_active: true,
+        metadata: { frequency: data.get("frequency") }
       };
       var api = window.SchoolSafeFinanceAPI;
       (api ? api.createFeeStructure(input) : Promise.reject(new Error("API indisponible"))).then(function () {
@@ -1414,7 +1432,15 @@
       });
     });
     document.querySelectorAll("[data-toggle-fee]").forEach(function (button) {
-      button.addEventListener("click", function () { var fee = financeState.feeTypes[Number(button.getAttribute("data-toggle-fee"))]; fee.active = !fee.active; queueOfflineOperation("finance", "Modification d’un type de frais · " + fee.name, { kind: "fee-type-status", name: fee.name, active: fee.active }); renderFinanceModule(); });
+      button.addEventListener("click", function () {
+        var index = Number(button.getAttribute("data-toggle-fee"));
+        var fee = financeState.feeTypes[index];
+        var updated = Object.assign({}, fee, { active: !fee.active });
+        financeState.feeTypes = financeState.feeTypes.slice();
+        financeState.feeTypes[index] = updated;
+        queueOfflineOperation("finance", "Modification d’un type de frais · " + updated.name, { kind: "fee-type-status", name: updated.name, active: updated.active });
+        renderFinanceModule();
+      });
     });
     var paymentForm = document.getElementById("paymentForm");
     if (paymentForm) paymentForm.addEventListener("submit", function (event) {
@@ -1441,15 +1467,16 @@
         renderFinanceModule();
       }).catch(function (err) {
         console.warn("[Finance] paiement backend échoué", err);
-        student.paid += amount;
-        student.balance = Math.max(0, student.expected - student.paid);
-        student.status = student.balance === 0 ? "En ordre" : "À régulariser";
-        var fullStudent = financeState.students.find(function (s) { return s.id === student.id; });
-        if (fullStudent) {
-          fullStudent.paid = student.paid;
-          fullStudent.balance = student.balance;
-          fullStudent.status = student.status;
-        }
+        var updatedStudent = Object.assign({}, student, {
+          paid: student.paid + amount,
+          balance: Math.max(0, student.expected - (student.paid + amount))
+        });
+        updatedStudent.status = updatedStudent.balance === 0 ? "En ordre" : "À régulariser";
+        financeState.pendingStudents = financeState.pendingStudents.slice();
+        financeState.pendingStudents[financeState.selectedPendingStudent] = updatedStudent;
+        financeState.students = financeState.students.map(function (s) {
+          return s.id === updatedStudent.id ? Object.assign({}, s, { paid: updatedStudent.paid, balance: updatedStudent.balance, status: updatedStudent.status }) : s;
+        });
         var localReference = "PAY-LOCAL-" + Date.now();
         financeState.transactions.unshift({ id: "local-" + Date.now(), receipt: "Après synchronisation", date: formatIsoDateTimeFr(new Date().toISOString()), day: formatIsoDateFr(new Date().toISOString()), student: student.name, className: student.className, fee: String(data.get("fee")).split(" · ")[0], amount: amount, mode: modeLabel(mode), cashier: "—", reference: reference, status: "En attente de synchronisation", localReference: localReference });
         queueOfflineOperation("finance", "Paiement de " + student.name, {
@@ -1511,8 +1538,6 @@
         notify("Clôture impossible : " + (err.message || "erreur"));
       });
     });
-    var exportReport = document.getElementById("exportCashReport");
-    if (exportReport) exportReport.addEventListener("click", exportCashReportPdf);
     var submitDay = document.getElementById("submitCashDay");
     if (submitDay) submitDay.addEventListener("click", function () { financeState.dayStatus = "Soumise"; queueOfflineOperation("finance", "Soumission de la journée de caisse", { kind: "cash-day-submission" }); notify("Journée soumise localement pour contrôle."); renderFinanceModule(); });
   }
@@ -1639,8 +1664,12 @@
     return y + 10;
   }
 
-    async function exportReceiptPdf(paymentId) {
+  async function exportReceiptPdf(paymentId) {
     if (!paymentId) { notify("Reçu introuvable."); return; }
+    if (!checkAuthorization("finance.receipts.view", { scope: "own_children" })) {
+      notify("Accès non autorisé", "error");
+      return;
+    }
     try {
       var api = window.SchoolSafeFinanceAPI;
       if (!api) { notify("API finance non disponible."); return; }
