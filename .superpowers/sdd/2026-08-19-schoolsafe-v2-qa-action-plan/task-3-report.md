@@ -70,6 +70,19 @@ Tests  7 failed (7)
 | Plateforme | `file.upload` + type/taille valides | Partiel | Conditions simulées ; pas de table fichier avec RLS. |
 | Plateforme | `sync.submit` + audit | OK | Audit inséré via RLS `current_school_id()` / `current_profile_id()`. |
 
+## Fix apporté suite à la revue
+
+**Fichier :** `tests/qa/rls/school.setup.test.sql` (lignes ~113–171 et ~196)
+
+**Problème :** Le test `own_children` sur `student_guardians` ne vérifiait effectivement la portée car il n'y avait qu'un seul tuteur (celui de l'enfant A) et la requête filtrait déjà sur `student_id = v_student_a`.
+
+**Correction :**
+- Ajout d'un second tuteur pour l'enfant B (`v_guardian_b`).
+- La requête parent sur `student_guardians` est maintenant sans clause `WHERE` et asserte `count(*) = 1`.
+- Le nettoyage supprime les deux tuteurs (`id IN (v_guardian_a, v_guardian_b)`).
+
+Cela rend le test sensible à l'absence d'application de la portée `own_children` en RLS.
+
 ## Concerns
 
 1. **Environnement local** : Docker Desktop ne démarre pas (`cannot find registry key`), empêchant tout test RLS local. Les tests sont prêts mais non exécutés.

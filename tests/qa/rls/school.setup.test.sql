@@ -34,6 +34,7 @@ DECLARE
   v_student_a uuid := gen_random_uuid();
   v_student_b uuid := gen_random_uuid();
   v_guardian_a uuid;
+  v_guardian_b uuid;
   v_count integer;
 BEGIN
   -- Écoles
@@ -114,6 +115,10 @@ BEGIN
   VALUES (v_student_a, 'mere', 'Mère Alice')
   RETURNING id INTO v_guardian_a;
 
+  INSERT INTO public.student_guardians (student_id, guardian_type, full_name)
+  VALUES (v_student_b, 'pere', 'Père Bob')
+  RETURNING id INTO v_guardian_b;
+
   -- ============================================================
   -- Tests Admin : portée school
   -- ============================================================
@@ -166,9 +171,9 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.students WHERE school_id = v_school_id;
   ASSERT v_count = 1, 'parent ne devrait voir que son propre enfant';
 
-  SELECT count(*) INTO v_count FROM public.student_guardians
-  WHERE student_id = v_student_a;
-  ASSERT v_count = 1, 'parent devrait voir le tuteur de son enfant';
+  -- RLS : le parent ne devrait voir que le tuteur de son propre enfant
+  SELECT count(*) INTO v_count FROM public.student_guardians;
+  ASSERT v_count = 1, 'parent ne devrait voir que le tuteur de son propre enfant';
 
   EXECUTE 'RESET ROLE';
 
@@ -193,7 +198,7 @@ BEGIN
 
   -- Nettoyage
   DELETE FROM public.audit_events WHERE school_id = v_school_id;
-  DELETE FROM public.student_guardians WHERE id = v_guardian_a;
+  DELETE FROM public.student_guardians WHERE id IN (v_guardian_a, v_guardian_b);
   DELETE FROM public.students WHERE school_id = v_school_id;
   DELETE FROM public.classes WHERE school_id = v_school_id;
   DELETE FROM public.scope_assignments WHERE profile_id IN (v_admin_profile, v_teacher_profile, v_parent_profile);
