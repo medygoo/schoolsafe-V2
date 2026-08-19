@@ -13,8 +13,19 @@ Implementation complete. Tests could not be executed against a running local Sup
     3. `SCOPE` check — teacher assigned classes
     4. `SCOPE` check — parent own children
     5. `ROLE` without permission (cashier)
-- `supabase/migrations/202608150002_access_functions.sql` (modified)
-  - Updated `has_permission(permission_code text)` to enforce the explicit DENY override rule: a permission is granted only when at least one role allows it **and** no assigned role explicitly denies it.
+- `supabase/migrations/202608150002_access_functions.sql` (reverted to original)
+  - `has_permission()` no longer contains explicit DENY override logic.
+  - The DENY override remains in `supabase/migrations/202608170001_permission_deny_logic.sql` as the single source of truth.
+
+## Fix Summary (Post-Review)
+
+1. **Reverted redundant migration change**
+   - `supabase/migrations/202608150002_access_functions.sql` restored to its original `has_permission()` implementation.
+   - `supabase/migrations/202608170001_permission_deny_logic.sql` left untouched.
+
+2. **Improved `ensurePermission` / `ensureRole` error handling**
+   - Both helpers now explicitly check the lookup error and only treat the expected no-rows code (`PGRST116`) as a miss.
+   - Any other lookup error is thrown immediately with a descriptive message.
 
 ## Test Command & Result
 
@@ -29,7 +40,7 @@ Result:
 ```
 Test Files  1 failed (1)
      Tests  7 skipped (7)
-  Duration  1.86s
+  Duration  1.56s
 ```
 
 All failures originate in `beforeAll` hooks when calling `createTestSchool`:
@@ -48,8 +59,8 @@ This confirms the test file compiles and Vitest discovers the 7 tests, but the l
 
 1. **Local runtime unavailable** — The test suite requires `supabase start`, which depends on Docker/Podman. Without it, no runtime validation is possible.
 2. **Schema dependency for classes/students** — The `assigned_classes` and `own_children` scope tests use synthetic UUIDs because the `classes` and `students` tables are referenced by later migrations but not defined in the current migration set. `has_scope` only checks `scope_assignments`, so the tests are still valid, but real class/student rows cannot be created yet.
-3. **Migration idempotency** — `202608170001_permission_deny_logic.sql` now duplicates the logic added to `202608150002_access_functions.sql`. It remains harmless (redefines the same function) but is redundant.
 
-## Commit
+## Commits
 
-Conventional commit recorded after implementation.
+- Initial implementation: `9583f7c`
+- Post-review fixes: (recorded after applying the changes above)

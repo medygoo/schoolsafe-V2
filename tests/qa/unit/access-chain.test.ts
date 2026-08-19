@@ -60,7 +60,14 @@ async function createSingleProfile(
 }
 
 async function ensurePermission(client: SupabaseClient, code: string, description: string): Promise<string> {
-  const { data: existing } = await client.from("permissions").select("id").eq("code", code).single();
+  const { data: existing, error: lookupError } = await client
+    .from("permissions")
+    .select("id")
+    .eq("code", code)
+    .single();
+  if (lookupError && lookupError.code !== "PGRST116") {
+    throw new Error(`Failed to lookup permission ${code}: ${lookupError.message}`);
+  }
   if (existing) return existing.id as string;
 
   const { data, error } = await client.from("permissions").insert({ code, description }).select("id").single();
@@ -69,7 +76,10 @@ async function ensurePermission(client: SupabaseClient, code: string, descriptio
 }
 
 async function ensureRole(client: SupabaseClient, code: string, label: string): Promise<string> {
-  const { data: existing } = await client.from("roles").select("id").eq("code", code).single();
+  const { data: existing, error: lookupError } = await client.from("roles").select("id").eq("code", code).single();
+  if (lookupError && lookupError.code !== "PGRST116") {
+    throw new Error(`Failed to lookup role ${code}: ${lookupError.message}`);
+  }
   if (existing) return existing.id as string;
 
   const { data, error } = await client.from("roles").insert({ code, label }).select("id").single();
