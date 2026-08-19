@@ -80,4 +80,4 @@ Tests  7 failed (7)
 
 ## Commits
 
-- `2463982` — `test(qa): add per-module RLS SQL tests with runner and Vitest wrapper`
+- `test(qa): add per-module RLS SQL tests with runner and Vitest wrapper`
