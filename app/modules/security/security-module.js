@@ -9,19 +9,27 @@
     });
   }
 
+  var scanStream = null;
+  var scanTimeout = null;
+
   function render(containerId) {
     var container = document.getElementById(containerId);
     if (!container) return;
     container.innerHTML =
       '<div class="security-scan-panel">' +
-        '<header><span>Contrôle d’accès</span><h2>Scanner une carte SchoolSafe</h2><p>Saisissez le contenu du QR ou utilisez un lecteur de codes connecté.</p></header>' +
+        '<header><span>Contrôle d’accès</span><h2>Scanner une carte SchoolSafe</h2><p>Saisissez le contenu du QR, utilisez un lecteur connecté ou activez la caméra.</p></header>' +
         '<div class="scan-form">' +
           '<label>QR payload<input type="text" id="qrPayloadInput" placeholder="schoolsafe://card/..." autocomplete="off"></label>' +
           '<div class="scan-actions">' +
             '<button type="button" class="primary-button" data-event-type="entry"><i data-lucide="log-in"></i> Entrée</button>' +
             '<button type="button" class="primary-button" data-event-type="exit"><i data-lucide="log-out"></i> Sortie</button>' +
             '<button type="button" class="secondary-button" data-event-type="incident"><i data-lucide="siren"></i> Incident</button>' +
+            '<button type="button" class="secondary-button" id="cameraToggle"><i data-lucide="camera"></i> Caméra</button>' +
           '</div>' +
+        '</div>' +
+        '<div id="cameraContainer" class="camera-container hidden">' +
+          '<video id="cameraVideo" autoplay playsinline muted></video>' +
+          '<p class="camera-hint">Placez le QR code devant la caméra.</p>' +
         '</div>' +
         '<div id="scanResult" class="scan-result hidden"></div>' +
       '</div>';
@@ -46,6 +54,92 @@
         }
       });
     }
+    var cameraToggle = container.querySelector("#cameraToggle");
+    if (cameraToggle) {
+      cameraToggle.addEventListener("click", function () {
+        var cameraContainer = container.querySelector("#cameraContainer");
+        if (cameraContainer.classList.contains("hidden")) {
+          startCamera(containerId);
+        } else {
+          stopCamera(containerId);
+        }
+      });
+    }
+  }
+
+  function startCamera(containerId) {
+    var container = document.getElementById(containerId);
+    var cameraContainer = container.querySelector("#cameraContainer");
+    var video = container.querySelector("#cameraVideo");
+    var toggle = container.querySelector("#cameraToggle");
+
+    if (!window.BarcodeDetector) {
+      showResult(containerId, "error", "La détection de QR par caméra n’est pas supportée par ce navigateur. Utilisez la saisie manuelle.");
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(function (stream) {
+        scanStream = stream;
+        video.srcObject = stream;
+        cameraContainer.classList.remove("hidden");
+        toggle.innerHTML = '<i data-lucide="camera-off"></i> Arrêter';
+        if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+        detectLoop(containerId);
+      })
+      .catch(function (err) {
+        showResult(containerId, "error", "Impossible d’accéder à la caméra : " + (err.message || err.name));
+      });
+  }
+
+  function stopCamera(containerId) {
+    var container = document.getElementById(containerId);
+    var cameraContainer = container.querySelector("#cameraContainer");
+    var video = container.querySelector("#cameraVideo");
+    var toggle = container.querySelector("#cameraToggle");
+
+    if (scanTimeout) {
+      clearTimeout(scanTimeout);
+      scanTimeout = null;
+    }
+    if (scanStream) {
+      scanStream.getTracks().forEach(function (track) { track.stop(); });
+      scanStream = null;
+    }
+    if (video) video.srcObject = null;
+    if (cameraContainer) cameraContainer.classList.add("hidden");
+    if (toggle) {
+      toggle.innerHTML = '<i data-lucide="camera"></i> Caméra';
+      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+    }
+  }
+
+  function detectLoop(containerId) {
+    var container = document.getElementById(containerId);
+    var video = container.querySelector("#cameraVideo");
+    if (!video || !scanStream) return;
+
+    var detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+    detector.detect(video).then(function (barcodes) {
+      if (barcodes.length > 0) {
+        var payload = barcodes[0].rawValue;
+        var input = container.querySelector("#qrPayloadInput");
+        if (input) input.value = payload;
+        stopCamera(containerId);
+        performScan(containerId);
+        return;
+      }
+      scanTimeout = setTimeout(function () { detectLoop(containerId); }, 300);
+    }).catch(function () {
+      scanTimeout = setTimeout(function () { detectLoop(containerId); }, 300);
+    });
+  }
+
+  function showResult(containerId, type, message) {
+    var container = document.getElementById(containerId);
+    var resultBox = container.querySelector("#scanResult");
+    resultBox.innerHTML = '<div class="scan-alert ' + type + '"><p>' + escapeHtml(message) + '</p></div>';
+    resultBox.classList.remove("hidden");
   }
 
   function performScan(containerId) {
