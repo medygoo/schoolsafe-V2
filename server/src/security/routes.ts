@@ -6,14 +6,16 @@ import { securityScanSchema, lockdownSchema } from "./schema.js";
 import { requirePermission } from "../access/guard.js";
 import type { AccessService } from "../access/service.js";
 import type { EventService } from "../events/service.js";
+import type { AuditService } from "../audit/service.js";
 
-export type ResolveProfileId = (token: string) => Promise<string | null>;
+export type ResolveProfileAndSchool = (token: string) => Promise<{ profileId: string | null; schoolId: string | null }>;
 
 export type SecurityRouteDependencies = {
   service: SecurityService;
-  resolveProfileId: ResolveProfileId;
+  resolveProfileAndSchool: ResolveProfileAndSchool;
   access: AccessService;
   eventService?: EventService;
+  audit?: AuditService;
 };
 
 export function registerSecurityRoutes(app: FastifyInstance, dependencies: SecurityRouteDependencies): void {
@@ -28,7 +30,7 @@ export function registerSecurityRoutes(app: FastifyInstance, dependencies: Secur
         throw new SchoolSafeError(401, "AUTH_REQUIRED", "Authentification requise", false);
       }
 
-      const profileId = await dependencies.resolveProfileId(token);
+      const { profileId, schoolId } = await dependencies.resolveProfileAndSchool(token);
       if (!profileId) {
         throw new SchoolSafeError(401, "AUTH_REQUIRED", "Profil non trouvé", false);
       }
@@ -36,6 +38,21 @@ export function registerSecurityRoutes(app: FastifyInstance, dependencies: Secur
       const parsed = securityScanSchema.parse(request.body);
       const inScope = await dependencies.access.hasScope(token, "assigned_portal", parsed.location_id);
       if (!inScope) {
+        if (dependencies.audit && schoolId) {
+          await dependencies.audit.insert({
+            schoolId,
+            actorProfileId: profileId,
+            eventType: "access.denied",
+            payload: {
+              permission: "security.scan",
+              resource_type: "security.scan",
+              resource_id: parsed.location_id,
+              reason: "SCOPE_DENIED",
+              scope_type: "assigned_portal",
+              scope_id: parsed.location_id,
+            },
+          });
+        }
         throw new SchoolSafeError(403, "SCOPE_DENIED", "Portail non assigné", false);
       }
 
@@ -55,7 +72,7 @@ export function registerSecurityRoutes(app: FastifyInstance, dependencies: Secur
         throw new SchoolSafeError(401, "AUTH_REQUIRED", "Authentification requise", false);
       }
 
-      const profileId = await dependencies.resolveProfileId(token);
+      const { profileId } = await dependencies.resolveProfileAndSchool(token);
       if (!profileId) {
         throw new SchoolSafeError(401, "AUTH_REQUIRED", "Profil non trouvé", false);
       }

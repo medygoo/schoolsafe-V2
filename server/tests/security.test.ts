@@ -41,13 +41,14 @@ const mockAccess: AccessService = {
   hasScope: vi.fn().mockResolvedValue(true),
 };
 
-const mockResolve = async (token: string) => (token === "valid-token" ? "resolved-profile-id" : null);
+const mockResolve = async (token: string) =>
+  token === "valid-token" ? { profileId: "resolved-profile-id", schoolId: "school-1" } : { profileId: null, schoolId: null };
 
 function makeApp() {
   return buildApp({
     security: {
       service: mockService,
-      resolveProfileId: mockResolve,
+      resolveProfileAndSchool: mockResolve,
       access: mockAccess,
     },
   });
@@ -87,7 +88,7 @@ describe("POST /security/scan", () => {
     const app = buildApp({
       security: {
         service: mockService,
-        resolveProfileId: mockResolve,
+        resolveProfileAndSchool: mockResolve,
         access: { hasPermission: vi.fn().mockResolvedValue(false), hasScope: vi.fn().mockResolvedValue(true) },
       },
     });
@@ -99,6 +100,39 @@ describe("POST /security/scan", () => {
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACCESS_DENIED");
+  });
+
+  it("returns 403 and audits when scope is denied", async () => {
+    const auditInsert = vi.fn().mockResolvedValue(undefined);
+    const app = buildApp({
+      security: {
+        service: mockService,
+        resolveProfileAndSchool: mockResolve,
+        access: { hasPermission: vi.fn().mockResolvedValue(true), hasScope: vi.fn().mockResolvedValue(false) },
+        audit: { insert: auditInsert },
+      },
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/security/scan",
+      headers: { authorization: "Bearer valid-token" },
+      payload: validPayload,
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("SCOPE_DENIED");
+    expect(auditInsert).toHaveBeenCalledWith({
+      schoolId: "school-1",
+      actorProfileId: "resolved-profile-id",
+      eventType: "access.denied",
+      payload: {
+        permission: "security.scan",
+        resource_type: "security.scan",
+        resource_id: validPayload.location_id,
+        reason: "SCOPE_DENIED",
+        scope_type: "assigned_portal",
+        scope_id: validPayload.location_id,
+      },
+    });
   });
 
   it("returns 400 with invalid body", async () => {
@@ -175,7 +209,7 @@ describe("Security scan business cases", () => {
     return buildApp({
       security: {
         service,
-        resolveProfileId: mockResolve,
+        resolveProfileAndSchool: mockResolve,
         access: mockAccess,
       },
     });

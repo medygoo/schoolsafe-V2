@@ -87,5 +87,6 @@ async function recordAccessDenial(
     });
   } catch (error) {
     console.error("[requirePermission] failed to record access denial audit event:", error);
+    throw new SchoolSafeError(500, "AUDIT_UNAVAILABLE", "Service d'audit indisponible", true);
   }
 }

@@ -18,6 +18,7 @@ export interface QaReportInput {
   date: string;
   profileCount: number;
   permissionCount: number;
+  permissionCoveredCount: number;
   unit: TestResult;
   rls: TestResult;
   integration: TestResult;
@@ -50,6 +51,7 @@ export function generateReport(input: QaReportInput): string {
     .replaceAll("{{date}}", input.date)
     .replaceAll("{{profile_count}}", String(input.profileCount))
     .replaceAll("{{permission_count}}", String(input.permissionCount))
+    .replaceAll("{{permission_covered_count}}", String(input.permissionCoveredCount))
     .replaceAll("{{unit_passed}}", String(input.unit.passed))
     .replaceAll("{{unit_total}}", String(input.unit.total))
     .replaceAll("{{rls_passed}}", String(input.rls.passed))

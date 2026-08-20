@@ -44,8 +44,8 @@ describe("Security — QR scan", () => {
     expect(body.data.decision).toBe("allowed");
   });
 
-  it("scan at unassigned portal → 403 SCOPE_DENIED", async () => {
-    const { request } = buildIntegrationHarness({ tokens: baseTokens });
+  it("scan at unassigned portal → 403 SCOPE_DENIED and audits", async () => {
+    const { request, auditLog } = buildIntegrationHarness({ tokens: baseTokens });
 
     const res = await request({
       method: "POST",
@@ -57,6 +57,19 @@ describe("Security — QR scan", () => {
     expect(res.statusCode).toBe(403);
     const body = res.json() as { code: string };
     expect(body.code).toBe("SCOPE_DENIED");
+    expect(auditLog).toContainEqual({
+      schoolId: "school-1",
+      actorProfileId: "profile-guard-2",
+      eventType: "access.denied",
+      payload: {
+        permission: "security.scan",
+        resource_type: "security.scan",
+        resource_id: PORTAL_A,
+        reason: "SCOPE_DENIED",
+        scope_type: "assigned_portal",
+        scope_id: PORTAL_A,
+      },
+    });
   });
 
   it("scan without location_id → 400 VALIDATION_INVALID", async () => {

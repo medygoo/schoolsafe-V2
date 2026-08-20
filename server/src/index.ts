@@ -184,9 +184,10 @@ const app = buildApp({
   security: securityService
     ? {
         service: securityService,
-        resolveProfileId: (token: string) => resolveProfileId(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+        resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
         eventService,
+        audit: auditService,
       }
     : undefined,
   alerts: alertService

@@ -2,6 +2,7 @@
   "date": "2026-08-20",
   "profileCount": 15,
   "permissionCount": 46,
+  "permissionCoveredCount": 18,
   "unit": { "passed": 0, "total": 7 },
   "rls": { "passed": 0, "total": 7 },
   "integration": { "passed": 17, "total": 17 },
@@ -48,6 +49,13 @@
       "function": "Modules non couverts",
       "gap": "Permissions manquantes pour Palmarès, RH, Cantine, Infirmerie, Communication, Safe, Rapports",
       "action": "Ajouter les permissions listées dans le diagnostic §9.7 C5"
+    },
+    {
+      "priority": "P2",
+      "module": "E2E",
+      "function": "Couverture des profils",
+      "gap": "Les scénarios E2E ne couvrent que 6 des 15 profils référence (administrateur, agent sécurité, agent caisse, chef d'établissement, enseignant, parent)",
+      "action": "Ajouter les 9 profils manquants dans des specs Playwright dédiés (comptable, secrétaire, infirmier, surveillant, etc.)"
     }
   ],
   "recommendation": "NO-GO pour le lancement en production. Les écarts P0 (conditions, exceptions individuelles) doivent être résolus avant toute mise en ligne. Les tests d'intégration et E2E passent en mode mock/harness, mais les tests RLS et unitaires nécessitent une instance Supabase locale pour validation complète."

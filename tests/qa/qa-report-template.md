@@ -3,7 +3,8 @@
 ## Résumé
 
 - Profils testés : {{profile_count}} / 15
-- Permissions testées : {{permission_count}} / 46
+- Permissions cataloguées : {{permission_count}} / 46
+- Permissions couvertes par au moins un test : {{permission_covered_count}} / 46
 - Tests unitaires : {{unit_passed}} / {{unit_total}}
 - Tests RLS : {{rls_passed}} / {{rls_total}}
 - Tests intégration : {{integration_passed}} / {{integration_total}}

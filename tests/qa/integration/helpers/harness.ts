@@ -245,8 +245,9 @@ export function buildIntegrationHarness(options: HarnessOptions): IntegrationHar
     },
     security: {
       service: securityService,
-      resolveProfileId,
+      resolveProfileAndSchool,
       access,
+      audit: auditService,
     },
     pedagogy: {
       service: pedagogyService,

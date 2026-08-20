@@ -10,7 +10,8 @@ const mockAccess: AccessService = {
   hasScope: vi.fn().mockResolvedValue(true),
 };
 
-const mockResolve = async (token: string) => (token === "valid-token" ? "profile-1" : null);
+const mockResolve = async (token: string) =>
+  token === "valid-token" ? { profileId: "profile-1", schoolId: "school-1" } : { profileId: null, schoolId: null };
 
 describe("Integration: scan emits event and creates notifications", () => {
   it("calls eventService.emit on scan", async () => {
@@ -42,7 +43,7 @@ describe("Integration: scan emits event and creates notifications", () => {
     };
 
     const app = buildApp({
-      security: { service: securityService, resolveProfileId: mockResolve, access: mockAccess, eventService },
+      security: { service: securityService, resolveProfileAndSchool: mockResolve, access: mockAccess, eventService },
     });
 
     const res = await app.inject({
