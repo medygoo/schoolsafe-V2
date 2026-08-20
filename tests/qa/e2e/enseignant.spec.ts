@@ -1,5 +1,5 @@
-const { test, expect } = require("@playwright/test");
-const { enterDemoWorkspace, expectBranches, expectNoBranch, openAction } = require("./helpers");
+import { test, expect } from "@playwright/test";
+import { enterDemoWorkspace, expectBranches, expectNoBranch, openAction } from "./helpers";
 
 test.describe("Profil enseignant", () => {
   test("affiche uniquement pédagogie et communication", async ({ page }) => {
@@ -10,11 +10,13 @@ test.describe("Profil enseignant", () => {
     await expectNoBranch(page, "pilotage");
   });
 
-  test("peut composer des devoirs", async ({ page }) => {
+  test("peut composer des devoirs et voir les travaux assignés", async ({ page }) => {
     await enterDemoWorkspace(page, "teacher");
     await openAction(page, "Devoirs et corrections");
     await expect(page.locator("#pedagogyModule")).toBeVisible();
     await expect(page.locator("#assignmentForm")).toBeVisible();
+    await expect(page.locator(".assignment-list")).toContainText("Fractions équivalentes");
+    await expect(page.locator(".assignment-list")).toContainText("Reading comprehension");
   });
 
   test("a un accès certificatif limité", async ({ page }) => {

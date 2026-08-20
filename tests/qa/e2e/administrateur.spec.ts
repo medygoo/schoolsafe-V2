@@ -1,5 +1,5 @@
-const { test, expect } = require("@playwright/test");
-const { enterDemoWorkspace, expectBranches, openAction, domClick } = require("./helpers");
+import { test, expect } from "@playwright/test";
+import { enterDemoWorkspace, expectBranches, openAction, domClick, openPermissionsConsole } from "./helpers";
 
 test.describe("Profil administrateur principal", () => {
   test("affiche les branches métier et la gestion des droits", async ({ page }) => {
@@ -27,5 +27,21 @@ test.describe("Profil administrateur principal", () => {
     await openAction(page, "Structure des frais");
     await expect(page.locator("#financeModule")).toBeVisible();
     await expect(page.locator('#financeTabs [data-finance-tab="fees"].active')).toBeVisible();
+  });
+
+  test("peut ouvrir la console rôles et accès", async ({ page }) => {
+    await enterDemoWorkspace(page, "admin");
+    await openPermissionsConsole(page);
+    await expect(page.locator("#accessConsole")).toBeVisible();
+    await expect(page.locator("#staffList")).toBeVisible();
+  });
+
+  test("documente que la branche administration avancée est masquée en mode démo", async ({ page }) => {
+    await enterDemoWorkspace(page, "admin");
+    // En mode démo sans session live, le filtre visibleBranches masque la branche
+    // "administration" (actions École & Personnel / Comptes et droits).
+    await expect(page.locator("#branch-administration")).toHaveCount(0);
+    await expect(page.locator('[data-action="Comptes et droits"]')).toHaveCount(0);
+    await expect(page.locator('[data-action="École & Personnel"]')).toHaveCount(0);
   });
 });

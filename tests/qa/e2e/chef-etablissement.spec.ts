@@ -1,5 +1,5 @@
-const { test, expect } = require("@playwright/test");
-const { enterDemoWorkspace, expectBranches, expectNoBranch, openAction } = require("./helpers");
+import { test, expect } from "@playwright/test";
+import { enterDemoWorkspace, expectBranches, expectNoBranch, openAction } from "./helpers";
 
 test.describe("Profil chef d’établissement", () => {
   test("affiche les branches stratégiques sans administration ni comptabilité", async ({ page }) => {
@@ -25,5 +25,14 @@ test.describe("Profil chef d’établissement", () => {
     await expect(page.locator('#financeTabs [data-finance-tab="cash"]')).toBeHidden();
     await expect(page.locator('#financeTabs [data-finance-tab="fees"]')).toBeHidden();
     await expect(page.locator("#paymentForm")).toHaveCount(0);
+  });
+
+  test("voit les indicateurs du tableau de bord", async ({ page }) => {
+    await enterDemoWorkspace(page, "school_head");
+    await openAction(page, "Tableau de bord");
+    await expect(page.locator("#pilotageModule")).toBeVisible();
+    await expect(page.locator(".pilotage-kpis")).toBeVisible();
+    await expect(page.locator(".pilotage-dashboard")).toContainText("Présence");
+    await expect(page.locator(".pilotage-dashboard")).toContainText("94 %");
   });
 });

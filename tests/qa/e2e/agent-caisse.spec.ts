@@ -1,5 +1,5 @@
-const { test, expect } = require("@playwright/test");
-const { enterDemoWorkspace, expectBranches, expectNoBranch, openAction } = require("./helpers");
+import { test, expect } from "@playwright/test";
+import { enterDemoWorkspace, expectBranches, expectNoBranch, openAction, domClick } from "./helpers";
 
 test.describe("Profil agent de caisse", () => {
   test("affiche uniquement la branche finance", async ({ page }) => {
@@ -34,5 +34,23 @@ test.describe("Profil agent de caisse", () => {
     await expect(page.locator("#financeModule")).toBeVisible();
     await expect(page.locator('#financeTabs [data-finance-tab="fees"]')).toBeHidden();
     await expect(page.locator("#closeCashRegister")).toBeVisible();
+  });
+
+  test("accède à l’interface d’émission des reçus", async ({ page }) => {
+    await enterDemoWorkspace(page, "cashier");
+    await openAction(page, "Produire un reçu PDF");
+    await expect(page.locator("#financeModule")).toBeVisible();
+    await expect(page.locator('#financeTabs [data-finance-tab="receipts"].active')).toBeVisible();
+    await expect(page.locator("[data-export-receipt-id]").first()).toBeVisible();
+  });
+
+  test("documente la présence du bouton d’annulation pour le caissier en mode démo", async ({ page }) => {
+    await enterDemoWorkspace(page, "cashier");
+    await openAction(page, "Produire un reçu PDF");
+    // Note métier : l’application actuelle affiche le bouton d’annulation pour le
+    // profil caissier. Ce test documente l’état actuel ; la décision de retirer
+    // cette action au caissier relève d’un ajustement produit à part.
+    const cancelButtons = page.locator("[data-cancel-payment-id]");
+    await expect(cancelButtons).toHaveCount(6);
   });
 });

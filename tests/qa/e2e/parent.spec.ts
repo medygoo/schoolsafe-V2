@@ -1,5 +1,5 @@
-const { test, expect } = require("@playwright/test");
-const { enterDemoWorkspace, expectBranches, expectNoBranch, openAction } = require("./helpers");
+import { test, expect } from "@playwright/test";
+import { enterDemoWorkspace, expectBranches, expectNoBranch, openAction } from "./helpers";
 
 test.describe("Profil parent", () => {
   test("affiche les branches école, finance et communication", async ({ page }) => {
@@ -21,6 +21,27 @@ test.describe("Profil parent", () => {
     expect(options).toContain("Lucas Martin");
     expect(options).toContain("Emma Martin");
     expect(options).toContain("Aline Martin");
+    expect(options).not.toContain("Ethan Leroy");
+    expect(options).not.toContain("Chloé Bernard");
+  });
+
+  test("sélectionne un enfant, consulte ses reçus, et ne peut pas accéder aux reçus d’un autre enfant", async ({ page }) => {
+    await enterDemoWorkspace(page, "parent");
+    await openAction(page, "Frais scolaires");
+    await expect(page.locator("#financeModule")).toBeVisible();
+
+    // Sélectionne Lucas Martin (premier enfant) et vérifie ses reçus.
+    await page.locator("#familyFinanceStudent").selectOption("0");
+    await expect(page.locator(".family-receipts")).toContainText("REC-2026-0586");
+    await expect(page.locator(".family-receipts")).toContainText("REC-2026-0584");
+
+    // Passe à Emma Martin (deuxième enfant) : les reçus doivent se mettre à jour.
+    await page.locator("#familyFinanceStudent").selectOption("1");
+    await expect(page.locator(".family-receipts")).toContainText("REC-2026-0585");
+    await expect(page.locator(".family-receipts")).not.toContainText("REC-2026-0586");
+
+    // Vérifie qu’un enfant non rattaché n’apparaît pas dans le sélecteur.
+    const options = await page.locator("#familyFinanceStudent").innerText();
     expect(options).not.toContain("Ethan Leroy");
     expect(options).not.toContain("Chloé Bernard");
   });
