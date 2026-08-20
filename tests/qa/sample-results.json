@@ -1,0 +1,54 @@
+{
+  "date": "2026-08-20",
+  "profileCount": 15,
+  "permissionCount": 46,
+  "unit": { "passed": 0, "total": 7 },
+  "rls": { "passed": 0, "total": 7 },
+  "integration": { "passed": 17, "total": 17 },
+  "e2e": { "passed": 46, "total": 46 },
+  "gaps": [
+    {
+      "priority": "P0",
+      "module": "Finance",
+      "function": "Encaissement / annulation",
+      "gap": "Conditions caisse ouverte et délai d'annulation non codées côté RLS/RPC",
+      "action": "Implémenter has_condition() et l'appliquer aux routes finance.payment.record/cancel"
+    },
+    {
+      "priority": "P0",
+      "module": "Sécurité QR",
+      "function": "Scan / pick-up",
+      "gap": "Condition portail actif non codée",
+      "action": "Ajouter has_condition('assigned_portal_open') aux routes security"
+    },
+    {
+      "priority": "P0",
+      "module": "Autorisation",
+      "function": "Exceptions individuelles",
+      "gap": "Aucune table profile_permission_exceptions",
+      "action": "Créer la table et mettre à jour has_permission()"
+    },
+    {
+      "priority": "P1",
+      "module": "Audit",
+      "function": "Tentatives refusées",
+      "gap": "Les refus de scope dans security.scan ne sont pas audités",
+      "action": "Auditer les SCOPE_DENIED inline dans security/routes.ts"
+    },
+    {
+      "priority": "P1",
+      "module": "RLS",
+      "function": "school_settings / approval_requests",
+      "gap": "school_settings manque UPDATE RLS ; approval_requests utilise current_setting au lieu de public.current_school_id()",
+      "action": "Corriger les politiques RLS"
+    },
+    {
+      "priority": "P2",
+      "module": "Catalogue permissions",
+      "function": "Modules non couverts",
+      "gap": "Permissions manquantes pour Palmarès, RH, Cantine, Infirmerie, Communication, Safe, Rapports",
+      "action": "Ajouter les permissions listées dans le diagnostic §9.7 C5"
+    }
+  ],
+  "recommendation": "NO-GO pour le lancement en production. Les écarts P0 (conditions, exceptions individuelles) doivent être résolus avant toute mise en ligne. Les tests d'intégration et E2E passent en mode mock/harness, mais les tests RLS et unitaires nécessitent une instance Supabase locale pour validation complète."
+}
