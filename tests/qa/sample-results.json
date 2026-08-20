@@ -31,13 +31,6 @@
     },
     {
       "priority": "P1",
-      "module": "Audit",
-      "function": "Tentatives refusées",
-      "gap": "Les refus de scope dans security.scan ne sont pas audités",
-      "action": "Auditer les SCOPE_DENIED inline dans security/routes.ts"
-    },
-    {
-      "priority": "P1",
       "module": "RLS",
       "function": "school_settings / approval_requests",
       "gap": "school_settings manque UPDATE RLS ; approval_requests utilise current_setting au lieu de public.current_school_id()",
