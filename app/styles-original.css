@@ -269,12 +269,12 @@ svg { width: 18px; height: 18px; stroke-width: 2; }
   backdrop-filter: blur(8px);
 }
 .language-switch button {
-  min-width: 39px;
+  min-width: 42px;
   border: 0;
   border-radius: 4px;
   color: rgba(255,255,255,.66);
   background: transparent;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
 }
 .language-switch button.selected { color: var(--navy-950); background: #fff; }
@@ -309,7 +309,7 @@ svg { width: 18px; height: 18px; stroke-width: 2; }
 .panel-brand div { display: flex; flex-direction: column; gap: 3px; }
 .panel-brand b { color: #fff; font-size: 22px; }
 .panel-brand span { color: rgba(255,255,255,.68); font-size: 13px; }
-.login-panel > label, .login-identity > label, .label-row label { display: block; margin: 0 0 7px; font-size: 13px; font-weight: 800; color: #fff; }
+.login-panel > label, .login-identity > label, .label-row label { display: block; margin: 0 0 7px; font-size: 14px; font-weight: 800; color: #fff; }
 .login-method {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -321,7 +321,7 @@ svg { width: 18px; height: 18px; stroke-width: 2; }
   background: rgba(4,17,42,.32);
 }
 .login-method button {
-  min-height: 38px;
+  min-height: 40px;
   border: 0;
   border-radius: 4px;
   display: inline-flex;
@@ -330,7 +330,7 @@ svg { width: 18px; height: 18px; stroke-width: 2; }
   gap: 7px;
   color: rgba(255,255,255,.7);
   background: transparent;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
 }
 .login-method button.selected { color: var(--navy-950); background: rgba(255,255,255,.94); box-shadow: 0 3px 12px rgba(0,0,0,.2); }
@@ -338,7 +338,7 @@ svg { width: 18px; height: 18px; stroke-width: 2; }
 .phone-shell { gap: 0; }
 .dial-code { padding-right: 11px; margin-right: 11px; border-right: 1px solid rgba(255,255,255,.24); color: #fff; font-size: 13px; font-weight: 850; }
 .label-row { display: flex; align-items: baseline; justify-content: space-between; margin-top: 17px; }
-.text-button { border: 0; background: transparent; padding: 0; color: #ffd063; font-size: 12px; font-weight: 800; }
+.text-button { border: 0; background: transparent; padding: 0; color: #ffd063; font-size: 13px; font-weight: 800; }
 .input-shell {
   height: 48px;
   display: flex;
@@ -370,11 +370,11 @@ svg { width: 18px; height: 18px; stroke-width: 2; }
 .check-row input { width: 17px; height: 17px; accent-color: var(--navy-900); }
 .login-button { width: 100%; color: #fff; background: var(--navy-900); }
 .login-button:hover { background: var(--navy-800); }
-.demo-access { min-height: 28px; margin-top: 9px; display: flex; align-items: center; justify-content: center; gap: 7px; color: rgba(255,255,255,.62); font-size: 10px; font-weight: 750; }
-.demo-access svg { width: 14px; height: 14px; }
-.demo-role-field { margin-top: 8px; }
-.demo-role-field label { display: block; margin-bottom: 5px; color: rgba(255,255,255,.72); font-size: 10px; font-weight: 800; }
-.demo-role-field select { width: 100%; min-height: 40px; border: 1px solid rgba(255,255,255,.26); border-radius: 5px; padding: 0 10px; color: #fff; background: rgba(4,17,42,.5); outline: 0; font-size: 11px; font-weight: 700; }
+.demo-access { min-height: 28px; margin-top: 9px; display: flex; align-items: center; justify-content: center; gap: 7px; color: rgba(255,255,255,.72); font-size: 12px; font-weight: 750; }
+.demo-access svg { width: 16px; height: 16px; }
+.demo-role-field { margin-top: 10px; }
+.demo-role-field label { display: block; margin-bottom: 6px; color: rgba(255,255,255,.8); font-size: 12px; font-weight: 800; }
+.demo-role-field select { width: 100%; min-height: 44px; border: 1px solid rgba(255,255,255,.26); border-radius: 5px; padding: 0 10px; color: #fff; background: rgba(4,17,42,.5); outline: 0; font-size: 13px; font-weight: 700; }
 .demo-role-field option { color: var(--ink); background: #fff; }
 .first-install {
   margin-top: 20px;
@@ -384,11 +384,11 @@ svg { width: 18px; height: 18px; stroke-width: 2; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  color: rgba(255,255,255,.64);
-  font-size: 12px;
+  color: rgba(255,255,255,.7);
+  font-size: 13px;
 }
 .first-install button { border: 0; background: transparent; color: #ffd063; padding: 4px 0; font-weight: 850; }
-.preview-profile-button { width: 100%; min-height: 38px; margin-top: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid rgba(255,255,255,.2); border-radius: 5px; color: rgba(255,255,255,.82); background: rgba(255,255,255,.08); font-size: 11px; font-weight: 800; }
+.preview-profile-button { width: 100%; min-height: 42px; margin-top: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid rgba(255,255,255,.2); border-radius: 5px; color: rgba(255,255,255,.88); background: rgba(255,255,255,.08); font-size: 13px; font-weight: 800; }
 .preview-profile-button:hover { color: #fff; background: rgba(255,255,255,.14); }
 .auth-footer {
   position: absolute;
@@ -398,8 +398,8 @@ svg { width: 18px; height: 18px; stroke-width: 2; }
   bottom: max(18px, env(safe-area-inset-bottom));
   display: flex;
   justify-content: space-between;
-  color: rgba(255,255,255,.68);
-  font-size: 12px;
+  color: rgba(255,255,255,.72);
+  font-size: 13px;
 }
 .auth-footer span { display: inline-flex; align-items: center; gap: 7px; }
 
@@ -1407,9 +1407,9 @@ html[lang="en"] .translation-fallback[data-source-language="en"] { display: none
   .gallery-source { top: max(76px,calc(env(safe-area-inset-top) + 56px)); left: 20px; }
   .auth-topbar { left: 18px; right: 18px; }
   .brand-button span { display: none; }
-  .auth-layout { width: calc(100% - 24px); align-items: end; padding-bottom: 62px; }
+  .auth-layout { width: calc(100% - 24px); align-items: end; padding-bottom: 120px; }
   .login-panel { padding: 22px 18px; margin: 0; background: linear-gradient(180deg, rgba(4,17,42,.44), rgba(4,17,42,.3)); }
-  .auth-footer { left: 18px; right: 18px; font-size: 10px; }
+  .auth-footer { left: 18px; right: 18px; font-size: 12px; }
   .first-install { align-items: flex-start; }
   .setup-screen { grid-template-columns: 1fr; }
   .setup-sidebar {

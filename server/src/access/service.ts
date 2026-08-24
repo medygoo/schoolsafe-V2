@@ -16,7 +16,8 @@ export function createSupabaseAccessService(
         permission_code: permissionCode,
       });
       if (error) {
-        throw new Error(`Permission check failed: ${error.message}`);
+        console.error(`[access] has_permission error for ${permissionCode}:`, error.message);
+        return false;
       }
       return data === true;
     },
@@ -28,7 +29,8 @@ export function createSupabaseAccessService(
         requested_scope_id: scopeId ?? null,
       });
       if (error) {
-        throw new Error(`Scope check failed: ${error.message}`);
+        console.error(`[access] has_scope error for ${scopeType}:`, error.message);
+        return false;
       }
       return data === true;
     },

@@ -21,10 +21,10 @@
         '<div class="scan-form">' +
           '<label>QR payload<input type="text" id="qrPayloadInput" placeholder="schoolsafe://card/..." autocomplete="off"></label>' +
           '<div class="scan-actions">' +
-            '<button type="button" class="primary-button" data-event-type="entry"><i data-lucide="log-in"></i> Entrée</button>' +
-            '<button type="button" class="primary-button" data-event-type="exit"><i data-lucide="log-out"></i> Sortie</button>' +
-            '<button type="button" class="secondary-button" data-event-type="incident"><i data-lucide="siren"></i> Incident</button>' +
-            '<button type="button" class="secondary-button" id="cameraToggle"><i data-lucide="camera"></i> Caméra</button>' +
+            window.ssButton({ label: "Entrée", icon: "log-in", attrs: { "data-event-type": "entry" } }) +
+            window.ssButton({ label: "Sortie", icon: "log-out", attrs: { "data-event-type": "exit" } }) +
+            window.ssButton({ label: "Incident", variant: "secondary", icon: "siren", attrs: { "data-event-type": "incident" } }) +
+            window.ssButton({ label: "Caméra", variant: "secondary", icon: "camera", attrs: { id: "cameraToggle" } }) +
           '</div>' +
         '</div>' +
         '<div id="cameraContainer" class="camera-container hidden">' +
@@ -35,6 +35,20 @@
       '</div>';
 
     bind(containerId);
+  }
+
+  function bindCameraToggle(containerId) {
+    var container = document.getElementById(containerId);
+    var cameraToggle = container.querySelector("#cameraToggle");
+    if (!cameraToggle) return;
+    cameraToggle.addEventListener("click", function () {
+      var cameraContainer = container.querySelector("#cameraContainer");
+      if (cameraContainer.classList.contains("hidden")) {
+        startCamera(containerId);
+      } else {
+        stopCamera(containerId);
+      }
+    });
   }
 
   function bind(containerId) {
@@ -54,17 +68,7 @@
         }
       });
     }
-    var cameraToggle = container.querySelector("#cameraToggle");
-    if (cameraToggle) {
-      cameraToggle.addEventListener("click", function () {
-        var cameraContainer = container.querySelector("#cameraContainer");
-        if (cameraContainer.classList.contains("hidden")) {
-          startCamera(containerId);
-        } else {
-          stopCamera(containerId);
-        }
-      });
-    }
+    bindCameraToggle(containerId);
   }
 
   function startCamera(containerId) {
@@ -83,8 +87,9 @@
         scanStream = stream;
         video.srcObject = stream;
         cameraContainer.classList.remove("hidden");
-        toggle.innerHTML = '<i data-lucide="camera-off"></i> Arrêter';
+        toggle.outerHTML = window.ssButton({ label: "Arrêter", variant: "secondary", icon: "camera-off", attrs: { id: "cameraToggle" } });
         if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+        bindCameraToggle(containerId);
         detectLoop(containerId);
       })
       .catch(function (err) {
@@ -109,8 +114,9 @@
     if (video) video.srcObject = null;
     if (cameraContainer) cameraContainer.classList.add("hidden");
     if (toggle) {
-      toggle.innerHTML = '<i data-lucide="camera"></i> Caméra';
+      toggle.outerHTML = window.ssButton({ label: "Caméra", variant: "secondary", icon: "camera", attrs: { id: "cameraToggle" } });
       if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+      bindCameraToggle(containerId);
     }
   }
 
@@ -138,7 +144,29 @@
   function showResult(containerId, type, message) {
     var container = document.getElementById(containerId);
     var resultBox = container.querySelector("#scanResult");
-    resultBox.innerHTML = '<div class="scan-alert ' + type + '"><p>' + escapeHtml(message) + '</p></div>';
+    var config = { size: "compact" };
+    if (type === "error") {
+      config.type = "error";
+      config.title = "Erreur";
+      config.message = message;
+    } else if (type === "info") {
+      config.type = "loading";
+      config.title = "Vérification en cours";
+      config.message = message;
+    } else if (type === "success") {
+      config.type = "success";
+      config.title = "AUTORISÉ";
+      config.message = message;
+    } else if (type === "warning") {
+      config.type = "unavailable";
+      config.title = "PASSAGE MANUEL";
+      config.message = message;
+    } else {
+      config.type = "error";
+      config.title = "Erreur";
+      config.message = message;
+    }
+    resultBox.innerHTML = window.ssState(config);
     resultBox.classList.remove("hidden");
   }
 
@@ -148,24 +176,28 @@
     var resultBox = container.querySelector("#scanResult");
     var payload = input.value.trim();
     if (!payload) {
-      resultBox.innerHTML = '<div class="scan-alert error">Veuillez saisir un QR.</div>';
-      resultBox.classList.remove("hidden");
+      showResult(containerId, "error", "Veuillez saisir un QR.");
       return;
     }
 
     if (!window.SchoolSafeSecurityAPI) {
-      resultBox.innerHTML = '<div class="scan-alert error">API de sécurité non disponible.</div>';
-      resultBox.classList.remove("hidden");
+      showResult(containerId, "error", "API de sécurité non disponible.");
       return;
     }
 
-    resultBox.innerHTML = '<div class="scan-alert info">Vérification en cours…</div>';
-    resultBox.classList.remove("hidden");
+    showResult(containerId, "info", "Vérification en cours…");
 
     window.SchoolSafeSecurityAPI.scan({ qr_payload: payload, event_type: currentEventType }).then(function (data) {
-      var decisionClass = data.decision === "allowed" ? "success" : data.decision === "manual_override" ? "warning" : "error";
-      var decisionText = data.decision === "allowed" ? "AUTORISÉ" : data.decision === "manual_override" ? "PASSAGE MANUEL" : "REFUSÉ";
-      var html = '<div class="scan-alert ' + decisionClass + '"><h3>' + decisionText + '</h3>';
+      var isAllowed = data.decision === "allowed";
+      var isManual = data.decision === "manual_override";
+      var stateConfig = isAllowed
+        ? { type: "success", title: "AUTORISÉ", message: "Accès autorisé", size: "compact" }
+        : isManual
+        ? { type: "unavailable", title: "PASSAGE MANUEL", message: "Passage manuel requis", size: "compact" }
+        : { type: "error", title: "REFUSÉ", message: "Accès refusé", size: "compact" };
+
+      var html = window.ssState(stateConfig);
+      html += '<div class="scan-result-details">';
       if (data.student) {
         html += '<p><b>' + escapeHtml(data.student.first_name + " " + data.student.last_name) + '</b> · ' + escapeHtml(data.student.matricule) + '</p>';
         html += '<p>' + escapeHtml(data.student.class_name || "") + '</p>';
@@ -188,7 +220,7 @@
       input.value = "";
       if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
     }).catch(function (err) {
-      resultBox.innerHTML = '<div class="scan-alert error"><h3>Erreur</h3><p>' + escapeHtml(err.message) + '</p></div>';
+      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: err.message, size: "compact" });
     });
   }
 

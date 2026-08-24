@@ -16,9 +16,10 @@
   function renderDashboard(containerId) {
     var container = document.getElementById(containerId);
     if (!container) return;
-    container.innerHTML = '<div class="pilotage-loading">Chargement du tableau de bord…</div>';
+    container.innerHTML = window.ssState({ type: "loading", title: "Chargement…", message: "Chargement du tableau de bord…" });
     if (!window.SchoolSafePilotageAPI) {
-      container.innerHTML = '<div class="pilotage-error">API Pilotage non disponible.</div>';
+      container.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "API Pilotage non disponible.", retry: { attrs: { "data-pilotage-retry": "" } } });
+      attachPilotageRetry(container, function () { renderDashboard(containerId); });
       return;
     }
     window.SchoolSafePilotageAPI.dashboard().then(function (data) {
@@ -40,21 +41,24 @@
         });
         html += '</ul>';
       } else {
-        html += '<p>Aucune alerte critique.</p>';
+        html += window.ssState({ type: "empty", title: "Aucune alerte", message: "Aucune alerte critique en cours.", size: "compact" });
       }
       html += '</section></div>';
       container.innerHTML = html;
+      if (typeof window.icons === "function") window.icons();
     }).catch(function (err) {
-      container.innerHTML = '<div class="pilotage-error">Erreur : ' + escapeHtml(err.message) + '</div>';
+      container.innerHTML = window.ssState({ type: "error", title: "Erreur", message: err.message, retry: { attrs: { "data-pilotage-retry": "" } } });
+      attachPilotageRetry(container, function () { renderDashboard(containerId); });
     });
   }
 
   function renderAlerts(containerId) {
     var container = document.getElementById(containerId);
     if (!container) return;
-    container.innerHTML = '<div class="pilotage-loading">Chargement des alertes…</div>';
+    container.innerHTML = window.ssState({ type: "loading", title: "Chargement…", message: "Chargement des alertes…" });
     if (!window.SchoolSafePilotageAPI) {
-      container.innerHTML = '<div class="pilotage-error">API Pilotage non disponible.</div>';
+      container.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "API Pilotage non disponible.", retry: { attrs: { "data-pilotage-retry": "" } } });
+      attachPilotageRetry(container, function () { renderAlerts(containerId); });
       return;
     }
     window.SchoolSafePilotageAPI.listAlerts({ status: "open" }).then(function (result) {
@@ -67,20 +71,22 @@
             '<b>' + escapeHtml(alert.title) + '</b>' +
             '<small>' + escapeHtml(alert.message || "") + ' · ' + formatDate(alert.detected_at) + '</small>' +
             '<div class="alert-actions">' +
-              '<button type="button" class="secondary-button small" data-action="ack">Prendre en charge</button>' +
-              '<button type="button" class="primary-button dark small" data-action="resolve">Résoudre</button>' +
+              window.ssButton({ label: "Prendre en charge", variant: "secondary", size: "sm", attrs: { "data-action": "ack" } }) +
+              window.ssButton({ label: "Résoudre", variant: "primary", size: "sm", attrs: { "data-action": "resolve" } }) +
             '</div>' +
           '</li>';
         });
         html += '</ul>';
       } else {
-        html += '<p>Aucune alerte ouverte.</p>';
+        html += window.ssState({ type: "empty", title: "Aucune alerte", message: "Aucune alerte ouverte en cours.", size: "compact" });
       }
       html += '</div>';
       container.innerHTML = html;
+      if (typeof window.icons === "function") window.icons();
       bindAlerts(container);
     }).catch(function (err) {
-      container.innerHTML = '<div class="pilotage-error">Erreur : ' + escapeHtml(err.message) + '</div>';
+      container.innerHTML = window.ssState({ type: "error", title: "Erreur", message: err.message, retry: { attrs: { "data-pilotage-retry": "" } } });
+      attachPilotageRetry(container, function () { renderAlerts(containerId); });
     });
   }
 
@@ -97,10 +103,25 @@
         promise.then(function () {
           li.remove();
         }).catch(function (err) {
-          alert("Erreur : " + err.message);
+          if (window.ssModal) {
+            window.ssModal({
+              title: "Erreur",
+              content: "<p>" + escapeHtml("Erreur : " + err.message) + "</p>",
+              size: "sm",
+              actions: [{ label: "OK", variant: "primary" }]
+            });
+          } else {
+            alert("Erreur : " + err.message);
+          }
         });
       });
     });
+  }
+
+  function attachPilotageRetry(container, callback) {
+    var btn = container.querySelector("[data-pilotage-retry]");
+    if (btn) btn.addEventListener("click", callback);
+    if (typeof window.icons === "function") window.icons();
   }
 
   root.SchoolSafePilotageModule = {

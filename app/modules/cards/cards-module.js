@@ -18,8 +18,13 @@ function $(id) { return document.getElementById(id); }
 function setStatus(msg, type = 'ok') {
   const el = $('cardsStatus');
   if (!el) return;
-  el.textContent = msg;
-  el.style.color = type === 'error' ? '#c22f2f' : type === 'warning' ? '#b8860b' : '#08825a';
+  if (msg && typeof msg === 'object') {
+    el.innerHTML = window.ssState(msg);
+    el.style.color = '';
+  } else {
+    el.textContent = msg;
+    el.style.color = type === 'error' ? '#c22f2f' : type === 'warning' ? '#b8860b' : '#08825a';
+  }
 }
 
 function getToken() {
@@ -41,7 +46,7 @@ function getSupabaseClient() {
 async function loadClasses() {
   const client = getSupabaseClient();
   if (!client) {
-    setStatus('Supabase non disponible', 'error');
+    setStatus({ type: 'error', title: 'Service indisponible', message: 'Supabase non disponible', size: 'inline' });
     return;
   }
   const { data, error } = await client
@@ -49,7 +54,7 @@ async function loadClasses() {
     .select('id, name, cycle_key, option, teacher_id, card_color, card_color_soft, card_color_dark, card_pat, card_family, card_variant, card_pat_style')
     .order('name');
   if (error) {
-    setStatus('Erreur chargement classes : ' + error.message, 'error');
+    setStatus({ type: 'error', title: 'Erreur de chargement', message: 'Erreur chargement classes : ' + error.message, size: 'inline' });
     return;
   }
   state.classes = data || [];
@@ -72,7 +77,7 @@ async function loadStudents(classId) {
     .eq('class_id', classId)
     .order('last_name');
   if (error) {
-    setStatus('Erreur chargement élèves : ' + error.message, 'error');
+    setStatus({ type: 'error', title: 'Erreur de chargement', message: 'Erreur chargement élèves : ' + error.message, size: 'inline' });
     return;
   }
   state.students = data || [];
@@ -81,7 +86,7 @@ async function loadStudents(classId) {
   renderStudentList();
   $('cardsRenderBtn').disabled = state.students.length === 0;
   $('cardsRequestPrintBtn').disabled = true;
-  $('cardsPreview').innerHTML = '<div style="text-align:center;padding:40px;color:#888;font-size:13px">Sélectionnez un ou plusieurs élèves.</div>';
+  $('cardsPreview').innerHTML = window.ssState({ type: 'empty', title: 'Aucun aperçu', message: 'Sélectionnez un ou plusieurs élèves.', size: 'compact' });
 }
 
 async function loadGuardians(classId) {
@@ -97,7 +102,7 @@ async function loadGuardians(classId) {
     .select('student_id, guardian_type, is_primary, full_name, phone, is_authorized_pickup')
     .in('student_id', studentIds);
   if (error) {
-    setStatus('Erreur chargement tuteurs : ' + error.message, 'error');
+    setStatus({ type: 'error', title: 'Erreur de chargement', message: 'Erreur chargement tuteurs : ' + error.message, size: 'inline' });
     return;
   }
   state.guardians.clear();
@@ -136,7 +141,7 @@ function renderStudentList() {
   const list = $('cardsStudentList');
   list.innerHTML = '';
   if (state.students.length === 0) {
-    list.innerHTML = '<div style="padding:10px;color:#888;font-size:13px">Aucun élève dans cette classe.</div>';
+    list.innerHTML = window.ssState({ type: 'empty', title: 'Aucun élève', message: 'Aucun élève dans cette classe.', size: 'compact' });
     return;
   }
   state.students.forEach(s => {
@@ -174,7 +179,7 @@ function updateSelectionState() {
   btn.disabled = count === 0;
   renderBtn.disabled = count === 0;
   $('cardsSelectAll').checked = count > 0 && count === state.students.filter(s => isCardInfoComplete(s)).length;
-  setStatus(count === 0 ? 'Sélectionnez un ou plusieurs élèves.' : `${count} élève(s) sélectionné(s).`);
+  setStatus(count === 0 ? { type: 'empty', title: 'Aucune sélection', message: 'Sélectionnez un ou plusieurs élèves.', size: 'inline' } : `${count} élève(s) sélectionné(s).`);
 }
 
 function adaptClassForRenderer(cls) {
@@ -227,11 +232,11 @@ async function renderPreview() {
   if (!state.selectedClass) return;
   const selected = state.students.filter(s => state.selectedStudentIds.has(s.id));
   if (selected.length === 0) {
-    setStatus('Sélectionnez au moins un élève.', 'warning');
+    setStatus({ type: 'error', title: 'Sélection requise', message: 'Sélectionnez au moins un élève.', size: 'inline' });
     return;
   }
   await renderPreviewForStudent(selected[0]);
-  setStatus(`Aperçu de ${selected[0].first_name} ${selected[0].last_name}. ${selected.length > 1 ? `+ ${selected.length - 1} autre(s) sélectionné(s).` : ''}`);
+  setStatus({ type: 'success', title: 'Aperçu prêt', message: `Aperçu de ${selected[0].first_name} ${selected[0].last_name}. ${selected.length > 1 ? `+ ${selected.length - 1} autre(s) sélectionné(s).` : ''}`, size: 'inline' });
 }
 
 async function generateCardPayload(student) {
@@ -260,29 +265,29 @@ async function generateCardPayload(student) {
 async function requestPrintBatch() {
   const token = getToken();
   if (!token) {
-    setStatus('Vous devez être connecté.', 'error');
+    setStatus({ type: 'error', title: 'Connexion requise', message: 'Vous devez être connecté.', size: 'inline' });
     return;
   }
   const selected = state.students.filter(s => state.selectedStudentIds.has(s.id));
   if (selected.length === 0) {
-    setStatus('Sélectionnez au moins un élève.', 'warning');
+    setStatus({ type: 'error', title: 'Sélection requise', message: 'Sélectionnez au moins un élève.', size: 'inline' });
     return;
   }
 
-  setStatus(`Génération de ${selected.length} carte(s)…`, 'warning');
+  setStatus({ type: 'loading', title: 'Génération en cours', message: `Génération de ${selected.length} carte(s)…`, size: 'inline' });
   const payloads = [];
   for (let i = 0; i < selected.length; i++) {
     try {
       const payload = await generateCardPayload(selected[i]);
       payloads.push(payload);
-      setStatus(`Génération ${i + 1}/${selected.length}…`, 'warning');
+      setStatus({ type: 'loading', title: 'Génération en cours', message: `Génération ${i + 1}/${selected.length}…`, size: 'inline' });
     } catch (e) {
-      setStatus(`Erreur génération pour ${selected[i].first_name} ${selected[i].last_name} : ${e.message}`, 'error');
+      setStatus({ type: 'error', title: 'Erreur de génération', message: `Erreur génération pour ${selected[i].first_name} ${selected[i].last_name} : ${e.message}`, size: 'inline' });
       return;
     }
   }
 
-  setStatus('Envoi au VPS…', 'warning');
+  setStatus({ type: 'loading', title: 'Envoi en cours', message: 'Envoi au VPS…', size: 'inline' });
   try {
     const res = await fetch(state.apiBase + '/cards/request-print', {
       method: 'POST',
@@ -299,10 +304,10 @@ async function requestPrintBatch() {
     }
     const submitted = data?.data?.filter(r => r.status === 'submitted').length || 0;
     const failed = data?.data?.filter(r => r.status === 'failed').length || 0;
-    setStatus(`Envoi terminé : ${submitted} soumis, ${failed} échec.`);
+    setStatus({ type: 'success', title: 'Envoi terminé', message: `Envoi terminé : ${submitted} soumis, ${failed} échec.`, size: 'inline' });
     await loadStudents(state.selectedClass.id);
   } catch (e) {
-    setStatus('Erreur envoi : ' + e.message, 'error');
+    setStatus({ type: 'error', title: 'Erreur d\'envoi', message: 'Erreur envoi : ' + e.message, size: 'inline' });
   }
 }
 
@@ -350,11 +355,11 @@ export function initCardsModule(options) {
     state.selectedStudentIds.clear();
     renderBtn.disabled = true;
     requestBtn.disabled = true;
-    $('cardsPreview').innerHTML = '<div style="text-align:center;padding:40px;color:#888;font-size:13px">Sélectionnez un ou plusieurs élèves.</div>';
+    $('cardsPreview').innerHTML = window.ssState({ type: 'empty', title: 'Aucun aperçu', message: 'Sélectionnez un ou plusieurs élèves.', size: 'compact' });
     if (state.selectedClass) {
       await loadStudents(classId);
     } else {
-      $('cardsStudentList').innerHTML = '<div style="padding:10px;color:#888;font-size:13px">Sélectionnez une classe.</div>';
+      $('cardsStudentList').innerHTML = window.ssState({ type: 'empty', title: 'Aucune classe', message: 'Sélectionnez une classe.', size: 'compact' });
       selectAll.checked = false;
     }
   });

@@ -1,6 +1,7 @@
 name = "schoolsafe-v2-api"
 main = "src/index.ts"
 compatibility_date = "2026-08-18"
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 ALLOWED_ORIGINS = "https://schoolsafe-v2.pages.dev,http://127.0.0.1:4175,http://localhost:4175"

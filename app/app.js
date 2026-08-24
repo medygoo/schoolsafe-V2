@@ -86,6 +86,16 @@
     return data;
   }
 
+  async function validateSetupToken(token) {
+    var config = await loadBackendConfig();
+    if (!config) throw new Error("Serveur de configuration non disponible.");
+    var result = await apiPost("/setup/validate-token", { token: token });
+    if (!result || !result.valid) throw new Error("Token de configuration invalide.");
+    setupToken = token;
+    renderStep();
+    showScreen("setup");
+  }
+
   function currentApiToken() {
     if (currentSession && currentSession.token) return currentSession.token;
     try {
@@ -172,13 +182,17 @@
     };
     storeSession(session);
     storageSet("schoolsafe-v2-active-role", activeRole);
-    document.getElementById("workspaceProfileName").textContent = bootstrap.profile.display_name || "";
-    document.getElementById("workspaceInitials").textContent = initialsFromName(bootstrap.profile.display_name || "SchoolSafe");
-    document.getElementById("workspaceSchoolName").textContent = bootstrap.school ? bootstrap.school.name : "Configuration en cours";
-    document.getElementById("workspaceRole").textContent = roleCatalog[activeRole] ? roleCatalog[activeRole].label : activeRole;
-    document.getElementById("statusRole").textContent = roleCatalog[activeRole] ? roleCatalog[activeRole].label : activeRole;
-    document.getElementById("statusScope").textContent = scopeSummary(session);
-    document.getElementById("syncStatusDetail").textContent = "Connecté · " + (bootstrap.school ? bootstrap.school.name : "école");
+    function setText(id, text) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+    setText("workspaceProfileName", bootstrap.profile.display_name || "");
+    setText("workspaceInitials", initialsFromName(bootstrap.profile.display_name || "SchoolSafe"));
+    setText("workspaceSchoolName", bootstrap.school ? bootstrap.school.name : "Configuration en cours");
+    setText("workspaceRole", roleCatalog[activeRole] ? roleCatalog[activeRole].label : activeRole);
+    setText("statusRole", roleCatalog[activeRole] ? roleCatalog[activeRole].label : activeRole);
+    setText("statusScope", scopeSummary(session));
+    setText("syncStatusDetail", "Connecté · " + (bootstrap.school ? bootstrap.school.name : "école"));
     renderWorkspace(activeRole);
   }
 
@@ -197,6 +211,115 @@
     return parts.join(" · ") || "Instance";
   }
 
+  /**
+   * Construit le contexte utilisateur pour le moteur d’autorisation central.
+   * En session réelle : currentSession.
+   * En démonstration sans session : rôle démo avec permissions vides (roleCatalog reste le mécanisme de démo).
+   */
+  function getCurrentUser() {
+    if (currentSession && currentSession.token) return currentSession;
+    return { role: currentDemoRole || "admin", permissions: [] };
+  }
+
+  /**
+   * Affiche le dashboard et masque les modules métier.
+   */
+  function showDashboard() {
+    var dashboardContainer = document.getElementById("dashboardContainer");
+    if (dashboardContainer) dashboardContainer.hidden = false;
+    var modules = ["pedagogyModule", "financeModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
+    modules.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.hidden = true;
+    });
+    var cardsProtected = document.getElementById("cardsProtected");
+    if (cardsProtected) cardsProtected.hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
+    setBreadcrumb(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /**
+   * Met à jour le fil d’Ariane. Si moduleLabel est null, le breadcrumb est masqué.
+   */
+  function setBreadcrumb(moduleLabel) {
+    var breadcrumb = document.getElementById("workspaceBreadcrumb");
+    var moduleItem = document.getElementById("workspaceBreadcrumbModule");
+    if (!breadcrumb || !moduleItem) return;
+    if (!moduleLabel) {
+      breadcrumb.hidden = true;
+      return;
+    }
+    moduleItem.textContent = moduleLabel;
+    breadcrumb.hidden = false;
+  }
+
+  /**
+   * Gestion des dropdowns du topbar.
+   */
+  function closeAllDropdowns() {
+    document.querySelectorAll(".topbar-dropdown").forEach(function (dropdown) { dropdown.hidden = true; });
+    document.querySelectorAll("[aria-haspopup='true']").forEach(function (btn) { btn.setAttribute("aria-expanded", "false"); });
+  }
+
+  function toggleDropdown(dropdownId, buttonId) {
+    var dropdown = document.getElementById(dropdownId);
+    var button = document.getElementById(buttonId);
+    if (!dropdown) return;
+    var isHidden = dropdown.hidden;
+    closeAllDropdowns();
+    dropdown.hidden = !isHidden;
+    if (button) button.setAttribute("aria-expanded", String(!dropdown.hidden));
+  }
+
+  function bindTopbarDropdown(buttonId, dropdownId) {
+    var button = document.getElementById(buttonId);
+    if (!button || button.__ssDropdownBound) return;
+    button.__ssDropdownBound = true;
+    button.addEventListener("click", function (event) {
+      event.stopPropagation();
+      toggleDropdown(dropdownId, buttonId);
+    });
+  }
+
+  /**
+   * FAB menu — actions rapides selon les permissions.
+   */
+  function renderFabMenu(user) {
+    var container = document.getElementById("workspaceFabMenuActions");
+    if (!container) return;
+    var access = window.SchoolSafeAccess;
+    var actions = (access && typeof access.getAllowedQuickActions === "function")
+      ? access.getAllowedQuickActions(user)
+      : [];
+    if (actions.length === 0) {
+      container.innerHTML = window.ssState({ type: "empty", title: "Aucune action rapide disponible.", message: "Aucune action rapide n’est autorisée pour ce profil.", size: "compact" });
+      icons();
+      return;
+    }
+    container.innerHTML = actions.map(function (action) {
+      return '<button class="ss-fab-menu__action" type="button" data-fab-action="' + action.key + '"><span class="ss-fab-menu__icon"><i data-lucide="' + action.icon + '"></i></span><span>' + escapeMarkup(action.label) + '</span></button>';
+    }).join("");
+    container.querySelectorAll("[data-fab-action]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var key = btn.getAttribute("data-fab-action");
+        toggleFabMenu(false);
+        if (key === "record-payment") { openModuleByBranch("finance"); return; }
+        if (key === "scan-qr") { openModuleByBranch("security"); return; }
+        if (key === "publish-assignment") { openModuleByBranch("pedagogy"); return; }
+        if (key === "send-message") { notify("Messages — ouverture dans une prochaine étape."); return; }
+      });
+    });
+    icons();
+  }
+
+  function toggleFabMenu(show) {
+    var menu = document.getElementById("workspaceFabMenu");
+    var fab = document.querySelector('[data-bottom-nav="create"]');
+    if (!menu) return;
+    menu.hidden = !show;
+    if (fab) fab.setAttribute("aria-expanded", String(show));
+  }
+
   function enterDemo() {
     notify("Accès de démonstration — ouverture de l’espace Administrateur principal.");
     window.setTimeout(function () { showScreen("workspace"); }, 250);
@@ -208,17 +331,17 @@
   }
 
   var branchDefinitions = {
-    pilotage: { label: "Pilotage", icon: "layout-dashboard", color: "#1264df", background: "#dceaff" },
-    school: { label: "École", icon: "school", color: "#087a55", background: "#dff8ee" },
-    pedagogy: { label: "Pédagogie", icon: "book-open-check", color: "#6b42c7", background: "#eee7ff" },
-    security: { label: "Sécurité et contrôle", icon: "shield-check", color: "#087a55", background: "#dff8ee" },
-    finance: { label: "Finances", icon: "wallet-cards", color: "#9b6700", background: "#fff2cd" },
-    accounting: { label: "Comptabilité", icon: "landmark", color: "#c64b45", background: "#ffe7e4" },
-    people: { label: "Personnel", icon: "contact-round", color: "#c64b45", background: "#ffe7e4" },
-    communication: { label: "Communication", icon: "messages-square", color: "#1264df", background: "#dceaff" },
-    care: { label: "Vie et bien-être", icon: "heart-pulse", color: "#c64b45", background: "#ffe7e4" },
-    administration: { label: "Administration", icon: "folder-cog", color: "#5c6578", background: "#edf0f5" },
-    reports: { label: "Contrôle et rapports", icon: "chart-no-axes-combined", color: "#6b42c7", background: "#eee7ff" }
+    pilotage: { label: "Pilotage", icon: "layout-dashboard", color: "#1d4ed8", background: "#dbeafe" },
+    school: { label: "École", icon: "school", color: "#2563eb", background: "#eff6ff" },
+    pedagogy: { label: "Pédagogie", icon: "book-open-check", color: "#1e3a8a", background: "#dbeafe" },
+    security: { label: "Sécurité et contrôle", icon: "shield-check", color: "#1d4ed8", background: "#dbeafe" },
+    finance: { label: "Finances", icon: "wallet-cards", color: "#d97706", background: "#fffbeb" },
+    accounting: { label: "Comptabilité", icon: "landmark", color: "#475569", background: "#f1f5f9" },
+    people: { label: "Personnel", icon: "contact-round", color: "#64748b", background: "#f1f5f9" },
+    communication: { label: "Communication", icon: "messages-square", color: "#3b82f6", background: "#eff6ff" },
+    care: { label: "Vie et bien-être", icon: "heart-pulse", color: "#1d4ed8", background: "#dbeafe" },
+    administration: { label: "Administration", icon: "folder-cog", color: "#475569", background: "#f1f5f9" },
+    reports: { label: "Contrôle et rapports", icon: "chart-no-axes-combined", color: "#1e40af", background: "#dbeafe" }
   };
 
   function group(label, actions) { return { label: label, actions: actions }; }
@@ -336,25 +459,12 @@
     }
   };
 
-  var profileIndicators = {
-    admin: [["Total élèves","1 245","users"],["Filles","648","user-round"],["Garçons","597","user-round"],["Personnel total","72","contact-round"],["Femmes personnel","39","user-round"],["Hommes personnel","33","user-round"],["Enseignants","48","graduation-cap"],["Classes actives","38","school"],["Cycles ouverts","3","layers-3"],["Présence globale","94 %","chart-no-axes-combined"]],
-    school_head: [["Total élèves","1 245","users"],["Filles","648","user-round"],["Garçons","597","user-round"],["Personnel total","72","contact-round"],["Femmes personnel","39","user-round"],["Hommes personnel","33","user-round"],["Enseignants","48","graduation-cap"],["Classes actives","38","school"],["Alertes prioritaires","3","triangle-alert"],["Présence globale","94 %","chart-no-axes-combined"]],
-    pedagogy: [["Élèves suivis","1 245","users"],["Filles","648","user-round"],["Garçons","597","user-round"],["Classes suivies","38","school"],["Enseignants","48","graduation-cap"],["Enseignantes","26","user-round"],["Enseignants hommes","22","user-round"],["Évaluations à valider","3","file-check-2"],["Cahiers à contrôler","12","book-open-check"],["Moyenne générale","67 %","chart-no-axes-combined"]],
-    admissions: [["Élèves inscrits","1 245","users"],["Filles","648","user-round"],["Garçons","597","user-round"],["Maternelle","186","shapes"],["Primaire","612","book-open"],["Secondaire","447","graduation-cap"],["Dossiers ouverts","32","folder-open"],["Dossiers incomplets","5","file-warning"],["Places disponibles","84","armchair"],["Admissions du mois","27","clipboard-pen-line"]],
-    secretary: [["Total élèves","1 245","users"],["Filles","648","user-round"],["Garçons","597","user-round"],["Personnel total","72","contact-round"],["Femmes personnel","39","user-round"],["Hommes personnel","33","user-round"],["Documents du mois","186","files"],["Demandes ouvertes","12","inbox"],["Rendez-vous","8","calendar-clock"],["Archives à classer","4","archive"]],
-    finance: [["Élèves facturés","1 208","users"],["En ordre","1 082","badge-check"],["À régulariser","126","badge-alert"],["Taux recouvrement","82 %","chart-pie"],["Frais actifs","14","wallet-cards"],["Échéances ouvertes","3","calendar-range"],["Caisses ouvertes","2","landmark"],["Dépenses à valider","3","receipt"],["Rapports prêts","4","file-chart-column"],["Clôture période","En cours","lock-keyhole"]],
-    cashier: [["Caisse affectée","Principale","landmark"],["Solde initial","2,4 M FC","wallet"],["Paiements du jour","12","receipt-text"],["Reçus émis","12","file-check-2"],["Espèces","8 opérations","banknote"],["Autres moyens","4 opérations","credit-card"],["Élèves recherchés","18","search"],["À régulariser","2","badge-alert"],["Annulations demandées","1","circle-x"],["Clôture prévue","17 h 00","clock-3"]],
-    accountant: [["Journaux actifs","4","notebook-tabs"],["Écritures du mois","286","file-pen-line"],["Pièces à classer","8","files"],["Pièces manquantes","2","file-warning"],["Rapprochements","2","list-checks"],["Comptes mouvementés","47","list-tree"],["Dépenses comptabilisées","38","receipt"],["Période active","Août 2026","calendar-range"],["Balance","Provisoire","scale"],["États à produire","3","file-chart-column"]],
-    hr: [["Personnel total","72","contact-round"],["Femmes","39","user-round"],["Hommes","33","user-round"],["Enseignants","48","graduation-cap"],["Personnel administratif","16","briefcase-business"],["Personnel de service","8","users"],["Contrats actifs","70","files"],["Absences du jour","3","calendar-x"],["Présence personnel","96 %","fingerprint"],["Paies à préparer","72","banknote"]],
-    teacher: [["Classes affectées","2","school"],["Matières enseignées","3","book-open"],["Total élèves","58","users"],["Filles","31","user-round"],["Garçons","27","user-round"],["Cours aujourd’hui","4","calendar-clock"],["Présence moyenne","94 %","clipboard-check"],["Devoirs à corriger","18","notebook-tabs"],["Moyenne des classes","13,8 / 20","chart-no-axes-combined"],["Élèves à accompagner","7","life-buoy"]],
-    guard: [["Portail affecté","Principal","door-open"],["Élèves dans l’école","286","users"],["Filles présentes","149","user-round"],["Garçons présents","137","user-round"],["Entrées élèves","291","log-in"],["Sorties confirmées","5","log-out"],["Sorties en attente","4","clock-3"],["Personnes autorisées","312","contact-round"],["Personnel présent","61","badge-check"],["Anomalies actives","1","triangle-alert"]],
-    nurse: [["Élèves suivis","1 245","users"],["Filles","648","user-round"],["Garçons","597","user-round"],["Dossiers santé","1 102","heart-pulse"],["Dossiers incomplets","143","file-warning"],["Allergies signalées","24","triangle-alert"],["Traitements autorisés","18","pill"],["Passages du jour","5","clipboard-plus"],["Parents à contacter","1","phone-call"],["Urgences actives","0","siren"]],
-    canteen: [["Bénéficiaires","318","users"],["Filles","164","user-round"],["Garçons","154","user-round"],["Maternelle","64","shapes"],["Primaire","172","book-open"],["Secondaire","82","graduation-cap"],["Repas prévus","318","utensils"],["Présences confirmées","286","clipboard-check"],["Allergies signalées","6","triangle-alert"],["Service prévu","12 h 30","clock-3"]],
-    communication: [["Communauté totale","1 389","users"],["Élèves","1 245","school"],["Filles","648","user-round"],["Garçons","597","user-round"],["Parents actifs","1 112","contact-round"],["Personnel actif","72","briefcase-business"],["Annonces publiées","24","megaphone"],["Brouillons à valider","2","file-pen-line"],["Messages non lus","7","messages-square"],["Langues actives","FR / EN","languages"]],
-    parent: [["Enfants rattachés","2","users"],["Filles","1","user-round"],["Garçons","1","user-round"],["Enfants présents","2","badge-check"],["Devoirs ouverts","3","notebook-pen"],["Résultats publiés","2","chart-no-axes-combined"],["Documents disponibles","6","files"],["Notifications non lues","1","bell-ring"],["Statut scolaire","À consulter","wallet-cards"],["Prochaine sortie","16 h 15","clock-3"]]
-  };
+  // Les indicateurs de profil sont désormais chargés via l’API Pilotage.
+  // Aucune donnée codée en dur n’est affichée comme réelle.
 
   var currentDemoRole = "admin";
+  Object.defineProperty(window, "currentDemoRole", { get: function () { return currentDemoRole; }, configurable: true });
+  Object.defineProperty(window, "currentSession", { get: function () { return currentSession; }, configurable: true });
   var staffSamples = [
     { name: "M. X", initials: "MX", role: "guard", scopeType: "portal", scope: "Portail principal" },
     { name: "Mme Y", initials: "MY", role: "teacher", scopeType: "class", scope: "Classe 4e A" },
@@ -465,207 +575,6 @@
     }
   };
 
-  function todayIsoDate() {
-    return new Date().toISOString().split("T")[0];
-  }
-
-  function formatIsoDateFr(isoString) {
-    if (!isoString) return "—";
-    var d = new Date(isoString);
-    if (isNaN(d.getTime())) return String(isoString);
-    return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-  }
-
-  function formatIsoDateTimeFr(isoString) {
-    if (!isoString) return "—";
-    var d = new Date(isoString);
-    if (isNaN(d.getTime())) return String(isoString);
-    return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) + " · " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-  }
-
-  function modeLabel(mode) {
-    if (!mode) return "—";
-    var map = {
-      cash: "Espèces",
-      card: "Carte bancaire",
-      check: "Chèque",
-      bank_transfer: "Virement constaté",
-      mobile_money: "Mobile money",
-      other: "Autre moyen constaté",
-      unknown: "—"
-    };
-    return map[mode] || mode;
-  }
-
-  function cycleLabel(cycleKey) {
-    if (!cycleKey) return "—";
-    var map = { nursery: "Maternelle", primary: "Primaire", secondary: "Secondaire", kindergarten: "Maternelle", all: "Tous les cycles" };
-    return map[cycleKey] || cycleKey;
-  }
-
-  var financeState = {
-    activeTab: "overview",
-    selectedStudent: 0,
-    selectedFamilyStudent: 0,
-    receiptSequence: 587,
-    dayStatus: "Ouverte",
-    loaded: false,
-    loading: false,
-    pendingStudents: [],
-    selectedPendingStudent: 0,
-    reportClosure: null,
-    feeTypes: [
-      { id: "demo-1", name: "Frais scolaires", cycle: "Primaire", amount: 300000, frequency: "Trimestre", due: "30 septembre 2026", active: true },
-      { id: "demo-2", name: "Frais scolaires", cycle: "Humanités", amount: 450000, frequency: "Trimestre", due: "30 septembre 2026", active: true },
-      { id: "demo-3", name: "Inscription", cycle: "Tous les cycles", amount: 50000, frequency: "Une fois", due: "À l’inscription", active: true },
-      { id: "demo-4", name: "Transport scolaire", cycle: "Service facultatif", amount: 100000, frequency: "Mois", due: "Chaque 5 du mois", active: true }
-    ],
-    studentFeeMap: {},
-    students: [
-      { id: "demo-s1", name: "Lucas Martin", initials: "LM", sex: "Garçon", className: "6e A", guardian: "Mme Sophie Martin", expected: 450000, paid: 350000, balance: 100000, status: "À régulariser", currency: "CDF" },
-      { id: "demo-s2", name: "Emma Martin", initials: "EM", sex: "Fille", className: "Maternelle 3", guardian: "Mme Sophie Martin", expected: 300000, paid: 300000, balance: 0, status: "En ordre", currency: "CDF" },
-      { id: "demo-s3", name: "Ethan Leroy", initials: "EL", sex: "Garçon", className: "1re A", guardian: "M. Paul Leroy", expected: 450000, paid: 150000, balance: 300000, status: "À régulariser", currency: "CDF" },
-      { id: "demo-s4", name: "Chloé Bernard", initials: "CB", sex: "Fille", className: "2e B", guardian: "Mme Julie Bernard", expected: 450000, paid: 450000, balance: 0, status: "En ordre", currency: "CDF" },
-      { id: "demo-s5", name: "Aline Martin", initials: "AM", sex: "Fille", className: "4e Humanités A", guardian: "Mme Sophie Martin", expected: 600000, paid: 600000, balance: 0, status: "En ordre", currency: "CDF" }
-    ],
-    transactions: [
-      { id: "demo-p1", receipt: "REC-2026-0587", date: "14 août 2026 · 10:20", day: "14 août 2026", student: "Ethan Leroy", className: "1re A", fee: "Frais scolaires", amount: 150000, mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
-      { id: "demo-p2", receipt: "REC-2026-0586", date: "14 août 2026 · 09:15", day: "14 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 150000, mode: "Espèces", cashier: "Mme K", reference: "Deuxième tranche", status: "Validé" },
-      { id: "demo-p3", receipt: "REC-2026-0585", date: "13 août 2026 · 14:40", day: "13 août 2026", student: "Emma Martin", className: "Maternelle 3", fee: "Frais scolaires", amount: 300000, mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
-      { id: "demo-p4", receipt: "REC-2026-0584", date: "12 août 2026 · 11:05", day: "12 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 200000, mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
-      { id: "demo-p5", receipt: "REC-2026-0583", date: "11 août 2026 · 08:55", day: "11 août 2026", student: "Chloé Bernard", className: "2e B", fee: "Frais scolaires", amount: 450000, mode: "Espèces", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
-      { id: "demo-p6", receipt: "REC-2026-0582", date: "10 août 2026 · 13:10", day: "10 août 2026", student: "Aline Martin", className: "4e Humanités A", fee: "Frais scolaires", amount: 600000, mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" }
-    ],
-    expenses: [
-      { reference: "DEP-2026-011", date: "14 août 2026", label: "Fournitures administratives", amount: 120000, status: "Validée" },
-      { reference: "DEP-2026-012", date: "14 août 2026", label: "Entretien du groupe électrogène", amount: 75000, status: "À approuver" }
-    ],
-    dailyReport: null,
-    reportDate: todayIsoDate()
-  };
-
-  function initialsFromName(name) {
-    return name.split(" ").map(function (part) { return part[0]; }).join("").toUpperCase().slice(0, 2);
-  }
-
-  function statusLabelFromFeeStatus(status) {
-    if (status === "paid") return "En ordre";
-    if (status === "partial") return "À régulariser";
-    if (status === "exempted") return "Exempté";
-    return "À régulariser";
-  }
-
-  function mapFeeStructure(fee) {
-    var metadata = fee.metadata || {};
-    return {
-      id: fee.id,
-      name: fee.label || "Frais",
-      cycle: cycleLabel(fee.cycle_key),
-      amount: Number(fee.amount || 0),
-      currency: fee.currency || "CDF",
-      frequency: metadata.frequency || "Trimestre",
-      due: fee.due_date ? formatIsoDateFr(fee.due_date) : "À définir",
-      active: fee.is_active !== false
-    };
-  }
-
-  function mapStudentFee(sf) {
-    var student = sf.students || {};
-    var name = [student.first_name, student.last_name].filter(Boolean).join(" ") || "Élève";
-    return {
-      id: sf.id,
-      student_id: sf.student_id,
-      name: name,
-      initials: initialsFromName(name),
-      sex: student.gender === "F" ? "Fille" : "Garçon",
-      className: sf.class_name || student.class_name || "Classe",
-      guardian: sf.guardian_name || student.guardian_name || "—",
-      expected: Number(sf.amount_expected || 0),
-      paid: Number(sf.amount_paid || 0),
-      balance: Number(sf.amount_remaining || 0),
-      status: statusLabelFromFeeStatus(sf.status),
-      currency: sf.currency || "CDF"
-    };
-  }
-
-  function mapDailyPayment(payment) {
-    var student = payment.student || {};
-    var name = [student.first_name, student.last_name].filter(Boolean).join(" ") || "Élève";
-    return {
-      id: payment.id,
-      receipt: payment.id,
-      date: formatIsoDateTimeFr(payment.received_at),
-      day: formatIsoDateFr(payment.received_at),
-      student: name,
-      student_id: student.id,
-      className: "",
-      fee: payment.fee_label || "Frais",
-      amount: Number(payment.amount || 0),
-      mode: modeLabel(payment.mode),
-      reference: payment.reference || "",
-      status: "Validé",
-      currency: payment.currency || "CDF"
-    };
-  }
-
-  async function loadDailyReport(date) {
-    if (!window.SchoolSafeFinanceAPI) return;
-    try {
-      var report = await window.SchoolSafeFinanceAPI.getDailyReport(date);
-      financeState.reportDate = date;
-      financeState.dailyReport = report || null;
-    } catch (e) {
-      console.warn("[Finance] rapport journalier échoué", e);
-      financeState.dailyReport = null;
-    }
-  }
-
-  async function loadFinanceData() {
-    if (financeState.loading || financeState.loaded) return;
-    if (!window.SchoolSafeFinanceAPI) return;
-    var api = window.SchoolSafeFinanceAPI;
-    financeState.loading = true;
-    try {
-      var [feeStructures, studentFees, pendingFees, partialFees, report] = await Promise.all([
-        api.listFeeStructures().catch(function () { return []; }),
-        api.listStudentFees({}).catch(function () { return []; }),
-        api.listStudentFees({ status: "pending" }).catch(function () { return []; }),
-        api.listStudentFees({ status: "partial" }).catch(function () { return []; }),
-        api.getDailyReport(financeState.reportDate).catch(function () { return null; })
-      ]);
-      var pendingById = {};
-      (pendingFees || []).concat(partialFees || []).forEach(function (sf) {
-        pendingById[sf.id] = sf;
-      });
-      var pendingFeesMerged = Object.values(pendingById);
-      if (feeStructures && feeStructures.length) {
-        financeState.feeTypes = feeStructures.map(mapFeeStructure);
-      }
-      if (studentFees && studentFees.length) {
-        financeState.studentFeeMap = {};
-        financeState.students = studentFees.map(function (sf, index) {
-          var mapped = mapStudentFee(sf);
-          financeState.studentFeeMap[index] = sf.id;
-          return mapped;
-        });
-      }
-      if (pendingFeesMerged) {
-        financeState.pendingStudents = pendingFeesMerged.map(mapStudentFee);
-        if (financeState.selectedPendingStudent >= financeState.pendingStudents.length) {
-          financeState.selectedPendingStudent = 0;
-        }
-      }
-      if (report) {
-        financeState.dailyReport = report;
-        financeState.transactions = (report.payments || []).map(mapDailyPayment);
-      }
-      financeState.loaded = true;
-    } catch (e) {
-      console.warn("[Finance] chargement backend échoué, démo locale conservée", e);
-    } finally {
-      financeState.loading = false;
-    }
-  }
   function escapeMarkup(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character];
@@ -695,6 +604,7 @@
       return null;
     });
   }
+  window.queueOfflineOperation = queueOfflineOperation;
 
   function renderSyncState(state) {
     latestSyncState = state;
@@ -752,7 +662,7 @@
     document.getElementById("syncQueueList").innerHTML = queue.length ? queue.map(function (operation) {
       var time = new Date(operation.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
       return '<article class="sync-operation ' + escapeMarkup(operation.status) + '"><span><i data-lucide="' + syncOperationIcon(operation.type) + '"></i></span><div><b>' + escapeMarkup(operation.label) + '</b><small>' + escapeMarkup(operation.role) + " · " + time + '</small></div><em>' + escapeMarkup(syncOperationStatus(operation.status)) + "</em></article>";
-    }).join("") : '<p class="sync-empty">Les prochaines opérations hors connexion apparaîtront ici.</p>';
+    }).join("") : window.ssState({ type: "empty", title: "Aucune opération hors connexion", message: "Les prochaines opérations hors connexion apparaîtront ici.", size: "inline" });
     icons();
   }
 
@@ -772,15 +682,18 @@
 
   function finalizeLocallyConfirmedOperation(operation) {
     if (!operation || operation.type !== "finance" || operation.payload.kind !== "payment") return;
-    var transaction = financeState.transactions.find(function (item) { return item.localReference === operation.payload.localReference; });
+    var mod = window.SchoolSafeFinanceModule;
+    if (!mod || !mod._state) return;
+    var state = mod._state;
+    var transaction = state.transactions.find(function (item) { return item.localReference === operation.payload.localReference; });
     if (!transaction || transaction.status === "Validé") return;
-    financeState.receiptSequence += 1;
-    transaction.receipt = "REC-2026-" + String(financeState.receiptSequence).padStart(4, "0");
+    state.receiptSequence += 1;
+    transaction.receipt = "REC-2026-" + String(state.receiptSequence).padStart(4, "0");
     transaction.status = "Validé";
     transaction.date = "14 août 2026 · confirmé localement";
     transaction.syncOperationId = operation.id;
     notify("Opération confirmée localement : reçu officiel de démonstration et notification préparés.");
-    if (!document.getElementById("financeModule").hidden) renderFinanceModule();
+    if (!document.getElementById("financeModule").hidden && typeof mod.render === "function") mod.render();
   }
 
   function initPwaExperience() {
@@ -807,6 +720,7 @@
   }
 
   function pedagogyTabForAction(actionName) {
+    if (/palmarès/i.test(actionName)) return "palmares";
     if (/rattrapage|accompagnement renforcé|versement de rattrapage/i.test(actionName)) return "remediation";
     if (/ENAFEP|TENASOSP|EXETAT|épreuve.*certificative|épreuve.*nationale/i.test(actionName)) return "certifications";
     if (/devoir|cahier/i.test(actionName)) return "assignments";
@@ -816,8 +730,29 @@
     return "";
   }
 
+  function openPalmaresModule() {
+    document.getElementById("accessConsole").hidden = true;
+    document.getElementById("financeModule").hidden = true;
+    document.getElementById("securityModule").hidden = true;
+    document.getElementById("pilotageModule").hidden = true;
+    document.getElementById("feeControlModule").hidden = true;
+    document.getElementById("pedagogyModule").hidden = true;
+    document.getElementById("schoolModule").hidden = true;
+    document.getElementById("palmaresModule").hidden = false;
+    document.querySelector(".workspace-grid").hidden = true;
+    document.getElementById("cardsProtected").hidden = true;
+    if (window.renderPalmaresModule) {
+      window.renderPalmaresModule(document.getElementById("palmaresContent"), currentSession);
+    }
+    document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function openPedagogyModule(actionName) {
     var requestedTab = pedagogyTabForAction(actionName || "") || (currentDemoRole === "parent" ? "parent" : "assignments");
+    if (requestedTab === "palmares") {
+      openPalmaresModule();
+      return;
+    }
     if (/ENAFEP/i.test(actionName || "")) pedagogyState.certifications.activeExam = "ENAFEP";
     if (/TENASOSP/i.test(actionName || "")) pedagogyState.certifications.activeExam = "TENASOSP";
     if (/EXETAT/i.test(actionName || "")) pedagogyState.certifications.activeExam = "EXETAT";
@@ -834,13 +769,15 @@
     document.getElementById("securityModule").hidden = true;
     document.getElementById("pilotageModule").hidden = true;
     document.getElementById("feeControlModule").hidden = true;
+    document.getElementById("palmaresModule").hidden = true;
     document.getElementById("pedagogyModule").hidden = false;
     document.querySelector(".workspace-grid").hidden = true;
     document.getElementById("cardsProtected").hidden = true;
     document.getElementById("pedagogyTabs").hidden = true;
     document.getElementById("pedagogyModuleTitle").textContent = "Pédagogie";
-    if (window.SchoolSafePedagogyModule) {
-      window.SchoolSafePedagogyModule.render("pedagogyContent");
+    var newModuleTabs = ["subjects", "assignments", "lesson-plans", "parent-view"];
+    if (window.SchoolSafePedagogyModule && newModuleTabs.indexOf(requestedTab) >= 0) {
+      window.SchoolSafePedagogyModule.render("pedagogyContent", { tab: requestedTab });
     } else {
       renderPedagogyModule();
     }
@@ -849,14 +786,24 @@
 
   function closePedagogyModule() {
     document.getElementById("pedagogyModule").hidden = true;
+    document.getElementById("palmaresModule").hidden = true;
     document.getElementById("feeControlModule").hidden = true;
     document.querySelector(".workspace-grid").hidden = false;
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    setBreadcrumb(null);
+  }
+
+  function closePalmaresModule() {
+    document.getElementById("palmaresModule").hidden = true;
+    document.querySelector(".workspace-grid").hidden = false;
+    document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
+    document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    setBreadcrumb(null);
   }
 
   function assignmentStatus(item) {
-    return item.published ? '<span class="pedagogy-badge published">Publié</span>' : '<span class="pedagogy-badge draft">Brouillon</span>';
+    return item.published ? 'ssBadge({ label: "Publié", variant: "success" })' : 'ssBadge({ label: "Brouillon", variant: "warning" })';
   }
 
   function renderAssignmentsTab() {
@@ -867,13 +814,13 @@
       return '<button class="assignment-row' + (index === pedagogyState.selectedAssignment ? " active" : "") + '" type="button" data-assignment-index="' + index + '"><span class="assignment-format"><i data-lucide="' + (item.format === "PDF" ? "file-text" : item.format === "Images" ? "images" : "align-left") + '"></i></span><span><b>' + escapeMarkup(item.title) + '</b><small>' + escapeMarkup(item.className + " · " + item.subject + " · " + item.language) + '</small></span>' + assignmentStatus(item) + '</button>';
     }).join("");
     var questions = pedagogyState.assignmentDraftQuestions.map(function (question, index) {
-      return '<article class="question-editor-row"><header><b>Question ' + (index + 1) + '</b><button class="icon-button light" type="button" data-remove-question="' + index + '" title="Supprimer la question"><i data-lucide="trash-2"></i></button></header><label>Énoncé<textarea rows="2" data-question-field="text" data-question-index="' + index + '">' + escapeMarkup(question.text) + '</textarea></label><div><label>Type<select data-question-field="type" data-question-index="' + index + '">' + ["Réponse courte","Réponse longue","Calcul","Dessin","Choix multiple"].map(function (type) { return '<option' + (type === question.type ? " selected" : "") + '>' + type + '</option>'; }).join("") + '</select></label><label>Points<input type="number" min="0" data-question-field="points" data-question-index="' + index + '" value="' + question.points + '"></label><label>Espace de réponse<select data-question-field="answerSpace" data-question-index="' + index + '">' + ["3 lignes","5 lignes","8 lignes","Demi-page","Page entière"].map(function (space) { return '<option' + (space === question.answerSpace ? " selected" : "") + '>' + space + '</option>'; }).join("") + '</select></label></div>' + (question.type === "Choix multiple" ? '<label>Choix séparés par un point-virgule<input data-question-field="choices" data-question-index="' + index + '" value="' + escapeMarkup(question.choices || "") + '"></label>' : "") + '</article>';
+      return '<article class="question-editor-row"><header><b>Question ' + (index + 1) + '</b>' + ssIconButton({ icon: "trash-2", variant: "light", title: "Supprimer la question", attrs: { "data-remove-question": index } }) + '</header><label>Énoncé<textarea rows="2" data-question-field="text" data-question-index="' + index + '">' + escapeMarkup(question.text) + '</textarea></label><div><label>Type<select data-question-field="type" data-question-index="' + index + '">' + ["Réponse courte","Réponse longue","Calcul","Dessin","Choix multiple"].map(function (type) { return '<option' + (type === question.type ? " selected" : "") + '>' + type + '</option>'; }).join("") + '</select></label><label>Points<input type="number" min="0" data-question-field="points" data-question-index="' + index + '" value="' + question.points + '"></label><label>Espace de réponse<select data-question-field="answerSpace" data-question-index="' + index + '">' + ["3 lignes","5 lignes","8 lignes","Demi-page","Page entière"].map(function (space) { return '<option' + (space === question.answerSpace ? " selected" : "") + '>' + space + '</option>'; }).join("") + '</select></label></div>' + (question.type === "Choix multiple" ? '<label>Choix séparés par un point-virgule<input data-question-field="choices" data-question-index="' + index + '" value="' + escapeMarkup(question.choices || "") + '"></label>' : "") + '</article>';
     }).join("");
-    var creation = canEdit ? '<form class="pedagogy-form assignment-composer" id="assignmentForm"><div class="form-section-title"><span><i data-lucide="file-pen-line"></i></span><div><h3>Composer un devoir SchoolSafe</h3><p>Le contenu saisi sera aligné dans un modèle A4 avec l’identité officielle de l’école.</p></div></div><div class="pedagogy-form-grid"><label>Titre<input name="title" required placeholder="Titre du devoir" value="' + escapeMarkup(draft.title) + '"></label><label>Classe<select name="className">' + ["1re A","2e B","Maternelle 3"].map(function (value) { return '<option' + (draft.className === value ? " selected" : "") + '>' + value + '</option>'; }).join("") + '</select></label><label>Matière<input name="subject" required value="' + escapeMarkup(draft.subject) + '"></label><label>Langue<select name="language">' + ["FR","EN","Autre"].map(function (value) { return '<option' + (draft.language === value ? " selected" : "") + '>' + value + '</option>'; }).join("") + '</select></label><label>Type<select name="type">' + ["Devoir","Interrogation","Examen","Activité compensatoire"].map(function (value) { return '<option' + (draft.type === value ? " selected" : "") + '>' + value + '</option>'; }).join("") + '</select></label><label>Enseignant<input name="teacher" value="' + escapeMarkup(draft.teacher) + '"></label><label>Barème total<input name="scale" type="number" min="0" value="' + draft.scale + '"></label><label>Date de remise<input name="due" value="' + escapeMarkup(draft.due) + '"></label><label class="wide">Prérequis<textarea name="prerequisites" rows="2" placeholder="Connaissances nécessaires avant le devoir...">' + escapeMarkup(draft.prerequisites) + '</textarea></label><label class="wide">Consignes générales<textarea name="instructions" rows="2" placeholder="Consignes de travail...">' + escapeMarkup(draft.instructions) + '</textarea></label><label class="wide file-field"><span>Pièce jointe facultative</span><input name="attachment" type="file" accept="image/*,.pdf"><small>Une photo ou un PDF peut accompagner le devoir composé. Le fichier reste local dans cette démonstration.</small></label></div><section class="question-composer"><header><div><span>Contenu du document</span><h3>Questions et espaces de réponse</h3></div><button class="secondary-button" type="button" id="addAssignmentQuestion"><i data-lucide="plus"></i> Ajouter une question</button></header><div>' + questions + '</div><aside><i data-lucide="layout-template"></i><p>SchoolSafe évite de couper une question entre deux pages et ajoute automatiquement les lignes, cadres de dessin ou pages de réponse demandées.</p></aside></section><footer><button class="secondary-button" type="button" id="previewAssignmentPdf"><i data-lucide="file-down"></i> Aperçu PDF</button><button class="secondary-button" type="button" id="saveAssignmentDraft"><i data-lucide="save"></i> Enregistrer le brouillon</button><button class="primary-button dark" type="submit"><i data-lucide="send"></i> Publier aux parents</button></footer></form>' : "";
-    var pdfButton = selected.questions && selected.questions.length ? '<button class="secondary-button" type="button" data-download-assignment="' + pedagogyState.selectedAssignment + '"><i data-lucide="file-down"></i> Télécharger le devoir PDF</button>' : "";
+    var creation = canEdit ? '<form class="pedagogy-form assignment-composer" id="assignmentForm"><div class="form-section-title"><span><i data-lucide="file-pen-line"></i></span><div><h3>Composer un devoir SchoolSafe</h3><p>Le contenu saisi sera aligné dans un modèle A4 avec l’identité officielle de l’école.</p></div></div><div class="pedagogy-form-grid"><label>Titre<input name="title" required placeholder="Titre du devoir" value="' + escapeMarkup(draft.title) + '"></label><label>Classe<select name="className">' + ["1re A","2e B","Maternelle 3"].map(function (value) { return '<option' + (draft.className === value ? " selected" : "") + '>' + value + '</option>'; }).join("") + '</select></label><label>Matière<input name="subject" required value="' + escapeMarkup(draft.subject) + '"></label><label>Langue<select name="language">' + ["FR","EN","Autre"].map(function (value) { return '<option' + (draft.language === value ? " selected" : "") + '>' + value + '</option>'; }).join("") + '</select></label><label>Type<select name="type">' + ["Devoir","Interrogation","Examen","Activité compensatoire"].map(function (value) { return '<option' + (draft.type === value ? " selected" : "") + '>' + value + '</option>'; }).join("") + '</select></label><label>Enseignant<input name="teacher" value="' + escapeMarkup(draft.teacher) + '"></label><label>Barème total<input name="scale" type="number" min="0" value="' + draft.scale + '"></label><label>Date de remise<input name="due" value="' + escapeMarkup(draft.due) + '"></label><label class="wide">Prérequis<textarea name="prerequisites" rows="2" placeholder="Connaissances nécessaires avant le devoir...">' + escapeMarkup(draft.prerequisites) + '</textarea></label><label class="wide">Consignes générales<textarea name="instructions" rows="2" placeholder="Consignes de travail...">' + escapeMarkup(draft.instructions) + '</textarea></label><label class="wide file-field"><span>Pièce jointe facultative</span><input name="attachment" type="file" accept="image/*,.pdf"><small>Une photo ou un PDF peut accompagner le devoir composé. Le fichier reste local dans cette démonstration.</small></label></div><section class="question-composer"><header><div><span>Contenu du document</span><h3>Questions et espaces de réponse</h3></div>' + ssButton({ variant: "secondary", icon: "plus", label: "Ajouter une question", attrs: { id: "addAssignmentQuestion" } }) + '</header><div>' + questions + '</div><aside><i data-lucide="layout-template"></i><p>SchoolSafe évite de couper une question entre deux pages et ajoute automatiquement les lignes, cadres de dessin ou pages de réponse demandées.</p></aside></section><footer>' + ssButton({ variant: "secondary", icon: "file-down", label: "Aperçu PDF", attrs: { id: "previewAssignmentPdf" } }) + '' + ssButton({ variant: "secondary", icon: "save", label: "Enregistrer le brouillon", attrs: { id: "saveAssignmentDraft" } }) + '' + ssButton({ variant: "primary", type: "submit", icon: "send", label: "Publier aux parents" }) + '</footer></form>' : "";
+    var pdfButton = selected.questions && selected.questions.length ? 'ssButton({ variant: "secondary", icon: "file-down", label: "Télécharger le devoir PDF", attrs: { "data-download-assignment": pedagogyState.selectedAssignment } })' : "";
     var sourceLanguage = String(selected.language || "").toLowerCase();
     var translationNotice = '<span class="translation-fallback" data-source-language="' + escapeMarkup(sourceLanguage) + '"><i data-lucide="languages"></i> Traduction non disponible : contenu original conservé.</span>';
-    return '<div class="pedagogy-two-column assignment-layout"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Travaux de la classe</span><h3>Devoirs et activités</h3></div><b>' + pedagogyState.assignments.length + '</b></header><div class="assignment-list">' + assignmentList + '</div><article class="assignment-detail"><div>' + translationNotice + '<span class="subject-tag">' + escapeMarkup(selected.subject + " · " + selected.language) + '</span><h3>' + escapeMarkup(selected.title) + '</h3><p>' + escapeMarkup(selected.instructions) + '</p></div><dl><div><dt>Échéance</dt><dd>' + escapeMarkup(selected.due) + '</dd></div><div><dt>Support</dt><dd>' + escapeMarkup(selected.format) + '</dd></div><div><dt>Version</dt><dd>v' + (selected.version || 1) + '</dd></div><div><dt>Barème</dt><dd>' + (selected.scale ? "/ " + selected.scale : "Qualitatif") + '</dd></div></dl><div class="assignment-detail-actions">' + pdfButton + '<button class="primary-button" type="button" data-open-grades><i data-lucide="clipboard-pen-line"></i> Coter ce travail</button></div></article></section>' + creation + '</div>';
+    return '<div class="pedagogy-two-column assignment-layout"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Travaux de la classe</span><h3>Devoirs et activités</h3></div><b>' + pedagogyState.assignments.length + '</b></header><div class="assignment-list">' + assignmentList + '</div><article class="assignment-detail"><div>' + translationNotice + '<span class="subject-tag">' + escapeMarkup(selected.subject + " · " + selected.language) + '</span><h3>' + escapeMarkup(selected.title) + '</h3><p>' + escapeMarkup(selected.instructions) + '</p></div><dl><div><dt>Échéance</dt><dd>' + escapeMarkup(selected.due) + '</dd></div><div><dt>Support</dt><dd>' + escapeMarkup(selected.format) + '</dd></div><div><dt>Version</dt><dd>v' + (selected.version || 1) + '</dd></div><div><dt>Barème</dt><dd>' + (selected.scale ? "/ " + selected.scale : "Qualitatif") + '</dd></div></dl><div class="assignment-detail-actions">' + pdfButton + '' + ssButton({ variant: "primary", icon: "clipboard-pen-line", label: "Coter ce travail", attrs: { "data-open-grades": true } }) + '</div></article></section>' + creation + '</div>';
   }
 
   function renderGradesTab() {
@@ -884,9 +831,15 @@
       var input = qualitative
         ? '<select data-grade-index="' + index + '">' + ["Non observé","À renforcer","En acquisition","Acquis","Bien","Très bien","Excellent"].map(function (label) { return '<option' + (grade === label ? " selected" : "") + '>' + label + '</option>'; }).join("") + '</select>'
         : '<div class="grade-input"><input data-grade-index="' + index + '" type="number" min="0" max="' + selected.scale + '" step="0.25" value="' + (grade == null ? "" : grade) + '" placeholder="Absent"><span>/ ' + selected.scale + '</span></div>';
-      return '<tr><td><span class="student-avatar">' + student.initials + '</span><b>' + student.name + '</b></td><td>' + input + '</td><td><select data-grade-state="' + index + '"><option>Présent</option><option' + (grade == null ? " selected" : "") + '>Absent</option><option>Rattrapage requis</option><option>Dispensé</option></select></td><td><span class="payment-dot ' + (student.paid ? "paid" : "unpaid") + '"></span>' + (student.paid ? "En règle" : "À régulariser") + '</td></tr>';
+      return '<tr><td><span class="student-avatar">' + student.initials + '</span><b>' + student.name + '</b></td><td>' + input + '</td><td><select data-grade-state="' + index + '"><option>Présent</option><option' + (grade == null ? " selected" : "") + '>Absent</option><option>Rattrapage requis</option><option>Dispensé</option></select></td><td>' + window.ssBadge({ label: student.paid ? "En règle" : "À régulariser", variant: student.paid ? "success" : "warning", dot: true, size: "sm" }) + '</td></tr>';
     }).join("");
-    return '<section class="pedagogy-panel gradebook"><header class="gradebook-head"><div><span>Cotation de la classe</span><h3>' + escapeMarkup(selected.title) + '</h3><p>' + escapeMarkup(selected.className + " · " + selected.subject + " · " + selected.language) + '</p></div><label>Travail<select id="gradeAssignmentSelect">' + pedagogyState.assignments.map(function (item, index) { return '<option value="' + index + '"' + (index === pedagogyState.selectedAssignment ? " selected" : "") + '>' + escapeMarkup(item.title) + '</option>'; }).join("") + '</select></label></header><div class="grade-summary"><article><small>Barème</small><b>' + (qualitative ? "Qualitatif" : "/ " + selected.scale) + '</b></article><article><small>Cotes remplies</small><b>' + selected.grades.filter(function (grade) { return grade != null; }).length + ' / ' + pedagogyState.students.length + '</b></article><article><small>Publication</small><b>' + (selected.published ? "Visible" : "Brouillon") + '</b></article></div><div class="table-scroll"><table class="grade-table"><thead><tr><th>Élève</th><th>Cotation</th><th>Situation</th><th>Statut administratif</th></tr></thead><tbody>' + rows + '</tbody></table></div><footer class="grade-actions"><span><i data-lucide="info"></i> Les montants financiers ne sont jamais visibles ici.</span><div><button class="secondary-button" id="saveGrades" type="button"><i data-lucide="save"></i> Brouillon</button><button class="primary-button dark" id="publishGrades" type="button"><i data-lucide="send"></i> Publier les cotes</button></div></footer></section>';
+    return '<section class="pedagogy-panel gradebook"><header class="gradebook-head"><div><span>Cotation de la classe</span><h3>' + escapeMarkup(selected.title) + '</h3><p>' + escapeMarkup(selected.className + " · " + selected.subject + " · " + selected.language) + '</p></div><label>Travail<select id="gradeAssignmentSelect">' + pedagogyState.assignments.map(function (item, index) { return '<option value="' + index + '"' + (index === pedagogyState.selectedAssignment ? " selected" : "") + '>' + escapeMarkup(item.title) + '</option>'; }).join("") + '</select></label></header><div class="grade-summary"><article><small>Barème</small><b>' + (qualitative ? "Qualitatif" : "/ " + selected.scale) + '</b></article><article><small>Cotes remplies</small><b>' + selected.grades.filter(function (grade) { return grade != null; }).length + ' / ' + pedagogyState.students.length + '</b></article><article><small>Publication</small><b>' + (selected.published ? "Visible" : "Brouillon") + '</b></article></div>' + window.ssTable({
+      headers: ['Élève', 'Cotation', 'Situation', 'Statut administratif'],
+      rows: rows,
+      empty: 'Aucun élève dans cette classe.',
+      emptyTitle: 'Cotation',
+      responsive: true
+    }) + '<footer class="grade-actions"><span><i data-lucide="info"></i> Les montants financiers ne sont jamais visibles ici.</span><div>' + ssButton({ variant: "secondary", icon: "save", label: "Brouillon", attrs: { id: "saveGrades" } }) + ' ' + ssButton({ variant: "primary", icon: "send", label: "Publier les cotes", attrs: { id: "publishGrades" } }) + '</div></footer></section>';
   }
 
   function numberInput(name, label, value, suffix) {
@@ -894,21 +847,21 @@
   }
 
   function renderRulesTab() {
-    return '<form class="pedagogy-rules" id="pedagogyRulesForm"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Calendrier des résultats</span><h3>Périodes scolaires</h3></div><i data-lucide="calendar-range"></i></header><div class="pedagogy-form-grid compact"><label>Organisation<select name="periodType"><option' + (pedagogyState.periods.type === "Trimestres" ? " selected" : "") + '>Trimestres</option><option' + (pedagogyState.periods.type === "Semestres" ? " selected" : "") + '>Semestres</option><option>Périodes personnalisées</option></select></label><label>Nombre de périodes<input name="periodCount" type="number" min="1" max="12" value="' + pedagogyState.periods.count + '"></label><label>Seuil de réussite<span class="number-field"><input name="passMark" type="number" value="' + pedagogyState.periods.passMark + '"><b>%</b></span></label><label>Décimales<select name="precision"><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option></select></label></div></section><section class="pedagogy-panel"><header class="panel-heading"><div><span>Calcul de période</span><h3>Poids des évaluations</h3></div><i data-lucide="calculator"></i></header><div class="rule-grid">' + numberInput("homeworkWeight", "Devoirs", pedagogyState.weights.homework, "%") + numberInput("quizWeight", "Interrogations", pedagogyState.weights.quiz, "%") + numberInput("examWeight", "Examens", pedagogyState.weights.exam, "%") + '</div><p class="rule-total" id="assessmentWeightTotal">Total : ' + (pedagogyState.weights.homework + pedagogyState.weights.quiz + pedagogyState.weights.exam) + ' %</p></section><section class="pedagogy-panel"><header class="panel-heading"><div><span>École bilingue</span><h3>Langues d’enseignement</h3></div><i data-lucide="languages"></i></header><div class="rule-grid">' + numberInput("frenchWeight", "Français", pedagogyState.languages[0].weight, "%") + numberInput("englishWeight", "Anglais", pedagogyState.languages[1].weight, "%") + '<label>Matière éliminatoire<select name="eliminatory"><option>Option désactivée</option><option>Au moins une matière</option></select></label></div><p class="rule-total">Chaque langue garde ses matières et ses cotations dans le bulletin unique.</p></section><section class="pedagogy-panel"><header class="panel-heading"><div><span>Vie scolaire</span><h3>Calcul de la conduite</h3></div><i data-lucide="shield-check"></i></header><div class="rule-grid">' + numberInput("teacherConduct", "Enseignant", pedagogyState.conduct.teacher, "%") + numberInput("disciplineConduct", "Responsable de discipline", pedagogyState.conduct.discipline, "%") + '<label>Rattrapage<select name="makeup"><option>Décision de l’enseignant</option><option>Remplace la note initiale</option><option>Conserve les deux notes</option></select></label></div></section><footer class="rules-footer"><span><i data-lucide="history"></i> Les résultats clôturés ne seront jamais recalculés silencieusement.</span><button class="primary-button dark" type="submit"><i data-lucide="save"></i> Enregistrer les règles</button></footer></form>';
+    return '<form class="pedagogy-rules" id="pedagogyRulesForm"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Calendrier des résultats</span><h3>Périodes scolaires</h3></div><i data-lucide="calendar-range"></i></header><div class="pedagogy-form-grid compact"><label>Organisation<select name="periodType"><option' + (pedagogyState.periods.type === "Trimestres" ? " selected" : "") + '>Trimestres</option><option' + (pedagogyState.periods.type === "Semestres" ? " selected" : "") + '>Semestres</option><option>Périodes personnalisées</option></select></label><label>Nombre de périodes<input name="periodCount" type="number" min="1" max="12" value="' + pedagogyState.periods.count + '"></label><label>Seuil de réussite<span class="number-field"><input name="passMark" type="number" value="' + pedagogyState.periods.passMark + '"><b>%</b></span></label><label>Décimales<select name="precision"><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option></select></label></div></section><section class="pedagogy-panel"><header class="panel-heading"><div><span>Calcul de période</span><h3>Poids des évaluations</h3></div><i data-lucide="calculator"></i></header><div class="rule-grid">' + numberInput("homeworkWeight", "Devoirs", pedagogyState.weights.homework, "%") + numberInput("quizWeight", "Interrogations", pedagogyState.weights.quiz, "%") + numberInput("examWeight", "Examens", pedagogyState.weights.exam, "%") + '</div><p class="rule-total" id="assessmentWeightTotal">Total : ' + (pedagogyState.weights.homework + pedagogyState.weights.quiz + pedagogyState.weights.exam) + ' %</p></section><section class="pedagogy-panel"><header class="panel-heading"><div><span>École bilingue</span><h3>Langues d’enseignement</h3></div><i data-lucide="languages"></i></header><div class="rule-grid">' + numberInput("frenchWeight", "Français", pedagogyState.languages[0].weight, "%") + numberInput("englishWeight", "Anglais", pedagogyState.languages[1].weight, "%") + '<label>Matière éliminatoire<select name="eliminatory"><option>Option désactivée</option><option>Au moins une matière</option></select></label></div><p class="rule-total">Chaque langue garde ses matières et ses cotations dans le bulletin unique.</p></section><section class="pedagogy-panel"><header class="panel-heading"><div><span>Vie scolaire</span><h3>Calcul de la conduite</h3></div><i data-lucide="shield-check"></i></header><div class="rule-grid">' + numberInput("teacherConduct", "Enseignant", pedagogyState.conduct.teacher, "%") + numberInput("disciplineConduct", "Responsable de discipline", pedagogyState.conduct.discipline, "%") + '<label>Rattrapage<select name="makeup"><option>Décision de l’enseignant</option><option>Remplace la note initiale</option><option>Conserve les deux notes</option></select></label></div></section><footer class="rules-footer"><span><i data-lucide="history"></i> Les résultats clôturés ne seront jamais recalculés silencieusement.</span>' + ssButton({ variant: "primary", type: "submit", icon: "save", label: "Enregistrer les règles" }) + '</footer></form>';
   }
 
   function renderBulletinTab() {
     var parentChild = pedagogyState.parentChildren[pedagogyState.selectedParentChild];
     if (currentDemoRole === "parent" && !parentChild.paid) {
-      return '<section class="result-locked"><span><i data-lucide="file-lock-2"></i></span><div><small>Résultat officiel non disponible</small><h3>' + escapeMarkup(parentChild.name) + '</h3><p>Les devoirs et cotations quotidiennes restent visibles. Le bulletin de fin de période et le résultat annuel attendent une autorisation de la Direction.</p><button class="secondary-button" type="button" data-return-parent><i data-lucide="arrow-left"></i> Retour au suivi quotidien</button></div></section>';
+      return '<section class="result-locked"><span><i data-lucide="file-lock-2"></i></span><div><small>Résultat officiel non disponible</small><h3>' + escapeMarkup(parentChild.name) + '</h3><p>Les devoirs et cotations quotidiennes restent visibles. Le bulletin de fin de période et le résultat annuel attendent une autorisation de la Direction.</p>' + ssButton({ variant: "secondary", icon: "arrow-left", label: "Retour au suivi quotidien", attrs: { "data-return-parent": true } }) + '</div></section>';
     }
     var periods = Array.from({ length: pedagogyState.periods.count }, function (_, index) {
       var closed = Boolean(pedagogyState.periodStatuses[index]);
       return '<article class="period-card ' + (closed ? "closed" : "") + '"><header><span>' + (index + 1) + '</span><div><b>' + escapeMarkup(pedagogyState.periods.type.replace(/s$/, "")) + ' ' + (index + 1) + '</b><small>' + (closed ? "Validé par la Direction pédagogique" : "En cours de remplissage") + '</small></div><i data-lucide="' + (closed ? "lock-keyhole" : "circle-dashed") + '"></i></header><div><span>Français <b>' + (closed ? "14,25 / 20" : "—") + '</b></span><span>Anglais <b>' + (closed ? "13,75 / 20" : "—") + '</b></span><span>Synthèse <b>' + (closed ? "14,00 / 20" : "—") + '</b></span></div></article>';
     }).join("");
     var canValidate = currentDemoRole === "pedagogy" || currentDemoRole === "admin";
-    var validationButton = canValidate && pedagogyState.periodStatuses.some(function (status) { return !status; }) ? '<button class="secondary-button" type="button" id="validatePeriod"><i data-lucide="badge-check"></i> Valider la période suivante</button>' : "";
-    return '<section class="continuous-bulletin"><header class="bulletin-identity"><div class="student-photo">' + escapeMarkup(currentDemoRole === "parent" ? parentChild.initials : "LM") + '</div><div><span>Bulletin scolaire continu · 2026-2027</span><h3>' + escapeMarkup(currentDemoRole === "parent" ? parentChild.name : "Lucas Martin") + '</h3><p>' + escapeMarkup(currentDemoRole === "parent" ? parentChild.className : "1re A") + ' · Cycle primaire · Matricule 4521</p></div><span class="single-record"><i data-lucide="file-check-2"></i> Un bulletin annuel</span></header><div class="bulletin-metrics"><article><small>Moyenne consolidée</small><b>14,00 / 20</b><span>70 % · Réussite</span></article><article><small>Position provisoire</small><b>5e / 32</b><span>Après validation</span></article><article><small>Conduite</small><b>Très bien</b><span>40 % + 60 %</span></article><article><small>Langues</small><b>50 / 50</b><span>Français · Anglais</span></article></div><div class="period-grid">' + periods + '</div><section class="subject-results"><header><h3>Résultats par matière et langue</h3><span>Deux décimales</span></header><div class="language-result"><b>Mathématiques</b><span>FR <strong>15,25</strong></span><span>EN <strong>14,50</strong></span><span>Synthèse <strong>14,88</strong></span></div><div class="language-result"><b>Français / English</b><span>FR <strong>13,75</strong></span><span>EN <strong>14,25</strong></span><span>Synthèse <strong>14,00</strong></span></div></section><footer><span><i data-lucide="badge-check"></i> Le PDF officiel portera le logo de l’école après validation.</span><div class="bulletin-actions">' + validationButton + '<button class="primary-button dark" type="button" id="prepareBulletin"><i data-lucide="file-down"></i> Préparer le PDF</button></div></footer></section>';
+    var validationButton = canValidate && pedagogyState.periodStatuses.some(function (status) { return !status; }) ? 'ssButton({ variant: "secondary", icon: "badge-check", label: "Valider la période suivante", attrs: { id: "validatePeriod" } })' : "";
+    return '<section class="continuous-bulletin"><header class="bulletin-identity"><div class="student-photo">' + escapeMarkup(currentDemoRole === "parent" ? parentChild.initials : "LM") + '</div><div><span>Bulletin scolaire continu · 2026-2027</span><h3>' + escapeMarkup(currentDemoRole === "parent" ? parentChild.name : "Lucas Martin") + '</h3><p>' + escapeMarkup(currentDemoRole === "parent" ? parentChild.className : "1re A") + ' · Cycle primaire · Matricule 4521</p></div><span class="single-record"><i data-lucide="file-check-2"></i> Un bulletin annuel</span></header><div class="bulletin-metrics"><article><small>Moyenne consolidée</small><b>14,00 / 20</b><span>70 % · Réussite</span></article><article><small>Position provisoire</small><b>5e / 32</b><span>Après validation</span></article><article><small>Conduite</small><b>Très bien</b><span>40 % + 60 %</span></article><article><small>Langues</small><b>50 / 50</b><span>Français · Anglais</span></article></div><div class="period-grid">' + periods + '</div><section class="subject-results"><header><h3>Résultats par matière et langue</h3><span>Deux décimales</span></header><div class="language-result"><b>Mathématiques</b><span>FR <strong>15,25</strong></span><span>EN <strong>14,50</strong></span><span>Synthèse <strong>14,88</strong></span></div><div class="language-result"><b>Français / English</b><span>FR <strong>13,75</strong></span><span>EN <strong>14,25</strong></span><span>Synthèse <strong>14,00</strong></span></div></section><footer><span><i data-lucide="badge-check"></i> Le PDF officiel portera le logo de l’école après validation.</span><div class="bulletin-actions">' + validationButton + '' + ssButton({ variant: "primary", icon: "file-down", label: "Préparer le PDF", attrs: { id: "prepareBulletin" } }) + '</div></footer></section>';
   }
 
   function renderParentTab() {
@@ -919,18 +872,19 @@
     }).join("");
     var childOptions = pedagogyState.parentChildren.map(function (item, index) { return '<option value="' + index + '"' + (index === pedagogyState.selectedParentChild ? " selected" : "") + '>' + escapeMarkup(item.name + " · " + item.className) + '</option>'; }).join("");
     var officialCopy = child.paid ? "Visible après validation pédagogique et confirmation administrative. Les paiements ne transitent pas dans SchoolSafe." : "Le suivi quotidien reste disponible. Le résultat officiel attend une autorisation de la Direction.";
-    return '<div class="parent-learning"><div class="parent-child-picker"><label>Enfant suivi<select id="parentChildSelect">' + childOptions + '</select></label></div><header><div><span>Suivi pédagogique</span><h3>' + escapeMarkup(child.name) + '</h3><p>Les devoirs et cotations publiés par ses enseignants.</p></div><span class="payment-state ' + (child.paid ? "" : "pending") + '"><i data-lucide="' + (child.paid ? "badge-check" : "clock-3") + '"></i> ' + (child.paid ? "En règle" : "À régulariser") + '</span></header><div class="parent-summary"><article><small>Devoirs publiés</small><b>' + pedagogyState.assignments.filter(function (item) { return item.published; }).length + '</b></article><article><small>Moyenne officielle</small><b>' + escapeMarkup(child.average) + '</b></article><article><small>Classement validé</small><b>' + escapeMarkup(child.rank) + '</b></article></div><section class="parent-work-list"><header><h3>Travaux et cotations</h3><span>Mise à jour dans l’application</span></header>' + cards + '</section><aside class="official-result ' + (child.paid ? "" : "restricted") + '"><i data-lucide="file-lock-2"></i><div><b>Résultat officiel de fin de période</b><p>' + officialCopy + '</p></div><button class="secondary-button" type="button" data-parent-bulletin' + (child.paid ? "" : " disabled") + '>' + (child.paid ? "Consulter" : "Accès suspendu") + '</button></aside></div>';
+    return '<div class="parent-learning"><div class="parent-child-picker"><label>Enfant suivi<select id="parentChildSelect">' + childOptions + '</select></label></div><header><div><span>Suivi pédagogique</span><h3>' + escapeMarkup(child.name) + '</h3><p>Les devoirs et cotations publiés par ses enseignants.</p></div><span class="payment-state ' + (child.paid ? "" : "pending") + '"><i data-lucide="' + (child.paid ? "badge-check" : "clock-3") + '"></i> ' + (child.paid ? "En règle" : "À régulariser") + '</span></header><div class="parent-summary"><article><small>Devoirs publiés</small><b>' + pedagogyState.assignments.filter(function (item) { return item.published; }).length + '</b></article><article><small>Moyenne officielle</small><b>' + escapeMarkup(child.average) + '</b></article><article><small>Classement validé</small><b>' + escapeMarkup(child.rank) + '</b></article></div><section class="parent-work-list"><header><h3>Travaux et cotations</h3><span>Mise à jour dans l’application</span></header>' + cards + '</section><aside class="official-result ' + (child.paid ? "" : "restricted") + '"><i data-lucide="file-lock-2"></i><div><b>Résultat officiel de fin de période</b><p>' + officialCopy + '</p></div>' + ssButton({ variant: "secondary", label: child.paid ? "Consulter" : "Accès suspendu", disabled: !child.paid, attrs: { "data-parent-bulletin": true } }) + '</aside></div>';
   }
 
   function money(value) {
     return new Intl.NumberFormat("fr-FR").format(Number(value || 0)) + " FC";
   }
+  window.money = money;
 
   function remediationStatusClass(status) {
     if (/renforcée/i.test(status)) return "danger";
-    if (/cours/i.test(status)) return "active";
-    if (/validé|terminé/i.test(status)) return "done";
-    return "pending";
+    if (/cours/i.test(status)) return "info";
+    if (/validé|terminé/i.test(status)) return "success";
+    return "warning";
   }
 
   function remediationCaseList() {
@@ -947,20 +901,20 @@
     if (cases.indexOf(selected) === -1) selected = cases[0];
     var list = cases.map(function (item) {
       var index = pedagogyState.remediation.cases.indexOf(item);
-      return '<button class="remediation-case-row' + (item === selected ? " active" : "") + '" type="button" data-remediation-case="' + index + '"><span class="student-avatar">' + item.initials + '</span><span><b>' + escapeMarkup(item.student) + '</b><small>' + escapeMarkup(item.className + " · " + item.month) + '</small></span><span class="case-score">' + String(item.average).replace(".", ",") + ' %</span><span class="case-status ' + remediationStatusClass(item.status) + '">' + escapeMarkup(item.status) + '</span></button>';
+      return '<button class="remediation-case-row' + (item === selected ? " active" : "") + '" type="button" data-remediation-case="' + index + '"><span class="student-avatar">' + item.initials + '</span><span><b>' + escapeMarkup(item.student) + '</b><small>' + escapeMarkup(item.className + " · " + item.month) + '</small></span><span class="case-score">' + String(item.average).replace(".", ",") + ' %</span>' + window.ssBadge({ variant: remediationStatusClass(item.status), label: item.status }) + '</button>';
     }).join("");
     var subjects = selected.subjects.map(function (subject) { return '<span><i data-lucide="book-open"></i>' + escapeMarkup(subject) + '</span>'; }).join("");
     var canDecide = currentDemoRole === "admin" || currentDemoRole === "school_head" || currentDemoRole === "pedagogy";
-    var decision = canDecide ? '<form class="remediation-decision" id="remediationDecisionForm"><h4>Décision de la Direction</h4><div><label>Enseignant<select name="teacher"><option' + (selected.teacher === "Non affecté" ? " selected" : "") + '>Non affecté</option><option' + (selected.teacher === "Mme Y" ? " selected" : "") + '>Mme Y</option><option>M. Kabasele</option></select></label><label>Prix mensuel<input name="price" type="number" min="0" value="' + selected.price + '"></label><label>Début<input name="start" value="' + escapeMarkup(selected.start) + '"></label><label>Fin<input name="end" value="' + escapeMarkup(selected.end) + '"></label></div><footer><button class="secondary-button" type="button" id="cancelDetection"><i data-lucide="circle-x"></i> Annuler la détection</button><button class="primary-button dark" type="submit"><i data-lucide="user-round-check"></i> Valider et affecter</button></footer></form>' : "";
+    var decision = canDecide ? '<form class="remediation-decision" id="remediationDecisionForm"><h4>Décision de la Direction</h4><div><label>Enseignant<select name="teacher"><option' + (selected.teacher === "Non affecté" ? " selected" : "") + '>Non affecté</option><option' + (selected.teacher === "Mme Y" ? " selected" : "") + '>Mme Y</option><option>M. Kabasele</option></select></label><label>Prix mensuel<input name="price" type="number" min="0" value="' + selected.price + '"></label><label>Début<input name="start" value="' + escapeMarkup(selected.start) + '"></label><label>Fin<input name="end" value="' + escapeMarkup(selected.end) + '"></label></div><footer>' + ssButton({ variant: "secondary", icon: "circle-x", label: "Annuler la détection", attrs: { id: "cancelDetection" } }) + ' ' + ssButton({ variant: "primary", type: "submit", icon: "user-round-check", label: "Valider et affecter" }) + '</footer></form>' : "";
     var alert = selected.monthsWithoutProgress >= 6 ? '<aside class="reinforced-alert"><i data-lucide="triangle-alert"></i><div><b>Accompagnement renforcé requis</b><p>Six mois sans progression suffisante. Une nouvelle convocation et un plan spécial doivent être préparés.</p></div></aside>' : "";
-    return '<div class="remediation-case-layout"><section class="remediation-list"><header><div><span>Analyse mensuelle automatique</span><h3>Élèves sous 50 %</h3></div><b>' + cases.length + '</b></header><div>' + list + '</div><aside class="free-makeup-note"><i data-lucide="shield-check"></i><div><b>Évaluation manquée avec absence justifiée</b><p>Rattrapage gratuit, organisé par l’enseignant et exclu du programme mensuel payant.</p></div></aside></section><section class="remediation-case-detail"><header><div class="student-avatar large">' + selected.initials + '</div><div><span>' + escapeMarkup(selected.cycle + " · " + selected.month) + '</span><h3>' + escapeMarkup(selected.student) + '</h3><p>' + escapeMarkup(selected.parentStatus) + '</p></div><span class="case-status ' + remediationStatusClass(selected.status) + '">' + escapeMarkup(selected.status) + '</span></header>' + alert + '<div class="remediation-subjects"><h4>Matières détectées séparément</h4><div>' + subjects + '</div></div><div class="remediation-facts"><article><small>Moyenne détectée</small><b>' + String(selected.average).replace(".", ",") + ' %</b></article><article><small>Enseignant affecté</small><b>' + escapeMarkup(selected.teacher) + '</b></article><article><small>Prix mensuel</small><b>' + money(selected.price) + '</b></article><article><small>Durée</small><b>1 mois</b></article></div><aside class="convocation-note"><i data-lucide="messages-square"></i><div><b>Convocation parent</b><p>Notification dans SchoolSafe et notification Web Push gratuite. Le parent doit rencontrer la Direction avant l’affectation.</p></div></aside>' + decision + '</section></div>';
+    return '<div class="remediation-case-layout"><section class="remediation-list"><header><div><span>Analyse mensuelle automatique</span><h3>Élèves sous 50 %</h3></div><b>' + cases.length + '</b></header><div>' + list + '</div><aside class="free-makeup-note"><i data-lucide="shield-check"></i><div><b>Évaluation manquée avec absence justifiée</b><p>Rattrapage gratuit, organisé par l’enseignant et exclu du programme mensuel payant.</p></div></aside></section><section class="remediation-case-detail"><header><div class="student-avatar large">' + selected.initials + '</div><div><span>' + escapeMarkup(selected.cycle + " · " + selected.month) + '</span><h3>' + escapeMarkup(selected.student) + '</h3><p>' + escapeMarkup(selected.parentStatus) + '</p></div>' + window.ssBadge({ variant: remediationStatusClass(selected.status), label: selected.status }) + '</header>' + alert + '<div class="remediation-subjects"><h4>Matières détectées séparément</h4><div>' + subjects + '</div></div><div class="remediation-facts"><article><small>Moyenne détectée</small><b>' + String(selected.average).replace(".", ",") + ' %</b></article><article><small>Enseignant affecté</small><b>' + escapeMarkup(selected.teacher) + '</b></article><article><small>Prix mensuel</small><b>' + money(selected.price) + '</b></article><article><small>Durée</small><b>1 mois</b></article></div><aside class="convocation-note"><i data-lucide="messages-square"></i><div><b>Convocation parent</b><p>Notification dans SchoolSafe et notification Web Push gratuite. Le parent doit rencontrer la Direction avant l’affectation.</p></div></aside>' + decision + '</section></div>';
   }
 
   function renderRemediationSchedule() {
     var cases = remediationCaseList().filter(function (item) { return item.teacher !== "Non affecté" && !item.cancelled; });
     var cards = cases.map(function (item) {
       var attendance = item.sessions.map(function (session) { return '<li><span>' + escapeMarkup(session.date + " · " + session.subject) + '</span><b class="' + (session.present ? "present" : "absent") + '">' + (session.present ? "Présent" : "Absent · séance perdue") + '</b></li>'; }).join("") || '<li><span>Aucune séance enregistrée</span><b>À organiser</b></li>';
-      return '<article class="remediation-plan"><header><span class="student-avatar">' + item.initials + '</span><div><h3>' + escapeMarkup(item.student) + '</h3><p>' + escapeMarkup(item.start + " au " + item.end) + '</p></div><span>' + item.sessions.length + ' séance(s)</span></header><div class="plan-subjects">' + item.subjects.map(function (subject) { return '<span>' + escapeMarkup(subject.split(" · ")[0]) + '</span>'; }).join("") + '</div><ul>' + attendance + '</ul><form data-session-form="' + pedagogyState.remediation.cases.indexOf(item) + '"><label>Date<input name="date" required placeholder="15 août"></label><label>Matière<select name="subject">' + item.subjects.map(function (subject) { return '<option>' + escapeMarkup(subject.split(" · ")[0]) + '</option>'; }).join("") + '</select></label><label>Présence<select name="presence"><option value="present">Présent</option><option value="absent">Absent</option></select></label><button class="primary-button" type="submit"><i data-lucide="plus"></i> Ajouter</button></form></article>';
+      return '<article class="remediation-plan"><header><span class="student-avatar">' + item.initials + '</span><div><h3>' + escapeMarkup(item.student) + '</h3><p>' + escapeMarkup(item.start + " au " + item.end) + '</p></div><span>' + item.sessions.length + ' séance(s)</span></header><div class="plan-subjects">' + item.subjects.map(function (subject) { return '<span>' + escapeMarkup(subject.split(" · ")[0]) + '</span>'; }).join("") + '</div><ul>' + attendance + '</ul><form data-session-form="' + pedagogyState.remediation.cases.indexOf(item) + '"><label>Date<input name="date" required placeholder="15 août"></label><label>Matière<select name="subject">' + item.subjects.map(function (subject) { return '<option>' + escapeMarkup(subject.split(" · ")[0]) + '</option>'; }).join("") + '</select></label><label>Présence<select name="presence"><option value="present">Présent</option><option value="absent">Absent</option></select></label>' + ssButton({ variant: "primary", type: "submit", icon: "plus", label: "Ajouter" }) + '</form></article>';
     }).join("");
     return '<div class="remediation-schedule"><header><div><span>Organisation libre de l’enseignant</span><h3>Suivi des séances</h3><p>Les absences déclenchent une alerte et ne prolongent pas le mois.</p></div><span><i data-lucide="calendar-clock"></i> Un mois fixe</span></header><div>' + cards + '</div></div>';
   }
@@ -971,9 +925,15 @@
     var rows = cases.map(function (item) {
       var teacherShare = item.paid * 0.6;
       var schoolShare = item.paid * 0.4;
-      return '<tr><td><b>' + escapeMarkup(item.student) + '</b><small>' + escapeMarkup(item.month) + '</small></td><td>' + money(item.price) + '</td><td>' + money(item.paid) + '</td><td>' + money(item.price - item.paid) + '</td><td>' + money(teacherShare) + '</td><td>' + money(schoolShare) + '</td><td><button class="icon-button light" type="button" data-add-installment="' + pedagogyState.remediation.cases.indexOf(item) + '" title="Enregistrer une tranche"><i data-lucide="circle-plus"></i></button></td></tr>';
+      return '<tr><td><b>' + escapeMarkup(item.student) + '</b><small>' + escapeMarkup(item.month) + '</small></td><td>' + money(item.price) + '</td><td>' + money(item.paid) + '</td><td>' + money(item.price - item.paid) + '</td><td>' + money(teacherShare) + '</td><td>' + money(schoolShare) + '</td><td>' + ssIconButton({ icon: "circle-plus", variant: "light", title: "Enregistrer une tranche", attrs: { "data-add-installment": pedagogyState.remediation.cases.indexOf(item) } }) + '</td></tr>';
     }).join("");
-    return '<section class="remediation-finance"><header><div><span>Enregistrement comptable local</span><h3>Versements et ventilation</h3><p>SchoolSafe enregistre les tranches; aucun argent ne transite dans l’application.</p></div><span class="closure-chip"><i data-lucide="calendar-check"></i> Paiement enseignant à la clôture</span></header><div class="finance-summary"><article><small>Total attendu</small><b>' + money(cases.reduce(function (sum, item) { return sum + item.price; }, 0)) + '</b></article><article><small>Réellement encaissé</small><b>' + money(totalPaid) + '</b></article><article><small>Part enseignants · 60 %</small><b>' + money(totalPaid * .6) + '</b></article><article><small>Part école · 40 %</small><b>' + money(totalPaid * .4) + '</b></article></div><div class="table-scroll"><table class="remediation-table"><thead><tr><th>Élève</th><th>Prix</th><th>Encaissé</th><th>Solde</th><th>Enseignant 60 %</th><th>École 40 %</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div><footer><span><i data-lucide="info"></i> Une tranche tardive sera intégrée à la clôture suivante.</span><button class="primary-button dark" type="button" id="closeRemediationMonth"><i data-lucide="lock-keyhole"></i> Préparer la clôture du mois</button></footer></section>';
+    return '<section class="remediation-finance"><header><div><span>Enregistrement comptable local</span><h3>Versements et ventilation</h3><p>SchoolSafe enregistre les tranches; aucun argent ne transite dans l’application.</p></div>' + window.ssBadge({ variant: "info", icon: "calendar-check", label: "Paiement enseignant à la clôture" }) + '</header><div class="finance-summary"><article><small>Total attendu</small><b>' + money(cases.reduce(function (sum, item) { return sum + item.price; }, 0)) + '</b></article><article><small>Réellement encaissé</small><b>' + money(totalPaid) + '</b></article><article><small>Part enseignants · 60 %</small><b>' + money(totalPaid * .6) + '</b></article><article><small>Part école · 40 %</small><b>' + money(totalPaid * .4) + '</b></article></div>' + window.ssTable({
+      headers: ['Élève', 'Prix', 'Encaissé', 'Solde', 'Enseignant 60 %', 'École 40 %', ''],
+      rows: rows,
+      empty: 'Aucun cas de rattrapage.',
+      emptyTitle: 'Versements et ventilation',
+      responsive: true
+    }) + '<footer><span><i data-lucide="info"></i> Une tranche tardive sera intégrée à la clôture suivante.</span>' + ssButton({ variant: "primary", icon: "lock-keyhole", label: "Préparer la clôture du mois", attrs: { id: "closeRemediationMonth" } }) + '</footer></section>';
   }
 
   function renderRemediationReports() {
@@ -981,14 +941,14 @@
     var reports = cases.map(function (item) {
       var index = pedagogyState.remediation.cases.indexOf(item);
       var gain = item.progress - item.average;
-      return '<article class="remediation-report"><header><span class="student-avatar">' + item.initials + '</span><div><h3>' + escapeMarkup(item.student) + '</h3><p>' + escapeMarkup(item.month + " · " + item.teacher) + '</p></div><span class="case-status ' + (item.validated ? "done" : "pending") + '">' + (item.validated ? "Validé" : "À valider") + '</span></header><div class="progress-comparison"><div><small>Détection</small><b>' + String(item.average).replace(".", ",") + ' %</b></div><i data-lucide="arrow-right"></i><div><small>Fin du suivi</small><b>' + item.progress + ' %</b></div><strong>+' + String(gain).replace(".", ",") + ' points</strong></div><label>Bilan pédagogique<textarea data-report-index="' + index + '" rows="3">' + escapeMarkup(item.report) + '</textarea></label><footer><span>Résultat séparé du bulletin officiel</span>' + (currentDemoRole === "pedagogy" || currentDemoRole === "admin" ? '<button class="primary-button" type="button" data-validate-report="' + index + '"' + (item.validated ? " disabled" : "") + '><i data-lucide="badge-check"></i> ' + (item.validated ? "Bilan validé" : "Valider le bilan") + '</button>' : '<button class="secondary-button" type="button" data-save-report="' + index + '"><i data-lucide="save"></i> Enregistrer</button>') + '</footer></article>';
+      return '<article class="remediation-report"><header><span class="student-avatar">' + item.initials + '</span><div><h3>' + escapeMarkup(item.student) + '</h3><p>' + escapeMarkup(item.month + " · " + item.teacher) + '</p></div>' + window.ssBadge({ variant: item.validated ? "success" : "warning", label: item.validated ? "Validé" : "À valider" }) + '</header><div class="progress-comparison"><div><small>Détection</small><b>' + String(item.average).replace(".", ",") + ' %</b></div><i data-lucide="arrow-right"></i><div><small>Fin du suivi</small><b>' + item.progress + ' %</b></div><strong>+' + String(gain).replace(".", ",") + ' points</strong></div><label>Bilan pédagogique<textarea data-report-index="' + index + '" rows="3">' + escapeMarkup(item.report) + '</textarea></label><footer><span>Résultat séparé du bulletin officiel</span>' + (currentDemoRole === "pedagogy" || currentDemoRole === "admin" ? '' + ssButton({ variant: "primary", icon: "badge-check", label: item.validated ? "Bilan validé" : "Valider le bilan", disabled: item.validated, attrs: { "data-validate-report": index } }) + '' : '' + ssButton({ variant: "secondary", icon: "save", label: "Enregistrer", attrs: { "data-save-report": index } }) + '') + '</footer></article>';
     }).join("");
     return '<div class="remediation-reports"><header><div><span>Fin du mois</span><h3>Progression et bilans</h3></div><span><i data-lucide="file-check-2"></i> Validation pédagogique</span></header><div>' + reports + '</div></div>';
   }
 
   function renderRemediationParent() {
     var item = pedagogyState.remediation.cases.filter(function (record) { return record.student === "Lucas Martin"; })[0];
-    return '<div class="remediation-parent"><header><div><span>Accompagnement pédagogique</span><h3>' + escapeMarkup(item.student) + '</h3><p>' + escapeMarkup(item.month + " · " + item.className) + '</p></div><span class="case-status ' + remediationStatusClass(item.status) + '">' + escapeMarkup(item.status) + '</span></header><div class="parent-remediation-summary"><article><small>Enseignant</small><b>' + escapeMarkup(item.teacher) + '</b></article><article><small>Période</small><b>' + escapeMarkup(item.start + " au " + item.end) + '</b></article><article><small>Progression</small><b>' + item.average + ' % → ' + item.progress + ' %</b></article></div><section><h3>Matières accompagnées</h3>' + item.subjects.map(function (subject) { return '<span><i data-lucide="book-open-check"></i>' + escapeMarkup(subject) + '</span>'; }).join("") + '</section><section class="parent-installments"><header><h3>Situation du programme</h3><span>Aucun paiement en ligne</span></header><div><span>Prix fixé par la Direction <b>' + money(item.price) + '</b></span><span>Versements enregistrés <b>' + money(item.paid) + '</b></span><span>Solde restant <b>' + money(item.price - item.paid) + '</b></span></div></section><aside><i data-lucide="info"></i><p>Les résultats de cet accompagnement mesurent la progression. Ils restent séparés du bulletin officiel et ne décident pas du passage de classe.</p></aside></div>';
+    return '<div class="remediation-parent"><header><div><span>Accompagnement pédagogique</span><h3>' + escapeMarkup(item.student) + '</h3><p>' + escapeMarkup(item.month + " · " + item.className) + '</p></div>' + window.ssBadge({ variant: remediationStatusClass(item.status), label: item.status }) + '</header><div class="parent-remediation-summary"><article><small>Enseignant</small><b>' + escapeMarkup(item.teacher) + '</b></article><article><small>Période</small><b>' + escapeMarkup(item.start + " au " + item.end) + '</b></article><article><small>Progression</small><b>' + item.average + ' % → ' + item.progress + ' %</b></article></div><section><h3>Matières accompagnées</h3>' + item.subjects.map(function (subject) { return '<span><i data-lucide="book-open-check"></i>' + escapeMarkup(subject) + '</span>'; }).join("") + '</section><section class="parent-installments"><header><h3>Situation du programme</h3><span>Aucun paiement en ligne</span></header><div><span>Prix fixé par la Direction <b>' + money(item.price) + '</b></span><span>Versements enregistrés <b>' + money(item.paid) + '</b></span><span>Solde restant <b>' + money(item.price - item.paid) + '</b></span></div></section><aside><i data-lucide="info"></i><p>Les résultats de cet accompagnement mesurent la progression. Ils restent séparés du bulletin officiel et ne décident pas du passage de classe.</p></aside></div>';
   }
 
   function renderRemediationTab() {
@@ -1015,11 +975,12 @@
   }
 
   function certificationStatusClass(value) {
-    if (/complet|réussi|publié|présent|terminé|validé|en ordre/i.test(value) && !/incomplet/i.test(value)) return "done";
-    if (/incomplet|rejeté|absent|échoué|non admis|régulariser/i.test(value)) return "danger";
-    if (/vérifier|attente|venir/i.test(value)) return "pending";
-    return "active";
+    if (/complet|réussi|publié|présent|terminé|validé|en ordre/i.test(value) && !/incomplet/i.test(value)) return "success";
+    if (/incomplet|rejeté|absent|échoué|non admis|régulariser/i.test(value)) return "error";
+    if (/vérifier|attente|venir/i.test(value)) return "warning";
+    return "info";
   }
+  window.certificationStatusClass = certificationStatusClass;
 
   function certificationFiltersMarkup(exam) {
     function options(values, selected) {
@@ -1037,11 +998,17 @@
     var candidates = certificationCandidates();
     var canManage = currentDemoRole === "admin" || currentDemoRole === "school_head" || currentDemoRole === "pedagogy" || currentDemoRole === "secretary";
     var rows = candidates.map(function (candidate, index) {
-      return '<tr><td><span class="student-avatar">' + candidate.initials + '</span><b>' + escapeMarkup(candidate.name) + '</b><small>' + escapeMarkup(candidate.sex) + '</small></td><td><b class="candidate-class">' + escapeMarkup(candidate.className) + '</b>' + (candidate.option ? '<span class="candidate-option">' + escapeMarkup(candidate.option) + '</span>' : "") + '</td><td>' + escapeMarkup(candidate.number) + '</td><td>' + escapeMarkup(candidate.center) + '</td><td><span class="case-status ' + certificationStatusClass(candidate.dossier) + '">' + escapeMarkup(candidate.dossier) + '</span></td><td><button class="icon-button light" type="button" data-cert-candidate="' + exam.candidates.indexOf(candidate) + '" title="Ouvrir le dossier"><i data-lucide="folder-open"></i></button></td></tr>';
+      return '<tr><td><span class="student-avatar">' + candidate.initials + '</span><b>' + escapeMarkup(candidate.name) + '</b><small>' + escapeMarkup(candidate.sex) + '</small></td><td><b class="candidate-class">' + escapeMarkup(candidate.className) + '</b>' + (candidate.option ? '<span class="candidate-option">' + escapeMarkup(candidate.option) + '</span>' : "") + '</td><td>' + escapeMarkup(candidate.number) + '</td><td>' + escapeMarkup(candidate.center) + '</td><td>' + window.ssBadge({ variant: certificationStatusClass(candidate.dossier), label: candidate.dossier }) + '</td><td>' + ssIconButton({ icon: "folder-open", variant: "light", title: "Ouvrir le dossier", attrs: { "data-cert-candidate": exam.candidates.indexOf(candidate) } }) + '</td></tr>';
     }).join("");
     var selected = exam.candidates[pedagogyState.certifications.selectedCandidate] || exam.candidates[0];
-    var exetatDetails = selected.option ? '<div><dt>Option / filière</dt><dd>' + escapeMarkup(selected.option) + '</dd></div><div><dt>Type de cycle</dt><dd>' + escapeMarkup(selected.cycleType) + '</dd></div><div><dt>Jury</dt><dd>' + escapeMarkup(selected.jury) + '</dd></div><div><dt>Participation</dt><dd><span class="case-status ' + certificationStatusClass(selected.participationStatus) + '">' + escapeMarkup(selected.participationStatus) + '</span></dd></div>' : "";
-    return '<div class="certification-candidate-layout"><section class="certification-table-card"><header><div><span>Registre des candidats</span><h3>Dossiers et affectations</h3></div><b>' + candidates.length + '</b></header>' + certificationFiltersMarkup(exam) + '<div class="table-scroll"><table class="certification-table"><thead><tr><th>Candidat</th><th>Classe / option</th><th>Numéro</th><th>Centre / jury</th><th>Dossier</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></section><aside class="candidate-file"><header><span class="student-avatar large">' + selected.initials + '</span><div><small>' + escapeMarkup(exam.label + " · " + selected.className) + '</small><h3>' + escapeMarkup(selected.name) + '</h3><p>' + escapeMarkup(selected.number) + '</p></div><span class="case-status ' + certificationStatusClass(selected.dossier) + '">' + escapeMarkup(selected.dossier) + '</span></header><dl><div><dt>Centre</dt><dd>' + escapeMarkup(selected.center) + '</dd></div>' + exetatDetails + '<div><dt>Préparation</dt><dd>' + selected.preparation + ' %</dd></div><div><dt>Présence</dt><dd>' + escapeMarkup(selected.attendance) + '</dd></div><div><dt>Résultat officiel</dt><dd>' + (selected.percentage == null ? "Non publié" : String(selected.percentage).replace(".", ",") + " % · " + selected.decision) + '</dd></div></dl><aside><i data-lucide="shield-check"></i><p>L’identité, le numéro de candidat, l’option, le jury et le centre doivent être vérifiés avant transmission. SchoolSafe ne fabrique aucun résultat national et ne produit aucun diplôme d’État.</p></aside>' + (canManage ? '<button class="secondary-button" type="button" data-cert-save><i data-lucide="save"></i> Enregistrer le contrôle local</button>' : "") + '</aside></div>';
+    var exetatDetails = selected.option ? '<div><dt>Option / filière</dt><dd>' + escapeMarkup(selected.option) + '</dd></div><div><dt>Type de cycle</dt><dd>' + escapeMarkup(selected.cycleType) + '</dd></div><div><dt>Jury</dt><dd>' + escapeMarkup(selected.jury) + '</dd></div><div><dt>Participation</dt><dd>' + window.ssBadge({ variant: certificationStatusClass(selected.participationStatus), label: selected.participationStatus }) + '</dd></div>' : "";
+    return '<div class="certification-candidate-layout"><section class="certification-table-card"><header><div><span>Registre des candidats</span><h3>Dossiers et affectations</h3></div><b>' + candidates.length + '</b></header>' + certificationFiltersMarkup(exam) + window.ssTable({
+      headers: ['Candidat', 'Classe / option', 'Numéro', 'Centre / jury', 'Dossier', ''],
+      rows: rows,
+      empty: 'Aucun candidat enregistré.',
+      emptyTitle: 'Dossiers et affectations',
+      responsive: true
+    }) + '</section><aside class="candidate-file"><header><span class="student-avatar large">' + selected.initials + '</span><div><small>' + escapeMarkup(exam.label + " · " + selected.className) + '</small><h3>' + escapeMarkup(selected.name) + '</h3><p>' + escapeMarkup(selected.number) + '</p></div>' + window.ssBadge({ variant: certificationStatusClass(selected.dossier), label: selected.dossier }) + '</header><dl><div><dt>Centre</dt><dd>' + escapeMarkup(selected.center) + '</dd></div>' + exetatDetails + '<div><dt>Préparation</dt><dd>' + selected.preparation + ' %</dd></div><div><dt>Présence</dt><dd>' + escapeMarkup(selected.attendance) + '</dd></div><div><dt>Résultat officiel</dt><dd>' + (selected.percentage == null ? "Non publié" : String(selected.percentage).replace(".", ",") + " % · " + selected.decision) + '</dd></div></dl><aside><i data-lucide="shield-check"></i><p>L’identité, le numéro de candidat, l’option, le jury et le centre doivent être vérifiés avant transmission. SchoolSafe ne fabrique aucun résultat national et ne produit aucun diplôme d’État.</p></aside>' + (canManage ? '' + ssButton({ variant: "secondary", icon: "save", label: "Enregistrer le contrôle local", attrs: { "data-cert-save": true } }) + '' : "") + '</aside></div>';
   }
 
   function renderCertificationPreparation(exam) {
@@ -1051,18 +1018,18 @@
     var offsets = [-3, 2, -6];
     var cards = candidates.map(function (candidate) {
       var areaRows = areas.map(function (area, index) { return '<span>' + escapeMarkup(area) + ' <b>' + Math.max(35, Math.min(98, candidate.preparation + offsets[index % offsets.length])) + ' %</b></span>'; }).join("");
-      return '<article class="preparation-card"><header><span class="student-avatar">' + candidate.initials + '</span><div><h3>' + escapeMarkup(candidate.name) + '</h3><p>' + escapeMarkup(candidate.className + (candidate.option ? " · " + candidate.option : "")) + '</p></div><b>' + candidate.preparation + ' %</b></header><div class="preparation-bar"><i style="width:' + candidate.preparation + '%"></i></div><div>' + areaRows + '</div><footer><span>Simulations séparées du résultat officiel</span><button class="icon-button light" type="button" title="Consigner une simulation"><i data-lucide="clipboard-pen-line"></i></button></footer></article>';
+      return '<article class="preparation-card"><header><span class="student-avatar">' + candidate.initials + '</span><div><h3>' + escapeMarkup(candidate.name) + '</h3><p>' + escapeMarkup(candidate.className + (candidate.option ? " · " + candidate.option : "")) + '</p></div><b>' + candidate.preparation + ' %</b></header><div class="preparation-bar"><i style="width:' + candidate.preparation + '%"></i></div><div>' + areaRows + '</div><footer><span>Simulations séparées du résultat officiel</span>' + ssIconButton({ icon: "clipboard-pen-line", variant: "light", title: "Consigner une simulation" }) + '</footer></article>';
     }).join("");
-    return '<section class="certification-preparation"><header><div><span>Préparation interne de l’école</span><h3>Simulations et progression</h3><p>Les enseignants suivent la préparation sans modifier le bulletin ni le futur résultat national.</p></div><button class="secondary-button" type="button" data-export-cert="preparation"><i data-lucide="file-down"></i> Exporter la préparation PDF</button></header><div>' + cards + '</div></section>';
+    return '<section class="certification-preparation"><header><div><span>Préparation interne de l’école</span><h3>Simulations et progression</h3><p>Les enseignants suivent la préparation sans modifier le bulletin ni le futur résultat national.</p></div>' + ssButton({ variant: "secondary", icon: "file-down", label: "Exporter la préparation PDF", attrs: { "data-export-cert": "preparation" } }) + '</header><div>' + cards + '</div></section>';
   }
 
   function renderCertificationStages(exam) {
     if (!exam.phases || !exam.phases.length) {
-      return '<section class="certification-stages empty"><i data-lucide="calendar-clock"></i><div><h3>Calendrier national à confirmer</h3><p>L’école ajoutera les étapes officielles après publication du calendrier de la session.</p></div></section>';
+      return '<section class="certification-stages">' + window.ssState({ type: "empty", title: "Calendrier national à confirmer", message: "L’école ajoutera les étapes officielles après publication du calendrier de la session.", icon: "calendar-clock" }) + '</section>';
     }
     var completed = exam.phases.filter(function (phase) { return /terminé|publié/i.test(phase.status); }).length;
     var phases = exam.phases.map(function (phase, index) {
-      return '<article><span class="stage-number">' + (index + 1) + '</span><div><header><small>' + escapeMarkup(phase.scope) + '</small><span class="case-status ' + certificationStatusClass(phase.status) + '">' + escapeMarkup(phase.status) + '</span></header><h3>' + escapeMarkup(phase.label) + '</h3><b><i data-lucide="calendar-days"></i>' + escapeMarkup(phase.date) + '</b><p>' + escapeMarkup(phase.detail) + '</p></div></article>';
+      return '<article><span class="stage-number">' + (index + 1) + '</span><div><header><small>' + escapeMarkup(phase.scope) + '</small>' + window.ssBadge({ variant: certificationStatusClass(phase.status), label: phase.status }) + '</header><h3>' + escapeMarkup(phase.label) + '</h3><b><i data-lucide="calendar-days"></i>' + escapeMarkup(phase.date) + '</b><p>' + escapeMarkup(phase.detail) + '</p></div></article>';
     }).join("");
     return '<section class="certification-stages"><header><div><span>Parcours réglementaire suivi par l’école</span><h3>Étapes de l’EXETAT</h3><p>Calendrier 2026 de référence. Les dates d’une nouvelle session devront être confirmées avant utilisation.</p></div><div><b>' + completed + ' / ' + exam.phases.length + '</b><span>étapes documentées</span></div></header><div class="certification-stage-grid">' + phases + '</div><footer><i data-lucide="landmark"></i><p>Les corrections, le scannage, la délibération, la publication et le diplôme d’État relèvent exclusivement des services officiels. SchoolSafe conserve seulement le suivi local et la référence de la source.</p></footer></section>';
   }
@@ -1072,9 +1039,15 @@
     var passed = published.filter(function (candidate) { return candidate.decision === "Réussi"; }).length;
     var rate = published.length ? Math.round(passed / published.length * 100) : 0;
     var rows = published.map(function (candidate) {
-      return '<tr><td><span class="student-avatar">' + candidate.initials + '</span><b>' + escapeMarkup(candidate.name) + '</b></td><td><b class="candidate-class">' + escapeMarkup(candidate.className) + '</b>' + (candidate.option ? '<span class="candidate-option">' + escapeMarkup(candidate.option) + '</span>' : "") + '</td><td>' + escapeMarkup(candidate.number) + '</td><td><b>' + String(candidate.percentage).replace(".", ",") + ' %</b></td><td><span class="case-status ' + certificationStatusClass(candidate.decision) + '">' + escapeMarkup(candidate.decision) + '</span></td><td><button class="icon-button light" type="button" data-export-cert-person="' + exam.candidates.indexOf(candidate) + '" title="Télécharger le résultat individuel PDF"><i data-lucide="file-down"></i></button></td></tr>';
+      return '<tr><td><span class="student-avatar">' + candidate.initials + '</span><b>' + escapeMarkup(candidate.name) + '</b></td><td><b class="candidate-class">' + escapeMarkup(candidate.className) + '</b>' + (candidate.option ? '<span class="candidate-option">' + escapeMarkup(candidate.option) + '</span>' : "") + '</td><td>' + escapeMarkup(candidate.number) + '</td><td><b>' + String(candidate.percentage).replace(".", ",") + ' %</b></td><td>' + window.ssBadge({ variant: certificationStatusClass(candidate.decision), label: candidate.decision }) + '</td><td>' + ssIconButton({ icon: "file-down", variant: "light", title: "Télécharger le résultat individuel PDF", attrs: { "data-export-cert-person": exam.candidates.indexOf(candidate) } }) + '</td></tr>';
     }).join("") || '<tr><td colspan="6">Aucun résultat officiel validé pour ce filtre.</td></tr>';
-    return '<section class="certification-results"><header><div><span>Après publication et validation</span><h3>Résultats officiels enregistrés</h3><p>Chaque résultat conserve sa source, sa date d’import et la personne qui l’a vérifié.</p></div><div class="certification-export-actions"><button class="secondary-button" type="button" data-export-cert="filtered"><i data-lucide="filter"></i> PDF filtré</button><button class="primary-button dark" type="button" data-export-cert="all"><i data-lucide="file-down"></i> Exporter tous les résultats PDF</button></div></header><div class="certification-metrics"><article><small>Résultats publiés</small><b>' + published.length + '</b></article><article><small>Réussites</small><b>' + passed + '</b></article><article><small>Taux de réussite</small><b>' + rate + ' %</b></article><article><small>Source</small><b>À documenter</b></article></div>' + certificationFiltersMarkup(exam) + '<div class="table-scroll"><table class="certification-table"><thead><tr><th>Candidat</th><th>Classe</th><th>Numéro</th><th>Pourcentage</th><th>Décision</th><th>PDF</th></tr></thead><tbody>' + rows + '</tbody></table></div><footer><i data-lucide="badge-alert"></i><span>Dans cette démonstration, les valeurs sont fictives et les PDF portent la mention « Aperçu non officiel ».</span></footer></section>';
+    return '<section class="certification-results"><header><div><span>Après publication et validation</span><h3>Résultats officiels enregistrés</h3><p>Chaque résultat conserve sa source, sa date d’import et la personne qui l’a vérifié.</p></div><div class="certification-export-actions">' + ssButton({ variant: "secondary", icon: "filter", label: "PDF filtré", attrs: { "data-export-cert": "filtered" } }) + ' ' + ssButton({ variant: "primary", icon: "file-down", label: "Exporter tous les résultats PDF", attrs: { "data-export-cert": "all" } }) + '</div></header><div class="certification-metrics"><article><small>Résultats publiés</small><b>' + published.length + '</b></article><article><small>Réussites</small><b>' + passed + '</b></article><article><small>Taux de réussite</small><b>' + rate + ' %</b></article><article><small>Source</small><b>À documenter</b></article></div>' + certificationFiltersMarkup(exam) + window.ssTable({
+      headers: ['Candidat', 'Classe', 'Numéro', 'Pourcentage', 'Décision', 'PDF'],
+      rows: rows,
+      empty: 'Aucun résultat officiel validé pour ce filtre.',
+      emptyTitle: 'Résultats officiels',
+      responsive: true
+    }) + '<footer><i data-lucide="badge-alert"></i><span>Dans cette démonstration, les valeurs sont fictives et les PDF portent la mention « Aperçu non officiel ».</span></footer></section>';
   }
 
   function renderCertificationParent(exam) {
@@ -1083,7 +1056,7 @@
     if (!candidate) return '<section class="result-locked"><span><i data-lucide="scroll-text"></i></span><div><small>Aucune épreuve rattachée</small><h3>Mes enfants</h3><p>Aucun candidat de ce profil parent n’est rattaché à cette session.</p></div></section>';
     var optionSummary = candidate.option ? '<article><small>Option / jury</small><b>' + escapeMarkup(candidate.option + " · " + candidate.jury) + '</b></article>' : "";
     var parentNotice = exam.label === "EXETAT" ? "Ce résultat apparaît seulement après publication officielle et validation par l’école. Le PDF SchoolSafe n’est ni le diplôme d’État ni un relevé officiel." : "Ce résultat apparaît seulement après publication officielle et validation par l’école.";
-    return '<section class="certification-parent"><header><div><span>' + escapeMarkup(exam.label + " · " + exam.session) + '</span><h3>' + escapeMarkup(candidate.name) + '</h3><p>' + escapeMarkup(candidate.className + " · " + candidate.number) + '</p></div><span class="case-status ' + certificationStatusClass(candidate.decision) + '">' + escapeMarkup(candidate.decision) + '</span></header><div><article><small>Dossier</small><b>' + escapeMarkup(candidate.dossier) + '</b></article>' + optionSummary + '<article><small>Centre</small><b>' + escapeMarkup(candidate.center) + '</b></article><article><small>Résultat validé</small><b>' + (candidate.published ? String(candidate.percentage).replace(".", ",") + " %" : "Non publié") + '</b></article></div><aside><i data-lucide="info"></i><p>' + escapeMarkup(parentNotice) + '</p></aside><button class="primary-button dark" type="button" data-export-cert-person="' + exam.candidates.indexOf(candidate) + '"' + (candidate.published ? "" : " disabled") + '><i data-lucide="file-down"></i> Télécharger le relevé SchoolSafe PDF</button></section>';
+    return '<section class="certification-parent"><header><div><span>' + escapeMarkup(exam.label + " · " + exam.session) + '</span><h3>' + escapeMarkup(candidate.name) + '</h3><p>' + escapeMarkup(candidate.className + " · " + candidate.number) + '</p></div>' + window.ssBadge({ variant: certificationStatusClass(candidate.decision), label: candidate.decision }) + '</header><div><article><small>Dossier</small><b>' + escapeMarkup(candidate.dossier) + '</b></article>' + optionSummary + '<article><small>Centre</small><b>' + escapeMarkup(candidate.center) + '</b></article><article><small>Résultat validé</small><b>' + (candidate.published ? String(candidate.percentage).replace(".", ",") + " %" : "Non publié") + '</b></article></div><aside><i data-lucide="info"></i><p>' + escapeMarkup(parentNotice) + '</p></aside>' + ssButton({ variant: "primary", icon: "file-down", label: "Télécharger le relevé SchoolSafe PDF", disabled: !candidate.published, attrs: { "data-export-cert-person": exam.candidates.indexOf(candidate) } }) + '</section>';
   }
 
   function renderCertificationsTab() {
@@ -1113,54 +1086,7 @@
     icons();
   }
 
-  function financeTabForAction(actionName) {
-    if (/structure des frais|types de frais|contrôle des frais|échéance/i.test(actionName)) return "fees";
-    if (/reçu/i.test(actionName)) return "receipts";
-    if (/impayé|solde|en ordre|régulariser/i.test(actionName)) return "balances";
-    if (/rapport|clôture|soumettre|export|imprimer/i.test(actionName)) return "reports";
-    if (/encaissement|enregistrer un paiement|rechercher un élève|vérifier un paiement|historique du jour|caisse/i.test(actionName)) return "cash";
-    if (/frais scolaires|paiement|échéances/i.test(actionName) && currentDemoRole === "parent") return "family";
-    if (/financ|recette|dépense|statistique/i.test(actionName)) return "overview";
-    return "";
-  }
-
-  function financeTabsForRole() {
-    if (currentDemoRole === "parent") return ["family"];
-    if (currentDemoRole === "pedagogy") return ["balances"];
-    if (currentDemoRole === "cashier") return ["cash", "receipts", "balances", "reports"];
-    if (currentDemoRole === "school_head") return ["overview", "reports"];
-    if (currentDemoRole === "finance" || currentDemoRole === "admin") return ["overview", "fees", "cash", "receipts", "balances", "reports"];
-    return ["overview"];
-  }
-
-  function checkAuthorization(permission, options) {
-    options = options || {};
-    var allowed = false;
-    if (currentSession && Array.isArray(currentSession.permissions)) {
-      allowed = currentSession.permissions.indexOf(permission) !== -1;
-      if (!allowed && permission === "finance.receipts.view") {
-        allowed = currentSession.permissions.indexOf("finance.receipt.read") !== -1;
-      }
-    }
-    if (!allowed) {
-      if (permission === "finance.receipts.view") {
-        allowed = currentDemoRole === "admin" || currentDemoRole === "finance" || currentDemoRole === "cashier" || currentDemoRole === "school_head";
-        if (options.scope === "own_children" || currentDemoRole === "parent") {
-          allowed = allowed || currentDemoRole === "parent";
-        }
-      } else if (permission === "finance.fee.manage") {
-        allowed = currentDemoRole === "admin" || currentDemoRole === "finance";
-      } else {
-        allowed = currentDemoRole === "admin";
-      }
-    }
-    return allowed;
-  }
-
   function openFinanceModule(actionName) {
-    var requestedTab = financeTabForAction(actionName || "") || "overview";
-    var allowedTabs = financeTabsForRole();
-    financeState.activeTab = allowedTabs.indexOf(requestedTab) === -1 ? allowedTabs[0] : requestedTab;
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("securityModule").hidden = true;
     document.getElementById("pilotageModule").hidden = true;
@@ -1169,16 +1095,23 @@
     document.getElementById("financeModule").hidden = false;
     document.querySelector(".workspace-grid").hidden = true;
     document.getElementById("cardsProtected").hidden = true;
-    loadFinanceData().then(function () { renderFinanceModule(); });
+    if (window.SchoolSafeFinanceModule && typeof window.SchoolSafeFinanceModule.render === "function") {
+      window.SchoolSafeFinanceModule.render("financeModule", { action: actionName });
+    }
     document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function closeFinanceModule() {
-    document.getElementById("financeModule").hidden = true;
-    document.getElementById("feeControlModule").hidden = true;
-    document.querySelector(".workspace-grid").hidden = false;
-    document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
-    document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    if (window.SchoolSafeFinanceModule && typeof window.SchoolSafeFinanceModule.close === "function") {
+      window.SchoolSafeFinanceModule.close();
+    } else {
+      document.getElementById("financeModule").hidden = true;
+      document.getElementById("feeControlModule").hidden = true;
+      document.querySelector(".workspace-grid").hidden = false;
+      document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
+      document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+      setBreadcrumb(null);
+    }
   }
 
   function securityTabForAction(actionName) {
@@ -1211,6 +1144,7 @@
     document.querySelector(".workspace-grid").hidden = false;
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    setBreadcrumb(null);
   }
 
   function openPilotageModule(actionName) {
@@ -1236,6 +1170,7 @@
     document.querySelector(".workspace-grid").hidden = false;
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    setBreadcrumb(null);
   }
 
   function renderPilotageTab(tab) {
@@ -1267,6 +1202,7 @@
     document.querySelector(".workspace-grid").hidden = false;
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    setBreadcrumb(null);
   }
 
   function schoolTabForAction(actionName) {
@@ -1296,270 +1232,9 @@
     document.querySelector(".workspace-grid").hidden = false;
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    setBreadcrumb(null);
   }
 
-  function financeTotals() {
-    var expected = financeState.students.reduce(function (sum, student) { return sum + student.expected; }, 0);
-    var paid = financeState.students.reduce(function (sum, student) { return sum + student.paid; }, 0);
-    var balance = financeState.students.reduce(function (sum, student) { return sum + student.balance; }, 0);
-    var today = financeState.transactions.filter(function (transaction) { return transaction.status !== "Annulé"; });
-    return { expected: expected, paid: paid, balance: balance, rate: expected ? Math.round(paid / expected * 100) : 0, today: today, todayTotal: today.reduce(function (sum, transaction) { return sum + transaction.amount; }, 0) };
-  }
-
-
-  function renderFinanceOverview() {
-    var totals = financeTotals();
-    var recent = financeState.transactions.slice(0, 5).map(function (transaction) {
-      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td><td><span class="case-status ' + certificationStatusClass(transaction.status) + '">' + escapeMarkup(transaction.status) + '</span></td></tr>';
-    }).join("");
-    return '<section class="finance-overview"><header><div><span>Pilotage financier</span><h3>Situation enregistrée par l’école</h3><p>Les chiffres proviennent des opérations consignées sur le serveur.</p></div><span class="recording-only"><i data-lucide="hand-coins"></i> Aucun paiement en ligne</span></header><div class="finance-kpis"><article class="blue"><small>Frais attendus</small><b>' + money(totals.expected) + '</b><span>' + financeState.students.length + ' élèves suivis</span></article><article class="green"><small>Montants enregistrés</small><b>' + money(totals.paid) + '</b><span>' + totals.rate + ' % de recouvrement</span></article><article class="gold"><small>Soldes à régulariser</small><b>' + money(totals.balance) + '</b><span>' + financeState.students.filter(function (student) { return student.balance > 0; }).length + ' dossiers</span></article><article class="purple"><small>Encaissements du jour</small><b>' + money(totals.todayTotal) + '</b><span>' + totals.today.length + ' opérations</span></article></div><div class="finance-overview-grid"><section class="finance-panel"><header><div><span>Activité récente</span><h3>Derniers enregistrements</h3></div><button class="icon-button light" type="button" data-finance-open="receipts" title="Voir les reçus"><i data-lucide="arrow-right"></i></button></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode constaté</th><th>Montant</th><th>Statut</th></tr></thead><tbody>' + recent + '</tbody></table></div></section><aside class="finance-control"><span><i data-lucide="shield-check"></i></span><h3>Contrôle de la journée</h3><dl><div><dt>Caisse</dt><dd>' + escapeMarkup(financeState.dayStatus) + '</dd></div><div><dt>Dépenses à approuver</dt><dd>' + financeState.expenses.filter(function (expense) { return expense.status === "À approuver"; }).length + '</dd></div><div><dt>Annulations demandées</dt><dd>' + financeState.transactions.filter(function (transaction) { return transaction.status === "Annulation demandée"; }).length + '</dd></div></dl></aside></div></section>';
-  }
-  function renderFeeStructure() {
-    var canEdit = currentDemoRole === "admin" || currentDemoRole === "finance";
-    var rows = financeState.feeTypes.map(function (fee, index) {
-      return '<tr><td><b>' + escapeMarkup(fee.name) + '</b></td><td>' + escapeMarkup(fee.cycle) + '</td><td><b>' + money(fee.amount) + '</b></td><td>' + escapeMarkup(fee.frequency) + '</td><td>' + escapeMarkup(fee.due) + '</td><td><span class="case-status ' + (fee.active ? "done" : "pending") + '">' + (fee.active ? "Actif" : "Désactivé") + '</span></td><td>' + (canEdit ? '<button class="icon-button light" type="button" data-toggle-fee="' + index + '" title="Activer ou désactiver"><i data-lucide="power"></i></button>' : "") + '</td></tr>';
-    }).join("");
-    var form = canEdit ? '<form class="finance-fee-form" id="financeFeeForm"><header><span><i data-lucide="circle-plus"></i></span><div><h3>Ajouter un type de frais</h3><p>Le montant est configuré par l’école. Aucun prélèvement n’est effectué.</p></div></header><div><label>Libellé<input name="name" required placeholder="Ex. Frais scolaires"></label><label>Cycle ou service<input name="cycle" required placeholder="Ex. Primaire"></label><label>Montant en FC<input name="amount" required type="number" min="0" step="1000"></label><label>Périodicité<select name="frequency"><option>Une fois</option><option>Mois</option><option>Trimestre</option><option>Semestre</option><option>Année</option></select></label><label class="wide">Échéance<input name="due" required placeholder="Date ou règle d’échéance"></label></div><button class="primary-button dark" type="submit"><i data-lucide="save"></i> Enregistrer le type de frais</button></form>' : '<aside class="finance-readonly"><i data-lucide="eye"></i><p>Consultation uniquement. La structure des frais est modifiée par le Responsable financier ou l’Administrateur principal.</p></aside>';
-    return '<div class="finance-two-column"><section class="finance-panel"><header><div><span>Paramétrage</span><h3>Structure des frais</h3></div><b>' + financeState.feeTypes.length + '</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Frais</th><th>Cycle</th><th>Montant</th><th>Périodicité</th><th>Échéance</th><th>Statut</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' + form + '</div>';
-  }
-  function renderCash() {
-    var pending = financeState.pendingStudents;
-    var student = pending[financeState.selectedPendingStudent] || pending[0] || null;
-    var canRecord = (currentDemoRole === "cashier" || currentDemoRole === "admin") && financeState.dayStatus === "Ouverte";
-    var studentOptions = pending.map(function (item, index) {
-      return '<option value="' + index + '"' + (index === financeState.selectedPendingStudent ? " selected" : "") + '>' + escapeMarkup(item.name + " · " + item.className) + '</option>';
-    }).join("");
-    var feeOptions = financeState.feeTypes.filter(function (fee) { return fee.active; }).map(function (fee) {
-      return '<option>' + escapeMarkup(fee.name + " · " + fee.cycle) + '</option>';
-    }).join("");
-    var todayRows = financeTotals().today.map(function (transaction) {
-      var pdfAction = transaction.status === "Validé" ? '<button class="icon-button light" type="button" data-export-receipt-id="' + escapeMarkup(transaction.id) + '" title="Télécharger le reçu PDF"><i data-lucide="file-down"></i></button>' : '<span class="receipt-waiting"><i data-lucide="clock-3"></i> Après synchronisation</span>';
-      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(String(transaction.date).split(" · ").pop()) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td><td><span class="case-status ' + certificationStatusClass(transaction.status) + '">' + escapeMarkup(transaction.status) + '</span></td><td>' + pdfAction + '</td></tr>';
-    }).join("") || '<tr><td colspan="6">Aucune opération enregistrée aujourd’hui.</td></tr>';
-    var paymentForm = canRecord && student ? '<form class="payment-form" id="paymentForm"><header><span><i data-lucide="hand-coins"></i></span><div><h3>Enregistrer une tranche</h3><p>L’argent est reçu hors de SchoolSafe; cette action consigne uniquement l’opération.</p></div></header><div><label>Type de frais<select name="fee" required>' + feeOptions + '</select></label><label>Montant reçu en FC<input name="amount" type="number" min="1000" max="' + student.balance + '" step="1000" required placeholder="Montant"></label><label>Mode constaté<select name="mode"><option value="cash">Espèces</option><option value="card">Carte bancaire</option><option value="check">Chèque</option><option value="bank_transfer">Virement constaté</option><option value="mobile_money">Mobile money</option><option value="other">Autre moyen constaté</option></select></label><label>Référence ou observation<input name="reference" required placeholder="Ex. Deuxième tranche"></label></div><button class="primary-button dark" type="submit"' + (student.balance <= 0 ? " disabled" : "") + '><i data-lucide="badge-check"></i> Enregistrer et préparer le reçu</button></form>' : '<aside class="finance-readonly"><i data-lucide="' + (financeState.dayStatus === "Ouverte" ? "eye" : "lock-keyhole") + '"></i><p>' + (financeState.dayStatus === "Ouverte" ? "Consultation et contrôle uniquement. Les encaissements sont exécutés par l’Agent de caisse autorisé." : "La journée a été soumise. Aucun nouvel encaissement ne peut être ajouté dans cet aperçu.") + '</p></aside>';
-    var studentPanel = student ? '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div><span class="case-status ' + certificationStatusClass(student.status) + '">' + escapeMarkup(student.status) + '</span></header><label class="finance-student-picker">Élève<select id="financeStudentSelect">' + studentOptions + '</select></label><article class="student-finance-card"><span class="student-avatar large">' + student.initials + '</span><div><small>' + escapeMarkup(student.className + " · " + student.sex) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.guardian) + '</p></div></article><dl class="student-finance-facts"><div><dt>Frais attendus</dt><dd>' + money(student.expected) + '</dd></div><div><dt>Enregistré</dt><dd>' + money(student.paid) + '</dd></div><div><dt>Solde</dt><dd>' + money(student.balance) + '</dd></div></dl></section>' : '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div></header><p class="finance-empty">Aucun dossier avec solde à encaisser.</p></section>';
-    return '<div class="cash-workspace"><section class="cashier-layout">' + studentPanel + paymentForm + '</section><section class="finance-panel"><header><div><span>Journal de caisse</span><h3>Opérations du jour</h3></div><b>' + money(financeTotals().todayTotal) + '</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode constaté</th><th>Montant</th><th>Statut</th><th>PDF</th></tr></thead><tbody>' + todayRows + '</tbody></table></div></section></div>';
-  }
-  function renderReceipts() {
-    var canRequestCancellation = currentDemoRole === "cashier" || currentDemoRole === "admin";
-    var rows = financeState.transactions.map(function (transaction) {
-      var cancellationButton = canRequestCancellation && transaction.status === "Validé" ? '<button class="icon-button light danger" type="button" data-cancel-payment-id="' + escapeMarkup(transaction.id) + '" title="Demander l’annulation"><i data-lucide="circle-x"></i></button>' : "";
-      var receiptAction = transaction.status === "Validé" ? '<button class="icon-button light" type="button" data-export-receipt-id="' + escapeMarkup(transaction.id) + '" title="Télécharger le reçu PDF"><i data-lucide="file-down"></i></button>' : '<span class="receipt-waiting"><i data-lucide="clock-3"></i> PDF après synchronisation</span>';
-      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td><b>' + escapeMarkup(transaction.student) + '</b><small>' + escapeMarkup(transaction.className) + '</small></td><td>' + escapeMarkup(transaction.fee) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td><td><span class="case-status ' + certificationStatusClass(transaction.status) + '">' + escapeMarkup(transaction.status) + '</span></td><td><div class="finance-row-actions">' + receiptAction + cancellationButton + '</div></td></tr>';
-    }).join("");
-    return '<section class="finance-panel receipt-register"><header><div><span>Documents financiers</span><h3>Reçus et opérations</h3><p>Un reçu reste traçable même lorsqu’une annulation est demandée.</p></div><span class="recording-only"><i data-lucide="shield-check"></i> PDF avec logo</span></header><aside class="finance-audit-note"><i data-lucide="history"></i><p>Une demande d’annulation ne supprime jamais l’écriture. Elle doit être contrôlée et approuvée dans le circuit financier.</p></aside><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Frais</th><th>Mode constaté</th><th>Montant</th><th>Statut</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
-  }
-  function renderBalances() {
-    var statusOnly = currentDemoRole === "pedagogy";
-    var inOrder = financeState.students.filter(function (student) { return student.balance === 0; }).length;
-    var rows = financeState.students.map(function (student) {
-      if (statusOnly) return '<tr><td><span class="student-avatar">' + student.initials + '</span><b>' + escapeMarkup(student.name) + '</b></td><td>' + escapeMarkup(student.className) + '</td><td>' + escapeMarkup(student.sex) + '</td><td><span class="case-status ' + certificationStatusClass(student.status) + '">' + escapeMarkup(student.status) + '</span></td></tr>';
-      return '<tr><td><span class="student-avatar">' + student.initials + '</span><b>' + escapeMarkup(student.name) + '</b><small>' + escapeMarkup(student.guardian) + '</small></td><td>' + escapeMarkup(student.className) + '</td><td><b>' + money(student.expected) + '</b></td><td>' + money(student.paid) + '</td><td><b>' + money(student.balance) + '</b></td><td><span class="case-status ' + certificationStatusClass(student.status) + '">' + escapeMarkup(student.status) + '</span></td></tr>';
-    }).join("");
-    var heading = statusOnly ? '<aside class="finance-status-boundary"><i data-lucide="shield-check"></i><div><b>Attribution administrative limitée</b><p>Le Responsable pédagogique voit uniquement l’identité scolaire, la classe et le statut. Montants, paiements, reçus et trésorerie restent masqués.</p></div></aside>' : '<div class="balance-summary"><article><small>Élèves en ordre</small><b>' + inOrder + '</b></article><article><small>À régulariser</small><b>' + (financeState.students.length - inOrder) + '</b></article><article><small>Taux des dossiers en ordre</small><b>' + Math.round(inOrder / financeState.students.length * 100) + ' %</b></article></div>';
-    var tableHead = statusOnly ? '<tr><th>Élève</th><th>Classe</th><th>Sexe</th><th>Statut administratif</th></tr>' : '<tr><th>Élève</th><th>Classe</th><th>Frais attendus</th><th>Enregistré</th><th>Solde</th><th>Statut</th></tr>';
-    return '<section class="finance-panel balance-register"><header><div><span>' + (statusOnly ? "Suivi scolaire autorisé" : "Recouvrement") + '</span><h3>' + (statusOnly ? "Régularité des élèves" : "Impayés et soldes") + '</h3><p>' + (statusOnly ? "Aucun chiffre financier n’est exposé dans ce profil." : "Situation calculée à partir des opérations enregistrées par l’école.") + '</p></div><b>' + financeState.students.length + ' dossiers</b></header>' + heading + '<div class="table-scroll"><table class="finance-table' + (statusOnly ? " status-only-table" : "") + '"><thead>' + tableHead + '</thead><tbody>' + rows + '</tbody></table></div></section>';
-  }
-  function renderReports() {
-    var report = financeState.dailyReport || { total_amount: 0, transaction_count: 0, by_mode: [], by_fee_type: [], payments: [], currency: "USD" };
-    var payments = (report.payments || []).map(mapDailyPayment);
-    var cashTotal = (report.by_mode || []).reduce(function (sum, item) { return sum + (String(item.mode).toLowerCase() === "cash" ? Number(item.amount || 0) : 0); }, 0);
-    var otherTotal = Number(report.total_amount || 0) - cashTotal;
-    var modeRows = (report.by_mode || []).map(function (item) {
-      return '<tr><td>' + escapeMarkup(modeLabel(item.mode)) + '</td><td><b>' + money(item.amount) + '</b></td><td>' + Number(item.count || 0) + '</td></tr>';
-    }).join("") || '<tr><td colspan="3">Aucune opération</td></tr>';
-    var feeRows = (report.by_fee_type || []).map(function (item) {
-      return '<tr><td>' + escapeMarkup(item.fee_label || "-") + '</td><td><b>' + money(item.amount) + '</b></td><td>' + Number(item.count || 0) + '</td></tr>';
-    }).join("") || '<tr><td colspan="3">Aucune opération</td></tr>';
-    var paymentRows = payments.map(function (transaction) {
-      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + money(transaction.amount) + '</b></td></tr>';
-    }).join("") || '<tr><td colspan="4">Aucune opération enregistrée pour cette date.</td></tr>';
-    var canClose = currentDemoRole === "cashier" || currentDemoRole === "admin";
-    var closureNotice = financeState.reportClosure ? '<span class="closure-chip"><i data-lucide="lock-keyhole"></i> Caisse clôturée le ' + escapeMarkup(formatIsoDateFr(financeState.reportClosure.closure_date)) + '</span>' : '<span class="closure-chip"><i data-lucide="eye"></i> Caisse ouverte</span>';
-    return '<div class="finance-reports"><header class="finance-report-head"><div><span>Contrôle et clôture</span><h3>Rapport de caisse du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3><p>État préparé pour contrôle à partir des opérations enregistrées sur le serveur.</p></div><div><label class="finance-report-date">Date<input type="date" id="financeReportDate" value="' + escapeMarkup(financeState.reportDate) + '"></label>' + (canClose ? '<label class="finance-report-expected">Montant constaté (FC)<input type="number" id="closeExpectedAmount" min="0" step="1000" value="' + Number(report.total_amount || 0) + '"></label><button class="primary-button dark" type="button" id="closeCashRegister"><i data-lucide="lock-keyhole"></i> Clôturer la caisse</button>' : '') + closureNotice + '</div></header><div class="finance-kpis report-kpis"><article class="blue"><small>Encaissements</small><b>' + money(report.total_amount) + '</b><span>' + Number(report.transaction_count || 0) + ' opérations</span></article><article class="green"><small>Espèces constatées</small><b>' + money(cashTotal) + '</b><span>À rapprocher physiquement</span></article><article class="purple"><small>Autres moyens constatés</small><b>' + money(otherTotal) + '</b><span>Références conservées</span></article><article class="gold"><small>Dévise</small><b>' + escapeMarkup(report.currency || "-") + '</b><span>Rapport journalier</span></article></div><div class="finance-two-column"><section class="finance-panel"><header><div><span>Répartition par mode</span><h3>Modes de paiement</h3></div></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Mode</th><th>Montant</th><th>Opérations</th></tr></thead><tbody>' + modeRows + '</tbody></table></div></section><section class="finance-panel"><header><div><span>Répartition par frais</span><h3>Types de frais</h3></div></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Frais</th><th>Montant</th><th>Opérations</th></tr></thead><tbody>' + feeRows + '</tbody></table></div></section></div><section class="finance-panel"><header><div><span>Pièces de la journée</span><h3>Opérations du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3></div><b>' + payments.length + ' opération(s)</b></header><div class="table-scroll"><table class="finance-table"><thead><tr><th>Reçu</th><th>Élève</th><th>Mode</th><th>Montant</th></tr></thead><tbody>' + paymentRows + '</tbody></table></div></section><aside class="finance-audit-note"><i data-lucide="list-checks"></i><p>La clôture fige le rapport pour contrôle. Une clôture définitive devra suivre les permissions, validations et règles comptables de l’école.</p></aside></div>';
-  }
-  function renderFamilyFinance() {
-    var children = financeState.students.filter(function (student) { return student.guardian === "Mme Sophie Martin"; });
-    if (financeState.selectedFamilyStudent >= children.length) financeState.selectedFamilyStudent = 0;
-    var student = children[financeState.selectedFamilyStudent];
-    var options = children.map(function (item, index) { return '<option value="' + index + '"' + (index === financeState.selectedFamilyStudent ? " selected" : "") + '>' + escapeMarkup(item.name + " · " + item.className) + '</option>'; }).join("");
-    var receipts = financeState.transactions.map(function (transaction) { return { transaction: transaction }; }).filter(function (entry) { return entry.transaction.student === student.name; });
-    var receiptCards = receipts.map(function (entry) {
-      var transaction = entry.transaction;
-      var receiptButton = transaction.status === "Validé" ? '<button class="icon-button light" type="button" data-export-receipt-id="' + escapeMarkup(transaction.id) + '" title="Télécharger le reçu PDF"><i data-lucide="file-down"></i></button>' : '<span class="receipt-waiting"><i data-lucide="clock-3"></i></span>';
-      return '<article class="family-receipt"><span><i data-lucide="receipt-text"></i></span><div><small>' + escapeMarkup(transaction.date) + '</small><b>' + escapeMarkup(transaction.receipt) + '</b><p>' + escapeMarkup(transaction.fee + " · " + transaction.mode) + '</p></div><strong>' + money(transaction.amount) + '</strong>' + receiptButton + '</article>';
-    }).join("") || '<p class="finance-empty">Aucun reçu n’est encore rattaché à cet enfant.</p>';
-    return '<div class="family-finance"><header><div><span>Situation familiale</span><h3>Frais scolaires et reçus</h3><p>Vous voyez uniquement les enfants rattachés à votre profil.</p></div><span class="recording-only"><i data-lucide="shield-check"></i> Aucun paiement en ligne</span></header><label class="family-student-picker">Enfant suivi<select id="familyFinanceStudent">' + options + '</select></label><section class="family-finance-summary"><div><span class="student-avatar large">' + student.initials + '</span><div><small>' + escapeMarkup(student.className) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.status) + '</p></div></div><article><small>Frais attendus</small><b>' + money(student.expected) + '</b></article><article><small>Montants enregistrés</small><b>' + money(student.paid) + '</b></article><article><small>Solde restant</small><b>' + money(student.balance) + '</b></article></section><aside class="family-result-status ' + (student.balance === 0 ? "ready" : "pending") + '"><i data-lucide="' + (student.balance === 0 ? "badge-check" : "file-lock-2") + '"></i><div><b>Résultat officiel de fin de période</b><p>' + (student.balance === 0 ? "Situation en ordre. La publication reste soumise à la validation pédagogique et à la décision de la Direction." : "Le suivi quotidien reste visible. Le résultat officiel de fin de période reste suspendu jusqu’à la décision administrative.") + '</p></div></aside><section class="family-receipts"><header><h3>Reçus disponibles</h3><span>' + receipts.length + ' document(s)</span></header>' + receiptCards + '</section></div>';
-  }
-  function renderFinanceModule() {
-    var allowedTabs = financeTabsForRole();
-    if (allowedTabs.indexOf(financeState.activeTab) === -1) financeState.activeTab = allowedTabs[0];
-    var titles = { overview: "Pilotage financier", fees: "Structure des frais", cash: "Encaissements", receipts: "Reçus", balances: "Soldes et régularité", reports: "Rapports de caisse", family: "Situation familiale" };
-    document.getElementById("financeModuleTitle").textContent = titles[financeState.activeTab];
-    document.getElementById("workspaceTitle").textContent = titles[financeState.activeTab];
-    document.querySelectorAll("#financeTabs [data-finance-tab]").forEach(function (button) {
-      var tab = button.getAttribute("data-finance-tab");
-      button.hidden = allowedTabs.indexOf(tab) === -1;
-      button.classList.toggle("active", tab === financeState.activeTab);
-    });
-    var renderers = { overview: renderFinanceOverview, fees: renderFeeStructure, cash: renderCash, receipts: renderReceipts, balances: renderBalances, reports: renderReports, family: renderFamilyFinance };
-    document.getElementById("financeContent").innerHTML = renderers[financeState.activeTab]();
-    bindFinanceEvents();
-    icons();
-  }
-
-  function bindFinanceEvents() {
-    document.querySelectorAll("[data-finance-open]").forEach(function (button) {
-      button.addEventListener("click", function () { financeState.activeTab = button.getAttribute("data-finance-open"); renderFinanceModule(); });
-    });
-    var studentSelect = document.getElementById("financeStudentSelect");
-    if (studentSelect) studentSelect.addEventListener("change", function () { financeState.selectedPendingStudent = Number(this.value); renderFinanceModule(); });
-    var familySelect = document.getElementById("familyFinanceStudent");
-    if (familySelect) familySelect.addEventListener("change", function () { financeState.selectedFamilyStudent = Number(this.value); renderFinanceModule(); });
-    var feeForm = document.getElementById("financeFeeForm");
-    if (feeForm) feeForm.addEventListener("submit", function (event) {
-      event.preventDefault();
-      var data = new FormData(feeForm);
-      var cycle = String(data.get("cycle") || "").toLowerCase();
-      var cycleKey = cycle.indexOf("mater") !== -1 || cycle.indexOf("nurs") !== -1 ? "nursery" : cycle.indexOf("second") !== -1 || cycle.indexOf("human") !== -1 ? "secondary" : "primary";
-      var input = {
-        cycle_key: cycleKey,
-        label: data.get("name"),
-        amount: Number(data.get("amount")),
-        currency: "CDF",
-        due_date: data.get("due") || undefined,
-        is_active: true,
-        metadata: { frequency: data.get("frequency") }
-      };
-      var api = window.SchoolSafeFinanceAPI;
-      (api ? api.createFeeStructure(input) : Promise.reject(new Error("API indisponible"))).then(function () {
-        notify("Type de frais enregistré sur le serveur.");
-        financeState.loaded = false;
-        return loadFinanceData();
-      }).then(function () {
-        renderFinanceModule();
-      }).catch(function (err) {
-        console.warn("[Finance] création frais échouée", err);
-        financeState.feeTypes.push({ id: "local-" + Date.now(), name: data.get("name"), cycle: data.get("cycle"), amount: Number(data.get("amount")), frequency: data.get("frequency"), due: data.get("due"), active: true });
-        queueOfflineOperation("finance", "Création d’un type de frais · " + data.get("name"), { kind: "fee-type-create", name: data.get("name"), cycle: data.get("cycle"), amount: Number(data.get("amount")) });
-        notify("Type de frais conservé localement.");
-        renderFinanceModule();
-      });
-    });
-    document.querySelectorAll("[data-toggle-fee]").forEach(function (button) {
-      button.addEventListener("click", function () {
-        var index = Number(button.getAttribute("data-toggle-fee"));
-        var fee = financeState.feeTypes[index];
-        var updated = Object.assign({}, fee, { active: !fee.active });
-        financeState.feeTypes = financeState.feeTypes.slice();
-        financeState.feeTypes[index] = updated;
-        queueOfflineOperation("finance", "Modification d’un type de frais · " + updated.name, { kind: "fee-type-status", name: updated.name, active: updated.active });
-        renderFinanceModule();
-      });
-    });
-    var paymentForm = document.getElementById("paymentForm");
-    if (paymentForm) paymentForm.addEventListener("submit", function (event) {
-      event.preventDefault();
-      var student = financeState.pendingStudents[financeState.selectedPendingStudent];
-      if (!student) { notify("Aucun dossier sélectionné."); return; }
-      var data = new FormData(paymentForm);
-      var amount = Number(data.get("amount"));
-      if (!amount || amount <= 0 || amount > student.balance) { notify("Le montant doit être positif et ne pas dépasser le solde de l’élève."); return; }
-      var mode = data.get("mode");
-      var reference = data.get("reference");
-      var api = window.SchoolSafeFinanceAPI;
-      (api ? api.createPayment({
-        student_fee_id: student.id,
-        amount: amount,
-        currency: student.currency || "CDF",
-        mode: mode,
-        reference: reference,
-        metadata: { mode: mode, reference: reference }
-      }) : Promise.reject(new Error("API indisponible"))).then(function (res) {
-        notify("Paiement enregistré sur le serveur.");
-        financeState.loaded = false;
-        return loadFinanceData();
-      }).then(function () {
-        financeState.activeTab = "receipts";
-        renderFinanceModule();
-      }).catch(function (err) {
-        console.warn("[Finance] paiement backend échoué", err);
-        var updatedStudent = Object.assign({}, student, {
-          paid: student.paid + amount,
-          balance: Math.max(0, student.expected - (student.paid + amount))
-        });
-        updatedStudent.status = updatedStudent.balance === 0 ? "En ordre" : "À régulariser";
-        financeState.pendingStudents = financeState.pendingStudents.slice();
-        financeState.pendingStudents[financeState.selectedPendingStudent] = updatedStudent;
-        financeState.students = financeState.students.map(function (s) {
-          return s.id === updatedStudent.id ? Object.assign({}, s, { paid: updatedStudent.paid, balance: updatedStudent.balance, status: updatedStudent.status }) : s;
-        });
-        var localReference = "PAY-LOCAL-" + Date.now();
-        financeState.transactions.unshift({ id: "local-" + Date.now(), receipt: "Après synchronisation", date: formatIsoDateTimeFr(new Date().toISOString()), day: formatIsoDateFr(new Date().toISOString()), student: student.name, className: student.className, fee: String(data.get("fee")).split(" · ")[0], amount: amount, mode: modeLabel(mode), cashier: "—", reference: reference, status: "En attente de synchronisation", localReference: localReference });
-        queueOfflineOperation("finance", "Paiement de " + student.name, {
-          kind: "payment",
-          localReference: localReference,
-          student: student.name,
-          amount: amount,
-          fee: String(data.get("fee")).split(" · ")[0]
-        }).then(function (operation) {
-          if (operation && financeState.transactions[0] && financeState.transactions[0].localReference === localReference) financeState.transactions[0].syncOperationId = operation.id;
-        });
-        financeState.activeTab = "receipts";
-        notify(navigator.onLine ? "Paiement consigné. Le reçu sera produit après confirmation." : "Paiement conservé sur cet appareil. Le reçu sera produit au retour de la connexion.");
-        renderFinanceModule();
-      });
-    });
-    document.querySelectorAll("[data-export-receipt-id]").forEach(function (button) {
-      button.addEventListener("click", function () { exportReceiptPdf(button.getAttribute("data-export-receipt-id")); });
-    });
-    document.querySelectorAll("[data-cancel-payment-id]").forEach(function (button) {
-      button.addEventListener("click", function () {
-        var paymentId = button.getAttribute("data-cancel-payment-id");
-        var reason = window.prompt("Motif de l’annulation ?");
-        if (!reason) return;
-        var api = window.SchoolSafeFinanceAPI;
-        (api ? api.cancelPayment(paymentId, reason) : Promise.reject(new Error("API indisponible"))).then(function () {
-          notify("Annulation enregistrée sur le serveur.");
-          financeState.loaded = false;
-          return loadFinanceData();
-        }).then(function () {
-          renderFinanceModule();
-        }).catch(function (err) {
-          console.warn("[Finance] annulation backend échouée", err);
-          var transaction = financeState.transactions.find(function (t) { return t.id === paymentId; });
-          if (transaction && transaction.status === "Validé") {
-            transaction.status = "Annulation demandée";
-            queueOfflineOperation("finance", "Demande d’annulation " + transaction.receipt, { kind: "cancellation-request", receipt: transaction.receipt, reason: reason, paymentId: paymentId });
-          }
-          notify("Demande d’annulation conservée localement.");
-          renderFinanceModule();
-        });
-      });
-    });
-    var reportDateInput = document.getElementById("financeReportDate");
-    if (reportDateInput) reportDateInput.addEventListener("change", function () {
-      loadDailyReport(this.value).then(function () { renderFinanceModule(); });
-    });
-    var closeRegister = document.getElementById("closeCashRegister");
-    if (closeRegister) closeRegister.addEventListener("click", function () {
-      var api = window.SchoolSafeFinanceAPI;
-      if (!api) { notify("API finance non disponible."); return; }
-      var report = financeState.dailyReport || { total_amount: 0 };
-      var expectedInput = document.getElementById("closeExpectedAmount");
-      var expectedAmount = expectedInput && expectedInput.value !== "" ? Number(expectedInput.value) : Number(report.total_amount || 0);
-      api.closeCashRegister({ date: financeState.reportDate, expected_amount: expectedAmount, notes: "Clôture depuis le frontend" }).then(function (res) {
-        financeState.reportClosure = res && res.closure ? res.closure : null;
-        notify(res && res.alreadyClosed ? "La caisse était déjà clôturée pour cette date." : "Caisse clôturée pour le " + formatIsoDateFr(financeState.reportDate) + ".");
-        renderFinanceModule();
-      }).catch(function (err) {
-        console.warn("[Finance] clôture échouée", err);
-        notify("Clôture impossible : " + (err.message || "erreur"));
-      });
-    });
-    var submitDay = document.getElementById("submitCashDay");
-    if (submitDay) submitDay.addEventListener("click", function () { financeState.dayStatus = "Soumise"; queueOfflineOperation("finance", "Soumission de la journée de caisse", { kind: "cash-day-submission" }); notify("Journée soumise localement pour contrôle."); renderFinanceModule(); });
-  }
   function pdfLibrary() {
     return window.jspdf && window.jspdf.jsPDF ? window.jspdf.jsPDF : null;
   }
@@ -1682,147 +1357,17 @@
     columns.forEach(function (column) { doc.text(column.label, column.x, y + 5); });
     return y + 10;
   }
-
-  async function exportReceiptPdf(paymentId) {
-    if (!paymentId) { notify("Reçu introuvable."); return; }
-    if (!checkAuthorization("finance.receipts.view", { scope: "own_children" })) {
-      notify("Accès non autorisé", "error");
-      return;
-    }
-    try {
-      var api = window.SchoolSafeFinanceAPI;
-      if (!api) { notify("API finance non disponible."); return; }
-      var data = await api.getReceiptData(paymentId);
-      if (!data) { notify("Reçu introuvable."); return; }
-      var mod = await import("./modules/document-engine/templates/receipt-template.js");
-      var school = data.school || {};
-      var identity = {
-        name: school.name || "",
-        nameEn: null,
-        legalName: school.name || "",
-        address: school.address || null,
-        city: null,
-        province: null,
-        country: null,
-        phone: school.phone || null,
-        email: school.email || null,
-        website: school.website || null,
-        primaryColor: "#071a3d",
-        accentColor: "#e9a515",
-        logoUrl: school.logo_url || null,
-        documentFooter: null,
-        officialSealUrl: null,
-        currency: school.currency || "USD",
-        bankName: null,
-        bankAccount: null,
-        taxId: null,
-        directorName: null,
-        directorSignatureUrl: null,
-        activeAcademicYear: school.activeAcademicYear || null,
-        activeCycles: []
-      };
-      var p = data.payment || {};
-      var s = data.student || {};
-      var payment = {
-        student: {
-          firstName: s.first_name || "",
-          lastName: s.last_name || "",
-          matricule: s.matricule || "",
-          className: s.class_name || ""
-        },
-        feeLabel: p.fee_label || "",
-        period: "",
-        amountExpected: Number(p.expected_amount || 0),
-        amountPaid: Number(p.amount || 0),
-        remaining: Number(p.remaining_amount || 0),
-        currency: p.currency || identity.currency,
-        paymentMode: modeLabel(p.mode),
-        reference: p.reference || "",
-        paidAt: p.received_at || data.generatedAt,
-        cashierName: p.cashier_name || "",
-        verificationCode: p.verification_code || data.receiptNumber || ""
-      };
-      var doc = await mod.renderReceipt(identity, payment, data.receiptNumber || "");
-      var filename = "recu-" + sanitizeFilename(data.receiptNumber || "schoolsafe") + ".pdf";
-      doc.save(filename);
-      notify("Reçu PDF téléchargé.");
-    } catch (e) {
-      console.error("[Finance] receipt generation failed", e);
-      notify("Erreur lors de la génération du reçu : " + (e.message || "erreur inconnue"));
-    }
-  }
-  async function exportCashReportPdf() {
-    var JsPdf = pdfLibrary();
-    if (!JsPdf) { notify("Le générateur PDF n’est pas disponible."); return; }
-    var identity = pdfSchoolIdentity();
-    var logo = await loadPdfLogo();
-    var doc = configurePdfLanguage(new JsPdf({ unit: "mm", format: "a4" }));
-    var totals = financeTotals();
-    var validatedExpenses = financeState.expenses.filter(function (expense) { return expense.status === "Validée"; });
-    var expenseTotal = validatedExpenses.reduce(function (sum, expense) { return sum + expense.amount; }, 0);
-    pdfHeader(doc, identity, logo, "Rapport de caisse", "Journée du 14 août 2026 · Statut : " + financeState.dayStatus);
-    var metricData = [["Encaissements", totals.todayTotal, 7, 100, 194], ["Dépenses validées", expenseTotal, 8, 122, 85], ["Net de la journée", totals.todayTotal - expenseTotal, 155, 100, 0]];
-    metricData.forEach(function (metric, index) {
-      var x = 14 + index * 62;
-      doc.setFillColor(245, 248, 252);
-      doc.roundedRect(x, 65, 58, 25, 2, 2, "F");
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.setTextColor(83, 96, 119);
-      doc.text(metric[0], x + 5, 73);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.setTextColor(metric[2], metric[3], metric[4]);
-      doc.text(money(metric[1]), x + 5, 84);
-    });
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(7, 48, 112);
-    doc.text("Opérations enregistrées", 14, 104);
-    var transactionColumns = [{ label: "Reçu", x: 16 }, { label: "Élève", x: 48 }, { label: "Mode", x: 102 }, { label: "Montant", x: 151 }, { label: "Statut", x: 177 }];
-    var y = drawTableHeader(doc, transactionColumns, 109);
-    totals.today.forEach(function (transaction) {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.setTextColor(38, 50, 73);
-      doc.text(transaction.receipt, 16, y + 4);
-      doc.text(transaction.student, 48, y + 4);
-      doc.text(transaction.mode, 102, y + 4);
-      doc.text(money(transaction.amount), 151, y + 4);
-      doc.text(transaction.status, 177, y + 4);
-      doc.setDrawColor(230, 234, 241);
-      doc.line(14, y + 8, 196, y + 8);
-      y += 11;
-    });
-    y += 8;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(7, 48, 112);
-    doc.text("Dépenses consignées", 14, y);
-    var expenseColumns = [{ label: "Référence", x: 16 }, { label: "Libellé", x: 58 }, { label: "Montant", x: 145 }, { label: "Statut", x: 176 }];
-    y = drawTableHeader(doc, expenseColumns, y + 5);
-    financeState.expenses.forEach(function (expense) {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.setTextColor(38, 50, 73);
-      doc.text(expense.reference, 16, y + 4);
-      doc.text(expense.label, 58, y + 4);
-      doc.text(money(expense.amount), 145, y + 4);
-      doc.text(expense.status, 176, y + 4);
-      doc.setDrawColor(230, 234, 241);
-      doc.line(14, y + 8, 196, y + 8);
-      y += 11;
-    });
-    doc.setFillColor(244, 248, 253);
-    doc.roundedRect(14, y + 7, 182, 24, 2, 2, "F");
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(55, 67, 88);
-    doc.text(doc.splitTextToSize("Rapport préparé à partir des opérations consignées dans la démonstration SchoolSafe. Les espèces et références externes doivent être rapprochées et contrôlées par l’école.", 166), 22, y + 17);
-    pdfFooter(doc, identity);
-    doc.save("rapport-caisse-2026-08-14.pdf");
-    notify("Rapport de caisse PDF téléchargé avec le logo de l’école.");
-  }
+  window.SchoolSafePdfUtils = window.SchoolSafePdfUtils || {
+    pdfLibrary: pdfLibrary,
+    pdfDocumentText: pdfDocumentText,
+    configurePdfLanguage: configurePdfLanguage,
+    pdfSchoolIdentity: pdfSchoolIdentity,
+    loadPdfLogo: loadPdfLogo,
+    sanitizeFilename: sanitizeFilename,
+    pdfHeader: pdfHeader,
+    pdfFooter: pdfFooter,
+    drawTableHeader: drawTableHeader
+  };
 
   async function exportCertificationPdf(scope, candidateIndex) {
     var JsPdf = pdfLibrary();
@@ -1924,6 +1469,13 @@
   }
 
   async function exportAssignmentPdf(assignment) {
+    // DOC-03 : le Document Engine du module Pédagogie est désormais le chemin officiel
+    // pour les devoirs/interrogations. Si le nouveau module est chargé, on redirige
+    // l’utilisateur vers lui au lieu de générer un PDF concurrent.
+    if (window.SchoolSafePedagogyModule && document.getElementById("pedagogyContent").querySelector("[data-pedagogy-tab]")) {
+      notify("Utilisez le module Devoirs pour générer le PDF avec le Document Engine.");
+      return;
+    }
     var JsPdf = pdfLibrary();
     if (!JsPdf) { notify("Le générateur PDF n’est pas disponible."); return; }
     var identity = pdfSchoolIdentity();
@@ -2131,9 +1683,126 @@
     return profile.label;
   }
 
+  function renderProfileOverview() {
+    var desktopContainer = document.getElementById("dashboardKpi");
+    var mobileContainer = document.getElementById("mobileKpi");
+    var loadingMarkup = '<article class="kpi-card"><span class="kpi-icon blue"><i data-lucide="loader-2"></i></span><div><b>—</b><span>Chargement…</span><small>—</small></div></article>';
+    if (desktopContainer) desktopContainer.innerHTML = loadingMarkup.repeat(6);
+    if (mobileContainer) mobileContainer.innerHTML = loadingMarkup.repeat(4);
+    icons();
+
+    var perms = (currentSession && currentSession.permissions) || [];
+    var hasToken = !!currentApiToken();
+    var hasDashboardRead = perms.indexOf("pilotage.dashboard.read") >= 0;
+
+    function renderEmpty(state, message) {
+      var labels = ["Élèves inscrits", "Personnel actif", "Classes", "Matières", "Recettes (mois)", "Alertes actives"];
+      var typeMap = { shield: "denied", wifi: "unavailable", error: "error", empty: "empty" };
+      var iconMap = { shield: "shield-off", wifi: "wifi-off", error: "alert-circle", empty: "inbox" };
+      var type = typeMap[state] || "empty";
+      var icon = iconMap[state];
+      if (desktopContainer) {
+        desktopContainer.innerHTML = [0, 1, 2, 3, 4, 5].map(function (i) {
+          return '<article class="kpi-card">' + window.ssState({ type: type, title: labels[i % labels.length], message: message, icon: icon, size: "compact" }) + '</article>';
+        }).join("");
+      }
+      if (mobileContainer) {
+        mobileContainer.innerHTML = [0, 1, 2, 3].map(function (i) {
+          return '<article class="kpi-card">' + window.ssState({ type: type, title: labels[i % labels.length], message: message, icon: icon, size: "compact" }) + '</article>';
+        }).join("");
+      }
+      icons();
+    }
+
+    if (hasToken && !hasDashboardRead) {
+      renderEmpty("shield", "Non accessible");
+      return;
+    }
+    if (!hasToken) {
+      renderEmpty("wifi", "Non disponible");
+      return;
+    }
+    if (!window.SchoolSafePilotageAPI) {
+      renderEmpty("wifi", "Source non connectée");
+      return;
+    }
+
+    window.SchoolSafePilotageAPI.dashboard().then(function (data) {
+      var kpis = data && data.kpis ? data.kpis : [];
+      if (!kpis.length) {
+        renderEmpty("empty", "Aucun indicateur");
+        return;
+      }
+      // Desktop : 6 premiers KPI
+      if (desktopContainer) {
+        desktopContainer.innerHTML = kpis.slice(0, 6).map(function (kpi, index) {
+          return renderKpiCard(kpi, index);
+        }).join("");
+      }
+      // Mobile : 4 premiers KPI
+      if (mobileContainer) {
+        mobileContainer.innerHTML = kpis.slice(0, 4).map(function (kpi, index) {
+          return renderKpiCard(kpi, index);
+        }).join("");
+      }
+      icons();
+    }).catch(function () {
+      renderEmpty("error", "Données indisponibles · source non connectée.");
+    });
+  }
+
+  function renderKpiCard(kpi, index) {
+    var icon = kpiIconForCode(kpi.code);
+    var colors = ["blue", "green", "gold", "purple", "cyan", "coral"];
+    var color = colors[index % colors.length];
+    var label = kpiLabelForCode(kpi.code);
+    var trend = kpi.trend ? String(kpi.trend) : "—";
+    var value = escapeMarkup(kpi.value || "—");
+    return '<article class="kpi-card"><span class="kpi-icon ' + color + '"><i data-lucide="' + icon + '"></i></span><div><b>' + value + '</b><span>' + escapeMarkup(label) + '</span><small>' + escapeMarkup(trend) + '</small></div></article>';
+  }
+
+  function kpiLabelForCode(code) {
+    var map = {
+      students: "Élèves inscrits", eleves: "Élèves inscrits", pupils: "Élèves inscrits", enrollment: "Élèves inscrits",
+      girls: "Filles", filles: "Filles",
+      boys: "Garçons", garcons: "Garçons",
+      teachers: "Personnel actif", enseignants: "Personnel actif",
+      classes: "Classes", cycles: "Cycles",
+      presence: "Taux de présence", attendance: "Taux de présence",
+      finance: "Recettes (mois)", fees: "Frais de scolarité", payments: "Paiements",
+      alerts: "Alertes actives", incidents: "Incidents",
+      documents: "Documents", messages: "Messages", announcements: "Annonces"
+    };
+    var key = String(code || "").toLowerCase().replace(/[^a-z]/g, "");
+    return map[key] || escapeMarkup(code);
+  }
+
+  function kpiIconForCode(code) {
+    var map = {
+      students: "users", eleves: "users", pupils: "users", enrollment: "users",
+      girls: "user-round", filles: "user-round", women: "user-round",
+      boys: "user-round", garcons: "user-round", men: "user-round",
+      teachers: "graduation-cap", enseignants: "graduation-cap",
+      classes: "school", cycles: "layers-3",
+      presence: "clipboard-check", attendance: "clipboard-check",
+      finance: "wallet", fees: "wallet-cards", payments: "receipt-text",
+      alerts: "triangle-alert", incidents: "siren",
+      documents: "files", messages: "messages-square", announcements: "megaphone"
+    };
+    var key = String(code || "").toLowerCase().replace(/[^a-z]/g, "");
+    return map[key] || "gauge";
+  }
+
   function renderWorkspace(roleKey) {
     var profile = roleCatalog[roleKey] || roleCatalog.admin;
     currentDemoRole = roleCatalog[roleKey] ? roleKey : "admin";
+    var accessUser = getCurrentUser();
+    var access = window.SchoolSafeAccess;
+    var demoBanner = document.getElementById("workspaceDemoBanner");
+    if (demoBanner) {
+      demoBanner.hidden = !!currentApiToken();
+      if (!demoBanner.hidden) icons();
+    }
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("financeModule").hidden = true;
     document.getElementById("securityModule").hidden = true;
@@ -2141,61 +1810,123 @@
     document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.getElementById("schoolModule").hidden = true;
-    document.querySelector(".workspace-grid").hidden = false;
+
+    var dashboardContainer = document.getElementById("dashboardContainer");
+    if (dashboardContainer) dashboardContainer.hidden = false;
+
     var liveName = sessionDisplayName();
-    var liveInitials = sessionInitials();
     var roleLabel = sessionRoleLabel(currentDemoRole);
-    var scopeText = (currentSession && currentSession.scopes && currentSession.scopes.length) ? scopeSummary(currentSession) : profile.scope;
+    var firstName = (liveName || profile.short || "Administrateur").split(" ")[0];
+
+    // Greetings
+    var greetingText = "Bonjour, " + firstName + " 👋";
+    var desktopGreeting = document.getElementById("desktopGreeting");
+    var mobileGreeting = document.getElementById("mobileGreeting");
+    if (desktopGreeting) desktopGreeting.textContent = greetingText;
+    if (mobileGreeting) mobileGreeting.textContent = greetingText;
+
+    // Avatars
+    var topbarAvatar = document.getElementById("topbarAvatar");
+    var mobileTopbarAvatar = document.getElementById("mobileTopbarAvatar");
+    var sidebarAvatar = document.getElementById("sidebarAvatar");
+    var avatarUrl = (currentSession && currentSession.avatar) || "./safe2d/safe_sourire.png";
+    if (topbarAvatar) topbarAvatar.src = avatarUrl;
+    if (mobileTopbarAvatar) mobileTopbarAvatar.src = avatarUrl;
+    if (sidebarAvatar) sidebarAvatar.src = avatarUrl;
+
+    // Sidebar user
+    var sidebarUserName = document.getElementById("sidebarUserName");
+    if (sidebarUserName) sidebarUserName.textContent = liveName || profile.short;
+
+    // Anciens éléments conservés pour compatibilité
     document.getElementById("workspaceRole").textContent = roleLabel;
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
-    document.getElementById("workspaceInitials").textContent = liveInitials || profile.initials;
+    document.getElementById("workspaceInitials").textContent = sessionInitials() || profile.initials;
     document.getElementById("workspaceProfileName").textContent = liveName || profile.short;
     document.getElementById("workspaceEyebrow").textContent = profile.eyebrow;
     document.getElementById("workspaceWelcomeTitle").textContent = profile.welcome;
     document.getElementById("workspaceWelcomeCopy").textContent = profile.copy;
-    document.getElementById("statusRole").textContent = roleLabel;
-    document.getElementById("statusScope").textContent = scopeText;
-    document.getElementById("priorityScope").textContent = (liveName || profile.short) + " · " + scopeText;
-    document.getElementById("profileOverview").innerHTML = (profileIndicators[currentDemoRole] || profileIndicators.admin).map(function (indicator, index) {
-      return '<article class="overview-stat overview-' + (index % 6) + '"><span><i data-lucide="' + indicator[2] + '"></i></span><div><small>' + indicator[0] + '</small><b>' + indicator[1] + "</b></div></article>";
-    }).join("");
 
+    // Nom de l’établissement (source réelle : currentSession.school.name)
+    var workspaceSchoolName = document.getElementById("workspaceSchoolName");
+    if (workspaceSchoolName) {
+      var schoolName = (currentSession && currentSession.school && currentSession.school.name) || "Configuration en cours";
+      workspaceSchoolName.textContent = schoolName;
+    }
+
+    // Dropdown profil
+    var profileDropdownAvatar = document.getElementById("profileDropdownAvatar");
+    var profileDropdownName = document.getElementById("profileDropdownName");
+    var profileDropdownRole = document.getElementById("profileDropdownRole");
+    if (profileDropdownAvatar) profileDropdownAvatar.src = avatarUrl;
+    if (profileDropdownName) profileDropdownName.textContent = liveName || profile.short;
+    if (profileDropdownRole) profileDropdownRole.textContent = roleLabel;
+
+    // KPI
+    renderProfileOverview();
+
+    // Role switch
     var roleSwitch = document.getElementById("workspaceRoleSwitch");
-    var userRoles = (currentSession && currentSession.roles) || [currentDemoRole];
-    roleSwitch.innerHTML = userRoles.map(function (role) {
-      var label = roleCatalog[role] ? roleCatalog[role].label : role;
-      return '<option value="' + role + '"' + (role === currentDemoRole ? " selected" : "") + ">" + label + "</option>";
-    }).join("");
-    roleSwitch.hidden = userRoles.length <= 1;
-    roleSwitch.disabled = userRoles.length <= 1;
-
-    var visibleBranches = profile.branches.filter(function (item) {
-      if (item.key !== "administration") return true;
-      var perms = (currentSession && currentSession.permissions) || [];
-      return perms.indexOf("school.manage") >= 0 || perms.indexOf("staff.manage") >= 0;
-    });
-
-    document.getElementById("workspaceNav").innerHTML = visibleBranches.map(function (item, index) {
-      var definition = branchDefinitions[item.key];
-      var mobileGroups = item.groups.map(function (workGroup) {
-        var mobileActions = workGroup.actions.map(function (action) {
-          return '<button class="nav-action" type="button" data-nav-branch="' + item.key + '" data-nav-action="' + action[0] + '"><i data-lucide="' + action[1] + '"></i><span>' + action[0] + "</span></button>";
-        }).join("");
-        return '<div class="nav-action-group"><span class="nav-group-label">' + workGroup.label + '</span>' + mobileActions + "</div>";
+    if (roleSwitch) {
+      var userRoles = (currentSession && currentSession.roles) || [currentDemoRole];
+      roleSwitch.innerHTML = userRoles.map(function (role) {
+        var label = roleCatalog[role] ? roleCatalog[role].label : role;
+        return '<option value="' + role + '"' + (role === currentDemoRole ? " selected" : "") + ">" + label + "</option>";
       }).join("");
-      return '<div class="nav-branch-item' + (index === 0 ? " active" : "") + '"><button class="nav-branch-button' + (index === 0 ? " active" : "") + '" type="button" data-branch="' + item.key + '" aria-expanded="false"><i data-lucide="' + definition.icon + '"></i><span>' + definition.label + '</span><i class="nav-chevron" data-lucide="chevron-down"></i></button><div class="nav-submenu" hidden>' + mobileGroups + "</div></div>";
-    }).join("");
+      roleSwitch.hidden = userRoles.length <= 1;
+      roleSwitch.disabled = userRoles.length <= 1;
+    }
+
+    // Branches visibles selon ACCESS_LAW : permission + portée + condition + exception.
+    // En session réelle, SchoolSafeAccess filtre selon currentSession.permissions.
+    // En démo sans session, roleCatalog continue de fournir le modèle de navigation.
+    var isLiveSession = !!(currentSession && currentSession.token);
+    var allBranches = Object.keys(branchDefinitions).map(function (key) {
+      return { key: key, description: branchDefinitions[key].label, groups: [] };
+    });
+    var visibleBranches = (isLiveSession && access && typeof access.filterBranches === "function")
+      ? access.filterBranches(accessUser, allBranches)
+      : profile.branches;
+
+    // Sidebar navigation
+    var workspaceNav = document.getElementById("workspaceNav");
+    if (workspaceNav) {
+      workspaceNav.innerHTML = '<button class="active" type="button" data-dashboard><i data-lucide="layout-dashboard"></i><span>Tableau de bord</span></button>' +
+        '<div class="nav-section"><span>Résumé école</span></div>' +
+        visibleBranches.map(function (item, index) {
+          var definition = branchDefinitions[item.key];
+          return '<button type="button" data-branch="' + item.key + '"><i data-lucide="' + definition.icon + '"></i><span>' + definition.label + '</span></button>';
+        }).join("") +
+        '<div class="nav-section"><span>Système</span></div>' +
+        '<button type="button" data-action="Paramètres"><i data-lucide="settings"></i><span>Paramètres</span></button>' +
+        '<button type="button" id="permissionsNav"' + (currentDemoRole !== "admin" ? " hidden" : "") + '><i data-lucide="shield-ellipsis"></i><span>Rôles et accès</span></button>' +
+        '<button type="button" data-action="Audit et journaux"><i data-lucide="scroll-text"></i><span>Audit et journaux</span></button>' +
+        '<button type="button" data-action="Intégrations"><i data-lucide="plug"></i><span>Intégrations</span></button>';
+    }
+
+    // Desktop module grid
+    var desktopModuleGrid = document.getElementById("desktopModuleGrid");
+    if (desktopModuleGrid) {
+      desktopModuleGrid.innerHTML = visibleBranches.map(function (item) {
+        return renderModuleCard(item);
+      }).join("");
+    }
+
+    // Mobile quick access
+    var mobileQuickAccess = document.getElementById("mobileQuickAccess");
+    if (mobileQuickAccess) {
+      mobileQuickAccess.innerHTML = visibleBranches.map(function (item) {
+        return renderQuickAccessItem(item);
+      }).join("");
+    }
+
+    // Anciens éléments
     document.getElementById("statusBranchList").innerHTML = visibleBranches.map(function (item) {
       return "<span>" + branchDefinitions[item.key].label + "</span>";
     }).join("");
 
-    var todayColors = [
-      ["#1264df", "#dceaff"], ["#087a55", "#dff8ee"],
-      ["#9b6700", "#fff2cd"], ["#6b42c7", "#eee7ff"]
-    ];
-    document.getElementById("workspaceToday").innerHTML = profile.today.map(function (item, index) {
-      var colors = todayColors[index % todayColors.length];
-      return '<div class="today-item" style="--item-color:' + colors[0] + ';--item-bg:' + colors[1] + '"><span><i data-lucide="' + item[2] + '"></i></span><div><b>' + item[0] + "</b><small>" + item[1] + "</small></div></div>";
+    document.getElementById("workspaceToday").innerHTML = profile.today.map(function (item) {
+      return '<div class="today-item"><span><i data-lucide="' + item[2] + '"></i></span><div><b>' + item[0] + "</b><small>À synchroniser</small></div></div>";
     }).join("");
 
     document.getElementById("workspaceBranches").innerHTML = visibleBranches.map(function (item) {
@@ -2210,92 +1941,262 @@
     }).join("") + '<div class="scope-note"><i data-lucide="map-pin-check"></i><span><b>Périmètre appliqué :</b> ' + profile.scope + "</span></div>";
 
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
-    document.getElementById("permissionsNav").hidden = currentDemoRole !== "admin";
     document.getElementById("demoRole").value = currentDemoRole;
-    document.querySelectorAll("#workspaceNav .nav-branch-button").forEach(function (button) {
+
+    // Événements sidebar
+    document.querySelectorAll("#workspaceNav [data-dashboard]").forEach(function (button) {
       button.addEventListener("click", function () {
-        var item = button.closest(".nav-branch-item");
-        if (window.matchMedia("(max-width: 620px)").matches) {
-          var shouldOpen = !item.classList.contains("expanded");
-          document.querySelectorAll("#workspaceNav .nav-branch-item").forEach(function (navItem) {
-            navItem.classList.remove("expanded");
-            navItem.querySelector(".nav-branch-button").setAttribute("aria-expanded", "false");
-            navItem.querySelector(".nav-submenu").hidden = true;
-          });
-          item.classList.toggle("expanded", shouldOpen);
-          button.setAttribute("aria-expanded", String(shouldOpen));
-          item.querySelector(".nav-submenu").hidden = !shouldOpen;
-          return;
-        }
-        var target = document.getElementById("branch-" + button.getAttribute("data-branch"));
-        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-        document.querySelectorAll("#workspaceNav .nav-branch-button").forEach(function (navButton) { navButton.classList.toggle("active", navButton === button); });
+        document.querySelectorAll("#workspaceNav button").forEach(function (b) { b.classList.remove("active"); });
+        button.classList.add("active");
         closeWorkspaceMenu();
+        window.scrollTo({ top: 0, behavior: "smooth" });
       });
     });
-    document.querySelectorAll("#workspaceNav [data-nav-action]").forEach(function (button) {
+
+    document.querySelectorAll("#workspaceNav [data-branch]").forEach(function (button) {
       button.addEventListener("click", function () {
-        var actionName = button.getAttribute("data-nav-action");
-        var branchKey = button.getAttribute("data-nav-branch");
-        var target = Array.prototype.find.call(document.querySelectorAll("#branch-" + branchKey + " [data-action]"), function (actionButton) {
-          return actionButton.getAttribute("data-action") === actionName;
-        });
-        document.querySelectorAll("#workspaceBranches .action-button").forEach(function (actionButton) { actionButton.classList.remove("action-selected"); });
-        document.querySelectorAll("#workspaceNav .nav-branch-button").forEach(function (navButton) { navButton.classList.toggle("active", navButton.getAttribute("data-branch") === branchKey); });
-        if (target) {
-          target.classList.add("action-selected");
-          target.scrollIntoView({ behavior: "smooth", block: "center" });
-          target.focus({ preventScroll: true });
-        }
-        document.getElementById("workspaceTitle").textContent = actionName;
+        var branchKey = button.getAttribute("data-branch");
+        document.querySelectorAll("#workspaceNav button").forEach(function (b) { b.classList.remove("active"); });
+        button.classList.add("active");
         closeWorkspaceMenu();
-        if (pedagogyTabForAction(actionName)) {
-          openPedagogyModule(actionName);
-          return;
-        }
-        if (financeTabForAction(actionName)) {
-          openFinanceModule(actionName);
-          return;
-        }
-        if (schoolTabForAction(actionName)) {
-          openSchoolModule(schoolTabForAction(actionName));
-          return;
-        }
-        notify(actionName + " — espace ouvert dans la branche " + branchDefinitions[branchKey].label + ".");
+        openModuleByBranch(branchKey);
       });
     });
-    document.querySelectorAll("#workspaceBranches [data-action]").forEach(function (button) {
+
+    document.querySelectorAll("#workspaceNav [data-action]").forEach(function (button) {
       button.addEventListener("click", function () {
         var actionName = button.getAttribute("data-action");
-        if (pedagogyTabForAction(actionName)) {
-          openPedagogyModule(actionName);
-          return;
-        }
-        if (financeTabForAction(actionName)) {
-          openFinanceModule(actionName);
-          return;
-        }
-        if (securityTabForAction(actionName)) {
-          openSecurityModule(actionName);
-          return;
-        }
-        if (pilotageTabForAction(actionName)) {
-          openPilotageModule(actionName);
-          return;
-        }
-        if (feeControlTabForAction(actionName)) {
-          openFeeControlModule(actionName);
-          return;
-        }
-        if (schoolTabForAction(actionName)) {
-          openSchoolModule(schoolTabForAction(actionName));
-          return;
-        }
-        notify(actionName + " — fonction à brancher dans l’étape métier correspondante.");
+        document.querySelectorAll("#workspaceNav button").forEach(function (b) { b.classList.remove("active"); });
+        button.classList.add("active");
+        closeWorkspaceMenu();
+        if (actionName === "Paramètres") { notify("Paramètres — ouverture dans une prochaine étape."); return; }
+        if (actionName === "Audit et journaux") { notify("Audit et journaux — ouverture dans une prochaine étape."); return; }
+        if (actionName === "Intégrations") { notify("Intégrations — ouverture dans une prochaine étape."); return; }
       });
     });
+
+    var permissionsNav = document.getElementById("permissionsNav");
+    if (permissionsNav) {
+      permissionsNav.addEventListener("click", function () {
+        openAccessConsole();
+      });
+    }
+
+    // Clics sur les cartes modules desktop
+    document.querySelectorAll("#desktopModuleGrid .module-card").forEach(function (card) {
+      card.addEventListener("click", function () {
+        openModuleByBranch(card.getAttribute("data-branch"));
+      });
+    });
+
+    // Clics sur les accès rapides mobile
+    document.querySelectorAll("#mobileQuickAccess .quick-access-item").forEach(function (item) {
+      item.addEventListener("click", function () {
+        openModuleByBranch(item.getAttribute("data-branch"));
+      });
+    });
+
+    // Jaspe suggestions
+    document.querySelectorAll(".jaspe-suggestions button, .jaspe-input button").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var query = button.getAttribute("data-query") || "";
+        var input = button.closest(".jaspe-card") && button.closest(".jaspe-card").querySelector(".jaspe-input input");
+        if (!query && input) query = input.value;
+        if (window.SafeAssistant && window.SafeAssistant.openWithQuery) {
+          window.SafeAssistant.openWithQuery(query);
+        } else {
+          notify(query ? "Jaspe : " + query : "Posez votre question à Jaspe.");
+        }
+      });
+    });
+    document.querySelectorAll(".jaspe-input input").forEach(function (input) {
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          if (window.SafeAssistant && window.SafeAssistant.openWithQuery) {
+            window.SafeAssistant.openWithQuery(input.value);
+          } else {
+            notify(input.value ? "Jaspe : " + input.value : "Posez votre question à Jaspe.");
+          }
+        }
+      });
+    });
+
+    // Navigation mobile bas
+    var bottomNav = document.getElementById("workspaceBottomNav");
+    if (bottomNav) {
+      bottomNav.hidden = false;
+      if (!window.__ssBottomNavObserver) {
+        window.__ssBottomNavObserver = new MutationObserver(function () {
+          bottomNav.hidden = dashboardContainer ? dashboardContainer.hidden : false;
+        });
+        if (dashboardContainer) window.__ssBottomNavObserver.observe(dashboardContainer, { attributes: true, attributeFilter: ["hidden"] });
+      }
+      document.querySelectorAll("#workspaceBottomNav [data-bottom-nav]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var target = btn.getAttribute("data-bottom-nav");
+          if (target !== "create") {
+            document.querySelectorAll("#workspaceBottomNav .ss-bottom-nav__item").forEach(function (item) { item.classList.remove("active"); });
+            if (btn.classList.contains("ss-bottom-nav__item")) btn.classList.add("active");
+          }
+          if (target === "dashboard" || target === "board") {
+            showDashboard();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            return;
+          }
+          if (target === "notifications") {
+            toggleDropdown("notificationsDropdown", "topbarNotifications");
+            return;
+          }
+          if (target === "menu") {
+            var sidebar = document.getElementById("workspaceSidebar");
+            var backdrop = document.getElementById("workspaceMenuBackdrop");
+            if (sidebar) sidebar.classList.add("open");
+            if (backdrop) backdrop.classList.add("visible");
+            return;
+          }
+          if (target === "create") {
+            renderFabMenu(accessUser);
+            toggleFabMenu(true);
+            return;
+          }
+          notify(target + " — navigation rapide.");
+        });
+      });
+    }
+
+    // Dropdowns topbar desktop + mobile
+    bindTopbarDropdown("topbarNotifications", "notificationsDropdown");
+    bindTopbarDropdown("topbarMessages", "messagesDropdown");
+    bindTopbarDropdown("topbarProfile", "profileDropdown");
+    bindTopbarDropdown("mobileNotifications", "notificationsDropdown");
+    bindTopbarDropdown("mobileMessages", "messagesDropdown");
+    bindTopbarDropdown("mobileProfile", "profileDropdown");
+
+    // Actions du dropdown profil
+    var profileDropdownSettings = document.getElementById("profileDropdownSettings");
+    if (profileDropdownSettings) {
+      profileDropdownSettings.addEventListener("click", function () {
+        closeAllDropdowns();
+        notify("Paramètres — ouverture dans une prochaine étape.");
+      });
+    }
+    var profileDropdownLogout = document.getElementById("profileDropdownLogout");
+    if (profileDropdownLogout) {
+      profileDropdownLogout.addEventListener("click", function () {
+        closeAllDropdowns();
+        showScreen("auth");
+      });
+    }
+
+    // FAB menu
+    var fabMenuBackdrop = document.getElementById("workspaceFabMenuBackdrop");
+    if (fabMenuBackdrop && !fabMenuBackdrop.__ssFabBound) {
+      fabMenuBackdrop.__ssFabBound = true;
+      fabMenuBackdrop.addEventListener("click", function () { toggleFabMenu(false); });
+    }
+    renderFabMenu(accessUser);
+
+    // Fermeture menu mobile
+    var menuBackdrop = document.getElementById("workspaceMenuBackdrop");
+    if (menuBackdrop && !menuBackdrop.__ssBackdropBound) {
+      menuBackdrop.__ssBackdropBound = true;
+      menuBackdrop.addEventListener("click", function () {
+        var sidebar = document.getElementById("workspaceSidebar");
+        if (sidebar) sidebar.classList.remove("open");
+        menuBackdrop.classList.remove("visible");
+      });
+    }
+
+    // Breadcrumb
+    var breadcrumbBack = document.getElementById("workspaceBreadcrumbBack");
+    if (breadcrumbBack && !breadcrumbBack.__ssBreadcrumbBound) {
+      breadcrumbBack.__ssBreadcrumbBound = true;
+      breadcrumbBack.addEventListener("click", function () {
+        showDashboard();
+      });
+    }
+    var breadcrumbHome = document.getElementById("workspaceBreadcrumbHome");
+    if (breadcrumbHome && !breadcrumbHome.__ssBreadcrumbBound) {
+      breadcrumbHome.__ssBreadcrumbBound = true;
+      breadcrumbHome.addEventListener("click", function () {
+        showDashboard();
+      });
+    }
+
+    // Fermeture dropdowns au clic extérieur
+    if (!document.body.__ssDropdownOutsideBound) {
+      document.body.__ssDropdownOutsideBound = true;
+      document.addEventListener("click", function (event) {
+        var target = event.target;
+        if (target.closest(".topbar-tool-wrap")) return;
+        if (target.closest(".mobile-tools")) return;
+        if (target.closest(".ss-fab-menu")) return;
+        if (target.closest('[data-bottom-nav="create"]')) return;
+        closeAllDropdowns();
+        toggleFabMenu(false);
+      });
+    }
+
+    // Bouton retour connexion
+    var workspaceBack = document.getElementById("workspaceBack");
+    if (workspaceBack && !workspaceBack.__ssBackBound) {
+      workspaceBack.__ssBackBound = true;
+      workspaceBack.addEventListener("click", function () {
+        showScreen("auth");
+      });
+    }
+
+    // Theme toggle
+    var themeToggle = document.getElementById("sidebarThemeToggle");
+    if (themeToggle && !themeToggle.__ssThemeBound) {
+      themeToggle.__ssThemeBound = true;
+      themeToggle.addEventListener("change", function () {
+        var theme = themeToggle.checked ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", theme);
+        try { localStorage.setItem("ss-theme", theme); } catch (e) {}
+      });
+      themeToggle.checked = document.documentElement.getAttribute("data-theme") === "dark";
+    }
+
     icons();
     if (window.SchoolSafeCards) window.SchoolSafeCards.init();
+  }
+
+  function renderModuleCard(branchItem) {
+    var definition = branchDefinitions[branchItem.key];
+    var desc = branchItem.description || "";
+    return '<article class="module-card module-card--' + branchItem.key + '" data-branch="' + branchItem.key + '">' +
+      '<div class="module-card__header"><span class="module-card__icon"><i data-lucide="' + definition.icon + '"></i></span></div>' +
+      '<h3 class="module-card__title">' + definition.label + '</h3>' +
+      '<p class="module-card__desc">' + desc + '</p>' +
+      '<span class="module-card__link">Accéder <i data-lucide="chevron-right"></i></span>' +
+      '</article>';
+  }
+
+  function renderQuickAccessItem(branchItem) {
+    var definition = branchDefinitions[branchItem.key];
+    var label = definition.label;
+    if (label === "Contrôle et rapports") label = "Rapports";
+    return '<button class="quick-access-item quick-access-item--' + branchItem.key + '" type="button" data-branch="' + branchItem.key + '">' +
+      '<span class="quick-access-item__icon"><i data-lucide="' + definition.icon + '"></i></span>' +
+      '<span>' + label + '</span>' +
+      '</button>';
+  }
+
+  function openModuleByBranch(branchKey) {
+    var definition = branchDefinitions[branchKey];
+    if (!definition) return;
+    setBreadcrumb(definition.label);
+    if (branchKey === "pedagogy") { openPedagogyModule("Devoirs et corrections"); return; }
+    if (branchKey === "finance") { openFinanceModule("Encaissements"); return; }
+    if (branchKey === "security") { openSecurityModule("Scanner un QR"); return; }
+    if (branchKey === "school") { openSchoolModule("school"); return; }
+    if (branchKey === "pilotage") { openPilotageModule("Tableau de bord"); return; }
+    if (branchKey === "people") { notify("Personnel — ouverture dans une prochaine étape."); return; }
+    if (branchKey === "accounting") { notify("Comptabilité — ouverture dans une prochaine étape."); return; }
+    if (branchKey === "communication") { notify("Communication — ouverture dans une prochaine étape."); return; }
+    if (branchKey === "reports") { notify("Contrôle et rapports — ouverture dans une prochaine étape."); return; }
+    notify(definition.label + " — ouverture dans une prochaine étape.");
   }
 
   function populateRoleSelect(select, value) {
@@ -2388,12 +2289,16 @@
     document.getElementById("accessConsole").hidden = true;
     document.querySelector(".workspace-grid").hidden = false;
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
+    setBreadcrumb(null);
   }
 
   function closeWorkspaceMenu() {
     var sidebar = document.getElementById("workspaceSidebar");
-    sidebar.classList.remove("open");
-    document.getElementById("cubeMenu").setAttribute("aria-expanded", "false");
+    if (sidebar) sidebar.classList.remove("open");
+    var cubeMenu = document.getElementById("cubeMenu");
+    if (cubeMenu) cubeMenu.setAttribute("aria-expanded", "false");
+    var backdrop = document.getElementById("workspaceMenuBackdrop");
+    if (backdrop) backdrop.classList.remove("visible");
   }
 
   function initParticles() {
@@ -2418,11 +2323,14 @@
   function icons() {
     if (window.lucide) window.lucide.createIcons({ attrs: { "aria-hidden": "true" } });
   }
+  window.icons = icons;
 
   function showScreen(name) {
     Object.keys(screens).forEach(function (key) {
       screens[key].classList.toggle("active", key === name);
     });
+    document.body.classList.remove("screen-splash", "screen-guardian", "screen-auth", "screen-setup", "screen-workspace");
+    document.body.classList.add("screen-" + name);
     if (name === "auth") startImageRotation();
     else stopImageRotation();
     if (name === "guardian") startGuardianGallery();
@@ -2438,9 +2346,18 @@
     toast.classList.add("show");
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(function () { toast.classList.remove("show"); }, 3200);
+    dispatchSafeEvent(message);
   }
+  window.notify = notify;
   window.SchoolSafeApp = window.SchoolSafeApp || {};
   window.SchoolSafeApp.notify = notify;
+
+  function dispatchSafeEvent(message) {
+    var type = "action:success";
+    if (/erreur|échec|impossible|refusé/i.test(message)) type = "action:error";
+    else if (/publié|terminé|réussi|enregistré|généré/i.test(message)) type = "action:big_success";
+    window.dispatchEvent(new CustomEvent("safe:event", { detail: { type: type, message: message } }));
+  }
 
   function renderGuardianGallery(immediate) {
     var activeMedia = schoolMediaLibrary.filter(function (media) { return media.active; }).sort(function (a, b) { return a.order - b.order; });
@@ -2528,24 +2445,49 @@
   document.getElementById("backToSplash").addEventListener("click", function () { showScreen("splash"); });
   document.getElementById("setupHome").addEventListener("click", function () { showScreen("splash"); });
   document.getElementById("closeSetup").addEventListener("click", function () { showScreen("auth"); });
-  document.getElementById("startSetup").addEventListener("click", async function () {
-    var token = window.prompt("Token de configuration de l'école :");
-    if (!token) return;
-    try {
-      var config = await loadBackendConfig();
-      if (!config) { notify("Serveur de configuration non disponible."); return; }
-      var result = await apiPost("/setup/validate-token", { token: token });
-      if (!result || !result.valid) { notify("Token de configuration invalide."); return; }
-      setupToken = token;
-      renderStep();
-      showScreen("setup");
-    } catch (error) {
-      notify(error.message || "Impossible de valider le token.");
+  document.getElementById("startSetup").addEventListener("click", function () {
+    if (window.ssModal) {
+      window.ssModal({
+        title: "Configuration de l'école",
+        subtitle: "Saisissez le token de configuration fourni par SchoolSafe",
+        content: '<div class="school-form"><label for="setup-token-input">Token</label><input type="text" id="setup-token-input" class="ss-input" placeholder="Token de configuration" autocomplete="off"></div>',
+        size: "sm",
+        closeOnBackdrop: false,
+        actions: [
+          { label: "Annuler", variant: "ghost", close: true },
+          {
+            label: "Valider",
+            variant: "primary",
+            close: false,
+            onClick: async function (modalApi) {
+              var input = document.getElementById("setup-token-input");
+              var token = input ? input.value.trim() : "";
+              if (!token) { modalApi.setError("Veuillez saisir un token."); return; }
+              modalApi.setLoading(true);
+              try {
+                await validateSetupToken(token);
+              } catch (error) {
+                modalApi.setLoading(false);
+                modalApi.setError(error.message || "Impossible de valider le token.");
+              }
+            }
+          }
+        ]
+      });
+    } else {
+      var token = window.prompt("Token de configuration de l'école :");
+      if (!token) return;
+      validateSetupToken(token).catch(function (e) { notify(e.message || "Impossible de valider le token."); });
     }
   });
-  document.getElementById("workspaceBack").addEventListener("click", async function () {
+  function bindIfExists(id, event, handler) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener(event, handler);
+  }
+
+  bindIfExists("workspaceBack", "click", async function () {
     clearSession();
-    try { await getSupabaseClient()?.auth?.signOut(); } catch (e) {}
+    try { var client = getSupabaseClient(); if (client && client.auth && client.auth.signOut) await client.auth.signOut(); } catch (e) {}
     document.getElementById("emailIdentifier").value = "";
     document.getElementById("phoneIdentifier").value = "";
     document.getElementById("password").value = "";
@@ -2554,26 +2496,20 @@
     pendingPhone = null;
     showScreen("auth");
   });
-  document.getElementById("previewWorkspace").addEventListener("click", function () { showScreen("workspace"); });
-  document.getElementById("returnSetup").addEventListener("click", function () { showScreen("setup"); });
-  document.getElementById("closePedagogyModule").addEventListener("click", closePedagogyModule);
+  bindIfExists("previewWorkspace", "click", function () { showScreen("workspace"); });
+  bindIfExists("closePedagogyModule", "click", closePedagogyModule);
+  bindIfExists("closePalmaresModule", "click", closePalmaresModule);
   document.querySelectorAll("#pedagogyTabs [data-pedagogy-tab]").forEach(function (button) {
     button.addEventListener("click", function () {
       pedagogyState.activeTab = button.getAttribute("data-pedagogy-tab");
       renderPedagogyModule();
     });
   });
-  document.getElementById("closeFinanceModule").addEventListener("click", closeFinanceModule);
-  document.querySelectorAll("#financeTabs [data-finance-tab]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      financeState.activeTab = button.getAttribute("data-finance-tab");
-      renderFinanceModule();
-    });
-  });
-  document.getElementById("closeSecurityModule").addEventListener("click", closeSecurityModule);
-  document.getElementById("closePilotageModule").addEventListener("click", closePilotageModule);
-  document.getElementById("closeFeeControlModule").addEventListener("click", closeFeeControlModule);
-  document.getElementById("closeSchoolModule").addEventListener("click", closeSchoolModule);
+  bindIfExists("closeFinanceModule", "click", closeFinanceModule);
+  bindIfExists("closeSecurityModule", "click", closeSecurityModule);
+  bindIfExists("closePilotageModule", "click", closePilotageModule);
+  bindIfExists("closeFeeControlModule", "click", closeFeeControlModule);
+  bindIfExists("closeSchoolModule", "click", closeSchoolModule);
   document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (button) {
     button.addEventListener("click", function () {
       document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (b) { b.classList.remove("active"); });
@@ -2581,37 +2517,47 @@
       renderPilotageTab(button.getAttribute("data-pilotage-tab"));
     });
   });
-  document.getElementById("cubeMenu").addEventListener("click", function () {
-    var sidebar = document.getElementById("workspaceSidebar");
-    var isOpen = sidebar.classList.toggle("open");
-    this.setAttribute("aria-expanded", String(isOpen));
-  });
-  document.getElementById("closeWorkspaceMenu").addEventListener("click", closeWorkspaceMenu);
-  document.getElementById("workspaceMenuBackdrop").addEventListener("click", closeWorkspaceMenu);
+  var cubeMenu = document.getElementById("cubeMenu");
+  if (cubeMenu) {
+    cubeMenu.addEventListener("click", function () {
+      var sidebar = document.getElementById("workspaceSidebar");
+      var isOpen = sidebar.classList.toggle("open");
+      cubeMenu.setAttribute("aria-expanded", String(isOpen));
+    });
+  }
+  var closeWorkspaceMenuBtn = document.getElementById("closeWorkspaceMenu");
+  if (closeWorkspaceMenuBtn) closeWorkspaceMenuBtn.addEventListener("click", closeWorkspaceMenu);
+  var workspaceMenuBackdrop = document.getElementById("workspaceMenuBackdrop");
+  if (workspaceMenuBackdrop) workspaceMenuBackdrop.addEventListener("click", closeWorkspaceMenu);
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") closeWorkspaceMenu();
     if (event.key === "Escape" && !document.getElementById("syncPanel").hidden) closeSyncPanel();
   });
-  document.getElementById("syncStatusButton").addEventListener("click", openSyncPanel);
-  document.getElementById("closeSyncPanel").addEventListener("click", closeSyncPanel);
-  document.getElementById("syncPanelBackdrop").addEventListener("click", closeSyncPanel);
-  document.getElementById("syncNowButton").addEventListener("click", function () {
+  var syncStatusButton = document.getElementById("syncStatusButton");
+  if (syncStatusButton) syncStatusButton.addEventListener("click", openSyncPanel);
+  var closeSyncPanelBtn = document.getElementById("closeSyncPanel");
+  if (closeSyncPanelBtn) closeSyncPanelBtn.addEventListener("click", closeSyncPanel);
+  var syncPanelBackdrop = document.getElementById("syncPanelBackdrop");
+  if (syncPanelBackdrop) syncPanelBackdrop.addEventListener("click", closeSyncPanel);
+  var syncNowButton = document.getElementById("syncNowButton");
+  if (syncNowButton) syncNowButton.addEventListener("click", function () {
     if (!navigator.onLine) { notify("Aucune connexion. La reprise restera automatique."); return; }
     window.SchoolSafeSync.syncNow();
   });
-  document.getElementById("installPwaButton").addEventListener("click", function () {
+  var installPwaButton = document.getElementById("installPwaButton");
+  if (installPwaButton) installPwaButton.addEventListener("click", function () {
     if (!deferredInstallPrompt) { notify("L’installation sera proposée lorsque le navigateur l’autorisera."); return; }
     deferredInstallPrompt.prompt();
-    deferredInstallPrompt.userChoice.finally(function () { deferredInstallPrompt = null; document.getElementById("installPwaButton").hidden = true; });
+    deferredInstallPrompt.userChoice.finally(function () { deferredInstallPrompt = null; installPwaButton.hidden = true; });
   });
-  document.getElementById("workspaceRoleSwitch").addEventListener("change", function () {
+  bindIfExists("workspaceRoleSwitch", "change", function () {
     closeAccessConsole();
     storageSet("schoolsafe-v2-active-role", this.value);
     renderWorkspace(this.value);
   });
-  document.getElementById("permissionsNav").addEventListener("click", openAccessConsole);
-  document.getElementById("closeAccessConsole").addEventListener("click", closeAccessConsole);
-  document.getElementById("editorRole").addEventListener("change", function () {
+  bindIfExists("permissionsNav", "click", openAccessConsole);
+  bindIfExists("closeAccessConsole", "click", closeAccessConsole);
+  bindIfExists("editorRole", "change", function () {
     var person = staffSamples[selectedStaffIndex];
     person.role = this.value;
     document.getElementById("editorAssignment").textContent = roleCatalog[person.role].label + " · " + person.scope;
@@ -2619,14 +2565,14 @@
     renderPermissionTree(person.role);
     icons();
   });
-  document.getElementById("scopeType").addEventListener("change", function () {
+  bindIfExists("scopeType", "change", function () {
     staffSamples[selectedStaffIndex].scopeType = this.value;
   });
-  document.getElementById("scopeValue").addEventListener("input", function () {
+  bindIfExists("scopeValue", "input", function () {
     staffSamples[selectedStaffIndex].scope = this.value;
     document.getElementById("editorAssignment").textContent = roleCatalog[staffSamples[selectedStaffIndex].role].label + " · " + this.value;
   });
-  document.getElementById("savePermissions").addEventListener("click", function () {
+  bindIfExists("savePermissions", "click", function () {
     var person = staffSamples[selectedStaffIndex];
     queueOfflineOperation("administration", "Modification des droits · " + person.name, { kind: "permission-change", person: person.name, role: person.role, scopeType: person.scopeType, scope: person.scope, permissions: Object.assign({}, person.permissions || {}), actionLevels: Object.assign({}, person.actionLevels || {}), dataViews: Object.assign({}, person.dataViews || {}) });
     notify("Brouillon d’accès enregistré localement. Aucun serveur n’a été modifié.");
@@ -2731,12 +2677,14 @@
     });
   });
   var pdfLanguageMode = document.getElementById("pdfLanguageMode");
-  if (window.SchoolSafeI18n) pdfLanguageMode.value = window.SchoolSafeI18n.documentLanguage();
-  pdfLanguageMode.addEventListener("change", function () {
-    window.SchoolSafeI18n.setDocumentLanguage(this.value);
-    queueOfflineOperation("administration", "Modification de la langue des documents PDF", { kind: "document-language", value: this.value });
-    notify(window.SchoolSafeI18n.current() === "en" ? "PDF document language saved." : "Langue des documents PDF enregistrée.");
-  });
+  if (pdfLanguageMode) {
+    if (window.SchoolSafeI18n) pdfLanguageMode.value = window.SchoolSafeI18n.documentLanguage();
+    pdfLanguageMode.addEventListener("change", function () {
+      window.SchoolSafeI18n.setDocumentLanguage(this.value);
+      queueOfflineOperation("administration", "Modification de la langue des documents PDF", { kind: "document-language", value: this.value });
+      notify(window.SchoolSafeI18n.current() === "en" ? "PDF document language saved." : "Langue des documents PDF enregistrée.");
+    });
+  }
 
   var stepIndex = 0;
   var stepLabels = [
@@ -2815,22 +2763,34 @@
 
   function field(label, id, value, options) {
     var config = options || {};
-    var wide = config.wide ? " wide" : "";
+    var wideClass = config.wide ? " ss-field--wide" : "";
     var type = config.type || "text";
-    var hint = config.hint ? "<small>" + config.hint + "</small>" : "";
+    var help = config.hint ? String(config.hint) : "";
+    var inputHtml;
     if (config.select) {
-      return [
-        '<div class="form-field' + wide + '">',
-        "<label for=\"" + id + "\">" + label + "</label>",
-        "<select id=\"" + id + "\" name=\"" + id + "\">",
-        config.select.map(function (item) { return "<option" + (item === value ? " selected" : "") + ">" + item + "</option>"; }).join(""),
-        "</select>", hint, "</div>"
-      ].join("");
+      inputHtml = ssSelect({
+        id: id,
+        name: id,
+        value: value,
+        options: config.select.map(function (item) { return { value: item, label: item }; })
+      });
+    } else if (config.textarea) {
+      inputHtml = ssTextarea({
+        id: id,
+        name: id,
+        value: value,
+        placeholder: config.placeholder
+      });
+    } else {
+      inputHtml = ssInput({
+        id: id,
+        name: id,
+        type: type,
+        value: value,
+        placeholder: config.placeholder
+      });
     }
-    if (config.textarea) {
-      return '<div class="form-field' + wide + '"><label for="' + id + '">' + label + '</label><textarea id="' + id + '" name="' + id + '" placeholder="' + esc(config.placeholder || "") + '">' + esc(value) + "</textarea>" + hint + "</div>";
-    }
-    return '<div class="form-field' + wide + '"><label for="' + id + '">' + label + '</label><input id="' + id + '" name="' + id + '" type="' + type + '" value="' + esc(value) + '" placeholder="' + esc(config.placeholder || "") + '">' + hint + "</div>";
+    return ssField({ label: label, inputHtml: inputHtml, help: help, className: wideClass });
   }
 
   function intro(title, copy) {
@@ -2840,7 +2800,7 @@
   function renderIdentity() {
     return [
       intro("Présentez l’établissement", "Ces informations identifieront l’instance et alimenteront les en-têtes administratifs. Aucune école n’est préconfigurée."),
-      '<div class="form-grid">',
+      '<div class="ss-form-grid ss-form-grid--2">',
       field("Nom usuel de l’école", "schoolName", state.schoolName, { placeholder: "Ex. Groupe scolaire..." }),
       field("Dénomination légale", "legalName", state.legalName, { placeholder: "Nom figurant sur les documents officiels" }),
       field("Statut de l’établissement", "schoolType", state.schoolType, { select: ["Privée agréée", "Publique", "Conventionnée", "Confessionnelle", "Autre"] }),
@@ -2883,7 +2843,7 @@
   function renderAcademicYear() {
     return [
       intro("Cadrez l’année scolaire", "Les périodes seront réutilisées dans les présences, les paiements, les évaluations, les bulletins et les rapports."),
-      '<div class="form-grid">',
+      '<div class="ss-form-grid ss-form-grid--2">',
       field("Libellé de l’année scolaire", "yearLabel", state.yearLabel),
       field("Organisation pédagogique", "periods", state.periods, { select: ["Trimestres", "Semestres"] }),
       field("Date de début", "yearStart", state.yearStart, { type: "date" }),
@@ -2895,7 +2855,7 @@
   function renderContact() {
     return [
       intro("Renseignez les coordonnées", "Elles apparaîtront sur les documents officiels et serviront aux communications de l’établissement."),
-      '<div class="form-grid">',
+      '<div class="ss-form-grid ss-form-grid--2">',
       field("Pays", "country", state.country),
       field("Province", "province", state.province),
       field("Ville ou territoire", "city", state.city),
@@ -2904,7 +2864,7 @@
       field("Téléphone officiel", "phone", state.phone, { type: "tel" }),
       field("Site web actuel", "website", state.website, { wide: true, type: "url", placeholder: "https://..." }),
       "</div>",
-      '<section class="school-site-setup"><div class="site-setup-head"><span><i data-lucide="globe-2"></i></span><div><h3>Application privée + site public de l’école</h3><p>SchoolSafe prépare le site avec l’école; seules les publications validées quittent l’espace privé.</p></div></div><div class="form-grid">',
+      '<section class="school-site-setup"><div class="site-setup-head"><span><i data-lucide="globe-2"></i></span><div><h3>Application privée + site public de l’école</h3><p>SchoolSafe prépare le site avec l’école; seules les publications validées quittent l’espace privé.</p></div></div><div class="ss-form-grid ss-form-grid--2">',
       field("Mode du site", "websiteMode", state.websiteMode, { select: ["Créer un nouveau site SchoolSafe", "Relier un site existant", "Configurer plus tard"] }),
       field("Adresse souhaitée ou existante", "websiteAddress", state.websiteAddress, { type: "url", placeholder: "https://nom-ecole..." }),
       field("Publication des actualités", "publicNews", state.publicNews, { select: ["Après validation", "Désactivée"] }),
@@ -2915,10 +2875,11 @@
   }
 
   function renderBrand() {
+    var logoInputHtml = '<label class="logo-upload" for="officialLogoInput"><span><i data-lucide="image-up"></i><b>' + (state.officialLogoData ? "Logo officiel chargé" : "Sélectionner le logo officiel") + '</b><span>PNG haute définition, fond transparent recommandé</span></span><input id="officialLogoInput" type="file" accept="image/png,image/jpeg" hidden></label>';
     return [
       intro("Installez l’identité officielle", "Le logo validé sera obligatoire sur chaque PDF officiel. Les couleurs personnalisent l’interface sans modifier le moteur de cartes."),
-      '<div class="form-grid">',
-      '<div class="form-field wide"><label>Logo officiel de l’école</label><label class="logo-upload" for="officialLogoInput"><span><i data-lucide="image-up"></i><b>' + (state.officialLogoData ? "Logo officiel chargé" : "Sélectionner le logo officiel") + '</b><span>PNG haute définition, fond transparent recommandé</span></span><input id="officialLogoInput" type="file" accept="image/png,image/jpeg" hidden></label></div>',
+      '<div class="ss-form-grid ss-form-grid--2">',
+      ssField({ label: "Logo officiel de l’école", inputHtml: logoInputHtml, className: "ss-field--wide" }),
       field("Couleur principale", "primaryColor", state.primaryColor, { type: "color" }),
       field("Couleur d’accent", "accentColor", state.accentColor, { type: "color" }),
       field("Mention de pied de page des PDF", "documentFooter", state.documentFooter, { wide: true, textarea: true, placeholder: "Adresse, contacts et références légales" }),
@@ -2929,14 +2890,14 @@
   function renderAdmin() {
     return [
       intro("Créez le premier responsable", "L’Administrateur principal attribuera ensuite les profils, les modules, les actions et les périmètres de chaque membre du personnel."),
-      '<div class="form-grid">',
+      '<div class="ss-form-grid ss-form-grid--2">',
       field("Prénom", "adminFirstName", state.adminFirstName),
       field("Nom", "adminLastName", state.adminLastName),
       field("E-mail professionnel", "adminEmail", state.adminEmail, { type: "email", placeholder: "direction@ecole.cd" }),
       field("Téléphone", "adminPhone", state.adminPhone, { type: "tel" }),
       field("Mot de passe", "adminPassword", state.adminPassword, { type: "password", placeholder: "Minimum 8 caractères" }),
       field("Confirmer le mot de passe", "adminPasswordConfirm", state.adminPasswordConfirm, { type: "password" }),
-      '<div class="warning-note form-field wide"><i data-lucide="key-round"></i><span>Ce compte sera créé immédiatement. L’authentification forte sera exigée pour les profils sensibles.</span></div>',
+      '<div class="ss-field ss-field--wide">' + ssState({ type: "warning", title: "Sécurité", message: "Ce compte sera créé immédiatement. L’authentification forte sera exigée pour les profils sensibles.", size: "inline" }) + "</div>",
       "</div>"
     ].join("");
   }

@@ -56,6 +56,14 @@ Appliquer les migrations et le seed :
 npx supabase db reset
 ```
 
+Pour mettre à jour une base existante avec les dernières migrations sans perdre les données :
+
+```bash
+npx supabase migration up
+```
+
+Les migrations du projet se trouvent dans `supabase/migrations/`.
+
 ### 3.3 Configurer l'API école (`server/`)
 
 ```bash
@@ -239,10 +247,15 @@ node tests/qa-permanent-preview.cjs
 - [ ] Le token de setup est accepté.
 - [ ] L'école peut être configurée sur les 7 étapes.
 - [ ] L'administrateur peut se connecter.
-- [ ] Le workspace affiche le module **Cartes élèves**.
+- [ ] Le workspace affiche les modules **Cartes élèves**, **Pédagogie**, **Finance**, **Sécurité QR**, **Pilotage**.
 - [ ] Le studio de cartes génère un aperçu recto/verso.
 - [ ] La demande d'impression arrive dans l'app centrale.
 - [ ] L'opérateur peut télécharger les PNG et marquer la demande comme imprimée.
+- [ ] Les paiements et reçus fonctionnent dans le module Finance.
+- [ ] Les devoirs, cotes et moyennes fonctionnent dans le module Pédagogie.
+- [ ] Le scan QR et le lockdown fonctionnent dans le module Sécurité.
+- [ ] Les alertes, approbations et snapshots fonctionnent dans le module Pilotage.
+- [ ] Les notifications push s’enregistrent côté navigateur.
 
 ---
 
@@ -267,6 +280,12 @@ node tests/qa-permanent-preview.cjs
 | `CONTROL_APP_INSTANCE_ID` | non | ID de l'instance dans l'app centrale |
 | `CONTROL_APP_HMAC_SECRET` | non | Secret HMAC pour signer les appels à l'app centrale |
 | `VAPID_PRIVATE_KEY` | non | Clé privée VAPID pour les notifications push |
+| `VAPID_PUBLIC_KEY` | non | Clé publique VAPID (fournie au front) |
+| `VAPID_SUBJECT` | non | Sujet VAPID (`mailto:` ou URL) |
+| `BREVO_API_KEY` | non | Clé API Brevo pour les e-mails transactionnels |
+| `BREVO_SENDER_EMAIL` | non | Adresse d’envoi Brevo |
+| `CARD_HMAC_SECRET` | non | Secret pour signer les QR codes des cartes |
+| `DEFAULT_STAFF_PASSWORD` | non | Mot de passe temporaire des nouveaux membres du personnel |
 
 ### `schoolsafe-control-/.env`
 

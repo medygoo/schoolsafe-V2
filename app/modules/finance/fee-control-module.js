@@ -22,16 +22,16 @@
     container.innerHTML =
       '<div class="fee-control-panel">' +
         '<header><span>Contrôle des frais</span><h2>Campagnes de contrôle par QR</h2><p>Sélectionnez une campagne publiée, scannez la carte d’un élève et enregistrez le résultat.</p></header>' +
-        '<div id="feeControlCampaigns" class="fee-control-campaigns"><p>Chargement des campagnes…</p></div>' +
+        '<div id="feeControlCampaigns" class="fee-control-campaigns">' + window.ssState({ type: "loading", title: "Chargement...", message: "Chargement des campagnes…" }) + '</div>' +
         '<div id="feeControlScan" class="fee-control-scan hidden">' +
           '<h3>Scanner un élève</h3>' +
           '<label>QR payload<input type="text" id="feeControlQrInput" placeholder="schoolsafe://card/..." autocomplete="off"></label>' +
           '<div class="fee-control-result-options">' +
-            '<button type="button" class="primary-button" data-result="ok"><i data-lucide="badge-check"></i> En règle</button>' +
-            '<button type="button" class="secondary-button" data-result="partial"><i data-lucide="hand-coins"></i> Paiement partiel</button>' +
-            '<button type="button" class="secondary-button danger" data-result="unpaid"><i data-lucide="badge-alert"></i> Non en règle</button>' +
-            '<button type="button" class="secondary-button" data-result="exempted"><i data-lucide="shield-check"></i> Exempté</button>' +
-            '<button type="button" class="secondary-button" data-result="anomaly"><i data-lucide="triangle-alert"></i> Anomalie</button>' +
+            window.ssButton({ label: "En règle", icon: "badge-check", attrs: { "data-result": "ok" } }) +
+            window.ssButton({ label: "Paiement partiel", variant: "secondary", icon: "hand-coins", attrs: { "data-result": "partial" } }) +
+            window.ssButton({ label: "Non en règle", variant: "danger", icon: "badge-alert", attrs: { "data-result": "unpaid" } }) +
+            window.ssButton({ label: "Exempté", variant: "secondary", icon: "shield-check", attrs: { "data-result": "exempted" } }) +
+            window.ssButton({ label: "Anomalie", variant: "secondary", icon: "triangle-alert", attrs: { "data-result": "anomaly" } }) +
           '</div>' +
           '<div id="feeControlResult" class="scan-result hidden"></div>' +
         '</div>' +
@@ -62,14 +62,14 @@
   function loadCampaigns() {
     var box = document.getElementById("feeControlCampaigns");
     if (!window.SchoolSafeFinanceAPI) {
-      box.innerHTML = '<p>API Finance non disponible.</p>';
+      box.innerHTML = window.ssState({ type: "unavailable", title: "Service indisponible", message: "API Finance non disponible." });
       return;
     }
     window.SchoolSafeFinanceAPI.listCampaigns().then(function (data) {
       campaigns = data || [];
       var published = campaigns.filter(function (c) { return c.status === "published"; });
       if (!published.length) {
-        box.innerHTML = '<p>Aucune campagne publiée. L’Administrateur général doit d’abord créer et publier une campagne.</p>';
+        box.innerHTML = window.ssState({ type: "empty", title: "Aucune campagne publiée", message: "L’Administrateur général doit d’abord créer et publier une campagne." });
         return;
       }
       var html = '<h3>Campagnes actives</h3><ul>';
@@ -89,7 +89,7 @@
       });
       if (selectedCampaignId) document.getElementById("feeControlScan").classList.remove("hidden");
     }).catch(function (err) {
-      box.innerHTML = '<p>Erreur : ' + escapeHtml(err.message) + '</p>';
+      box.innerHTML = window.ssState({ type: "error", title: "Erreur", message: err.message });
     });
   }
 
@@ -105,29 +105,29 @@
     var resultBox = container.querySelector("#feeControlResult");
     var payload = input.value.trim();
     if (!selectedCampaignId) {
-      resultBox.innerHTML = '<div class="scan-alert error">Veuillez d’abord sélectionner une campagne.</div>';
+      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "Veuillez d’abord sélectionner une campagne.", size: "compact" });
       resultBox.classList.remove("hidden");
       return;
     }
     if (!payload) {
-      resultBox.innerHTML = '<div class="scan-alert error">Veuillez saisir un QR.</div>';
+      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "Veuillez saisir un QR.", size: "compact" });
       resultBox.classList.remove("hidden");
       return;
     }
     var parsed = parseQrPayload(payload);
     if (!parsed) {
-      resultBox.innerHTML = '<div class="scan-alert error">Format de QR non reconnu.</div>';
+      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "Format de QR non reconnu.", size: "compact" });
       resultBox.classList.remove("hidden");
       return;
     }
 
     if (!window.SchoolSafeSecurityAPI || !window.SchoolSafeFinanceAPI) {
-      resultBox.innerHTML = '<div class="scan-alert error">API non disponible.</div>';
+      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "API non disponible.", size: "compact" });
       resultBox.classList.remove("hidden");
       return;
     }
 
-    resultBox.innerHTML = '<div class="scan-alert info">Vérification du QR…</div>';
+    resultBox.innerHTML = window.ssState({ type: "loading", title: "Vérification du QR", message: "Analyse en cours…", size: "compact" });
     resultBox.classList.remove("hidden");
 
     // Étape 1 : vérifier le QR via l’API sécurité pour identifier l’élève
@@ -141,13 +141,13 @@
         result: result,
       });
     }).then(function (controlData) {
-      var statusClass = controlData.result === "ok" || controlData.result === "exempted" ? "success" : controlData.result === "partial" ? "warning" : "error";
+      var statusType = controlData.result === "ok" || controlData.result === "exempted" ? "success" : controlData.result === "partial" ? "unavailable" : "error";
       var statusText = { ok: "EN RÈGLE", partial: "PAIEMENT PARTIEL", unpaid: "NON EN RÈGLE", exempted: "EXEMPTÉ", anomaly: "ANOMALIE" }[controlData.result];
-      resultBox.innerHTML = '<div class="scan-alert ' + statusClass + '"><h3>' + statusText + '</h3><p>Contrôle enregistré sous référence ' + escapeHtml(controlData.id.slice(0, 8)) + '</p></div>';
+      resultBox.innerHTML = window.ssState({ type: statusType, title: statusText, message: "Contrôle enregistré sous référence " + escapeHtml(controlData.id.slice(0, 8)), size: "compact" });
       input.value = "";
       if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
     }).catch(function (err) {
-      resultBox.innerHTML = '<div class="scan-alert error"><h3>Erreur</h3><p>' + escapeHtml(err.message) + '</p></div>';
+      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: escapeHtml(err.message), size: "compact" });
     });
   }
 

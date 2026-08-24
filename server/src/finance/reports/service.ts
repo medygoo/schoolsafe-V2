@@ -188,7 +188,9 @@ export function createFinanceReportsService(
 
     const { data: payments, error } = await client
       .from("fee_payments")
-      .select("*, student_fees!inner(amount_expected, amount_remaining, fee_structures(label)), students!inner(id, matricule, first_name, last_name)")
+      .select(
+        "*, student_fees!inner(amount_expected, amount_remaining, fee_structures(label), students!inner(id, matricule, first_name, last_name))",
+      )
       .eq("school_id", schoolId)
       .gte("received_at", start)
       .lt("received_at", end)
@@ -234,7 +236,7 @@ export function createFinanceReportsService(
       const amount = Number(row.amount ?? 0);
       const studentFee = (row.student_fees ?? {}) as Record<string, unknown>;
       const feeStructure = (studentFee.fee_structures ?? {}) as Record<string, unknown>;
-      const student = (row.students ?? {}) as Record<string, unknown>;
+      const student = (studentFee.students ?? {}) as Record<string, unknown>;
       const metadata = (row.metadata ?? {}) as Record<string, unknown>;
       const feeLabel = (feeStructure.label as string) ?? "Non spécifié";
 

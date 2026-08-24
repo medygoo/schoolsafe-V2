@@ -38,6 +38,7 @@ export function createSetupService(
   anonKey: string,
   serviceRoleKey: string | undefined,
   setupToken: string | undefined,
+  apiBase: string,
 ): SetupService {
   if (!serviceRoleKey) {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for setup operations");
@@ -47,7 +48,7 @@ export function createSetupService(
 
   return {
     getConfig(): ConfigResponse {
-      return { supabase_url: supabaseUrl, supabase_anon_key: anonKey };
+      return { supabase_url: supabaseUrl, supabase_anon_key: anonKey, api_base: apiBase };
     },
 
     validateToken(token: string): boolean {

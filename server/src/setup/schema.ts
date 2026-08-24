@@ -82,4 +82,5 @@ export type AdminSetupResult = {
 export type ConfigResponse = {
   supabase_url: string;
   supabase_anon_key: string;
+  api_base: string;
 };

@@ -18,9 +18,38 @@
       .replace(/'/g, "&#039;");
   }
 
+  function formField(name, label, type, value, extra) {
+    extra = extra || {};
+    var id = "school-field-" + name;
+    var inputHtml;
+    if (type === "textarea") {
+      inputHtml = window.ssTextarea({ name: name, id: id, value: value, rows: extra.rows || 2 });
+    } else if (type === "select") {
+      inputHtml = window.ssSelect({ name: name, id: id, value: value, options: extra.options || [], required: extra.required });
+    } else if (type === "file") {
+      inputHtml = window.ssInput({ name: name, id: id, type: type, accept: extra.accept });
+    } else if (type === "hidden") {
+      inputHtml = '<input type="hidden" name="' + escapeMarkup(name) + '" value="' + escapeMarkup(value || "") + '">';
+    } else {
+      inputHtml = window.ssInput(Object.assign({ name: name, id: id, type: type, value: value }, extra));
+    }
+    return window.ssField({ label: label, inputHtml: inputHtml, required: extra.required });
+  }
+
+  function formCheckbox(name, value, label, checked) {
+    return '<label class="ss-checkbox"><input type="checkbox" name="' + escapeMarkup(name) + '" value="' + escapeMarkup(value) + '"' + (checked ? " checked" : "") + '> ' + escapeMarkup(label) + "</label>";
+  }
+
   function notify(message) {
     if (window.SchoolSafeApp && window.SchoolSafeApp.notify) {
       window.SchoolSafeApp.notify(message);
+    } else if (window.ssModal) {
+      window.ssModal({
+        title: "Information",
+        content: "<p>" + escapeMarkup(message) + "</p>",
+        size: "sm",
+        actions: [{ label: "OK", variant: "primary" }]
+      });
     } else {
       window.alert(message);
     }
@@ -67,19 +96,23 @@
         "<td>" + escapeMarkup(y.label) + "</td>" +
         "<td>" + escapeMarkup(y.starts_on) + "</td>" +
         "<td>" + escapeMarkup(y.ends_on) + "</td>" +
-        '<td>' + (y.is_active ? '<span class="school-status active">Active</span>' : '') + "</td>" +
+        '<td>' + (y.is_active ? window.ssBadge({ label: "Active", variant: "success" }) : '') + "</td>" +
         '<td class="school-actions">' +
-        (y.is_active ? '' : '<button class="icon-button" type="button" data-action="activate-year" title="Activer"><i data-lucide="check"></i></button>') +
-        '<button class="icon-button" type="button" data-action="edit-year" title="Modifier"><i data-lucide="pencil"></i></button>' +
+        (y.is_active ? '' : window.ssIconButton({ icon: "check", title: "Activer", attrs: { "data-action": "activate-year" } })) +
+        window.ssIconButton({ icon: "pencil", title: "Modifier", attrs: { "data-action": "edit-year" } }) +
         "</td></tr>"
       );
     }).join("");
     return (
       '<section class="form-section"><h3>Années scolaires</h3>' +
-      '<div class="school-table-wrap"><table class="school-table"><thead><tr><th>Libellé</th><th>Début</th><th>Fin</th><th>Statut</th><th>Actions</th></tr></thead><tbody>' +
-      (rows || '<tr><td colspan="5" class="school-empty">Aucune année scolaire.</td></tr>') +
-      "</tbody></table></div>" +
-      '<button class="primary-button" type="button" id="addYearBtn"><i data-lucide="plus"></i> Ajouter une année</button>' +
+      window.ssTable({
+        headers: ["Libellé", "Début", "Fin", "Statut", "Actions"],
+        rows: rows,
+        empty: "Aucune année scolaire.",
+        emptyTitle: "Années scolaires",
+        responsive: true
+      }) +
+      window.ssButton({ label: "Ajouter une année", icon: "plus", attrs: { id: "addYearBtn" } }) +
       "</section>"
     );
   }
@@ -89,15 +122,20 @@
     var rows = cycles.map(function (c) {
       return (
         '<tr><td>' + escapeMarkup(c.cycle_name) + '</td>' +
-        '<td>' + (c.is_active ? '<span class="school-status active">Actif</span>' : '<span class="school-status inactive">Inactif</span>') + "</td>" +
-        '<td><button type="button" data-cycle="' + escapeMarkup(c.cycle_key) + '" class="toggle-cycle">' + (c.is_active ? "Désactiver" : "Activer") + "</button></td></tr>"
+        '<td>' + (c.is_active ? window.ssBadge({ label: "Actif", variant: "success" }) : window.ssBadge({ label: "Inactif", variant: "error" })) + "</td>" +
+        '<td>' + window.ssButton({ label: (c.is_active ? "Désactiver" : "Activer"), size: "sm", className: "toggle-cycle", attrs: { "data-cycle": escapeMarkup(c.cycle_key) } }) + "</td></tr>"
       );
     }).join("");
     return (
       '<section class="form-section"><h3>Cycles</h3>' +
-      '<div class="school-table-wrap"><table class="school-table"><thead><tr><th>Cycle</th><th>Statut</th><th>Action</th></tr></thead><tbody>' +
-      (rows || '<tr><td colspan="3" class="school-empty">Aucun cycle configuré.</td></tr>') +
-      "</tbody></table></div></section>"
+      window.ssTable({
+        headers: ["Cycle", "Statut", "Action"],
+        rows: rows,
+        empty: "Aucun cycle configuré.",
+        emptyTitle: "Cycles",
+        responsive: true
+      }) +
+      "</section>"
     );
   }
 
@@ -106,41 +144,39 @@
     if (!container || !settingsData) return;
     var s = settingsData;
     container.innerHTML =
-      '<form id="schoolSettingsForm" class="school-form">' +
-      '<div class="form-section"><h3>Identité de l\'école</h3>' +
-      '<label>Nom (français)<input name="name" required value="' + escapeMarkup(s.identity.name) + '"></label>' +
-      '<label>Nom (anglais)<input name="name_en" value="' + escapeMarkup(s.identity.name_en || "") + '"></label>' +
-      '<label>Nom légal<input name="legal_name" value="' + escapeMarkup(s.identity.legal_name || "") + '"></label>' +
-      '<label>Type<input name="school_type" value="' + escapeMarkup(s.identity.school_type || "") + '"></label>' +
-      '<label>Code d\'agrément<input name="approval_code" value="' + escapeMarkup(s.identity.approval_code || "") + '"></label>' +
-      '<label>Devise<input name="currency" value="' + escapeMarkup(s.identity.currency || "USD") + '"></label>' +
-      '<label>Motto / devise de l\'école<input name="motto" value="' + escapeMarkup(s.identity.motto || "") + '"></label>' +
-      '<label>Nom de la banque<input name="bank_name" value="' + escapeMarkup(s.identity.bank_name || "") + '"></label>' +
-      '<label>Compte bancaire<input name="bank_account" value="' + escapeMarkup(s.identity.bank_account || "") + '"></label>' +
-      '<label>Numéro d\'identification fiscale<input name="tax_id" value="' + escapeMarkup(s.identity.tax_id || "") + '"></label>' +
-      '<label>Nom du directeur<input name="director_name" value="' + escapeMarkup(s.identity.director_name || "") + '"></label>' +
-      '<label>Langue officielle<input name="official_language" value="' + escapeMarkup(s.identity.official_language || "FR") + '"></label>' +
-      "</div>" +
-      '<div class="form-section"><h3>Coordonnées</h3>' +
-      '<label>Pays<input name="country" value="' + escapeMarkup(s.contact.country || "") + '"></label>' +
-      '<label>Province<input name="province" value="' + escapeMarkup(s.contact.province || "") + '"></label>' +
-      '<label>Ville<input name="city" value="' + escapeMarkup(s.contact.city || "") + '"></label>' +
-      '<label>Adresse<textarea name="address" rows="2">' + escapeMarkup(s.contact.address || "") + '</textarea></label>' +
-      '<label>Email<input name="email" type="email" value="' + escapeMarkup(s.contact.email || "") + '"></label>' +
-      '<label>Téléphone<input name="phone" value="' + escapeMarkup(s.contact.phone || "") + '"></label>' +
-      '<label>Site web<input name="website_url" value="' + escapeMarkup(s.contact.website_url || "") + '"></label>' +
-      "</div>" +
-      '<div class="form-section"><h3>Apparence</h3>' +
-      '<label>Couleur principale<input name="primary_color" type="color" value="' + escapeMarkup(s.brand.primary_color || "#071a3d") + '"></label>' +
-      '<label>Couleur d\'accent<input name="accent_color" type="color" value="' + escapeMarkup(s.brand.accent_color || "#e9a515") + '"></label>' +
-      '<label>Pied de page<input name="document_footer" value="' + escapeMarkup(s.brand.document_footer || "") + '"></label>' +
-      '<label>Logo<input name="logo_file" type="file" accept="image/png,image/jpeg,image/webp"></label>' +
-      '<input name="logo_path" type="hidden" value="' + escapeMarkup(s.brand.logo_path || "") + '">' +
-      (s.brand.logo_path ? '<img src="' + escapeMarkup(s.brand.logo_path) + '" alt="Logo" style="max-width:200px;max-height:100px;">' : '') +
-      "</div>" +
+      '<form id="schoolSettingsForm" class="ss-form-grid ss-form-grid--2">' +
+      '<div class="ss-panel ss-field--wide"><div class="ss-panel__header"><h3 class="ss-panel__title">Identité de l\'école</h3></div><div class="ss-panel__body ss-form-grid ss-form-grid--2">' +
+      formField("name", "Nom (français)", "text", s.identity.name, { required: true }) +
+      formField("name_en", "Nom (anglais)", "text", s.identity.name_en) +
+      formField("legal_name", "Nom légal", "text", s.identity.legal_name) +
+      formField("school_type", "Type", "text", s.identity.school_type) +
+      formField("approval_code", "Code d\'agrément", "text", s.identity.approval_code) +
+      formField("currency", "Devise", "text", s.identity.currency || "USD") +
+      formField("motto", "Motto / devise de l\'école", "text", s.identity.motto) +
+      formField("bank_name", "Nom de la banque", "text", s.identity.bank_name) +
+      formField("bank_account", "Compte bancaire", "text", s.identity.bank_account) +
+      formField("tax_id", "Numéro d\'identification fiscale", "text", s.identity.tax_id) +
+      formField("director_name", "Nom du directeur", "text", s.identity.director_name) +
+      formField("official_language", "Langue officielle", "text", s.identity.official_language || "FR") +
+      "</div></div>" +
+      '<div class="ss-panel ss-field--wide"><div class="ss-panel__header"><h3 class="ss-panel__title">Coordonnées</h3></div><div class="ss-panel__body ss-form-grid ss-form-grid--2">' +
+      formField("country", "Pays", "text", s.contact.country) +
+      formField("province", "Province", "text", s.contact.province) +
+      formField("city", "Ville", "text", s.contact.city) +
+      formField("address", "Adresse", "textarea", s.contact.address, { rows: 2 }) +
+      formField("email", "Email", "email", s.contact.email) +
+      formField("phone", "Téléphone", "tel", s.contact.phone) +
+      formField("website_url", "Site web", "url", s.contact.website_url) +
+      "</div></div>" +
+      '<div class="ss-panel ss-field--wide"><div class="ss-panel__header"><h3 class="ss-panel__title">Apparence</h3></div><div class="ss-panel__body ss-form-grid ss-form-grid--2">' +
+      formField("primary_color", "Couleur principale", "color", s.brand.primary_color || "#071a3d") +
+      formField("accent_color", "Couleur d\'accent", "color", s.brand.accent_color || "#e9a515") +
+      formField("document_footer", "Pied de page", "text", s.brand.document_footer) +
+      '<div class="ss-field ss-field--wide"><label class="ss-label">Logo</label><label class="logo-upload" for="school-field-logo_file"><span><i data-lucide="image-up"></i><b>' + (s.brand.logo_path ? "Logo officiel chargé" : "Sélectionner le logo officiel") + '</b><span>PNG haute définition, fond transparent recommandé</span></span>' + window.ssInput({ name: "logo_file", id: "school-field-logo_file", type: "file", accept: "image/png,image/jpeg,image/webp", className: "sr-only" }) + '</label>' + formField("logo_path", "", "hidden", s.brand.logo_path) + (s.brand.logo_path ? '<img src="' + escapeMarkup(s.brand.logo_path) + '" alt="Logo" style="max-width:200px;max-height:100px;margin-top:var(--ss-space-3);">' : '') + "</div>" +
+      "</div></div>" +
       renderAcademicYears() +
       renderCycles() +
-      '<div class="form-actions"><button class="primary-button" type="submit"><i data-lucide="save"></i> Enregistrer</button></div>' +
+      '<div class="ss-field--wide">' + window.ssButton({ label: "Enregistrer", icon: "save", type: "submit" }) + '</div>' +
       "</form>";
 
     document.getElementById("schoolSettingsForm").addEventListener("submit", async function (e) {
@@ -236,36 +272,34 @@
       });
       if (!year) return;
     }
-    var container = document.getElementById("schoolContent");
-    container.insertAdjacentHTML(
-      "beforeend",
-      '<div class="school-modal" id="yearModal">' +
-        '<div class="school-modal-box">' +
-        '<h3>' + (yearId ? "Modifier l'année" : "Ajouter une année") + "</h3>" +
-        '<form id="yearForm">' +
-        '<label>Libellé<input name="label" required value="' + (year ? escapeMarkup(year.label) : "") + '"></label>' +
-        '<label>Date de début<input name="starts_on" type="date" required value="' + (year ? escapeMarkup(year.starts_on) : "") + '"></label>' +
-        '<label>Date de fin<input name="ends_on" type="date" required value="' + (year ? escapeMarkup(year.ends_on) : "") + '"></label>' +
-        '<label>Périodes<select name="periods" required>' +
-        '<option value="Trimestres"' + (year && year.periods === "Trimestres" ? " selected" : "") + '>Trimestres</option>' +
-        '<option value="Semestres"' + (year && year.periods === "Semestres" ? " selected" : "") + '>Semestres</option>' +
-        '</select></label>' +
-        '<div class="form-actions"><button class="secondary-button" type="button" id="cancelYear">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div>' +
-        "</form></div></div>"
-    );
 
-    document.getElementById("cancelYear").addEventListener("click", function () {
-      document.getElementById("yearModal").remove();
+    var isSubmitting = false;
+    var modal = window.ssModal({
+      title: yearId ? "Modifier l'année" : "Ajouter une année",
+      content:
+        '<form id="yearForm" class="ss-form-grid">' +
+        formField("label", "Libellé", "text", year ? year.label : "", { required: true }) +
+        formField("starts_on", "Date de début", "date", year ? year.starts_on : "", { required: true }) +
+        formField("ends_on", "Date de fin", "date", year ? year.ends_on : "", { required: true }) +
+        formField("periods", "Périodes", "select", year ? year.periods : "", { required: true, options: [{ value: "Trimestres", label: "Trimestres" }, { value: "Semestres", label: "Semestres" }] }) +
+        '</form>',
+      actions: [
+        { label: "Annuler", variant: "secondary", onClick: function () { modal.close(); } },
+        { label: "Enregistrer", variant: "primary", type: "submit", attrs: { form: "yearForm" } }
+      ]
     });
 
-    document.getElementById("yearForm").addEventListener("submit", async function (e) {
+    var form = modal.content.querySelector("#yearForm");
+    form.addEventListener("submit", async function (e) {
       e.preventDefault();
-      var form = e.target;
+      if (isSubmitting) return;
+      isSubmitting = true;
+      modal.setLoading(true);
       var payload = {
         label: form.label.value,
         starts_on: form.starts_on.value,
         ends_on: form.ends_on.value,
-        periods: form.periods.value,
+        periods: form.periods.value
       };
       try {
         if (yearId) {
@@ -275,10 +309,13 @@
           await window.SchoolSafeSchoolAPI.createAcademicYear(payload);
           notify("Année créée.");
         }
-        document.getElementById("yearModal").remove();
+        modal.close();
         await loadSchool();
       } catch (err) {
-        notify("Erreur : " + err.message);
+        modal.setError(err.message);
+      } finally {
+        isSubmitting = false;
+        modal.setLoading(false);
       }
     });
   }
@@ -300,7 +337,7 @@
     var rows = staffData.map(function (person) {
       var roleBadges = (person.roles || [])
         .map(function (r) {
-          return '<span class="school-role-badge">' + escapeMarkup(r.label) + "</span>";
+          return window.ssBadge({ label: r.label, variant: "info", size: "sm" });
         })
         .join("");
       return (
@@ -309,12 +346,12 @@
         "<td>" + escapeMarkup(person.email) + "</td>" +
         "<td>" + escapeMarkup(person.phone || "—") + "</td>" +
         '<td class="school-roles-cell">' + roleBadges + "</td>" +
-        "<td>" + (person.is_active ? '<span class="school-status active">Actif</span>' : '<span class="school-status inactive">Inactif</span>') + "</td>" +
+        "<td>" + (person.is_active ? window.ssBadge({ label: "Actif", variant: "success" }) : window.ssBadge({ label: "Inactif", variant: "error" })) + "</td>" +
         '<td class="school-actions">' +
-        '<button class="icon-button" type="button" data-action="view-staff" title="Détails"><i data-lucide="eye"></i></button>' +
-        '<button class="icon-button" type="button" data-action="edit-roles" title="Modifier les rôles"><i data-lucide="shield"></i></button>' +
-        '<button class="icon-button" type="button" data-action="toggle-active" title="Activer/Désactiver"><i data-lucide="power"></i></button>' +
-        '<button class="icon-button" type="button" data-action="resend-invite" title="Renvoyer l\'invitation"><i data-lucide="mail"></i></button>' +
+        window.ssIconButton({ icon: "eye", title: "Détails", attrs: { "data-action": "view-staff" } }) +
+        window.ssIconButton({ icon: "shield", title: "Modifier les rôles", attrs: { "data-action": "edit-roles" } }) +
+        window.ssIconButton({ icon: "power", title: "Activer/Désactiver", attrs: { "data-action": "toggle-active" } }) +
+        window.ssIconButton({ icon: "mail", title: "Renvoyer l'invitation", attrs: { "data-action": "resend-invite" } }) +
         "</td></tr>"
       );
     }).join("");
@@ -322,12 +359,15 @@
     container.innerHTML =
       '<div class="school-staff-header">' +
       '<h3>Membres de l\'équipe</h3>' +
-      '<button class="primary-button" type="button" id="inviteStaffBtn"><i data-lucide="user-plus"></i> Inviter</button>' +
+      window.ssButton({ label: "Inviter", icon: "user-plus", attrs: { id: "inviteStaffBtn" } }) +
       "</div>" +
-      '<div class="school-table-wrap">' +
-      '<table class="school-table"><thead><tr><th>Nom</th><th>Email</th><th>Téléphone</th><th>Rôles</th><th>Statut</th><th>Actions</th></tr></thead><tbody>' +
-      (rows || '<tr><td colspan="6" class="school-empty">Aucun membre pour l\'instant.</td></tr>') +
-      "</tbody></table></div>";
+      window.ssTable({
+        headers: ["Nom", "Email", "Téléphone", "Rôles", "Statut", "Actions"],
+        rows: rows,
+        empty: "Aucun membre pour l'instant.",
+        emptyTitle: "Équipe",
+        responsive: true
+      });
 
     container.querySelectorAll("[data-action]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -348,24 +388,17 @@
   async function viewStaffDetail(profileId) {
     try {
       var detail = await window.SchoolSafeSchoolAPI.getStaffDetail(profileId);
-      var container = document.getElementById("schoolContent");
       var roles = (detail.roles || []).map(function (r) {
         return escapeMarkup(r.label);
       }).join(", ");
-      container.insertAdjacentHTML(
-        "beforeend",
-        '<div class="school-modal" id="staffDetailModal">' +
-          '<div class="school-modal-box">' +
-          '<h3>' + escapeMarkup(detail.display_name) + "</h3>" +
+      window.ssModal({
+        title: escapeMarkup(detail.display_name),
+        content:
           '<p><b>Email :</b> ' + escapeMarkup(detail.email) + "</p>" +
           '<p><b>Téléphone :</b> ' + escapeMarkup(detail.phone || "—") + "</p>" +
           '<p><b>Rôles :</b> ' + (roles || "—") + "</p>" +
-          '<p><b>Statut :</b> ' + (detail.is_active ? "Actif" : "Inactif") + "</p>" +
-          '<div class="form-actions"><button class="secondary-button" type="button" id="closeStaffDetail">Fermer</button></div>' +
-          "</div></div>"
-      );
-      document.getElementById("closeStaffDetail").addEventListener("click", function () {
-        document.getElementById("staffDetailModal").remove();
+          '<p><b>Statut :</b> ' + (detail.is_active ? "Actif" : "Inactif") + "</p>",
+        actions: [{ label: "Fermer", variant: "secondary" }]
       });
     } catch (err) {
       notify("Erreur : " + err.message);
@@ -383,55 +416,58 @@
   }
 
   function openInviteModal() {
-    var container = document.getElementById("schoolContent");
     var rolesOptions = rolesData
       .map(function (r) {
-        return '<label class="school-checkbox"><input type="checkbox" name="role" value="' + escapeMarkup(r.id) + '"> ' + escapeMarkup(r.label) + "</label>";
+        return formCheckbox("role", r.id, r.label, false);
       })
       .join("");
 
-    container.insertAdjacentHTML(
-      "beforeend",
-      '<div class="school-modal" id="inviteModal">' +
-        '<div class="school-modal-box">' +
-        '<h3>Inviter un membre</h3>' +
-        '<form id="inviteStaffForm">' +
-        '<label>Prénom<input name="first_name" required></label>' +
-        '<label>Nom<input name="last_name" required></label>' +
-        '<label>Email<input name="email" type="email" required></label>' +
-        '<label>Téléphone<input name="phone"></label>' +
-        '<div class="school-roles-select"><span>Rôles</span>' + rolesOptions + "</div>" +
-        '<div class="form-actions"><button class="secondary-button" type="button" id="cancelInvite">Annuler</button><button class="primary-button" type="submit">Inviter</button></div>' +
-        "</form></div></div>"
-    );
-
-    document.getElementById("cancelInvite").addEventListener("click", function () {
-      document.getElementById("inviteModal").remove();
+    var isSubmitting = false;
+    var modal = window.ssModal({
+      title: "Inviter un membre",
+      content:
+        '<form id="inviteStaffForm" class="ss-form-grid">' +
+        formField("first_name", "Prénom", "text", "", { required: true }) +
+        formField("last_name", "Nom", "text", "", { required: true }) +
+        formField("email", "Email", "email", "", { required: true }) +
+        formField("phone", "Téléphone", "tel", "") +
+        '<div class="ss-field ss-field--wide"><span class="ss-label">Rôles</span><div class="ss-checkbox-group">' + rolesOptions + "</div></div>" +
+        '</form>',
+      actions: [
+        { label: "Annuler", variant: "secondary", onClick: function () { modal.close(); } },
+        { label: "Inviter", variant: "primary", type: "submit", attrs: { form: "inviteStaffForm" } }
+      ]
     });
 
-    document.getElementById("inviteStaffForm").addEventListener("submit", async function (e) {
+    var form = modal.content.querySelector("#inviteStaffForm");
+    form.addEventListener("submit", async function (e) {
       e.preventDefault();
-      var form = e.target;
+      if (isSubmitting) return;
       var selectedRoles = Array.from(form.querySelectorAll('input[name="role"]:checked')).map(function (cb) {
         return cb.value;
       });
       if (selectedRoles.length === 0) {
-        notify("Sélectionnez au moins un rôle.");
+        modal.setError("Sélectionnez au moins un rôle.");
         return;
       }
+      isSubmitting = true;
+      modal.setLoading(true);
       try {
         await window.SchoolSafeSchoolAPI.inviteStaff({
           email: form.email.value,
           first_name: form.first_name.value,
           last_name: form.last_name.value,
           phone: form.phone.value || undefined,
-          role_ids: selectedRoles,
+          role_ids: selectedRoles
         });
         notify("Invitation envoyée.");
-        document.getElementById("inviteModal").remove();
+        modal.close();
         await loadStaff();
       } catch (err) {
-        notify("Erreur : " + err.message);
+        modal.setError(err.message);
+      } finally {
+        isSubmitting = false;
+        modal.setLoading(false);
       }
     });
   }
@@ -442,51 +478,44 @@
     });
     if (!person) return;
 
-    var container = document.getElementById("schoolContent");
     var rolesOptions = rolesData
       .map(function (r) {
         var checked = person.roles.some(function (pr) {
           return pr.id === r.id;
         });
-        return (
-          '<label class="school-checkbox"><input type="checkbox" name="role" value="' +
-          escapeMarkup(r.id) +
-          '"' +
-          (checked ? " checked" : "") +
-          "> " +
-          escapeMarkup(r.label) +
-          "</label>"
-        );
+        return formCheckbox("role", r.id, r.label, checked);
       })
       .join("");
 
-    container.insertAdjacentHTML(
-      "beforeend",
-      '<div class="school-modal" id="roleModal">' +
-        '<div class="school-modal-box">' +
-        '<h3>Rôles de ' + escapeMarkup(person.display_name) + "</h3>" +
-        '<form id="roleStaffForm">' +
-        '<div class="school-roles-select">' + rolesOptions + "</div>" +
-        '<div class="form-actions"><button class="secondary-button" type="button" id="cancelRole">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div>' +
-        "</form></div></div>"
-    );
-
-    document.getElementById("cancelRole").addEventListener("click", function () {
-      document.getElementById("roleModal").remove();
+    var isSubmitting = false;
+    var modal = window.ssModal({
+      title: "Rôles de " + escapeMarkup(person.display_name),
+      content: '<form id="roleStaffForm"><div class="ss-checkbox-group">' + rolesOptions + "</div></form>",
+      actions: [
+        { label: "Annuler", variant: "secondary", onClick: function () { modal.close(); } },
+        { label: "Enregistrer", variant: "primary", type: "submit", attrs: { form: "roleStaffForm" } }
+      ]
     });
 
-    document.getElementById("roleStaffForm").addEventListener("submit", async function (e) {
+    var form = modal.content.querySelector("#roleStaffForm");
+    form.addEventListener("submit", async function (e) {
       e.preventDefault();
-      var selectedRoles = Array.from(e.target.querySelectorAll('input[name="role"]:checked')).map(function (cb) {
+      if (isSubmitting) return;
+      var selectedRoles = Array.from(form.querySelectorAll('input[name="role"]:checked')).map(function (cb) {
         return cb.value;
       });
+      isSubmitting = true;
+      modal.setLoading(true);
       try {
         await window.SchoolSafeSchoolAPI.updateStaffRoles(profileId, selectedRoles);
         notify("Rôles mis à jour.");
-        document.getElementById("roleModal").remove();
+        modal.close();
         await loadStaff();
       } catch (err) {
-        notify("Erreur : " + err.message);
+        modal.setError(err.message);
+      } finally {
+        isSubmitting = false;
+        modal.setLoading(false);
       }
     });
   }

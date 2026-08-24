@@ -46,7 +46,189 @@
     }
   }
 
+  // Document Engine integration (DOC-03)
+  var documentEngine = null;
+  var documentEnginePromise = null;
+
+  function getCurrentUser() {
+    try {
+      var session = JSON.parse(global.localStorage.getItem("schoolsafe-v2-session") || "{}");
+      return session.user || { id: "demo-user", role: "admin", schoolId: "demo-school" };
+    } catch (e) {
+      return { id: "demo-user", role: "admin", schoolId: "demo-school" };
+    }
+  }
+
+  function getUserPermissions(user) {
+    if (user.role === "admin") return ["pedagogy.assignment.read", "pedagogy.assignment.manage"];
+    return user.permissions || [];
+  }
+
+  async function getDocumentEngine() {
+    if (documentEngine) return documentEngine;
+    if (documentEnginePromise) return documentEnginePromise;
+    documentEnginePromise = new Promise(async function (resolve, reject) {
+      try {
+        var mod = await import("../document-engine/index.js");
+        var registry = mod.createTemplateRegistry();
+        mod.registerDefaultTemplates(registry);
+
+        var accessGate = mod.createAccessGate({ adminRole: "admin" });
+        var schoolIdentityProvider = {
+          load: async function () {
+            try {
+              var settings = await global.SchoolSafeSchoolAPI.getSettings();
+              var identity = settings.identity || {};
+              var brand = settings.brand || {};
+              var contact = settings.contact || {};
+              return {
+                name: identity.name || "École",
+                legalName: identity.legal_name || identity.name || "École",
+                address: contact.address || "",
+                city: contact.city || "",
+                phone: contact.phone || "",
+                email: contact.email || "",
+                website: contact.website_url || "",
+                primaryColor: brand.primary_color || "#071a3d",
+                accentColor: brand.accent_color || "#e9a515",
+                logoUrl: brand.logo_path || null,
+                currency: identity.currency || "USD",
+                activeAcademicYear: (settings.academic_years || []).find(function (y) { return y.is_active; }) || null,
+              };
+            } catch (e) {
+              return {
+                name: "École Pilote",
+                legalName: "École Pilote",
+                address: "",
+                city: "",
+                phone: "",
+                email: "",
+                website: "",
+                primaryColor: "#071a3d",
+                accentColor: "#e9a515",
+                logoUrl: null,
+                currency: "USD",
+                activeAcademicYear: null,
+              };
+            }
+          }
+        };
+        var schoolSafeIdentityProvider = mod.createSchoolSafeIdentityProvider();
+        var dataResolver = mod.createDocumentDataResolver({
+          schoolIdentityProvider: schoolIdentityProvider,
+          schoolSafeIdentityProvider: schoolSafeIdentityProvider,
+          contextResolvers: {
+            pedagogy: function (context) { return context; }
+          }
+        });
+        var layoutEngine = mod.createLayoutEngine();
+        var renderer = mod.createFrontendRenderer({ layoutEngine: layoutEngine });
+        documentEngine = mod.createDocumentEngine({
+          accessGate: accessGate,
+          dataResolver: dataResolver,
+          templateRegistry: registry,
+          layoutEngine: layoutEngine,
+          renderer: renderer
+        });
+        resolve(documentEngine);
+      } catch (e) {
+        reject(e);
+      }
+    });
+    return documentEnginePromise;
+  }
+
+  function hasPdfPermission(user) {
+    if (user.role === "admin") return true;
+    var perms = getUserPermissions(user);
+    return perms.indexOf("pedagogy.assignment.read") >= 0 || perms.indexOf("pedagogy.assignment.manage") >= 0;
+  }
+
+  function hasValidSessionToken() {
+    try {
+      var raw = global.localStorage.getItem("schoolsafe-v2-session");
+      if (!raw) return false;
+      var session = JSON.parse(raw);
+      return !!(session && session.token);
+    } catch (e) { return false; }
+  }
+
+  function isDemoMode() {
+    if (global.schoolSafeDemoMode === true) return true;
+    var host = String(global.location && global.location.hostname || "").toLowerCase();
+    var isLocalhost = host === "localhost" || host === "127.0.0.1";
+    return isLocalhost && !hasValidSessionToken();
+  }
+
+  function createDemoStudents() {
+    return [
+      { id: "demo-s1", first_name: "Lucas", last_name: "Martin", matricule: "MAT-2026-001", sex: "M" },
+      { id: "demo-s2", first_name: "Emma", last_name: "Martin", matricule: "MAT-2026-002", sex: "F" },
+      { id: "demo-s3", first_name: "Ethan", last_name: "Leroy", matricule: "MAT-2026-003", sex: "M" },
+      { id: "demo-s4", first_name: "Chloé", last_name: "Bernard", matricule: "MAT-2026-004", sex: "F" }
+    ];
+  }
+
+  function createDemoState() {
+    return {
+      activeTab: "subjects",
+      subjects: [
+        { id: "demo-math", name: "Mathématiques", code: "MATH", language: "FR", cycle_key: "primary", subject_family_code: "MATH" },
+        { id: "demo-fr", name: "Français", code: "FR", language: "FR", cycle_key: "primary", subject_family_code: "FR" },
+        { id: "demo-en", name: "Anglais", code: "EN", language: "EN", cycle_key: "secondary", subject_family_code: "EN" }
+      ],
+      classes: [
+        { id: "demo-c1", name: "1re A", cycle_key: "secondary" },
+        { id: "demo-c2", name: "2e B", cycle_key: "secondary" },
+        { id: "demo-c3", name: "Maternelle 3", cycle_key: "nursery" }
+      ],
+      students: createDemoStudents(),
+      teacherAssignments: [
+        { id: "demo-ta1", teacher_id: "demo-teacher", class_id: "demo-c1", subject_id: "demo-math" },
+        { id: "demo-ta2", teacher_id: "demo-teacher", class_id: "demo-c2", subject_id: "demo-fr" }
+      ],
+      assignments: [
+        { id: "demo-a1", title: "Devoir de mathématiques", class_id: "demo-c1", classes: { name: "1re A" }, subject_id: "demo-math", subjects: { name: "Mathématiques" }, language: "FR", type: "homework", scale_mode: "numeric", scale_max: 20, scale_label: "/20", coefficient: 1, due_date: "2026-08-25", instructions: "Exercices 1 à 5 page 42.", status: "draft" },
+        { id: "demo-a2", title: "Interrogation de français", class_id: "demo-c2", classes: { name: "2e B" }, subject_id: "demo-fr", subjects: { name: "Français" }, language: "FR", type: "quiz", scale_mode: "numeric", scale_max: 10, scale_label: "/10", coefficient: 0.5, due_date: "2026-08-26", instructions: "Dictée et analyse de texte.", status: "published" }
+      ],
+      lessonPlans: [
+        { id: "demo-lp1", title: "Le théorème de Pythagore", lesson_date: "2026-08-21", class_id: "demo-c1", classes: { name: "1re A" }, subject_id: "demo-math", subjects: { name: "Mathématiques" }, teacher_id: "demo-teacher", profiles: { display_name: "M. Dupont" }, objectives: "Comprendre et appliquer le théorème.", materials: "Règle, équerre.", procedure: "Cours, exemples, exercices." }
+      ],
+      profiles: [],
+      selectedAssignmentId: null,
+      selectedLessonPlanId: null,
+      assignmentStudents: [],
+      assignmentGrades: [],
+      gradeDrafts: {},
+      parentChildren: [
+        { students: { id: "demo-s1", first_name: "Lucas", last_name: "Martin", matricule: "MAT-2026-001" } },
+        { students: { id: "demo-s2", first_name: "Emma", last_name: "Martin", matricule: "MAT-2026-002" } }
+      ],
+      selectedParentChildId: "demo-s1",
+      parentGrades: [
+        { assignment_id: "demo-a2", assignments: { title: "Interrogation de français", type: "quiz", subjects: { name: "Français" } }, value_numeric: 8, value_text: null, comment: "Bonne participation." }
+      ],
+      parentAverages: {
+        overall_average: 12.5,
+        subjects: [
+          { subject_name: "Mathématiques", average: 14, grade_count: 2 },
+          { subject_name: "Français", average: 11, grade_count: 3 }
+        ]
+      },
+      loading: false,
+      error: null
+    };
+  }
+
+  var demoState = isDemoMode() ? createDemoState() : null;
+
   async function loadAll() {
+    if (demoState) {
+      Object.assign(state, demoState);
+      render();
+      return;
+    }
+    state.loading = true;
     state.loading = true;
     state.error = null;
     render();
@@ -85,6 +267,12 @@
       state.gradeDrafts = {};
       return;
     }
+    if (demoState) {
+      state.assignmentStudents = demoState.students.filter(function (s) { return true; });
+      state.assignmentGrades = [];
+      state.gradeDrafts = {};
+      return;
+    }
     try {
       var results = await Promise.all([
         global.SchoolSafeSchoolAPI.listStudentsByClass(assignment.class_id),
@@ -117,6 +305,13 @@
   }
 
   async function loadParentView() {
+    if (demoState) {
+      state.parentChildren = demoState.parentChildren;
+      state.selectedParentChildId = demoState.selectedParentChildId;
+      state.parentGrades = demoState.parentGrades;
+      state.parentAverages = demoState.parentAverages;
+      return;
+    }
     try {
       state.parentChildren = await global.SchoolSafePedagogyAPI.getParentChildren();
       if (state.parentChildren.length > 0 && !state.selectedParentChildId) {
@@ -217,29 +412,57 @@
       '<label>Langue<select name="language"><option value="FR">Français</option><option value="EN">Anglais</option></select></label>' +
       '<label>Cycle<select name="cycle_key"><option value="nursery">Maternelle</option><option value="primary">Primaire</option><option value="secondary">Secondaire</option></select></label>' +
       '<label>Famille (optionnel)<input name="subject_family_code" placeholder="MATH"></label>' +
-      '</div><footer><button class="primary-button" type="submit"><i data-lucide="plus"></i> Ajouter la matière</button></footer></form>' +
-      '<div class="table-scroll"><table class="grade-table"><thead><tr><th>Nom</th><th>Code</th><th>Langue</th><th>Cycle</th><th>Famille</th></tr></thead><tbody>' + (rows || '<tr><td colspan="5">Aucune matière enregistrée.</td></tr>') + '</tbody></table></div></section>';
+      '</div><footer>' + ssButton({ label: "Ajouter la matière", variant: "primary", type: "submit", icon: "plus" }) + '</footer></form>' +
+      ssTable({
+        headers: ["Nom", "Code", "Langue", "Cycle", "Famille"],
+        rows: rows,
+        empty: "Aucune matière enregistrée.",
+        emptyTitle: "Matières",
+        responsive: true
+      }) + '</section>';
   }
 
   function renderAssignments() {
     var selected = state.assignments.find(function (a) { return a.id === state.selectedAssignmentId; }) || state.assignments[0] || null;
     var list = state.assignments.map(function (a) {
-      return '<button class="assignment-row' + (selected && selected.id === a.id ? " active" : "") + '" type="button" data-assignment-id="' + a.id + '"><span><b>' + escapeMarkup(a.title) + '</b><small>' + escapeMarkup((a.classes ? a.classes.name : a.class_id) + " · " + (a.subjects ? a.subjects.name : a.subject_id)) + '</small></span><span class="pedagogy-badge ' + (a.status === "published" ? "published" : "draft") + '">' + (a.status === "published" ? "Publié" : "Brouillon") + '</span></button>';
+      return '<button class="assignment-row' + (selected && selected.id === a.id ? " active" : "") + '" type="button" data-assignment-id="' + a.id + '"><span><b>' + escapeMarkup(a.title) + '</b><small>' + escapeMarkup((a.classes ? a.classes.name : a.class_id) + " · " + (a.subjects ? a.subjects.name : a.subject_id)) + '</small></span>' + ssBadge({ label: a.status === "published" ? "Publié" : "Brouillon", variant: a.status === "published" ? "success" : "warning" }) + '</button>';
     }).join("");
 
     var detail = "";
     if (selected) {
+      var pdfButtons = hasPdfPermission(getCurrentUser()) ?
+        '<div class="pdf-actions">' + ssButton({ label: "Aperçu PDF", variant: "secondary", icon: "eye", attrs: { "data-preview-assignment": selected.id } }) +
+        ssButton({ label: "Télécharger PDF", variant: "secondary", icon: "download", attrs: { "data-download-assignment": selected.id } }) +
+        ssButton({ label: "Imprimer", variant: "secondary", icon: "printer", attrs: { "data-print-assignment": selected.id } }) +
+        ssButton({ label: "Feuille de réponses", variant: "secondary", icon: "file-text", attrs: { "data-download-answer-sheet": selected.id } }) + '</div>' : '';
       detail = '<article class="assignment-detail"><div><span class="subject-tag">' + escapeMarkup((selected.subjects ? selected.subjects.name : selected.subject_id) + " · " + selected.language) + '</span><h3>' + escapeMarkup(selected.title) + '</h3><p>' + escapeMarkup(selected.instructions || "Aucune consigne.") + '</p></div><dl>' +
         '<div><dt>Échéance</dt><dd>' + escapeMarkup(selected.due_date || "Non planifiée") + '</dd></div>' +
         '<div><dt>Barème</dt><dd>' + escapeMarkup(selected.scale_label || (selected.scale_max ? "/" + selected.scale_max : "Qualitatif")) + '</dd></div>' +
         '<div><dt>Coefficient</dt><dd>' + escapeMarkup(String(selected.coefficient || 1)) + '</dd></div>' +
         '<div><dt>Publication</dt><dd>' + (selected.status === "published" ? "Visible" : "Brouillon") + '</dd></div>' +
-        '</dl><div class="assignment-detail-actions">' +
-        (selected.status === "draft" ? '<button class="primary-button" type="button" data-publish-assignment="' + selected.id + '"><i data-lucide="send"></i> Publier le devoir</button>' : '') +
+        '</dl>' + pdfButtons + '<div class="assignment-detail-actions">' +
+        (selected.status === "draft" ? ssButton({ label: "Publier le devoir", variant: "primary", icon: "send", attrs: { "data-publish-assignment": selected.id } }) : '') +
         '</div></article>';
     }
 
-    var composer = '<form class="pedagogy-form assignment-composer" id="assignmentForm"><div class="form-section-title"><span><i data-lucide="file-pen-line"></i></span><div><h3>Composer un devoir</h3></div></div><div class="pedagogy-form-grid">' +
+    var composer = renderAssignmentComposer();
+
+    var gradingPanel = "";
+    if (selected) {
+      gradingPanel = renderGradingPanel(selected);
+    }
+
+    return '<div class="pedagogy-two-column assignment-layout"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Travaux</span><h3>Devoirs et évaluations</h3></div><b>' + state.assignments.length + '</b></header><div class="assignment-list">' + (list || global.ssState({ type: "empty", title: "Aucun devoir", message: "Aucun devoir n'a été créé pour le moment.", size: "compact" })) + '</div>' + detail + '</section>' + (gradingPanel || composer) + '</div>';
+  }
+
+  function renderAssignmentComposer() {
+    return '<form class="pedagogy-form assignment-composer" id="assignmentForm" enctype="multipart/form-data"><div class="form-section-title"><span><i data-lucide="file-pen-line"></i></span><div><h3>Composer un devoir</h3></div></div>' +
+      '<div class="assignment-mode-selector" role="group" aria-label="Mode de devoir">' +
+      '<label><input type="radio" name="assignment_mode" value="text" checked> Texte SchoolSafe</label>' +
+      '<label><input type="radio" name="assignment_mode" value="pdf"> Importer un PDF</label>' +
+      '<label><input type="radio" name="assignment_mode" value="photo"> Importer une photo</label>' +
+      '</div>' +
+      '<div class="pedagogy-form-grid">' +
       '<label>Titre<input name="title" required placeholder="Titre du devoir"></label>' +
       '<label>Classe<select name="class_id" id="assignmentClassSelect">' + state.classes.map(function (c) { return '<option value="' + c.id + '">' + escapeMarkup(c.name) + '</option>'; }).join("") + '</select></label>' +
       '<label>Matière<select name="subject_id" id="assignmentSubjectSelect">' + state.subjects.map(function (s) { return '<option value="' + s.id + '">' + escapeMarkup(s.name) + '</option>'; }).join("") + '</select></label>' +
@@ -251,14 +474,17 @@
       '<label>Date de remise<input name="due_date" type="date"></label>' +
       '<label class="wide">Prérequis<textarea name="prerequisites" rows="2"></textarea></label>' +
       '<label class="wide">Consignes<textarea name="instructions" rows="3"></textarea></label>' +
-      '</div><footer><button class="secondary-button" type="submit" data-draft="true"><i data-lucide="save"></i> Enregistrer en brouillon</button><button class="primary-button dark" type="submit" data-publish="true"><i data-lucide="send"></i> Publier</button></footer></form>';
-
-    var gradingPanel = "";
-    if (selected) {
-      gradingPanel = renderGradingPanel(selected);
-    }
-
-    return '<div class="pedagogy-two-column assignment-layout"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Travaux</span><h3>Devoirs et évaluations</h3></div><b>' + state.assignments.length + '</b></header><div class="assignment-list">' + (list || '<p class="empty-list">Aucun devoir.</p>') + '</div>' + detail + '</section>' + (gradingPanel || composer) + '</div>';
+      '</div>' +
+      '<div class="assignment-upload-zone" id="assignmentUploadZone" hidden>' +
+      '<label class="wide">Fichier<input type="file" name="uploaded_file" id="assignmentFileInput"></label>' +
+      '<div id="assignmentUploadPreview" class="upload-preview"></div>' +
+      '</div>' +
+      '<div class="assignment-questions-zone" id="assignmentQuestionsZone">' +
+      '<div class="form-section-title"><span><i data-lucide="list-ordered"></i></span><div><h4>Questions</h4></div></div>' +
+      '<div id="assignmentQuestionsList"></div>' +
+      ssButton({ label: "Ajouter une question", variant: "secondary", icon: "plus", attrs: { id: "addQuestionButton" } }) +
+      '</div>' +
+      '<footer>' + ssButton({ label: "Enregistrer en brouillon", variant: "secondary", type: "submit", icon: "save", attrs: { "data-draft": "true" } }) + ssButton({ label: "Publier", variant: "primary", type: "submit", icon: "send", attrs: { "data-publish": "true" } }) + '</footer></form>';
   }
 
   function renderGradingPanel(selected) {
@@ -279,17 +505,21 @@
         '<td><input type="' + inputType + '"' + step + maxAttr + ' value="' + escapeMarkup(value) + '" data-grade-input="' + s.id + '"' + (isPublished ? ' data-published="true"' : "") + '></td>' +
         '<td><input type="text" placeholder="Commentaire" value="' + escapeMarkup(commentValue) + '" data-grade-comment="' + s.id + '"></td>' +
         '<td>' + (isPublished ? '<input type="text" placeholder="Motif de modification" value="' + escapeMarkup(reasonValue) + '" data-grade-reason="' + s.id + '" required>' : '—') + '</td>' +
-        '<td>' + (isPublished ? '<span class="pedagogy-badge published">Publié</span>' : (existing ? '<span class="pedagogy-badge draft">Brouillon</span>' : '<span class="pedagogy-badge">—</span>')) + '</td>' +
+        '<td>' + (isPublished ? ssBadge({ label: "Publié", variant: "success" }) : (existing ? ssBadge({ label: "Brouillon", variant: "warning" }) : ssBadge({ label: "—", variant: "default" }))) + '</td>' +
         '</tr>';
     }).join("");
 
     return '<section class="pedagogy-panel grading-panel"><header class="panel-heading"><div><span>Cotation</span><h3>Saisir les cotes · ' + escapeMarkup(selected.title) + '</h3></div><b>' + state.assignmentStudents.length + '</b></header>' +
-      '<div class="table-scroll"><table class="grade-table"><thead><tr><th>Élève</th><th>Matricule</th><th>Cote</th><th>Commentaire</th><th>Motif</th><th>Statut</th></tr></thead><tbody>' +
-      (rows || '<tr><td colspan="6">Aucun élève dans cette classe.</td></tr>') +
-      '</tbody></table></div>' +
+      ssTable({
+        headers: ["Élève", "Matricule", "Cote", "Commentaire", "Motif", "Statut"],
+        rows: rows,
+        empty: "Aucun élève dans cette classe.",
+        emptyTitle: "Cotation",
+        responsive: true
+      }) +
       '<footer class="grading-actions">' +
-      '<button class="secondary-button" type="button" data-save-grades="' + selected.id + '"><i data-lucide="save"></i> Enregistrer les cotes</button>' +
-      '<button class="primary-button dark" type="button" data-publish-grades="' + selected.id + '"><i data-lucide="send"></i> Publier les cotes</button>' +
+      ssButton({ label: "Enregistrer les cotes", variant: "secondary", icon: "save", attrs: { "data-save-grades": selected.id } }) +
+      ssButton({ label: "Publier les cotes", variant: "primary", icon: "send", attrs: { "data-publish-grades": selected.id } }) +
       '</footer></section>';
   }
 
@@ -312,17 +542,25 @@
         return '<tr><td><b>' + escapeMarkup(s.subject_name) + '</b></td><td>' + escapeMarkup(String(s.average !== null ? s.average : "—")) + '</td><td>' + escapeMarkup(String(s.grade_count)) + '</td></tr>';
       }).join("");
       averagesSection = '<section class="pedagogy-panel"><header class="panel-heading"><div><span>Moyennes</span><h3>Bulletin simplifié</h3></div><b>' + (state.parentAverages.overall_average !== null ? escapeMarkup(String(state.parentAverages.overall_average)) : "—") + '</b></header>' +
-        '<div class="table-scroll"><table class="grade-table"><thead><tr><th>Matière</th><th>Moyenne</th><th>Nb cotes</th></tr></thead><tbody>' +
-        (avgRows || '<tr><td colspan="3">Aucune moyenne calculable.</td></tr>') +
-        '</tbody></table></div></section>';
+        ssTable({
+          headers: ["Matière", "Moyenne", "Nb cotes"],
+          rows: avgRows,
+          empty: "Aucune moyenne calculable.",
+          emptyTitle: "Moyennes",
+          responsive: true
+        }) + '</section>';
     }
 
-    return '<div class="pedagogy-two-column assignment-layout"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Enfants</span><h3>Mes enfants</h3></div><b>' + state.parentChildren.length + '</b></header><div class="assignment-list">' + (childrenList || '<p class="empty-list">Aucun enfant lié à ce compte.</p>') + '</div></section>' +
+    return '<div class="pedagogy-two-column assignment-layout"><section class="pedagogy-panel"><header class="panel-heading"><div><span>Enfants</span><h3>Mes enfants</h3></div><b>' + state.parentChildren.length + '</b></header><div class="assignment-list">' + (childrenList || global.ssState({ type: "empty", title: "Aucun enfant lié", message: "Aucun enfant n'est lié à ce compte.", size: "compact" })) + '</div></section>' +
       '<div class="pedagogy-stack">' +
       '<section class="pedagogy-panel"><header class="panel-heading"><div><span>Cotes publiées</span><h3>Devoirs et évaluations</h3></div><b>' + state.parentGrades.length + '</b></header>' +
-      '<div class="table-scroll"><table class="grade-table"><thead><tr><th>Devoir</th><th>Matière</th><th>Type</th><th>Cote</th><th>Commentaire</th></tr></thead><tbody>' +
-      (gradesRows || '<tr><td colspan="5">Aucune cote publiée pour cet élève.</td></tr>') +
-      '</tbody></table></div></section>' +
+      ssTable({
+        headers: ["Devoir", "Matière", "Type", "Cote", "Commentaire"],
+        rows: gradesRows,
+        empty: "Aucune cote publiée pour cet élève.",
+        emptyTitle: "Cotes publiées",
+        responsive: true
+      }) + '</section>' +
       averagesSection +
       '</div></div>';
   }
@@ -341,14 +579,22 @@
       '<label class="wide">Objectifs<textarea name="objectives" rows="2"></textarea></label>' +
       '<label class="wide">Matériel<textarea name="materials" rows="2"></textarea></label>' +
       '<label class="wide">Déroulement<textarea name="procedure" rows="4"></textarea></label>' +
-      '</div><footer><button class="primary-button" type="submit"><i data-lucide="plus"></i> Ajouter la leçon</button></footer></form>' +
-      '<div class="table-scroll"><table class="grade-table"><thead><tr><th>Titre</th><th>Date</th><th>Classe</th><th>Matière</th><th>Enseignant</th></tr></thead><tbody>' + (rows || '<tr><td colspan="5">Aucune leçon enregistrée.</td></tr>') + '</tbody></table></div></section>';
+      '</div><footer>' + ssButton({ label: "Ajouter la leçon", variant: "primary", type: "submit", icon: "plus" }) + '</footer></form>' +
+      ssTable({
+        headers: ["Titre", "Date", "Classe", "Matière", "Enseignant"],
+        rows: rows,
+        empty: "Aucune leçon enregistrée.",
+        emptyTitle: "Leçons planifiées",
+        responsive: true
+      }) + '</section>';
   }
 
-  function render() {
-    var container = document.getElementById("pedagogyContent");
+  function render(containerId, options) {
+    options = options || {};
+    if (options.tab) state.activeTab = options.tab;
+    var container = document.getElementById(containerId || "pedagogyContent");
     if (!container) return;
-    var content = state.loading ? '<p class="loading">Chargement…</p>' : (state.error ? '<p class="error">' + escapeMarkup(state.error) + '</p>' : "");
+    var content = state.loading ? global.ssState({ type: "loading", title: "Chargement…", message: "Veuillez patienter pendant le chargement des données." }) : (state.error ? global.ssState({ type: "error", title: "Erreur", message: state.error }) : "");
     if (!state.loading && !state.error) {
       if (state.activeTab === "subjects") content = renderSubjects();
       else if (state.activeTab === "assignments") content = renderAssignments();
@@ -438,6 +684,32 @@
       });
     });
 
+    // DOC-03 — Document Engine actions for assignments
+    document.querySelectorAll("#pedagogyContent [data-preview-assignment]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        var id = button.getAttribute("data-preview-assignment");
+        await generateAssignmentDocument(id, { preview: true });
+      });
+    });
+    document.querySelectorAll("#pedagogyContent [data-download-assignment]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        var id = button.getAttribute("data-download-assignment");
+        await generateAssignmentDocument(id, { preview: false });
+      });
+    });
+    document.querySelectorAll("#pedagogyContent [data-print-assignment]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        var id = button.getAttribute("data-print-assignment");
+        await generateAssignmentDocument(id, { print: true });
+      });
+    });
+    document.querySelectorAll("#pedagogyContent [data-download-answer-sheet]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        var id = button.getAttribute("data-download-answer-sheet");
+        await generateAssignmentDocument(id, { answerSheet: true });
+      });
+    });
+
     var subjectForm = document.getElementById("subjectForm");
     if (subjectForm) {
       subjectForm.addEventListener("submit", async function (event) {
@@ -462,6 +734,7 @@
 
     var assignmentForm = document.getElementById("assignmentForm");
     if (assignmentForm) {
+      bindAssignmentComposer(assignmentForm);
       assignmentForm.addEventListener("submit", async function (event) {
         event.preventDefault();
         if (!assignmentForm.reportValidity()) return;
@@ -469,7 +742,9 @@
         var submitter = event.submitter;
         var published = submitter && submitter.getAttribute("data-publish") === "true";
         try {
-          var assignment = await global.SchoolSafePedagogyAPI.createAssignment({
+          var questions = collectAssignmentQuestions(assignmentForm);
+          var mode = String(data.get("assignment_mode") || "text");
+          var payload = {
             class_id: String(data.get("class_id")),
             subject_id: String(data.get("subject_id")),
             title: String(data.get("title")),
@@ -481,8 +756,25 @@
             prerequisites: String(data.get("prerequisites") || ""),
             instructions: String(data.get("instructions") || ""),
             language: String(data.get("language")),
-            questions: [],
-          });
+            mode: mode,
+            questions: questions,
+          };
+          var fileInput = document.getElementById("assignmentFileInput");
+          if (mode !== "text" && fileInput && fileInput.files && fileInput.files[0]) {
+            // Frontend-only : en mode démo on conserve le fichier en base64 pour prototypage/QA.
+            // En mode réel on n'envoie jamais de base64 au backend ; l'upload fera l'objet d'un
+            // traitement backend distinct (BE-NEED documenté dans BACKEND_LATER.md).
+            if (isDemoMode()) {
+              payload.uploaded_file = await readFileAsDataUrl(fileInput.files[0]);
+              payload.uploaded_file_name = fileInput.files[0].name;
+              payload.uploaded_file_type = fileInput.files[0].type;
+            } else {
+              payload.uploaded_file_name = fileInput.files[0].name;
+              payload.uploaded_file_type = fileInput.files[0].type;
+              notify("Fichier sélectionné : l'upload officiel nécessitera le backend (DOC-03).");
+            }
+          }
+          var assignment = await global.SchoolSafePedagogyAPI.createAssignment(payload);
           if (published) {
             await global.SchoolSafePedagogyAPI.publishAssignment(assignment.id);
           }
@@ -521,14 +813,250 @@
     }
   }
 
+  function bindAssignmentComposer(form) {
+    var modeInputs = form.querySelectorAll('input[name="assignment_mode"]');
+    var uploadZone = document.getElementById("assignmentUploadZone");
+    var questionsZone = document.getElementById("assignmentQuestionsZone");
+    var addButton = document.getElementById("addQuestionButton");
+    var fileInput = document.getElementById("assignmentFileInput");
+    var preview = document.getElementById("assignmentUploadPreview");
+
+    function updateMode() {
+      var mode = form.querySelector('input[name="assignment_mode"]:checked');
+      var value = mode ? mode.value : "text";
+      if (value === "text") {
+        if (uploadZone) uploadZone.hidden = true;
+        if (questionsZone) questionsZone.hidden = false;
+      } else {
+        if (uploadZone) uploadZone.hidden = false;
+        if (questionsZone) questionsZone.hidden = true;
+      }
+    }
+
+    modeInputs.forEach(function (input) {
+      input.addEventListener("change", updateMode);
+    });
+    updateMode();
+
+    if (addButton) {
+      addButton.addEventListener("click", function () {
+        var list = document.getElementById("assignmentQuestionsList");
+        if (!list) return;
+        var index = list.children.length;
+        var row = document.createElement("div");
+        row.className = "assignment-question-row";
+        row.innerHTML = '<textarea name="question_text_' + index + '" rows="2" placeholder="Texte de la question" required></textarea>' +
+          '<input type="number" name="question_points_' + index + '" placeholder="Points" min="0" step="0.5">' +
+          '<input type="text" name="question_answer_space_' + index + '" placeholder="Espace réponse (ex: 8 lignes)">' +
+          ssIconButton({ icon: "trash-2", title: "Supprimer", attrs: { "data-remove-question": true } });
+        list.appendChild(row);
+        refreshIcons();
+        row.querySelector("[data-remove-question]").addEventListener("click", function () {
+          row.remove();
+        });
+      });
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener("change", function () {
+        if (!preview) return;
+        preview.innerHTML = "";
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        if (file.type.startsWith("image/")) {
+          var img = document.createElement("img");
+          img.style.maxWidth = "200px";
+          img.style.maxHeight = "200px";
+          img.src = URL.createObjectURL(file);
+          preview.appendChild(img);
+        } else if (file.type === "application/pdf") {
+          var note = document.createElement("p");
+          note.textContent = "PDF sélectionné : " + file.name;
+          preview.appendChild(note);
+        } else {
+          var err = document.createElement("p");
+          err.className = "error-text";
+          err.textContent = "Format non supporté. Utilisez PDF ou image.";
+          preview.appendChild(err);
+          fileInput.value = "";
+        }
+      });
+    }
+  }
+
+  function collectAssignmentQuestions(form) {
+    var list = form.querySelector("#assignmentQuestionsList");
+    if (!list) return [];
+    var questions = [];
+    Array.from(list.children).forEach(function (row, index) {
+      var text = row.querySelector('textarea[name^="question_text_"]').value;
+      var points = row.querySelector('input[name^="question_points_"]').value;
+      var answerSpace = row.querySelector('input[name^="question_answer_space_"]').value;
+      if (text.trim()) {
+        questions.push({
+          text: text,
+          points: points ? Number(points) : undefined,
+          answerSpace: answerSpace || undefined,
+        });
+      }
+    });
+    return questions;
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(reader.error); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function generateAssignmentDocument(assignmentId, options) {
+    options = options || {};
+    var user = getCurrentUser();
+    user.permissions = getUserPermissions(user);
+
+    var assignment = state.assignments.find(function (a) { return a.id === assignmentId; });
+    if (!assignment) {
+      notify("Devoir introuvable.");
+      return;
+    }
+
+    var subjectName = assignment.subjects ? assignment.subjects.name : assignment.subject_id;
+    var className = assignment.classes ? assignment.classes.name : assignment.class_id;
+
+    try {
+      var engine = await getDocumentEngine();
+      var request = {
+        id: "doc-req-" + Date.now(),
+        documentType: options.answerSheet ? "answer-sheet" : "assignment",
+        sourceModule: "pedagogy",
+        action: options.preview ? "preview" : "download",
+        formats: ["pdf"],
+        origin: "generated",
+        context: {
+          title: assignment.title,
+          subjectName: subjectName,
+          className: className,
+          teacherName: user.name || user.displayName || user.role,
+          dueDate: assignment.due_date,
+          type: assignment.type,
+          scaleLabel: assignment.scale_label || (assignment.scale_max ? "/" + assignment.scale_max : ""),
+          coefficient: assignment.coefficient,
+          instructions: assignment.instructions,
+          questions: Array.isArray(assignment.questions) ? assignment.questions : [],
+          studentFirstName: options.studentFirstName || "",
+          studentLastName: options.studentLastName || "",
+        },
+        requestedBy: user,
+        locale: assignment.language === "EN" ? "en-US" : "fr-FR",
+      };
+
+      // For uploaded mode, show native preview instead of generating a wrapper for now.
+      if (assignment.mode === "pdf" || assignment.mode === "photo") {
+        if (!assignment.uploaded_file) {
+          notify("Aucun fichier importé pour ce devoir.");
+          return;
+        }
+        if (options.preview) {
+          openUploadedPreview(assignment);
+          return;
+        }
+        notify("Téléchargement du fichier original.");
+        downloadDataUrl(assignment.uploaded_file, assignment.uploaded_file_name || "fichier");
+        return;
+      }
+
+      var result = await engine.generate(request);
+      if (!result.ok) {
+        notify("Génération refusée : " + (result.error || "accès interdit"));
+        return;
+      }
+      var output = result.outputs && result.outputs.pdf;
+      if (!output || output.ok === false) {
+        notify("Erreur de génération PDF : " + (output && output.error ? output.error : "inconnue"));
+        return;
+      }
+
+      if (options.preview) {
+        openPdfPreview(output.objectUrl, assignment.title);
+      } else if (options.print) {
+        printPdf(output.objectUrl);
+      } else {
+        downloadBlob(output.blob, output.filename);
+      }
+    } catch (e) {
+      console.error("[Pedagogy] generateAssignmentDocument error", e);
+      notify("Erreur lors de la génération du document : " + (e.message || "inconnue"));
+    }
+  }
+
+  function openPdfPreview(url, title) {
+    window.ssModal({
+      title: title || "Aperçu",
+      size: "xl",
+      content: '<div style="width:100%;height:70vh;min-height:320px;"><iframe src="' + escapeMarkup(url) + '" frameborder="0" style="width:100%;height:100%;border-radius:var(--ss-radius-md);"></iframe></div>',
+      actions: [{ label: "Fermer", variant: "secondary" }]
+    });
+  }
+
+  function openUploadedPreview(assignment) {
+    if (assignment.mode === "photo") {
+      openPdfPreview(assignment.uploaded_file, assignment.title);
+    } else if (assignment.mode === "pdf") {
+      openPdfPreview(assignment.uploaded_file, assignment.title);
+    }
+  }
+
+  function printPdf(url) {
+    var iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.opacity = "0";
+    iframe.style.pointerEvents = "none";
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    iframe.onload = function () {
+      try {
+        iframe.contentWindow.print();
+      } catch (e) {
+        notify("Impression non disponible dans ce navigateur.");
+      }
+      setTimeout(function () { iframe.remove(); }, 1000);
+    };
+  }
+
+  function downloadBlob(blob, filename) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+  }
+
+  function downloadDataUrl(dataUrl, filename) {
+    var a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { a.remove(); }, 100);
+  }
+
   global.SchoolSafePedagogyModule = {
-    render: function (containerId) {
+    render: function (containerId, options) {
+      options = options || {};
       var container = document.getElementById(containerId || "pedagogyContent");
       if (!container) return;
       var wrapper = document.createElement("div");
       wrapper.innerHTML = renderTabs() + '<div id="pedagogyModuleContent"></div>';
       container.innerHTML = "";
       container.appendChild(wrapper);
+      if (options.tab) {
+        state.activeTab = options.tab;
+        if (demoState) demoState.activeTab = options.tab;
+      }
       loadAll();
     },
     renderTab: function (tab) {

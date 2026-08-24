@@ -14,13 +14,18 @@ import {
 } from "./schema.js";
 import { requirePermission } from "../access/guard.js";
 import type { AccessService } from "../access/service.js";
+import type { AuditService } from "../audit/service.js";
+import { registerRankingsRoutes } from "./rankings/routes.js";
+import type { RankingsService } from "./rankings/service.js";
 
 export type ResolveProfileAndSchool = (token: string) => Promise<{ profileId: string | null; schoolId: string | null }>;
 
 export type PedagogyRouteDependencies = {
   service: PedagogyService;
+  rankingsService: RankingsService;
   resolveProfileAndSchool: ResolveProfileAndSchool;
   access: AccessService;
+  audit?: AuditService;
 };
 
 async function authenticate(request: FastifyRequest, resolve: ResolveProfileAndSchool) {
@@ -275,5 +280,17 @@ export function registerPedagogyRoutes(app: FastifyInstance, dependencies: Pedag
       const result = await dependencies.service.computeStudentAverages(schoolId, id);
       return { data: result };
     },
+  );
+
+  app.register(
+    async (rankingsApp: FastifyInstance) => {
+      registerRankingsRoutes(rankingsApp, {
+        service: dependencies.rankingsService,
+        resolveProfileAndSchool: dependencies.resolveProfileAndSchool,
+        access: dependencies.access,
+        audit: dependencies.audit,
+      });
+    },
+    { prefix: "/pedagogy/rankings" },
   );
 }

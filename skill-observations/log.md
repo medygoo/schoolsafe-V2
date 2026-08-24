@@ -1,0 +1,86 @@
+# Skill Observation Log
+
+Observations captured during task-oriented work.
+
+**Status key:** OPEN = not yet actioned | ACTIONED (YYYY-MM-DD) = skill
+updated/created | DECLINED (YYYY-MM-DD) = user decided not to pursue —
+resolved statuses always carry their resolution date
+
+---
+
+### Observation 1: Hono strict typing requires ContextVariableMap and ContentfulStatusCode handling
+
+**Status:** OPEN
+**Date:** 2026-08-18
+**Session context:** Task 2.3 — Cloudflare Workers finance and pilotage routes
+**Skill:** New skill candidate: Hono + TypeScript strict typing for Workers
+**Type:** open-source
+**Phase/Area:** Type declarations and response status typing
+
+**Issue:** In a strict TypeScript Hono project, `c.get("schoolId")` / `c.set("token", ...)` fail with `key: never` unless Hono's `ContextVariableMap` is extended. Also, passing a dynamic `error.statusCode` (type `number`) to `c.json(..., status)` fails because Hono expects `ContentfulStatusCode`, not a plain `number`.
+
+**Suggested improvement:** Add a reusable Hono/Workers setup checklist or skill covering: (1) create `src/types/hono.d.ts` with `declare module "hono" { interface ContextVariableMap { token: string; schoolId: string; profileId: string; } }`; (2) import `ContentfulStatusCode` from `hono/utils/http-status` and cast dynamic status codes (`error.statusCode as ContentfulStatusCode`) or use literal status codes directly.
+
+**Principle:** Framework-specific type extension points (like Hono's `ContextVariableMap`) and branded status-code types must be configured explicitly in strict TypeScript; avoid `as any` casts in route code by centralizing type declarations.
+
+### Observation 2: Generated plan code often needs strict-TypeScript adaptation
+
+**Status:** OPEN
+**Date:** 2026-08-18
+**Session context:** Task 2.4 — Pedagogy routes; also applies to Tasks 2.2 and 2.3
+**Skill:** executing-plans / subagent-driven-development
+**Type:** open-source
+**Phase/Area:** Plan execution and TypeScript strictness
+
+**Issue:** The implementation plan's route snippets contained unused helper variables (`const schoolId = ...`) and passed `c.req.param("id")` (type `string | undefined`) directly to service methods expecting `string`. Following them verbatim caused strict TypeScript errors that had to be fixed during execution.
+
+**Suggested improvement:** When executing a generated plan in strict TypeScript, treat the plan as pseudocode: explicitly add non-null assertions (`c.req.param("id")!`) for path parameters, remove unused helpers, and run `typecheck` immediately after each module. The executing-plans/subagent-driven-development skills could include a "strict TypeScript sanity pass" checklist before running tests.
+
+**Principle:** A plan is a specification, not a compile-ready artifact; the executor must bridge the gap between plan-level intent and project-level type/strictness constraints.
+
+### Observation 3: Direct intervention preferred when subagent latency frustrates user
+
+**Status:** OPEN
+**Date:** 2026-08-19
+**Session context:** Partie D — Pédagogie Phase 2 (D1/D2/D3)
+**Skill:** superpowers:subagent-driven-development
+**Type:** open-source
+**Phase/Area:** Execution cadence and user control
+
+**Issue:** During a multi-step implementation phase, the user explicitly asked to stop relying on background subagents and to intervene directly because the process felt too slow. Work accelerated once I read the relevant files myself, ran the tests, and committed each task immediately.
+
+**Suggested improvement:** When a user signals impatience with subagent delegation, offer a "direct mode" for the remainder of the phase: one task at a time, immediate commit/push, no background agents. Document this as an explicit fallback in the subagent-driven-development skill.
+
+**Principle:** User pacing overrides agent orchestration defaults. Detect frustration signals early and switch to hands-on execution with tight feedback loops.
+
+---
+
+### Observation 4: Missing foundational API blocks feature work and must be added first
+
+**Status:** OPEN
+**Date:** 2026-08-19
+**Session context:** Partie D1 — panneau de saisie des cotes
+**Skill:** using-superpowers / planner
+**Type:** open-source
+**Phase/Area:** Dependency discovery before implementation
+
+**Issue:** To build the grading UI, I needed a list of students by class. No backend route existed for this. The plan/summary did not flag this dependency, so I had to pause feature work to add `/school/classes/:id/students` before completing the grading panel.
+
+**Suggested improvement:** During planning or early execution, explicitly scan for prerequisite CRUD endpoints that the feature assumes. Add a "dependency precondition" checklist before writing UI code.
+
+**Principle:** Feature work should not assume foundational read endpoints exist. Verify read dependencies before building dependent UI or business logic.
+
+### Observation 5: Prefer native BarcodeDetector over new CDN dependency for QR scanning
+
+**Status:** OPEN
+**Date:** 2026-08-19
+**Session context:** Task E2 — frontend scan QR
+**Skill:** frontend-design / implementation
+**Type:** open-source
+**Phase/Area:** Dependency choice and camera integration
+
+**Issue:** The security module needed camera-based QR scanning. Adding jsQR via CDN was an option, but the project has no local package manager for the `app/` folder, and external CDN dependencies add reliability and security surface.
+
+**Suggested improvement:** Use the native `BarcodeDetector` API first (supported in Chromium-based browsers), with a clear manual-entry fallback when unavailable. This keeps the frontend dependency-free and avoids loading third-party scripts for security-sensitive scanning.
+
+**Principle:** For security-critical frontend features, prefer native browser APIs over external libraries when coverage is acceptable; always provide a graceful manual fallback.

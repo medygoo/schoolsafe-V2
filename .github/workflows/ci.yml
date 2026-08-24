@@ -1,0 +1,88 @@
+name: SchoolSafe CI
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  server-contracts:
+    name: server-contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Reject high and critical dependency vulnerabilities
+        run: npm audit --audit-level=high
+      - name: Build and inspect self-contained auth SDK
+        run: npm run build:auth-sdk && npm run check:auth-sdk
+      - name: Typecheck and unit tests
+        run: npm run ci
+      - name: Reject tracked private-key assignments
+        shell: bash
+        run: |
+          if git grep -nE '(SUPABASE_SERVICE_ROLE_KEY|R2_SECRET_ACCESS_KEY|VAPID_PRIVATE_KEY)=[^[:space:]]+' -- .; then
+            echo "A private credential assignment is tracked by Git."
+            exit 1
+          fi
+
+  rls-contracts:
+    name: rls-contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Start isolated local Supabase
+        run: npm run supabase:start
+      - name: Reset local test database
+        run: npm run supabase:reset
+      - name: Run RLS contracts
+        run: npm run test:rls
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup
+
+  existing-browser-qa:
+    name: existing-browser-qa
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run existing SchoolSafe browser QA
+        shell: powershell
+        run: |
+          $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+          if (-not (Test-Path $chrome)) { throw "Google Chrome not found at expected path: $chrome" }
+          $server = Start-Process node -ArgumentList "app/server.mjs" -PassThru
+          try {
+            Start-Sleep -Seconds 3
+            $env:SCHOOLSAFE_URL = "http://127.0.0.1:4175/"
+            $env:CHROME_PATH = $chrome
+            npm run test:e2e:existing
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          finally {
+            if ($server -and -not $server.HasExited) { Stop-Process -Id $server.Id -Force }
+          }

@@ -29,3 +29,7 @@ repomix-output.*
 
 # Isolated agent worktrees
 .worktrees/
+
+NUL
+
+.kimi-code/

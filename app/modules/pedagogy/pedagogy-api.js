@@ -1,7 +1,12 @@
 (function (global) {
   "use strict";
 
-  var apiBase = window.schoolSafeBackendConfig ? window.schoolSafeBackendConfig.api_base : (window.location.protocol + "//" + window.location.host);
+  function getApiBase() {
+    if (window.schoolSafeBackendConfig && window.schoolSafeBackendConfig.api_base) {
+      return window.schoolSafeBackendConfig.api_base;
+    }
+    return window.location.protocol + "//" + window.location.host;
+  }
 
   function currentToken() {
     try {
@@ -18,7 +23,7 @@
   }
 
   async function apiGet(path) {
-    var res = await fetch(apiBase + path, {
+    var res = await fetch(getApiBase() + path, {
       method: "GET",
       headers: { Accept: "application/json", ...authHeaders() }
     });
@@ -29,7 +34,7 @@
   }
 
   async function apiPost(path, body) {
-    var res = await fetch(apiBase + path, {
+    var res = await fetch(getApiBase() + path, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
       body: JSON.stringify(body)
@@ -41,7 +46,7 @@
   }
 
   async function apiPatch(path, body) {
-    var res = await fetch(apiBase + path, {
+    var res = await fetch(getApiBase() + path, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
       body: JSON.stringify(body)
@@ -53,7 +58,7 @@
   }
 
   async function apiDelete(path) {
-    var res = await fetch(apiBase + path, {
+    var res = await fetch(getApiBase() + path, {
       method: "DELETE",
       headers: { Accept: "application/json", ...authHeaders() }
     });

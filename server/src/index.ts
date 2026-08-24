@@ -15,6 +15,7 @@ import { createFeeControlService } from "./finance/control/service.js";
 import { createFinancePaymentService } from "./finance/payments/service.js";
 import { createFinanceReportsService } from "./finance/reports/service.js";
 import { createPedagogyService } from "./pedagogy/service.js";
+import { createRankingsService } from "./pedagogy/rankings/service.js";
 import { createSchoolService } from "./school/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
 import { createSupabaseAuditService } from "./audit/service.js";
@@ -152,6 +153,10 @@ const pedagogyService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createPedagogyService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   : undefined;
 
+const rankingsService = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createRankingsService(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  : undefined;
+
 const schoolService = env.SUPABASE_SERVICE_ROLE_KEY
   ? createSchoolService(
       env.SUPABASE_URL,
@@ -172,6 +177,7 @@ const app = buildApp({
       env.SUPABASE_ANON_KEY,
       env.SUPABASE_SERVICE_ROLE_KEY,
       env.SETUP_TOKEN,
+      `http://${env.HOST}:${env.PORT}`,
     ),
   },
   cards: cardService
@@ -244,11 +250,13 @@ const app = buildApp({
         access: accessService,
       }
     : undefined,
-  pedagogy: pedagogyService
+  pedagogy: pedagogyService && rankingsService
     ? {
         service: pedagogyService,
+        rankingsService,
         resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
+        audit: auditService,
       }
     : undefined,
   school: schoolService
@@ -272,6 +280,13 @@ const app = buildApp({
 await app.register(fastifyStatic, {
   root: path.resolve(process.cwd(), "server/uploads"),
   prefix: "/uploads/",
+});
+
+await app.register(fastifyStatic, {
+  root: path.resolve(import.meta.dirname, "..", "..", "app"),
+  prefix: "/",
+  wildcard: true,
+  decorateReply: false,
 });
 
 await app.listen({ host: env.HOST, port: env.PORT });

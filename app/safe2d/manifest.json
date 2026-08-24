@@ -1,0 +1,20 @@
+{
+  "personnage": "Safe - Assistante intelligente SchoolSafe",
+  "format": "PNG transparent (RGBA) 1024x1536",
+  "poses": {
+    "accueil":    { "fichier": "safe_accueil.png",    "contexte": "Écran d'accueil, bienvenue, ouverture de l'app" },
+    "salue":      { "fichier": "safe_salue.png",      "contexte": "Salutation, début de conversation chat" },
+    "pointe":     { "fichier": "safe_pointe.png",     "contexte": "Guidage pas-à-pas, mode Montre-moi, tutoriel" },
+    "reflechie":  { "fichier": "safe_reflechie.png",  "contexte": "Chargement, attente de réponse, traitement" },
+    "pouce":      { "fichier": "safe_pouce.png",      "contexte": "Succès, action réussie, validation" },
+    "clin":       { "fichier": "safe_clin.png",       "contexte": "Encouragement, moment amical, récompense" },
+    "sourire":    { "fichier": "safe_sourire.png",    "contexte": "Pose neutre par défaut, présence rassurante" },
+    "saute":      { "fichier": "safe_saute.png",      "contexte": "Célébration, grande réussite, félicitations" },
+    "assise":     { "fichier": "safe_assise.png",     "contexte": "Pause, mode repos, écran de détente" },
+    "livre":      { "fichier": "safe_livre.png",      "contexte": "Lecture, documentation, aide, apprentissage" },
+    "pense":      { "fichier": "safe_pense.png",      "contexte": "Idée, suggestion, astuce, conseil intelligent" },
+    "marche":     { "fichier": "safe_marche.png",     "contexte": "Navigation, transition entre écrans, progression" }
+  },
+  "exemple_react": "const [pose, setPose] = useState('sourire'); <img src={`/safe/${poses[pose].fichier}`} alt='Safe' />",
+  "conseil": "Animer avec CSS : transition d'opacité entre poses, léger rebond (transform: scale/translateY) pour donner vie au personnage."
+}

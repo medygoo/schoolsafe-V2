@@ -46,7 +46,13 @@ export function createFinancePaymentService(
         .eq("id", studentFeeId)
         .eq("school_id", schoolId)
         .single();
-      if (feeError || !studentFee) throw new Error(`Frais étudiant introuvable : ${feeError?.message ?? "inconnu"}`);
+      if (feeError || !studentFee) {
+        const notFound = !studentFee || feeError?.code === "PGRST116";
+        if (notFound) {
+          throw new SchoolSafeError(404, "NOT_FOUND", "Frais étudiant introuvable", false);
+        }
+        throw new Error(`Frais étudiant introuvable : ${feeError?.message ?? "inconnu"}`);
+      }
 
       const { data: payments, error: paymentsError } = await client
         .from("fee_payments")

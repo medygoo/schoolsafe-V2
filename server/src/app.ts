@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
+import cors from "@fastify/cors";
 import { ZodError } from "zod";
 import { registerBootstrapRoutes, type BootstrapRouteDependencies } from "./bootstrap/routes.js";
 import { registerCardRoutes, type CardRouteDependencies } from "./cards/routes.js";
@@ -47,6 +48,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({ logger: false });
   const readinessProbe = options.readinessProbe ?? defaultReadinessProbe;
 
+  app.register(cors, {
+    origin: ["http://127.0.0.1:4175", "http://localhost:4175"],
+    credentials: true,
+  });
   app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 } });
 
   app.setErrorHandler((error, _request, reply) => {

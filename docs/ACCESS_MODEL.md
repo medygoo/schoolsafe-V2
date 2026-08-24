@@ -97,6 +97,22 @@ Exemples dans une instance SchoolSafe:
 - Responsable pedagogique + cycle primaire;
 - Parent + enfants explicitement rattaches.
 
+## Scopes officiels
+
+Chaque permission du catalogue `shared/permissions.json` est rattachée à un et un seul scope officiel. Les scopes reconnus sont:
+
+| Scope | Definition |
+|-------|------------|
+| `own` | Donnees du profil connecte. |
+| `own_children` | Donnees des enfants explicitement rattaches au parent/tuteur. |
+| `assigned_classes` | Classes ou groupes de classes affectes a l'utilisateur. |
+| `assigned_subjects` | Matieres affectees a l'utilisateur. |
+| `assigned_portal` | Portail ou point de controle assigne (securite QR). |
+| `school` | Toute l'ecole. |
+| `none` | Aucun perimetre (actions globales ou setup). |
+
+La validation du catalogue est executee au chargement par `server/src/access/permission-catalog.ts`. Tout scope non reconnu declenche une erreur au demarrage.
+
 ## Autorite
 
 Le catalogue pilote l'interface, mais ne constitue pas la securite definitive.

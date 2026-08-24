@@ -7,9 +7,18 @@ import { expect, Page } from "@playwright/test";
 export const ROLE_LABELS: Record<string, string> = {
   admin: "Administrateur principal",
   school_head: "Chef d’établissement",
-  teacher: "Enseignant",
+  pedagogy: "Responsable pédagogique",
+  admissions: "Responsable administratif et admissions",
+  secretary: "Secrétaire scolaire",
+  finance: "Responsable financier",
   cashier: "Agent de caisse",
+  accountant: "Comptable",
+  hr: "Responsable RH",
+  teacher: "Enseignant",
   guard: "Agent de contrôle d’accès",
+  nurse: "Infirmier",
+  canteen: "Responsable cantine",
+  communication: "Responsable communication et site",
   parent: "Parent ou responsable légal",
 };
 
@@ -17,9 +26,18 @@ export const BRANCHES_BY_ROLE: Record<string, string[]> = {
   // Administration branch is hidden in demo mode when no live session has school.manage/staff.manage.
   admin: ["pilotage", "school", "people", "pedagogy", "security", "finance", "accounting", "communication", "reports"],
   school_head: ["pilotage", "school", "pedagogy", "security", "finance", "reports"],
-  teacher: ["pedagogy", "communication"],
+  pedagogy: ["pedagogy", "finance", "reports"],
+  admissions: ["school"],
+  secretary: ["communication"],
+  finance: ["finance", "accounting"],
   cashier: ["finance"],
+  accountant: ["accounting"],
+  hr: ["people"],
+  teacher: ["pedagogy", "communication"],
   guard: ["security"],
+  nurse: ["care"],
+  canteen: ["care"],
+  communication: ["communication"],
   parent: ["school", "finance", "communication"],
 };
 

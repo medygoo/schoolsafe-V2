@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist-qa",
+    "rootDir": ".",
+    "types": ["node"],
+    "typeRoots": ["./server/node_modules/@types", "./node_modules/@types"],
+    "paths": {
+      "vitest": ["./server/node_modules/vitest"]
+    }
+  },
+  "include": [
+    "tests/qa/unit/access-chain.test.ts",
+    "tests/qa/unit/conditions.test.ts",
+    "tests/qa/unit/exceptions.test.ts",
+    "tests/qa/unit/scopes.test.ts",
+    "tests/qa/unit/permission-catalog.test.ts",
+    "tests/qa/integration/audit.flows.test.ts",
+    "tests/qa/rls/rls.test.ts",
+    "tests/qa/fixtures/*.ts"
+  ]
+}
