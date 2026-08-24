@@ -127,6 +127,7 @@
         { id: "demo-3", name: "Inscription", cycle: "Tous les cycles", amount: 50000, frequency: "Une fois", due: "À l’inscription", active: true },
         { id: "demo-4", name: "Transport scolaire", cycle: "Service facultatif", amount: 100000, frequency: "Mois", due: "Chaque 5 du mois", active: true }
       ],
+      feeAssignment: { feeStructureId: "", targetingMode: "cycle", classIds: [], studentIds: [], prepared: false },
       studentFeeMap: {},
       students: [
         { id: "demo-s1", name: "Lucas Martin", initials: "LM", sex: "Garçon", className: "6e A", guardian: "Mme Sophie Martin", expected: 450000, paid: 350000, balance: 100000, status: "À régulariser", currency: "CDF" },
@@ -166,6 +167,7 @@
       selectedPendingStudent: 0,
       reportClosure: null,
       feeTypes: [],
+      feeAssignment: { feeStructureId: "", targetingMode: "cycle", classIds: [], studentIds: [], prepared: false },
       studentFeeMap: {},
       students: [],
       transactions: [],
@@ -274,6 +276,39 @@
   function canReadFeeCatalog() { return canAccessFeeCatalog("finance.fee.read"); }
   function canManageFeeCatalog() { return canAccessFeeCatalog("finance.fee.manage"); }
 
+  /**
+   * FE-FIN-03 — prépare uniquement une intention d'affectation dans la vue.
+   * Aucune donnée n'est persistée ici : le backend devra créer les student_fees.
+   */
+  function feeAssignmentState() {
+    if (!financeState.feeAssignment) {
+      financeState.feeAssignment = { feeStructureId: "", targetingMode: "cycle", classIds: [], studentIds: [], prepared: false };
+    }
+    return financeState.feeAssignment;
+  }
+
+  function deduplicateAssignmentIds(values) {
+    var seen = {};
+    return (Array.isArray(values) ? values : []).filter(function (value) {
+      var key = String(value || "");
+      if (!key || seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+  }
+
+  function selectedFeeForAssignment() {
+    var assignment = feeAssignmentState();
+    var feeTypes = financeState.feeTypes || [];
+    if (!assignment.feeStructureId && feeTypes.length) assignment.feeStructureId = feeTypes[0].id;
+    return feeTypes.find(function (fee) { return fee.id === assignment.feeStructureId; }) || null;
+  }
+
+  function assignmentAmountLabel(fee) {
+    if (!fee) return "—";
+    return Number(fee.amount || 0).toLocaleString("fr-FR") + " " + escapeMarkup(fee.currency || "CDF");
+  }
+
   // ---------------------------------------------------------------------------
   // Chargement des données
   // ---------------------------------------------------------------------------
@@ -367,6 +402,7 @@
   // Onglets et autorisation des onglets
   // ---------------------------------------------------------------------------
   function financeTabForAction(actionName) {
+    if (/affectation des frais|affecter un frais/i.test(actionName)) return "assignments";
     if (/structure des frais|types de frais|contrôle des frais|échéance/i.test(actionName)) return "fees";
     if (/reçu/i.test(actionName)) return "receipts";
     if (/impayé|solde|en ordre|régulariser/i.test(actionName)) return "balances";
@@ -391,6 +427,8 @@
     } else {
       tabs = tabs.filter(function (tab) { return tab !== "fees"; });
     }
+    if (canManageFeeCatalog() && tabs.indexOf("assignments") === -1) tabs.push("assignments");
+    if (!canManageFeeCatalog()) tabs = tabs.filter(function (tab) { return tab !== "assignments"; });
     return tabs;
   }
 
@@ -469,6 +507,91 @@
       message: "Vous pouvez créer un type de frais, mais la permission finance.fee.read est nécessaire pour consulter le catalogue."
     });
     return '<div class="finance-two-column"><section class="finance-panel"><header><div><span>Paramétrage</span><h3>Catalogue des frais</h3></div><b>' + (canRead ? financeState.feeTypes.length : "—") + '</b></header>' + catalogue + '</section>' + form + '</div>';
+  }
+
+  function renderFeeAssignment() {
+    var canManage = canManageFeeCatalog();
+    var canRead = canReadFeeCatalog();
+    var assignment = feeAssignmentState();
+    assignment.classIds = deduplicateAssignmentIds(assignment.classIds);
+    assignment.studentIds = deduplicateAssignmentIds(assignment.studentIds);
+
+    if (!canManage) {
+      return window.ssState({
+        type: "denied",
+        title: "Affectation non autorisée",
+        message: "La prévisualisation FE-FIN-03 utilise temporairement finance.fee.manage. La permission finale finance.fee.assign sera raccordée au backend ultérieur.",
+        details: "Aucune affectation n’est créée depuis cette interface."
+      });
+    }
+
+    if (!canRead) {
+      return '<section class="finance-panel"><header><div><span>FE-FIN-03 · BACKEND_LATER</span><h3>Affecter un frais</h3></div>' + window.ssBadge({ variant: "warning", label: "Non connecté" }) + '</header>' + window.ssState({
+        type: "unavailable",
+        title: "Catalogue non disponible",
+        message: "La sélection exige un fee_structure réel et la permission finance.fee.read.",
+        details: "finance.fee.assign reste la permission cible finale."
+      }) + '</section>';
+    }
+
+    if (isDemoMode()) {
+      return '<section class="finance-panel"><header><div><span>FE-FIN-03 · BACKEND_LATER</span><h3>Affecter un frais</h3></div>' + window.ssBadge({ variant: "warning", label: "Non connecté" }) + '</header>' + window.ssState({
+        type: "unavailable",
+        title: "Catalogue réel requis",
+        message: "Les types de frais de démonstration ne peuvent pas être préparés pour une affectation.",
+        details: "Connectez une session Finance autorisée pour sélectionner un fee_structure réel."
+      }) + '</section>';
+    }
+
+    if (!financeState.feeTypes.length) {
+      return '<section class="finance-panel"><header><div><span>FE-FIN-03 · BACKEND_LATER</span><h3>Affecter un frais</h3></div>' + window.ssBadge({ variant: "warning", label: "Non connecté" }) + '</header>' + window.ssState({
+        type: "empty",
+        title: "Aucun type de frais disponible",
+        message: "Créez d’abord un type de frais dans le catalogue avant de préparer une affectation."
+      }) + '</section>';
+    }
+
+    var fee = selectedFeeForAssignment();
+    var targetingModes = [
+      { value: "cycle", label: "Cycle" },
+      { value: "class", label: "Une classe" },
+      { value: "classes", label: "Plusieurs classes" },
+      { value: "student", label: "Un élève" },
+      { value: "students", label: "Plusieurs élèves" }
+    ];
+    var feeOptions = financeState.feeTypes.map(function (item) {
+      return { value: item.id, label: item.name + " · " + item.cycle };
+    });
+    var selectionUnavailable = assignment.targetingMode !== "cycle";
+    var targetLabel = selectionUnavailable
+      ? "Liste indisponible — connexion backend requise"
+      : "Cycle concerné : " + (fee ? fee.cycle : "—");
+    var preparedState = assignment.prepared ? window.ssState({
+      type: "success",
+      title: "Configuration prête",
+      message: "Configuration prête — connexion backend requise pour appliquer l’affectation.",
+      details: "Aucun student_fee n’a été créé."
+    }) : "";
+    var unavailableState = selectionUnavailable ? window.ssState({
+      type: "unavailable",
+      title: "Liste indisponible — connexion backend requise",
+      message: "La projection Finance des classes et élèves n’existe pas encore. Aucune donnée Pédagogie n’est réutilisée.",
+      size: "inline"
+    }) : "";
+    var futureRows = [
+      ["À créer", "student_fee à créer transactionnellement côté backend"],
+      ["Déjà existant", "doublon serveur à retourner sans création"],
+      ["Conflit", "contrôle serveur, portée et exception à expliquer"]
+    ];
+
+    return '<div class="finance-two-column"><section class="finance-panel"><header><div><span>FE-FIN-03 · BACKEND_LATER</span><h3>Affecter un frais</h3><p>Préparez une configuration ; l’affectation réelle reste non connectée.</p></div>' + window.ssBadge({ variant: "warning", icon: "plug-zap", label: "Non connecté" }) + '</header>' +
+      '<form id="financeFeeAssignmentForm" class="finance-fee-form" novalidate><div class="ss-form-grid">' +
+      window.ssField({ label: "Type de frais", labelFor: "financeAssignmentFee", required: true, inputHtml: window.ssSelect({ name: "fee_structure_id", id: "financeAssignmentFee", required: true, value: assignment.feeStructureId, options: feeOptions }) }) +
+      window.ssField({ label: "Mode de ciblage", labelFor: "financeAssignmentTargetMode", required: true, inputHtml: window.ssSelect({ name: "targeting_mode", id: "financeAssignmentTargetMode", required: true, value: assignment.targetingMode, options: targetingModes }) }) +
+      window.ssField({ label: "Année scolaire", inputHtml: window.ssInput({ type: "text", value: "Année scolaire : connexion backend requise", readonly: true }), help: "Aucune source compatible Finance n’est disponible sans contourner ACCESS_LAW.", className: "wide" }) +
+      '</div><section class="finance-panel"><header><div><span>Type sélectionné</span><h3>' + escapeMarkup(fee ? fee.name : "—") + '</h3></div>' + window.ssBadge({ variant: fee && fee.active ? "success" : "warning", label: fee && fee.active ? "Actif" : "Inactif" }) + '</header><dl class="student-finance-facts"><div><dt>Cycle concerné</dt><dd>' + escapeMarkup(fee ? fee.cycle : "—") + '</dd></div><div><dt>Montant standard</dt><dd>' + assignmentAmountLabel(fee) + '</dd></div><div><dt>Échéance</dt><dd>' + escapeMarkup(fee ? fee.due : "—") + '</dd></div></dl></section>' +
+      unavailableState + window.ssButton({ label: "Préparer l’affectation", icon: "clipboard-check", type: "submit", disabled: selectionUnavailable || !fee }) + '</form>' + preparedState + '</section>' +
+      '<aside class="finance-panel"><header><div><span>Résumé avant validation</span><h3>Aperçu d’affectation</h3></div></header><dl class="student-finance-facts"><div><dt>Type de frais</dt><dd>' + escapeMarkup(fee ? fee.name : "—") + '</dd></div><div><dt>Cible</dt><dd>' + escapeMarkup(targetLabel) + '</dd></div><div><dt>Élèves potentiellement concernés</dt><dd>Indisponible tant que backend non connecté</dd></div><div><dt>Montant standard</dt><dd>' + assignmentAmountLabel(fee) + '</dd></div><div><dt>Année</dt><dd>Indisponible — connexion backend requise</dd></div></dl><aside class="finance-audit-note"><i data-lucide="shield-check"></i><p>Le futur backend devra imposer <code>unique(student_id, fee_structure_id)</code>. La déduplication locale ne prétend jamais vérifier les doublons serveur.</p></aside><p><strong>Groupe</strong> · BACKEND_LATER</p>' + window.ssTable({ headers: ["Résultat futur", "Contrat backend"], rows: futureRows, responsive: true, compact: true }) + '<aside class="finance-audit-note"><i data-lucide="git-branch"></i><p>Contrat : fee_structure → affectation → student_fee → campagne → scan → résultat. Sans student_fee, le futur contrôle doit signaler une anomalie / absence d’affectation, jamais « Non en règle » automatiquement.</p></aside></aside></div>';
   }
 
   function renderCash() {
@@ -620,7 +743,7 @@
     var allowedTabs = financeTabsForRole();
     if (allowedTabs.indexOf(financeState.activeTab) === -1) financeState.activeTab = allowedTabs[0];
 
-    var titles = { overview: "Pilotage financier", fees: "Structure des frais", cash: "Encaissements", receipts: "Reçus", balances: "Soldes et régularité", reports: "Rapports de caisse", family: "Situation familiale" };
+    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", cash: "Encaissements", receipts: "Reçus", balances: "Soldes et régularité", reports: "Rapports de caisse", family: "Situation familiale" };
     if (titleEl) titleEl.textContent = titles[financeState.activeTab];
     if (workspaceTitle) workspaceTitle.textContent = titles[financeState.activeTab];
 
@@ -645,6 +768,7 @@
     var renderers = {
       overview: renderFinanceOverview,
       fees: renderFeeStructure,
+      assignments: renderFeeAssignment,
       cash: renderCash,
       receipts: renderReceipts,
       balances: renderBalances,
@@ -711,6 +835,38 @@
         renderFinanceModule();
       });
     });
+
+    var assignmentForm = document.getElementById("financeFeeAssignmentForm");
+    if (assignmentForm) {
+      var assignment = feeAssignmentState();
+      var assignmentFeeSelect = document.getElementById("financeAssignmentFee");
+      var assignmentModeSelect = document.getElementById("financeAssignmentTargetMode");
+      if (assignmentFeeSelect) assignmentFeeSelect.addEventListener("change", function () {
+        assignment.feeStructureId = this.value;
+        assignment.prepared = false;
+        renderFinanceModule();
+      });
+      if (assignmentModeSelect) assignmentModeSelect.addEventListener("change", function () {
+        assignment.targetingMode = this.value;
+        assignment.prepared = false;
+        renderFinanceModule();
+      });
+      assignmentForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (!canManageFeeCatalog()) { d.notify("Action non autorisée.", "error"); return; }
+        var selectedFee = selectedFeeForAssignment();
+        if (!selectedFee || !assignment.targetingMode) {
+          d.notify("Sélectionnez un type de frais et un mode de ciblage.", "error");
+          return;
+        }
+        if (assignment.targetingMode !== "cycle") {
+          d.notify("La liste des cibles n’est pas encore connectée au backend Finance.", "error");
+          return;
+        }
+        assignment.prepared = true;
+        renderFinanceModule();
+      });
+    }
 
     document.querySelectorAll("[data-toggle-fee]").forEach(function (button) {
       button.addEventListener("click", function () {
