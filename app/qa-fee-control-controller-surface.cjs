@@ -140,10 +140,7 @@ async function main() {
   assert.doesNotMatch(demo.elements.feeControlCampaigns.innerHTML, /USD|CDF|\$|FC|450|Montant|Devise|Solde|Reçu|Transaction|Caisse/i, "La projection démo ne doit contenir aucun montant, devise ou autre donnée financière.");
   assert.equal(demo.controls.radios.length, 1, "Une campagne démo doit être sélectionnable.");
   assert.equal(demo.controls.radios[0].hasListener("change"), true, "La sélection de campagne doit réagir au changement.");
-  assert.equal(demo.elements.feeControlQrInput.hasListener("keydown"), false, "Enter ne doit pas lancer le scanner avant FE-FIN-08.");
-  assert.equal(demo.controls.results[0].hasListener("click"), false, "Les boutons de résultat neutralisés ne doivent pas lancer un scan.");
-  demo.elements.feeControlQrInput.trigger("keydown", { key: "Enter", preventDefault: function () {} });
-  demo.controls.results[0].trigger("click");
+  assert.equal(demo.controls.results.length, 0, "Aucun bouton de choix manuel du résultat ne doit rester dans la surface démo.");
   assert.equal(demo.calls.securityScan, 0, "Le rendu ne doit déclencher aucun scan Sécurité.");
   assert.equal(demo.calls.createScan, 0, "Le rendu ne doit créer aucun résultat de contrôle.");
 

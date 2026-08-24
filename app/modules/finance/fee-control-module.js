@@ -13,6 +13,15 @@
       description: "Vérifiez la carte de l’élève au portail et appliquez la consigne de contrôle affichée."
     }
   ];
+  // FE-FIN-08A : projection locale explicitement démo. Elle ne remplace ni
+  // l'identification sécurisée, ni le calcul serveur du résultat futur.
+  var demoScanRecords = {
+    "schoolsafe://card/DEMO-PAID/verification": { name: "Amina Kalonji", matricule: "DEMO-001", className: "5e primaire", studentFeeStatus: "paid" },
+    "schoolsafe://card/DEMO-PARTIAL/verification": { name: "Noah Ilunga", matricule: "DEMO-002", className: "4e primaire", studentFeeStatus: "partial" },
+    "schoolsafe://card/DEMO-PENDING/verification": { name: "Sarah Mbuyi", matricule: "DEMO-003", className: "3e primaire", studentFeeStatus: "pending" },
+    "schoolsafe://card/DEMO-EXEMPTED/verification": { name: "David Tshibangu", matricule: "DEMO-004", className: "6e primaire", studentFeeStatus: "exempted" },
+    "schoolsafe://card/DEMO-NO-FEE/verification": { name: "Lina Kabasele", matricule: "DEMO-005", className: "2e primaire", studentFeeStatus: null }
+  };
 
   function escapeHtml(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
@@ -70,16 +79,25 @@
         message: "Le scan et le résultat opérationnel seront connectés après validation du contrat sécurisé.",
         details: "Aucun appel Sécurité ni résultat financier n’est déclenché depuis cette surface."
       }) +
-      '<label>QR payload<input type="text" id="feeControlQrInput" placeholder="schoolsafe://card/..." autocomplete="off" disabled></label>' +
-      '<div class="fee-control-result-options">' +
-        window.ssButton({ label: "En règle", icon: "badge-check", disabled: true, attrs: { "data-result": "ok" } }) +
-        window.ssButton({ label: "Paiement partiel", variant: "secondary", icon: "hand-coins", disabled: true, attrs: { "data-result": "partial" } }) +
-        window.ssButton({ label: "Non en règle", variant: "danger", icon: "badge-alert", disabled: true, attrs: { "data-result": "unpaid" } }) +
-        window.ssButton({ label: "Exempté", variant: "secondary", icon: "shield-check", disabled: true, attrs: { "data-result": "exempted" } }) +
-        window.ssButton({ label: "Anomalie", variant: "secondary", icon: "triangle-alert", disabled: true, attrs: { "data-result": "anomaly" } }) +
-      '</div>' +
       '<div id="feeControlResult" class="scan-result hidden"></div>' +
     '</div>';
+  }
+
+  function renderDemoScanner() {
+    return '<div id="feeControlScan" class="fee-control-scan">' +
+      '<header><span>Scanner démo</span><h3>Résultat opérationnel simulé</h3><p>Utilisez uniquement un QR de démonstration. Ces résultats ne proviennent pas du serveur.</p></header>' +
+      window.ssBadge({ variant: "info", label: "DÉMO" }) +
+      window.ssState({ type: "ready", title: "Prêt à analyser", message: "Sélectionnez une campagne puis saisissez un QR de démonstration.", size: "compact" }) +
+      '<form id="feeControlDemoScanForm" novalidate>' +
+        '<label for="feeControlQrInput">QR de démonstration<input type="text" id="feeControlQrInput" placeholder="schoolsafe://card/DEMO-PAID/verification" autocomplete="off"></label>' +
+        window.ssButton({ label: "Analyser", type: "submit", icon: "scan-line" }) +
+      '</form>' +
+      '<div id="feeControlResult" class="scan-result hidden" aria-live="polite"></div>' +
+    '</div>';
+  }
+
+  function renderScanner() {
+    return isDemoMode() ? renderDemoScanner() : renderScannerBacklog();
   }
 
   function render(containerId) {
@@ -89,7 +107,7 @@
       '<div class="fee-control-panel">' +
         '<header><span>Contrôle des frais</span><h2>Mes campagnes autorisées</h2><p>Consultez la consigne de campagne. Le scan sécurisé et le résultat seront raccordés dans un lot distinct.</p></header>' +
         '<div id="feeControlCampaigns" class="fee-control-campaigns">' + window.ssState({ type: "loading", title: "Chargement...", message: "Chargement des campagnes…" }) + '</div>' +
-        renderScannerBacklog() +
+        renderScanner() +
       '</div>';
     loadCampaigns();
     bind(containerId);
@@ -99,6 +117,18 @@
     var container = document.getElementById(containerId);
     container.querySelectorAll("input[name='feeControlCampaign']").forEach(function (radio) {
       radio.addEventListener("change", function () { selectedCampaignId = this.value; });
+    });
+    var demoForm = container.querySelector("#feeControlDemoScanForm");
+    var qrInput = container.querySelector("#feeControlQrInput");
+    if (!demoForm || !qrInput) return;
+    demoForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      performDemoScan(containerId);
+    });
+    qrInput.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      performDemoScan(containerId);
     });
   }
 
@@ -137,6 +167,57 @@
     var match = payload.match(/^schoolsafe:\/\/card\/([^/]+)\/([^/]+)$/);
     if (!match) return null;
     return { cardNumber: match[1], signature: match[2] };
+  }
+
+  function demoResultForStatus(studentFeeStatus) {
+    var results = {
+      paid: { code: "ok", title: "En règle", state: "success", message: "La situation de démonstration est conforme." },
+      partial: { code: "partial", title: "Paiement partiel", state: "unavailable", message: "La situation de démonstration requiert une régularisation." },
+      pending: { code: "unpaid", title: "Non en règle", state: "error", message: "La situation de démonstration n’est pas régularisée." },
+      exempted: { code: "exempted", title: "Exempté", state: "success", message: "Une exemption de démonstration est appliquée." }
+    };
+    return results[studentFeeStatus] || { code: "anomaly", title: "Anomalie", state: "error", message: "NO_STUDENT_FEE — aucune obligation de démonstration n’est configurée pour cet élève." };
+  }
+
+  function renderDemoControlResult(resultBox, record) {
+    var outcome = demoResultForStatus(record.studentFeeStatus);
+    var identity = '<p><strong>' + escapeHtml(record.name) + '</strong> · Matricule : ' + escapeHtml(record.matricule) + ' · Classe : ' + escapeHtml(record.className) + '</p>';
+    resultBox.innerHTML = identity + window.ssState({ type: outcome.state, title: outcome.title, message: outcome.message, size: "compact" });
+    resultBox.classList.remove("hidden");
+  }
+
+  function performDemoScan(containerId) {
+    var container = document.getElementById(containerId);
+    var input = container.querySelector("#feeControlQrInput");
+    var resultBox = container.querySelector("#feeControlResult");
+    var payload = input.value.trim();
+    if (!selectedCampaignId) {
+      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "Veuillez d’abord sélectionner une campagne.", size: "compact" });
+      resultBox.classList.remove("hidden");
+      return;
+    }
+    if (!payload) {
+      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "Veuillez saisir un QR de démonstration.", size: "compact" });
+      resultBox.classList.remove("hidden");
+      return;
+    }
+    if (!parseQrPayload(payload)) {
+      resultBox.innerHTML = window.ssState({ type: "error", title: "QR invalide", message: "Le format du QR de démonstration n’est pas reconnu.", size: "compact" });
+      resultBox.classList.remove("hidden");
+      return;
+    }
+    resultBox.innerHTML = window.ssState({ type: "loading", title: "Analyse démo", message: "Résolution de la projection de démonstration…", size: "compact" });
+    resultBox.classList.remove("hidden");
+    Promise.resolve().then(function () {
+      var record = demoScanRecords[payload];
+      if (!record) {
+        resultBox.innerHTML = window.ssState({ type: "error", title: "QR démo inconnu", message: "Ce QR n’existe pas dans la projection de démonstration.", size: "compact" });
+        return;
+      }
+      renderDemoControlResult(resultBox, record);
+      input.value = "";
+      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+    });
   }
 
   function performScan(containerId, result) {
