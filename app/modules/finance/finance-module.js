@@ -165,6 +165,7 @@
       ],
       studentFinancialProfiles: [],
       selectedFinancialStudentId: "demo-s1",
+      exemptionDraft: { studentId: "demo-s1", studentFeeId: "demo-sf-lucas-transport", type: "total", prepared: false, preparedSummary: null },
       selectedCashStudentId: "demo-s1",
       selectedCashStudentFeeId: "demo-sf-lucas-school",
       lastConfirmedPayment: null,
@@ -208,6 +209,7 @@
       studentFees: [],
       studentFinancialProfiles: [],
       selectedFinancialStudentId: "",
+      exemptionDraft: { studentId: "", studentFeeId: "", type: "total", prepared: false, preparedSummary: null },
       selectedCashStudentId: "",
       selectedCashStudentFeeId: "",
       lastConfirmedPayment: null,
@@ -409,6 +411,55 @@
 
   function canRecordPayment() {
     return canAccessFeeCatalog("finance.payment.record");
+  }
+
+  // FE-FIN-06 : garde transitoire. La permission dédiée finance.exemption.manage
+  // reste BACKEND_LATER ; aucune décision finale ne repose sur un rôle.
+  function canPrepareExemption() {
+    return canManageFeeCatalog();
+  }
+
+  function exemptionDraftState() {
+    if (!financeState.exemptionDraft) {
+      financeState.exemptionDraft = { studentId: "", studentFeeId: "", type: "total", prepared: false, preparedSummary: null };
+    }
+    return financeState.exemptionDraft;
+  }
+
+  function selectedExemptionProfile() {
+    var draft = exemptionDraftState();
+    var profiles = financeState.studentFinancialProfiles || [];
+    if (!profiles.length) return null;
+    var selected = profiles.find(function (profile) { return profile.student.id === draft.studentId; });
+    if (selected) return selected;
+    if (!draft.studentId) {
+      draft.studentId = profiles[0].student.id;
+      return profiles[0];
+    }
+    return null;
+  }
+
+  function selectedExemptionStudentFee(profile) {
+    var draft = exemptionDraftState();
+    if (!profile || !Array.isArray(profile.fees) || !profile.fees.length) return null;
+    var selected = profile.fees.find(function (fee) { return fee.student_fee_id === draft.studentFeeId; });
+    if (selected) return selected;
+    if (!draft.studentFeeId) {
+      draft.studentFeeId = profile.fees[0].student_fee_id;
+      return profile.fees[0];
+    }
+    return null;
+  }
+
+  function exemptionAvailability(fee) {
+    if (!fee) return { allowed: false, message: "Sélectionnez une obligation financière précise." };
+    if (!fee.feeStructureAvailable || !fee.student_fee_id || !fee.label) return { allowed: false, message: "Le student_fee ou son type de frais est incomplet." };
+    if (["CDF", "USD"].indexOf(fee.currency) === -1) return { allowed: false, message: "La devise de cette obligation est inconnue." };
+    if (Number(fee.paid) > 0) return { allowed: false, message: "Paiement déjà enregistré : la politique rétroactive exige le backend." };
+    if (fee.status === "exempted") return { allowed: false, message: "Cette obligation est déjà affichée comme exemptée ; son historique n’est pas encore connecté." };
+    if (fee.status !== "pending") return { allowed: false, message: "Le statut financier n’est pas compatible avec une préparation d’exemption." };
+    if (!Number.isFinite(Number(fee.remaining)) || Number(fee.remaining) <= 0) return { allowed: false, message: "Aucun montant restant disponible pour une exemption." };
+    return { allowed: true, message: "" };
   }
 
   function selectedCashProfile() {
@@ -618,6 +669,7 @@
   // Onglets et autorisation des onglets
   // ---------------------------------------------------------------------------
   function financeTabForAction(actionName) {
+    if (/exemption|exonération/i.test(actionName)) return "exemptions";
     if (/affectation des frais|affecter un frais/i.test(actionName)) return "assignments";
     if (/structure des frais|types de frais|contrôle des frais|échéance/i.test(actionName)) return "fees";
     if (/reçu/i.test(actionName)) return "receipts";
@@ -647,6 +699,8 @@
     if (!canManageFeeCatalog()) tabs = tabs.filter(function (tab) { return tab !== "assignments"; });
     if (canRecordPayment() && tabs.indexOf("cash") === -1) tabs.push("cash");
     if (!canRecordPayment()) tabs = tabs.filter(function (tab) { return tab !== "cash"; });
+    if (canPrepareExemption() && tabs.indexOf("exemptions") === -1) tabs.push("exemptions");
+    if (!canPrepareExemption()) tabs = tabs.filter(function (tab) { return tab !== "exemptions"; });
     return tabs;
   }
 
@@ -1006,6 +1060,68 @@
     return '<section class="balance-register"><header><div><span>Situation financière</span><h3>Frais de l’élève</h3><p>Chaque ligne représente un student_fee distinct ; les montants proviennent des données Finance chargées.</p></div><b>' + filteredProfiles.length + ' élève(s)</b></header>' + filters + '<section class="finance-two-column"><aside class="finance-panel">' + studentSelect + identity + summaryMarkup + '</aside><section class="finance-panel"><header><div><span>Résumé de l’élève</span><h3>Obligations financières</h3></div></header>' + summaryMarkup + amountSummary + '</section></section><section class="finance-panel"><header><div><span>Détail individuel</span><h3>Frais applicables</h3><p>Les frais restent indépendants ; la synthèse ne remplace pas cette liste.</p></div></header>' + feesTable + '</section></section>';
   }
 
+  function renderExemptions() {
+    if (!canPrepareExemption()) {
+      return window.ssState({
+        type: "denied",
+        title: "Exemptions non autorisées",
+        message: "La préparation d’une exemption nécessite temporairement finance.fee.manage.",
+        details: "La permission cible finance.exemption.manage reste BACKEND_LATER."
+      });
+    }
+    if (!canReadFinancialDetails()) {
+      return window.ssState({
+        type: "unavailable",
+        title: "Exemptions indisponibles",
+        message: "Connexion backend à finaliser : la projection student_fee autorisée est requise.",
+        details: "La surface ne contourne jamais finance.fee.read pour obtenir des montants ou des élèves."
+      });
+    }
+
+    var profiles = financeState.studentFinancialProfiles || [];
+    if (!profiles.length) {
+      return window.ssState({ type: "empty", title: "Aucune obligation financière", message: "Aucun student_fee n’est disponible pour préparer une exemption." });
+    }
+
+    var draft = exemptionDraftState();
+    var profile = selectedExemptionProfile();
+    if (!profile) {
+      return window.ssState({ type: "unavailable", title: "Élève indisponible", message: "La sélection actuelle ne correspond à aucun élève autorisé." });
+    }
+    var fee = selectedExemptionStudentFee(profile);
+    var availability = exemptionAvailability(fee);
+    var student = profile.student;
+    var studentOptions = profiles.map(function (item) {
+      return { value: item.student.id, label: item.student.name + " · " + item.student.className };
+    });
+    var feeOptions = (profile.fees || []).map(function (item) {
+      return { value: item.student_fee_id, label: item.label + " · " + financialStatusDefinition(item.status).label + " · " + formatFinancialAmount(item.remaining, item.currency) };
+    });
+    var studentPanel = '<section class="finance-panel student-finance-panel"><header><div><span>Préparation d’exemption</span><h3>Élève et obligation</h3></div>' + window.ssBadge({ variant: "neutral", label: profile.fees.length + " obligation(s)" }) + '</header>' +
+      window.ssField({ label: "Élève", labelFor: "financeExemptionStudent", required: true, inputHtml: window.ssSelect({ id: "financeExemptionStudent", name: "student_id", value: student.id, options: studentOptions }) }) +
+      '<article class="student-finance-card"><span class="student-avatar large">' + escapeMarkup(student.initials) + '</span><div><small>' + escapeMarkup(student.className + " · " + student.sex) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.guardian) + '</p></div></article>' +
+      window.ssField({ label: "Obligation financière", labelFor: "financeExemptionStudentFee", required: true, inputHtml: window.ssSelect({ id: "financeExemptionStudentFee", name: "student_fee_id", value: fee ? fee.student_fee_id : draft.studentFeeId, options: feeOptions }) }) +
+      '</section>';
+
+    var feeSummary = fee ? '<section class="finance-panel"><header><div><span>Student_fee sélectionné</span><h3>' + escapeMarkup(fee.label) + '</h3></div>' + window.ssBadge({ variant: financialStatusDefinition(fee.status).variant, label: financialStatusDefinition(fee.status).label }) + '</header>' +
+      window.ssTable({ headers: ["Type de frais", "Attendu", "Payé", "Restant", "Devise"], rows: '<tr data-student-id="' + escapeMarkup(fee.student_id) + '" data-student-fee-id="' + escapeMarkup(fee.student_fee_id) + '" data-fee-structure-id="' + escapeMarkup(fee.fee_structure_id) + '"><td><b>' + escapeMarkup(fee.label) + '</b></td><td>' + formatFinancialAmount(fee.expected, fee.currency) + '</td><td>' + formatFinancialAmount(fee.paid, fee.currency) + '</td><td><b>' + formatFinancialAmount(fee.remaining, fee.currency) + '</b></td><td>' + escapeMarkup(fee.currency) + '</td></tr>', responsive: true, compact: true }) +
+      '</section>' : window.ssState({ type: "unavailable", title: "Obligation indisponible", message: "La sélection du student_fee doit être rétablie avant de préparer une exemption." });
+
+    var preparation = draft.prepared ? window.ssState({
+      type: "success",
+      title: "Configuration prête — connexion backend requise",
+      message: "Aucune exemption n’a été appliquée. La demande préparée reste non connectée.",
+      details: "BACKEND_LATER : validation, persistance, audit et révocation doivent être effectués côté serveur."
+    }) : "";
+    var form = fee && availability.allowed ? '<form class="payment-form" id="financeExemptionForm" data-student-id="' + escapeMarkup(student.id) + '" data-student-fee-id="' + escapeMarkup(fee.student_fee_id) + '" data-fee-structure-id="' + escapeMarkup(fee.fee_structure_id) + '" data-currency="' + escapeMarkup(fee.currency) + '"><header><span><i data-lucide="shield-check"></i></span><div><h3>Préparer une demande</h3><p>Aucune exonération ni modification de montant ne sera enregistrée depuis cet écran.</p></div></header><div>' +
+      window.ssField({ label: "Type d’exemption", labelFor: "financeExemptionType", required: true, inputHtml: window.ssSelect({ id: "financeExemptionType", name: "exemption_type", value: draft.type, options: [{ value: "total", label: "Totale" }, { value: "partial", label: "Partielle" }] }) }) +
+      (draft.type === "partial" ? window.ssField({ label: "Montant exonéré", labelFor: "financeExemptionAmount", required: true, help: "Maximum : " + formatFinancialAmount(fee.remaining, fee.currency), inputHtml: window.ssInput({ type: "number", id: "financeExemptionAmount", name: "amount", required: true, min: paymentStepForCurrency(fee.currency), max: fee.remaining, step: paymentStepForCurrency(fee.currency), inputmode: "decimal", placeholder: "Montant en " + fee.currency }) }) : "") +
+      window.ssField({ label: "Motif", labelFor: "financeExemptionReason", required: true, inputHtml: '<textarea id="financeExemptionReason" name="reason" rows="3" required maxlength="1000" placeholder="Expliquez le motif de la demande…"></textarea>' }) +
+      '</div>' + window.ssButton({ label: "Préparer la demande", icon: "clipboard-check", type: "submit" }) + '</form>' : window.ssState({ type: availability.allowed ? "unavailable" : "unavailable", title: "Préparation indisponible", message: availability.message, details: "Aucune exemption réelle n’est appliquée." });
+
+    return '<section class="balance-register"><header><div><span>Finance générale</span><h3>Exemptions</h3><p>Préparez une demande sur un student_fee précis. Cette surface est explicitement non connectée.</p></div>' + window.ssBadge({ variant: "warning", icon: "plug-zap", label: "BACKEND_LATER" }) + '</header><section class="finance-two-column">' + studentPanel + feeSummary + '</section><section class="finance-panel">' + preparation + form + '</section></section>';
+  }
+
   function renderReports() {
     var d = deps();
     var role = currentRole();
@@ -1091,7 +1207,7 @@
     var allowedTabs = financeTabsForRole();
     if (allowedTabs.indexOf(financeState.activeTab) === -1) financeState.activeTab = allowedTabs[0];
 
-    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", cash: "Encaissements", receipts: "Reçus", balances: "Soldes et régularité", reports: "Rapports de caisse", family: "Situation familiale" };
+    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", exemptions: "Exemptions", cash: "Encaissements", receipts: "Reçus", balances: "Soldes et régularité", reports: "Rapports de caisse", family: "Situation familiale" };
     if (titleEl) titleEl.textContent = titles[financeState.activeTab];
     if (workspaceTitle) workspaceTitle.textContent = titles[financeState.activeTab];
 
@@ -1117,6 +1233,7 @@
       overview: renderFinanceOverview,
       fees: renderFeeStructure,
       assignments: renderFeeAssignment,
+      exemptions: renderExemptions,
       cash: renderCash,
       receipts: renderReceipts,
       balances: renderBalances,
@@ -1156,6 +1273,62 @@
     var cashStudentFeeSelect = document.getElementById("financeCashStudentFee");
     if (cashStudentFeeSelect) cashStudentFeeSelect.addEventListener("change", function () {
       financeState.selectedCashStudentFeeId = this.value;
+      renderFinanceModule();
+    });
+
+    var exemptionStudentSelect = document.getElementById("financeExemptionStudent");
+    if (exemptionStudentSelect) exemptionStudentSelect.addEventListener("change", function () {
+      var exemption = exemptionDraftState();
+      exemption.studentId = this.value;
+      exemption.studentFeeId = "";
+      exemption.prepared = false;
+      exemption.preparedSummary = null;
+      renderFinanceModule();
+    });
+    var exemptionStudentFeeSelect = document.getElementById("financeExemptionStudentFee");
+    if (exemptionStudentFeeSelect) exemptionStudentFeeSelect.addEventListener("change", function () {
+      var exemption = exemptionDraftState();
+      exemption.studentFeeId = this.value;
+      exemption.prepared = false;
+      exemption.preparedSummary = null;
+      renderFinanceModule();
+    });
+    var exemptionTypeSelect = document.getElementById("financeExemptionType");
+    if (exemptionTypeSelect) exemptionTypeSelect.addEventListener("change", function () {
+      var exemption = exemptionDraftState();
+      exemption.type = this.value === "partial" ? "partial" : "total";
+      exemption.prepared = false;
+      exemption.preparedSummary = null;
+      renderFinanceModule();
+    });
+    var exemptionForm = document.getElementById("financeExemptionForm");
+    if (exemptionForm) exemptionForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!canPrepareExemption()) { d.notify("Action non autorisée.", "error"); return; }
+      var exemption = exemptionDraftState();
+      var profile = selectedExemptionProfile();
+      var fee = selectedExemptionStudentFee(profile);
+      var availability = exemptionAvailability(fee);
+      var data = new FormData(exemptionForm);
+      var type = String(data.get("exemption_type") || "");
+      var reason = String(data.get("reason") || "").trim();
+      var amount = type === "partial" ? Number(data.get("amount")) : null;
+      if (!availability.allowed || !profile || !fee || ["total", "partial"].indexOf(type) === -1 || !reason) {
+        d.notify("Vérifiez l’obligation financière, le type et le motif de la demande.", "error");
+        return;
+      }
+      if (type === "partial" && (!Number.isFinite(amount) || amount <= 0 || amount > Number(fee.remaining) || !hasValidPaymentPrecision(amount, fee.currency))) {
+        d.notify("Le montant exonéré doit être supérieur à zéro et ne pas dépasser le restant de ce student_fee.", "error");
+        return;
+      }
+      if (exemptionForm.getAttribute("data-student-id") !== profile.student.id || exemptionForm.getAttribute("data-student-fee-id") !== fee.student_fee_id || exemptionForm.getAttribute("data-currency") !== fee.currency) {
+        d.notify("La sélection affichée ne correspond plus au student_fee actif.", "error");
+        return;
+      }
+      exemption.type = type;
+      exemption.prepared = true;
+      exemption.preparedSummary = { student_fee_id: fee.student_fee_id, type: type, amount: amount, currency: fee.currency };
+      d.notify("Configuration prête. Aucune exemption n’a été appliquée : connexion backend requise.");
       renderFinanceModule();
     });
 
@@ -1594,7 +1767,7 @@
     financeState.activeTab = allowedTabs.indexOf(requestedTab) === -1 ? allowedTabs[0] : requestedTab;
 
     bindModuleTabs();
-    if ((financeState.activeTab === "family" && !isDemoMode()) || (financeState.activeTab === "balances" && !canReadFinancialDetails()) || (financeState.activeTab === "cash" && !isDemoMode() && canRecordPayment() && !canReadFeeCatalog())) {
+    if ((financeState.activeTab === "family" && !isDemoMode()) || (financeState.activeTab === "balances" && !canReadFinancialDetails()) || (financeState.activeTab === "cash" && !isDemoMode() && canRecordPayment() && !canReadFeeCatalog()) || (financeState.activeTab === "exemptions" && !isDemoMode() && canPrepareExemption() && !canReadFinancialDetails())) {
       // own_children et status-only n'ont pas de projection dédiée : ne jamais demander la liste globale des student_fees.
       renderFinanceModule();
     } else {
