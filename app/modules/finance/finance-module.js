@@ -182,16 +182,17 @@
   // Mapping données backend
   // ---------------------------------------------------------------------------
   function mapFeeStructure(fee) {
-    var metadata = fee.metadata || {};
     return {
       id: fee.id,
       name: fee.label || "Frais",
       cycle: cycleLabel(fee.cycle_key),
+      cycle_key: fee.cycle_key || "",
       amount: Number(fee.amount || 0),
       currency: fee.currency || "CDF",
-      frequency: metadata.frequency || "Trimestre",
-      due: fee.due_date ? formatIsoDateFr(fee.due_date) : "À définir",
-      active: fee.is_active !== false
+      due: fee.due_date ? formatIsoDateFr(fee.due_date) : "—",
+      due_date: fee.due_date || null,
+      active: fee.is_active !== false,
+      academic_year_id: fee.academic_year_id || null
     };
   }
 
@@ -260,6 +261,24 @@
       }
     }
     return allowed;
+  }
+
+  /**
+   * FE-FIN-02 : accès au catalogue fondé sur le moteur ACCESS_LAW.
+   * Les rôles démo restent un modèle initial, pas une permission finale.
+   */
+  function canAccessFeeCatalog(permission) {
+    var access = root.SchoolSafeAccess;
+    var user = currentSession() || { role: currentRole(), permissions: [] };
+    return !!(access && typeof access.canAccess === "function" && access.canAccess(user, permission));
+  }
+
+  function canReadFeeCatalog() {
+    return canAccessFeeCatalog("finance.fee.read");
+  }
+
+  function canManageFeeCatalog() {
+    return canAccessFeeCatalog("finance.fee.manage");
   }
 
   // ---------------------------------------------------------------------------
@@ -367,12 +386,22 @@
 
   function financeTabsForRole() {
     var role = currentRole();
-    if (role === "parent") return ["family"];
-    if (role === "pedagogy") return ["balances"];
-    if (role === "cashier") return ["cash", "receipts", "balances", "reports"];
-    if (role === "school_head") return ["overview", "reports"];
-    if (role === "finance" || role === "admin") return ["overview", "fees", "cash", "receipts", "balances", "reports"];
-    return ["overview"];
+    var tabs;
+    if (role === "parent") tabs = ["family"];
+    else if (role === "pedagogy") tabs = ["balances"];
+    else if (role === "cashier") tabs = ["cash", "receipts", "balances", "reports"];
+    else if (role === "school_head") tabs = ["overview", "reports"];
+    else if (role === "finance" || role === "admin") tabs = ["overview", "fees", "cash", "receipts", "balances", "reports"];
+    else tabs = ["overview"];
+
+    // FE-FIN-02 : le catalogue ne dépend pas du rôle. Il est accordé seulement
+    // par finance.fee.read ou finance.fee.manage via ACCESS_LAW.
+    if (canReadFeeCatalog() || canManageFeeCatalog()) {
+      if (tabs.indexOf("fees") === -1) tabs.push("fees");
+    } else {
+      tabs = tabs.filter(function (tab) { return tab !== "fees"; });
+    }
+    return tabs;
   }
 
   // ---------------------------------------------------------------------------
@@ -409,25 +438,84 @@
     var recent = financeState.transactions.slice(0, 5).map(function (transaction) {
       return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + d.money(transaction.amount) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td></tr>';
     }).join("");
-    return '<section class="finance-overview"><header><div><span>Pilotage financier</span><h3>Situation enregistrée par l’école</h3><p>Les chiffres proviennent des opérations consignées sur le serveur.</p></div>' + window.ssBadge({ variant: "neutral", icon: "hand-coins", label: "Aucun paiement en ligne" }) + '</header><div class="finance-kpis"><article class="blue"><small>Frais attendus</small><b>' + d.money(totals.expected) + '</b><span>' + financeState.students.length + ' élèves suivis</span></article><article class="green"><small>Montants enregistrés</small><b>' + d.money(totals.paid) + '</b><span>' + totals.rate + ' % de recouvrement</span></article><article class="gold"><small>Soldes à régulariser</small><b>' + d.money(totals.balance) + '</b><span>' + financeState.students.filter(function (student) { return student.balance > 0; }).length + ' dossiers</span></article><article class="purple"><small>Encaissements du jour</small><b>' + d.money(totals.todayTotal) + '</b><span>' + totals.today.length + ' opérations</span></article></div><div class="finance-overview-grid"><section class="finance-panel"><header><div><span>Activité récente</span><h3>Derniers enregistrements</h3></div>' + window.ssIconButton({ icon: "arrow-right", variant: "light", title: "Voir les reçus", attrs: { "data-finance-open": "receipts" } }) + '</header>' +
-      window.ssTable({
-        headers: ['Reçu', 'Élève', 'Mode constaté', 'Montant', 'Statut'],
-        rows: recent,
-        empty: 'Aucun enregistrement récent.',
-        emptyTitle: 'Activité récente',
-        responsive: true
-      }) +
-      '</section><aside class="finance-control"><span><i data-lucide="shield-check"></i></span><h3>Contrôle de la journée</h3><dl><div><dt>Caisse</dt><dd>' + escapeMarkup(financeState.dayStatus) + '</dd></div><div><dt>Dépenses à approuver</dt><dd>' + financeState.expenses.filter(function (expense) { return expense.status === "À approuver"; }).length + '</dd></div><div><dt>Annulations demandées</dt><dd>' + financeState.transactions.filter(function (transaction) { return transaction.status === "Annulation demandée"; }).length + '</dd></div></dl></aside></div></section>';
-  }
+    return '<section class="finance-overview"><header><div><span>Pilotage financier</span><h3>Situation enregistrée par l’école</h3><p>Les chiffres proviennent des opérations consignées sur le serveur.</p></div>' + window.ssBadge({ variant: "neutral", icon: "hand-coins", label: "Aucun paiement en ligne" }) + '</header><div class="finance-kpis"><article class="blue"><small>Frais attendus</small><b>' + d.money(totals.expected) + '</b><span>' + financeState.students.length + ' élèves suivis</span></article><article class="green"><small>Montants enregistrés</small><b>' + d.money(totals.paid) + '</b><span>' + totals.rate + ' % de recouvrement</span></article><article class="gold"><small>Soldes à régulariser</small><b>' + d.money(totals.balance) + '</b><span>' + financeState.students.filter(function (student) { return student.balance > 0; }).length + ' dossiers</span></article><article class="purple"><small>Encaissements du jour</small><b>' + d.money(totals.todayTotal) + '</b><span>' + totals.today.length + ' opérations</span></article></div><div class="finance-overview-grid"><section class="finance-panel"><header><div  function renderFeeStructure() {
+    var canRead = canReadFeeCatalog();
+    var canManage = canManageFeeCatalog();
+    var cycleOptions = [
+      { value: "nursery", label: "Maternelle" },
+      { value: "primary", label: "Primaire" },
+      { value: "secondary", label: "Secondaire" }
+    ];
+    var currencyOptions = [
+      { value: "CDF", label: "CDF" },
+      { value: "USD", label: "USD" }
+    ];
 
-  function renderFeeStructure() {
-    var d = deps();
-    var role = currentRole();
-    var canEdit = role === "admin" || role === "finance";
-    var rows = financeState.feeTypes.map(function (fee, index) {
-      return '<tr><td><b>' + escapeMarkup(fee.name) + '</b></td><td>' + escapeMarkup(fee.cycle) + '</td><td><b>' + d.money(fee.amount) + '</b></td><td>' + escapeMarkup(fee.frequency) + '</td><td>' + escapeMarkup(fee.due) + '</td><td>' + window.ssBadge({ label: fee.active ? "Actif" : "Désactivé", variant: fee.active ? "success" : "warning" }) + '</td><td>' + (canEdit ? '' + window.ssIconButton({ icon: "power", variant: "light", title: "Activer ou désactiver", attrs: { "data-toggle-fee": index } }) + '' : "") + '</td></tr>';
-    }).join("");
-    var form = canEdit ? '<form class="finance-fee-form" id="financeFeeForm"><header><span><i data-lucide="circle-plus"></i></span><div><h3>Ajouter un type de frais</h3><p>Le montant est configuré par l’école. Aucun prélèvement n’est effectué.</p></div></header><div><label>Libellé<input name="name" required placeholder="Ex. Frais scolaires"></label><label>Cycle ou service<input name="cycle" required placeholder="Ex. Primaire"></label><label>Montant en FC<input name="amount" required type="number" min="0" step="1000"></label><label>Périodicité<select name="frequency"><option>Une fois</option><option>Mois</option><option>Trimestre</option><option>Semestre</option><option>Année</option></select></label><label class="wide">Échéance<input name="due" required placeholder="Date ou règle d’échéance"></label></div>' + window.ssButton({ label: "Enregistrer le type de frais", icon: "save", type: "submit" }) + '</form>' : '<aside class="finance-readonly"><i data-lucide="eye"></i><p>Consultation uniquement. La structure des frais est modifiée par le Responsable financier ou l’Administrateur principal.</p></aside>';
+    if (!canRead && !canManage) {
+      return window.ssState({
+        type: "error",
+        title: "Accès non autorisé",
+        message: "Vous ne disposez pas de la permission de consulter ou gérer le catalogue des frais."
+      });
+    }
+
+    var rows = canRead ? financeState.feeTypes.map(function (fee) {
+      var amount = Number(fee.amount || 0).toLocaleString("fr-FR") + " " + escapeMarkup(fee.currency || "CDF");
+      return '<tr><td><b>' + escapeMarkup(fee.name) + '</b></td><td>' + escapeMarkup(fee.cycle) + '</td><td><b>' + amount + '</b></td><td>' + escapeMarkup(fee.due) + '</td><td>' + window.ssBadge({ label: fee.active ? "Actif" : "Inactif", variant: fee.active ? "success" : "warning" }) + '</td></tr>';
+    }).join("") : "";
+
+    var form = canManage
+      ? '<form class="finance-fee-form" id="financeFeeForm"><header><span><i data-lucide="circle-plus"></i></span><div><h3>Créer un type de frais</h3><p>Le libellé est libre. SchoolSafe enregistre la définition sans encaisser de paiement.</p></div></header><div>' +
+        window.ssField({
+          label: "Libellé",
+          labelFor: "financeFeeLabel",
+          required: true,
+          inputHtml: window.ssInput({ type: "text", name: "label", id: "financeFeeLabel", required: true, maxlength: 200, placeholder: "Ex. Transport scolaire", autocomplete: "off" })
+        }) +
+        window.ssField({
+          label: "Cycle concerné",
+          labelFor: "financeFeeCycle",
+          required: true,
+          inputHtml: window.ssSelect({ name: "cycle_key", id: "financeFeeCycle", required: true, options: cycleOptions })
+        }) +
+        window.ssField({
+          label: "Montant",
+          labelFor: "financeFeeAmount",
+          required: true,
+          inputHtml: window.ssInput({ type: "number", name: "amount", id: "financeFeeAmount", required: true, min: 0, step: 1000, inputmode: "decimal", placeholder: "Montant" })
+        }) +
+        window.ssField({
+          label: "Devise",
+          labelFor: "financeFeeCurrency",
+          required: true,
+          inputHtml: window.ssSelect({ name: "currency", id: "financeFeeCurrency", required: true, value: "CDF", options: currencyOptions })
+        }) +
+        window.ssField({
+          label: "Échéance",
+          labelFor: "financeFeeDueDate",
+          help: "Facultative. Utilisez une date précise ; les règles récurrentes ne sont pas encore connectées.",
+          className: "wide",
+          inputHtml: window.ssInput({ type: "date", name: "due_date", id: "financeFeeDueDate" })
+        }) +
+        '</div>' + window.ssButton({ label: "Enregistrer le type de frais", icon: "save", type: "submit" }) + '</form>'
+      : '<aside class="finance-readonly"><i data-lucide="eye"></i><p>Consultation uniquement. La création de types de frais exige la permission finance.fee.manage.</p></aside>';
+
+    var catalogue = canRead
+      ? window.ssTable({
+        headers: ["Libellé", "Cycle concerné", "Montant", "Échéance", "Statut"],
+        rows: rows,
+        empty: "Aucun type de frais configuré.",
+        emptyTitle: "Catalogue des frais",
+        responsive: true
+      })
+      : window.ssState({
+        type: "unavailable",
+        title: "Lecture du catalogue non accordée",
+        message: "Vous pouvez créer un type de frais, mais la permission finance.fee.read est nécessaire pour consulter le catalogue."
+      });
+
+    return '<div class="finance-two-column"><section class="finance-panel"><header><div><span>Paramétrage</span><h3>Catalogue des frais</h3></div><b>' + (canRead ? financeState.feeTypes.length : "—") + '</b></header>' + catalogue + '</section>' + form + '</div>';
+  }>Une fois</option><option>Mois</option><option>Trimestre</option><option>Semestre</option><option>Année</option></select></label><label class="wide">Échéance<input name="due" required placeholder="Date ou règle d’échéance"></label></div>' + window.ssButton({ label: "Enregistrer le type de frais", icon: "save", type: "submit" }) + '</form>' : '<aside class="finance-readonly"><i data-lucide="eye"></i><p>Consultation uniquement. La structure des frais est modifiée par le Responsable financier ou l’Administrateur principal.</p></aside>';
     return '<div class="finance-two-column"><section class="finance-panel"><header><div><span>Paramétrage</span><h3>Structure des frais</h3></div><b>' + financeState.feeTypes.length + '</b></header>' +
       window.ssTable({
         headers: ['Frais', 'Cycle', 'Montant', 'Périodicité', 'Échéance', 'Statut', ''],
@@ -654,16 +742,26 @@
         return;
       }
       var data = new FormData(feeForm);
-      var cycle = String(data.get("cycle") || "").toLowerCase();
-      var cycleKey = cycle.indexOf("mater") !== -1 || cycle.indexOf("nurs") !== -1 ? "nursery" : cycle.indexOf("second") !== -1 || cycle.indexOf("human") !== -1 ? "secondary" : "primary";
+      var label = String(data.get("label") || "").trim();
+      var cycleKey = String(data.get("cycle_key") || "");
+      var amount = Number(data.get("amount"));
+      var currency = String(data.get("currency") || "");
+      var dueDate = String(data.get("due_date") || "");
+      var allowedCycles = ["nursery", "primary", "secondary"];
+      var allowedCurrencies = ["CDF", "USD"];
+
+      if (!label || allowedCycles.indexOf(cycleKey) === -1 || !Number.isFinite(amount) || amount < 0 || allowedCurrencies.indexOf(currency) === -1 || (dueDate && !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate))) {
+        d.notify("Vérifiez le libellé, le cycle, le montant, la devise et la date d’échéance.", "error");
+        return;
+      }
+
       var input = {
         cycle_key: cycleKey,
-        label: data.get("name"),
-        amount: Number(data.get("amount")),
-        currency: "CDF",
-        due_date: data.get("due") || undefined,
-        is_active: true,
-        metadata: { frequency: data.get("frequency") }
+        label: label,
+        amount: amount,
+        currency: currency,
+        due_date: dueDate || undefined,
+        is_active: true
       };
       var api = d.api;
       (api ? api.createFeeStructure(input) : Promise.reject(new Error("API indisponible"))).then(function () {
@@ -678,8 +776,8 @@
           d.notify("Impossible d’enregistrer le type de frais : " + (err.message || "erreur"), "error");
           return;
         }
-        financeState.feeTypes.push({ id: "local-" + Date.now(), name: data.get("name"), cycle: data.get("cycle"), amount: Number(data.get("amount")), frequency: data.get("frequency"), due: data.get("due"), active: true });
-        d.queueOfflineOperation("finance", "Création d’un type de frais · " + data.get("name"), { kind: "fee-type-create", name: data.get("name"), cycle: data.get("cycle"), amount: Number(data.get("amount")) });
+        financeState.feeTypes.push({ id: "local-" + Date.now(), name: label, cycle: cycleLabel(cycleKey), cycle_key: cycleKey, amount: amount, currency: currency, due: dueDate ? formatIsoDateFr(dueDate) : "—", due_date: dueDate || null, active: true });
+        d.queueOfflineOperation("finance", "Création d’un type de frais · " + label, { kind: "fee-type-create", label: label, cycle_key: cycleKey, amount: amount, currency: currency, due_date: dueDate || null });
         d.notify("Type de frais conservé localement.");
         renderFinanceModule();
       });
