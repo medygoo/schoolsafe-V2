@@ -415,6 +415,13 @@
     return canAccessFeeCatalog("finance.payment.record");
   }
 
+  // FE-FIN-11A : la permission existante autorise uniquement l’accès à la
+  // surface Caisse. Sa projection réelle (journal, état, clôture, historique)
+  // reste BACKEND_LATER tant que son contrat serveur dédié n’existe pas.
+  function canAccessCashRegister() {
+    return canAccessFeeCatalog("finance.cash_register.close");
+  }
+
   // FE-FIN-06 : garde transitoire. La permission dédiée finance.exemption.manage
   // reste BACKEND_LATER ; aucune décision finale ne repose sur un rôle.
   function canPrepareExemption() {
@@ -699,8 +706,9 @@
     if (/structure des frais|types de frais|contrôle des frais|échéance/i.test(actionName)) return "fees";
     if (/reçu/i.test(actionName)) return "receipts";
     if (/impayé|solde|en ordre|régulariser/i.test(actionName)) return "balances";
-    if (/rapport|clôture|soumettre|export|imprimer/i.test(actionName)) return "reports";
-    if (/encaissement|enregistrer un paiement|rechercher un élève|vérifier un paiement|historique du jour|caisse/i.test(actionName)) return "cash";
+    if (/encaissement|enregistrer un paiement|rechercher un élève|vérifier un paiement/i.test(actionName)) return "cash";
+    if (/caisse|journal de caisse|historique du jour|clôture|soumettre/i.test(actionName)) return "cash-register";
+    if (/rapport|export|imprimer/i.test(actionName)) return "reports";
     if (/frais scolaires|paiement|échéances/i.test(actionName) && currentRole() === "parent") return "family";
     if (/financ|recette|dépense|statistique/i.test(actionName)) return "overview";
     return "";
@@ -724,6 +732,8 @@
     if (!canManageFeeCatalog()) tabs = tabs.filter(function (tab) { return tab !== "assignments"; });
     if (canRecordPayment() && tabs.indexOf("cash") === -1) tabs.push("cash");
     if (!canRecordPayment()) tabs = tabs.filter(function (tab) { return tab !== "cash"; });
+    if (canAccessCashRegister() && tabs.indexOf("cash-register") === -1) tabs.push("cash-register");
+    if (!canAccessCashRegister()) tabs = tabs.filter(function (tab) { return tab !== "cash-register"; });
     if (canPrepareExemption() && tabs.indexOf("exemptions") === -1) tabs.push("exemptions");
     if (!canPrepareExemption()) tabs = tabs.filter(function (tab) { return tab !== "exemptions"; });
     if (canManageControlCampaigns() && tabs.indexOf("campaigns") === -1) tabs.push("campaigns");
@@ -940,10 +950,6 @@
       var status = financialStatusDefinition(item.status);
       return { value: item.student_fee_id, label: item.label + " · " + status.label + " · " + formatFinancialAmount(item.remaining, item.currency) };
     });
-    var todayRows = financeTotals().today.map(function (transaction) {
-      var pdfAction = transaction.status === "Validé" ? window.ssIconButton({ icon: "file-down", variant: "light", title: "Télécharger le reçu PDF", attrs: { "data-export-receipt-id": escapeMarkup(transaction.id) } }) : transaction.status === "Démonstration" ? window.ssBadge({ variant: "info", icon: "flask-conical", label: "Démo — non officiel" }) : window.ssBadge({ variant: "warning", icon: "clock-3", label: "Après synchronisation" });
-      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(String(transaction.date).split(" · ").pop()) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + formatTransactionAmount(transaction) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td><td>' + pdfAction + '</td></tr>';
-    }).join("") || '<tr><td colspan="6">Aucune opération enregistrée aujourd’hui.</td></tr>';
     var studentPanel = '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Élève et obligations</h3></div>' + window.ssBadge({ variant: "neutral", label: profile.fees.length + " obligation(s)" }) + '</header>' +
       window.ssField({ label: "Élève", labelFor: "financeCashStudent", required: true, inputHtml: window.ssSelect({ id: "financeCashStudent", name: "student_id", value: student.id, options: studentOptions }) }) +
       '<article class="student-finance-card"><span class="student-avatar large">' + escapeMarkup(student.initials) + '</span><div><small>' + escapeMarkup(student.className + " · " + student.sex) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.guardian) + '</p></div></article>' +
@@ -957,15 +963,39 @@
       window.ssField({ label: "Mode constaté", labelFor: "financePaymentMode", required: true, inputHtml: window.ssSelect({ name: "mode", id: "financePaymentMode", value: "cash", options: [{ value: "cash", label: "Espèces" }, { value: "card", label: "Carte bancaire" }, { value: "check", label: "Chèque" }, { value: "bank_transfer", label: "Virement constaté" }, { value: "mobile_money", label: "Mobile money" }, { value: "other", label: "Autre moyen constaté" }] }) }) +
       window.ssField({ label: "Référence ou observation", labelFor: "financePaymentReference", required: true, inputHtml: window.ssInput({ type: "text", name: "reference", id: "financePaymentReference", required: true, maxlength: 200, placeholder: "Ex. Deuxième tranche" }) }) +
       '</div>' + window.ssButton({ label: isDemoMode() ? "Simuler le paiement (démo)" : "Enregistrer et préparer le reçu", icon: "badge-check", type: "submit" }) + '</form>' : window.ssState({ type: availability.allowed ? "unavailable" : "denied", title: availability.allowed ? "Encaissement indisponible" : "Paiement normal indisponible", message: financeState.dayStatus !== "Ouverte" ? "La journée de caisse ne permet plus de nouvel encaissement." : availability.message });
-    return '<div class="cash-workspace"><section class="cashier-layout">' + studentPanel + paymentForm + '</section><section class="finance-panel"><header><div><span>Journal de caisse</span><h3>Opérations du jour</h3></div><b>' + formatTransactionTotal(financeTotals().today) + '</b></header>' +
-      window.ssTable({
-        headers: ['Reçu', 'Élève', 'Mode constaté', 'Montant', 'Statut', 'PDF'],
-        rows: todayRows,
-        empty: 'Aucune opération enregistrée aujourd’hui.',
-        emptyTitle: 'Journal de caisse',
-        responsive: true
-      }) +
-      '</section>' + feeSummary + '</div>';
+    var demoActivity = isDemoMode() ? '<section class="finance-panel"><header><div><span>Encaissements · données fictives</span><h3>Activité de démonstration</h3></div><b>' + formatTransactionTotal(financeTotals().today) + '</b></header><aside class="finance-audit-note"><i data-lucide="flask-conical"></i><p>Cette activité est fictive et non officielle. Elle ne constitue ni un journal de caisse ni un registre de reçus.</p></aside>' + window.ssTable({ headers: ["Référence", "Élève", "Mode", "Montant", "Statut"], rows: financeTotals().today.map(function (transaction) { return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + formatTransactionAmount(transaction) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td></tr>'; }).join(""), empty: "Aucune opération fictive.", emptyTitle: "Encaissements de démonstration", responsive: true }) + '</section>' : "";
+    return '<div class="cash-workspace"><section class="cashier-layout">' + studentPanel + paymentForm + '</section>' + demoActivity + feeSummary + '</div>';
+  }
+
+  function renderCashRegister() {
+    if (!canAccessCashRegister()) {
+      return window.ssState({
+        type: "denied",
+        title: "Accès Caisse non autorisé",
+        message: "La consultation de cette surface exige une permission Caisse existante. Aucun accès n’est déduit d’un rôle ou de finance.payment.record."
+      });
+    }
+
+    if (!isDemoMode()) {
+      return '<section class="finance-panel"><header><div><span>Caisse</span><h3>Surface opérationnelle</h3><p>La connexion officielle reste volontairement indisponible.</p></div>' + window.ssBadge({ variant: "warning", icon: "plug-zap", label: "BACKEND_LATER" }) + '</header>' +
+        window.ssState({
+          type: "unavailable",
+          title: "Caisse — BACKEND_LATER",
+          message: "L’état courant, le journal autorisé, le rapprochement, la clôture et l’historique exigent une projection serveur dédiée.",
+          details: "Cette projection devra appliquer la permission, le scope, la condition, la persistance et une séparation stricte par devise et moyen de paiement. Aucun rapport journalier, état local, PDF ou action offline n’est utilisé ici."
+        }) + '</section>';
+    }
+
+    var demoRows = [
+      ["CDF", "450 000 CDF", "125 000 CDF", "5"],
+      ["USD", "80,00 USD", "45,00 USD", "3"]
+    ].map(function (row) {
+      return '<tr><td><b>' + row[0] + '</b></td><td>' + row[1] + '</td><td>' + row[2] + '</td><td>' + row[3] + '</td></tr>';
+    }).join("");
+    return '<section class="finance-panel cash-register-demo"><header><div><span>Caisse · projection fictive</span><h3>État opérationnel à venir</h3><p>Données d’illustration uniquement : aucune écriture, clôture ou synchronisation officielle n’est disponible.</p></div>' + window.ssBadge({ variant: "info", icon: "flask-conical", label: "DÉMO · Non officiel" }) + '</header>' +
+      '<aside class="finance-audit-note"><i data-lucide="shield-check"></i><p>Les devises et les moyens sont présentés séparément. Aucun total CDF + USD et aucun tiroir physique ne sont déduits des autres moyens.</p></aside>' +
+      window.ssTable({ headers: ["Devise", "Espèces", "Autres moyens", "Opérations fictives"], rows: demoRows, empty: "Aucune donnée de démonstration.", emptyTitle: "Caisse de démonstration", responsive: true }) +
+      '<section class="finance-two-column"><section class="finance-panel"><header><div><span>Journal autorisé</span><h3>Projection future</h3></div></header>' + window.ssState({ type: "unavailable", title: "Journal réel — BACKEND_LATER", message: "Le journal réel exigera une projection serveur filtrée par scope et paginée." }) + '</section><section class="finance-panel"><header><div><span>Clôture et historique</span><h3>Contrat serveur requis</h3></div></header>' + window.ssState({ type: "unavailable", title: "Clôture réelle — BACKEND_LATER", message: "La clôture officielle doit être en ligne, idempotente et auditée ; l’historique dépendra du même contrat." }) + '</section></section></section>';
   }
 
   function renderReceipts() {
@@ -1217,7 +1247,6 @@
 
   function renderReports() {
     var d = deps();
-    var role = currentRole();
     var report = financeState.dailyReport || { total_amount: 0, transaction_count: 0, by_mode: [], by_fee_type: [], payments: [], currency: "USD" };
     var payments = (report.payments || []).map(mapDailyPayment);
     var cashTotal = (report.by_mode || []).reduce(function (sum, item) { return sum + (String(item.mode).toLowerCase() === "cash" ? Number(item.amount || 0) : 0); }, 0);
@@ -1231,9 +1260,7 @@
     var paymentRows = payments.map(function (transaction) {
       return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + d.money(transaction.amount) + '</b></td></tr>';
     }).join("") || '<tr><td colspan="4">Aucune opération enregistrée pour cette date.</td></tr>';
-    var canClose = role === "cashier" || role === "admin";
-    var closureNotice = financeState.reportClosure ? '' + window.ssBadge({ variant: "success", icon: "lock-keyhole", label: "Caisse clôturée le " + escapeMarkup(formatIsoDateFr(financeState.reportClosure.closure_date)) }) + '' : '' + window.ssBadge({ variant: "info", icon: "eye", label: "Caisse ouverte" }) + '';
-    return '<div class="finance-reports"><header class="finance-report-head"><div><span>Contrôle et clôture</span><h3>Rapport de caisse du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3><p>État préparé pour contrôle à partir des opérations enregistrées sur le serveur.</p></div><div><label class="finance-report-date">Date<input type="date" id="financeReportDate" value="' + escapeMarkup(financeState.reportDate) + '"></label>' + (canClose ? '<label class="finance-report-expected">Montant constaté (FC)<input type="number" id="closeExpectedAmount" min="0" step="1000" value="' + Number(report.total_amount || 0) + '"></label>' + window.ssButton({ label: "Clôturer la caisse", icon: "lock-keyhole", attrs: { id: "closeCashRegister" } }) + '' : '') + closureNotice + '</div></header><div class="finance-kpis report-kpis"><article class="blue"><small>Encaissements</small><b>' + d.money(report.total_amount) + '</b><span>' + Number(report.transaction_count || 0) + ' opérations</span></article><article class="green"><small>Espèces constatées</small><b>' + d.money(cashTotal) + '</b><span>À rapprocher physiquement</span></article><article class="purple"><small>Autres moyens constatés</small><b>' + d.money(otherTotal) + '</b><span>Références conservées</span></article><article class="gold"><small>Devise</small><b>' + escapeMarkup(report.currency || "-") + '</b><span>Rapport journalier</span></article></div><div class="finance-two-column"><section class="finance-panel"><header><div><span>Répartition par mode</span><h3>Modes de paiement</h3></div></header>' + window.ssTable({
+    return '<div class="finance-reports"><header class="finance-report-head"><div><span>Rapport financier</span><h3>Rapport journalier du ' + escapeMarkup(formatIsoDateFr(financeState.reportDate)) + '</h3><p>La clôture officielle relève de la surface Caisse et reste BACKEND_LATER.</p></div><div><label class="finance-report-date">Date<input type="date" id="financeReportDate" value="' + escapeMarkup(financeState.reportDate) + '"></label></div></header><div class="finance-kpis report-kpis"><article class="blue"><small>Encaissements</small><b>' + d.money(report.total_amount) + '</b><span>' + Number(report.transaction_count || 0) + ' opérations</span></article><article class="green"><small>Espèces constatées</small><b>' + d.money(cashTotal) + '</b><span>À rapprocher physiquement</span></article><article class="purple"><small>Autres moyens constatés</small><b>' + d.money(otherTotal) + '</b><span>Références conservées</span></article><article class="gold"><small>Devise</small><b>' + escapeMarkup(report.currency || "-") + '</b><span>Rapport journalier</span></article></div><div class="finance-two-column"><section class="finance-panel"><header><div><span>Répartition par mode</span><h3>Modes de paiement</h3></div></header>' + window.ssTable({
         headers: ['Mode', 'Montant', 'Opérations'],
         rows: modeRows,
         empty: 'Aucune opération.',
@@ -1298,9 +1325,9 @@
     if (!moduleEl || !contentEl) return;
 
     var allowedTabs = financeTabsForRole();
-    if (allowedTabs.indexOf(financeState.activeTab) === -1) financeState.activeTab = allowedTabs[0];
+    if (allowedTabs.indexOf(financeState.activeTab) === -1 && financeState.activeTab !== "cash-register") financeState.activeTab = allowedTabs[0];
 
-    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", exemptions: "Exemptions", campaigns: "Campagnes de contrôle", cash: "Encaissements", receipts: "Reçus", balances: "Soldes et régularité", reports: "Rapports de caisse", family: "Situation familiale" };
+    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", exemptions: "Exemptions", campaigns: "Campagnes de contrôle", cash: "Encaissements", receipts: "Reçus", "cash-register": "Caisse", balances: "Soldes et régularité", reports: "Rapports financiers", family: "Situation familiale" };
     if (titleEl) titleEl.textContent = titles[financeState.activeTab];
     if (workspaceTitle) workspaceTitle.textContent = titles[financeState.activeTab];
 
@@ -1330,6 +1357,7 @@
       campaigns: renderControlCampaignManagement,
       cash: renderCash,
       receipts: renderReceipts,
+      "cash-register": renderCashRegister,
       balances: renderBalances,
       reports: renderReports,
       family: renderFamilyFinance
@@ -1893,10 +1921,10 @@
 
     var requestedTab = financeTabForAction(options.action || "") || "overview";
     var allowedTabs = financeTabsForRole();
-    financeState.activeTab = allowedTabs.indexOf(requestedTab) === -1 ? allowedTabs[0] : requestedTab;
+    financeState.activeTab = allowedTabs.indexOf(requestedTab) === -1 && requestedTab !== "cash-register" ? allowedTabs[0] : requestedTab;
 
     bindModuleTabs();
-    if ((financeState.activeTab === "family" && !isDemoMode()) || (financeState.activeTab === "receipts" && !isDemoMode()) || (financeState.activeTab === "balances" && !canReadFinancialDetails()) || (financeState.activeTab === "cash" && !isDemoMode() && canRecordPayment() && !canReadFeeCatalog()) || (financeState.activeTab === "exemptions" && !isDemoMode() && canPrepareExemption() && !canReadFinancialDetails())) {
+    if ((financeState.activeTab === "family" && !isDemoMode()) || (financeState.activeTab === "receipts" && !isDemoMode()) || (financeState.activeTab === "cash-register" && !isDemoMode()) || (financeState.activeTab === "balances" && !canReadFinancialDetails()) || (financeState.activeTab === "cash" && !isDemoMode() && canRecordPayment() && !canReadFeeCatalog()) || (financeState.activeTab === "exemptions" && !isDemoMode() && canPrepareExemption() && !canReadFinancialDetails())) {
       // own_children et status-only n'ont pas de projection dédiée : ne jamais demander la liste globale des student_fees.
       renderFinanceModule();
     } else {
