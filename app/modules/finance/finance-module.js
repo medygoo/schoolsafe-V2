@@ -87,6 +87,16 @@
     return "À régulariser";
   }
 
+  function financialStatusDefinition(status) {
+    var definitions = {
+      pending: { label: "À payer", variant: "warning" },
+      partial: { label: "Paiement partiel", variant: "warning" },
+      paid: { label: "En règle", variant: "success" },
+      exempted: { label: "Exempté", variant: "info" }
+    };
+    return definitions[status] || { label: "Statut indisponible", variant: "neutral" };
+  }
+
   function hasValidSessionToken() {
     try {
       var raw = root.localStorage.getItem("schoolsafe-v2-session");
@@ -125,17 +135,39 @@
         { id: "demo-1", name: "Frais scolaires", cycle: "Primaire", amount: 300000, frequency: "Trimestre", due: "30 septembre 2026", active: true },
         { id: "demo-2", name: "Frais scolaires", cycle: "Humanités", amount: 450000, frequency: "Trimestre", due: "30 septembre 2026", active: true },
         { id: "demo-3", name: "Inscription", cycle: "Tous les cycles", amount: 50000, frequency: "Une fois", due: "À l’inscription", active: true },
-        { id: "demo-4", name: "Transport scolaire", cycle: "Service facultatif", amount: 100000, frequency: "Mois", due: "Chaque 5 du mois", active: true }
+        { id: "demo-4", name: "Transport scolaire", cycle: "Service facultatif", amount: 100000, currency: "USD", frequency: "Mois", due: "Chaque 5 du mois", active: true }
       ],
       feeAssignment: { feeStructureId: "", targetingMode: "cycle", classIds: [], studentIds: [], prepared: false },
       studentFeeMap: {},
-      students: [
+      // Legacy conservé jusqu'au remplacement validé de la Caisse / FE-FIN-05.
+      legacyStudentRecords: [
         { id: "demo-s1", name: "Lucas Martin", initials: "LM", sex: "Garçon", className: "6e A", guardian: "Mme Sophie Martin", expected: 450000, paid: 350000, balance: 100000, status: "À régulariser", currency: "CDF" },
         { id: "demo-s2", name: "Emma Martin", initials: "EM", sex: "Fille", className: "Maternelle 3", guardian: "Mme Sophie Martin", expected: 300000, paid: 300000, balance: 0, status: "En ordre", currency: "CDF" },
         { id: "demo-s3", name: "Ethan Leroy", initials: "EL", sex: "Garçon", className: "1re A", guardian: "M. Paul Leroy", expected: 450000, paid: 150000, balance: 300000, status: "À régulariser", currency: "CDF" },
         { id: "demo-s4", name: "Chloé Bernard", initials: "CB", sex: "Fille", className: "2e B", guardian: "Mme Julie Bernard", expected: 450000, paid: 450000, balance: 0, status: "En ordre", currency: "CDF" },
         { id: "demo-s5", name: "Aline Martin", initials: "AM", sex: "Fille", className: "4e Humanités A", guardian: "Mme Sophie Martin", expected: 600000, paid: 600000, balance: 0, status: "En ordre", currency: "CDF" }
       ],
+      students: [
+        { id: "demo-s1", name: "Lucas Martin", initials: "LM", sex: "Garçon", className: "6e A", guardian: "Mme Sophie Martin" },
+        { id: "demo-s2", name: "Emma Martin", initials: "EM", sex: "Fille", className: "Maternelle 3", guardian: "Mme Sophie Martin" },
+        { id: "demo-s3", name: "Ethan Leroy", initials: "EL", sex: "Garçon", className: "1re A", guardian: "M. Paul Leroy" },
+        { id: "demo-s4", name: "Chloé Bernard", initials: "CB", sex: "Fille", className: "2e B", guardian: "Mme Julie Bernard" },
+        { id: "demo-s5", name: "Aline Martin", initials: "AM", sex: "Fille", className: "4e Humanités A", guardian: "Mme Sophie Martin" },
+        { id: "demo-student-no-fee", name: "Noah Ilunga", initials: "NI", sex: "Garçon", className: "5e A", guardian: "Mme Sarah Ilunga" }
+      ],
+      studentFees: [
+        { id: "demo-sf-lucas-school", student_id: "demo-s1", fee_structure_id: "demo-2", amount_expected: 450000, amount_paid: 350000, amount_remaining: 100000, status: "partial" },
+        { id: "demo-sf-lucas-transport", student_id: "demo-s1", fee_structure_id: "demo-4", amount_expected: 100000, amount_paid: 0, amount_remaining: 100000, status: "pending" },
+        { id: "demo-sf-emma-school", student_id: "demo-s2", fee_structure_id: "demo-1", amount_expected: 300000, amount_paid: 300000, amount_remaining: 0, status: "paid" },
+        { id: "demo-sf-ethan-school", student_id: "demo-s3", fee_structure_id: "demo-2", amount_expected: 450000, amount_paid: 150000, amount_remaining: 300000, status: "partial" },
+        { id: "demo-sf-chloe-school", student_id: "demo-s4", fee_structure_id: "demo-2", amount_expected: 450000, amount_paid: 450000, amount_remaining: 0, status: "paid" },
+        { id: "demo-sf-aline-school", student_id: "demo-s5", fee_structure_id: "demo-2", amount_expected: 600000, amount_paid: 0, amount_remaining: 0, status: "exempted" }
+      ],
+      studentFinancialProfiles: [],
+      selectedFinancialStudentId: "demo-s1",
+      financialSearch: "",
+      financialFeeFilter: "",
+      financialStatusFilter: "",
       transactions: [
         { id: "demo-p1", receipt: "REC-2026-0587", date: "14 août 2026 · 10:20", day: "14 août 2026", student: "Ethan Leroy", className: "1re A", fee: "Frais scolaires", amount: 150000, mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
         { id: "demo-p2", receipt: "REC-2026-0586", date: "14 août 2026 · 09:15", day: "14 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 150000, mode: "Espèces", cashier: "Mme K", reference: "Deuxième tranche", status: "Validé" },
@@ -170,6 +202,12 @@
       feeAssignment: { feeStructureId: "", targetingMode: "cycle", classIds: [], studentIds: [], prepared: false },
       studentFeeMap: {},
       students: [],
+      studentFees: [],
+      studentFinancialProfiles: [],
+      selectedFinancialStudentId: "",
+      financialSearch: "",
+      financialFeeFilter: "",
+      financialStatusFilter: "",
       transactions: [],
       expenses: [],
       dailyReport: null,
@@ -198,6 +236,75 @@
     };
   }
 
+  function mapFinancialStudent(student) {
+    student = student || {};
+    var name = student.name || [student.first_name, student.last_name].filter(Boolean).join(" ") || "Élève";
+    return {
+      id: student.id || null,
+      name: name,
+      initials: student.initials || initialsFromName(name),
+      sex: student.sex || (student.gender === "F" ? "Fille" : student.gender === "M" ? "Garçon" : "—"),
+      className: student.className || student.class_name || "Classe indisponible",
+      guardian: student.guardian || student.guardian_name || "—",
+      matricule: student.matricule || ""
+    };
+  }
+
+  function feeStructureById(feeStructureId) {
+    return (financeState.feeTypes || []).find(function (fee) { return fee.id === feeStructureId; }) || null;
+  }
+
+  function mapStudentFeeForFinancialProfile(studentFee) {
+    studentFee = studentFee || {};
+    var feeStructureId = studentFee.fee_structure_id || null;
+    var feeStructure = feeStructureById(feeStructureId);
+    var status = ["pending", "partial", "paid", "exempted"].indexOf(studentFee.status) >= 0 ? studentFee.status : "unknown";
+    return {
+      student_fee_id: studentFee.id || null,
+      fee_structure_id: feeStructureId,
+      student_id: studentFee.student_id || null,
+      label: feeStructure ? feeStructure.name : "Type de frais indisponible",
+      feeStructureAvailable: !!feeStructure,
+      expected: Number(studentFee.amount_expected || 0),
+      paid: Number(studentFee.amount_paid || 0),
+      remaining: Number(studentFee.amount_remaining || 0),
+      currency: feeStructure ? feeStructure.currency : null,
+      due: feeStructure ? feeStructure.due : "Indisponible",
+      due_date: feeStructure ? feeStructure.due_date : null,
+      status: status
+    };
+  }
+
+  function rebuildStudentFinancialProfiles() {
+    var profilesByStudentId = {};
+    var profileOrder = [];
+    (financeState.students || []).forEach(function (student) {
+      var mappedStudent = mapFinancialStudent(student);
+      if (!mappedStudent.id || profilesByStudentId[mappedStudent.id]) return;
+      profilesByStudentId[mappedStudent.id] = { student: mappedStudent, fees: [] };
+      profileOrder.push(mappedStudent.id);
+    });
+    (financeState.studentFees || []).forEach(function (studentFee) {
+      var studentId = studentFee.student_id || (studentFee.students && studentFee.students.id) || null;
+      if (!studentId) return;
+      if (!profilesByStudentId[studentId]) {
+        var student = mapFinancialStudent(Object.assign({ id: studentId }, studentFee.students || {}));
+        profilesByStudentId[studentId] = { student: student, fees: [] };
+        profileOrder.push(studentId);
+      }
+      profilesByStudentId[studentId].fees.push(mapStudentFeeForFinancialProfile(studentFee));
+    });
+    financeState.studentFinancialProfiles = profileOrder.map(function (studentId) { return profilesByStudentId[studentId]; });
+    if (!financeState.selectedFinancialStudentId || !profilesByStudentId[financeState.selectedFinancialStudentId]) {
+      financeState.selectedFinancialStudentId = profileOrder[0] || "";
+    }
+  }
+
+  function formatFinancialAmount(value, currency) {
+    if (!currency) return "Indisponible";
+    return Number(value || 0).toLocaleString("fr-FR") + " " + escapeMarkup(currency);
+  }
+
   function mapStudentFee(sf) {
     var student = sf.students || {};
     var name = [student.first_name, student.last_name].filter(Boolean).join(" ") || "Élève";
@@ -216,6 +323,8 @@
       currency: sf.currency || "CDF"
     };
   }
+
+  if (isDemoMode()) rebuildStudentFinancialProfiles();
 
   function mapDailyPayment(payment) {
     var student = payment.student || {};
@@ -275,6 +384,8 @@
   }
   function canReadFeeCatalog() { return canAccessFeeCatalog("finance.fee.read"); }
   function canManageFeeCatalog() { return canAccessFeeCatalog("finance.fee.manage"); }
+  function canReadFinancialDetails() { return isDemoMode() || canReadFeeCatalog(); }
+  function canReadFinancialStatus() { return canAccessFeeCatalog("finance.status.read"); }
 
   /**
    * FE-FIN-03 — prépare uniquement une intention d'affectation dans la vue.
@@ -369,13 +480,17 @@
       if (feeStructures && feeStructures.length) {
         financeState.feeTypes = feeStructures.map(mapFeeStructure);
       }
-      if (studentFees && studentFees.length) {
+      if (studentFees) {
         financeState.studentFeeMap = {};
-        financeState.students = studentFees.map(function (sf, index) {
-          var mapped = mapStudentFee(sf);
+        financeState.studentFees = studentFees.slice();
+        financeState.students = studentFees.reduce(function (students, sf, index) {
           financeState.studentFeeMap[index] = sf.id;
-          return mapped;
-        });
+          var identity = mapFinancialStudent(Object.assign({ id: sf.student_id }, sf.students || {}));
+          if (identity.id && !students.some(function (student) { return student.id === identity.id; })) students.push(identity);
+          // La projection legacy reste strictement dédiée aux flux Caisse existants.
+          return students;
+        }, []);
+        rebuildStudentFinancialProfiles();
       }
       if (pendingFeesMerged) {
         financeState.pendingStudents = pendingFeesMerged.map(mapStudentFee);
@@ -436,9 +551,9 @@
   // Renderers
   // ---------------------------------------------------------------------------
   function financeTotals() {
-    var expected = financeState.students.reduce(function (sum, student) { return sum + student.expected; }, 0);
-    var paid = financeState.students.reduce(function (sum, student) { return sum + student.paid; }, 0);
-    var balance = financeState.students.reduce(function (sum, student) { return sum + student.balance; }, 0);
+    var expected = financeState.studentFees.reduce(function (sum, studentFee) { return sum + Number(studentFee.amount_expected || 0); }, 0);
+    var paid = financeState.studentFees.reduce(function (sum, studentFee) { return sum + Number(studentFee.amount_paid || 0); }, 0);
+    var balance = financeState.studentFees.reduce(function (sum, studentFee) { return sum + Number(studentFee.amount_remaining || 0); }, 0);
     var today = financeState.transactions.filter(function (transaction) { return transaction.status !== "Annulé"; });
     return {
       expected: expected,
@@ -466,7 +581,7 @@
     var recent = financeState.transactions.slice(0, 5).map(function (transaction) {
       return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + d.money(transaction.amount) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td></tr>';
     }).join("");
-    return '<section class="finance-overview"><header><div><span>Pilotage financier</span><h3>Situation enregistrée par l’école</h3><p>Les chiffres proviennent des opérations consignées sur le serveur.</p></div>' + window.ssBadge({ variant: "neutral", icon: "hand-coins", label: "Aucun paiement en ligne" }) + '</header><div class="finance-kpis"><article class="blue"><small>Frais attendus</small><b>' + d.money(totals.expected) + '</b><span>' + financeState.students.length + ' élèves suivis</span></article><article class="green"><small>Montants enregistrés</small><b>' + d.money(totals.paid) + '</b><span>' + totals.rate + ' % de recouvrement</span></article><article class="gold"><small>Soldes à régulariser</small><b>' + d.money(totals.balance) + '</b><span>' + financeState.students.filter(function (student) { return student.balance > 0; }).length + ' dossiers</span></article><article class="purple"><small>Encaissements du jour</small><b>' + d.money(totals.todayTotal) + '</b><span>' + totals.today.length + ' opérations</span></article></div><div class="finance-overview-grid"><section class="finance-panel"><header><div><span>Activité récente</span><h3>Derniers enregistrements</h3></div>' + window.ssIconButton({ icon: "arrow-right", variant: "light", title: "Voir les reçus", attrs: { "data-finance-open": "receipts" } }) + '</header>' +
+    return '<section class="finance-overview"><header><div><span>Pilotage financier</span><h3>Situation enregistrée par l’école</h3><p>Les chiffres proviennent des opérations consignées sur le serveur.</p></div>' + window.ssBadge({ variant: "neutral", icon: "hand-coins", label: "Aucun paiement en ligne" }) + '</header><div class="finance-kpis"><article class="blue"><small>Frais attendus</small><b>' + d.money(totals.expected) + '</b><span>' + financeState.students.length + ' élèves suivis</span></article><article class="green"><small>Montants enregistrés</small><b>' + d.money(totals.paid) + '</b><span>' + totals.rate + ' % de recouvrement</span></article><article class="gold"><small>Soldes à régulariser</small><b>' + d.money(totals.balance) + '</b><span>' + financeState.studentFees.filter(function (studentFee) { return Number(studentFee.amount_remaining || 0) > 0; }).length + ' dossiers</span></article><article class="purple"><small>Encaissements du jour</small><b>' + d.money(totals.todayTotal) + '</b><span>' + totals.today.length + ' opérations</span></article></div><div class="finance-overview-grid"><section class="finance-panel"><header><div><span>Activité récente</span><h3>Derniers enregistrements</h3></div>' + window.ssIconButton({ icon: "arrow-right", variant: "light", title: "Voir les reçus", attrs: { "data-finance-open": "receipts" } }) + '</header>' +
       window.ssTable({
         headers: ['Reçu', 'Élève', 'Mode constaté', 'Montant', 'Statut'],
         rows: recent,
@@ -644,24 +759,92 @@
   }
 
   function renderBalances() {
-    var d = deps();
-    var role = currentRole();
-    var statusOnly = role === "pedagogy";
-    var inOrder = financeState.students.filter(function (student) { return student.balance === 0; }).length;
-    var rows = financeState.students.map(function (student) {
-      if (statusOnly) return '<tr><td><span class="student-avatar">' + student.initials + '</span><b>' + escapeMarkup(student.name) + '</b></td><td>' + escapeMarkup(student.className) + '</td><td>' + escapeMarkup(student.sex) + '</td><td>' + window.ssBadge({ variant: d.certificationStatusClass(student.status), label: student.status }) + '</td></tr>';
-      return '<tr><td><span class="student-avatar">' + student.initials + '</span><b>' + escapeMarkup(student.name) + '</b><small>' + escapeMarkup(student.guardian) + '</small></td><td>' + escapeMarkup(student.className) + '</td><td><b>' + d.money(student.expected) + '</b></td><td>' + d.money(student.paid) + '</td><td><b>' + d.money(student.balance) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(student.status), label: student.status }) + '</td></tr>';
+    if (!canReadFinancialDetails()) {
+      if (canReadFinancialStatus()) {
+        return window.ssState({
+          type: "unavailable",
+          title: "Vue statut non connectée",
+          message: "La projection serveur sans montants exigée par finance.status.read n’existe pas encore.",
+          details: "BACKEND_LATER — ne pas utiliser cette vue financière détaillée pour afficher seulement un statut."
+        });
+      }
+      return window.ssState({
+        type: "denied",
+        title: "Situation financière non autorisée",
+        message: "La consultation détaillée exige la permission finance.fee.read.",
+        details: "finance.status.read disposera plus tard d’une projection serveur distincte, sans montant."
+      });
+    }
+
+    var profiles = financeState.studentFinancialProfiles || [];
+    var search = String(financeState.financialSearch || "").trim().toLocaleLowerCase("fr-FR");
+    var feeFilter = financeState.financialFeeFilter || "";
+    var statusFilter = financeState.financialStatusFilter || "";
+    var filteredProfiles = profiles.filter(function (profile) {
+      var student = profile.student;
+      var matchesSearch = !search || [student.name, student.className, student.matricule].join(" ").toLocaleLowerCase("fr-FR").indexOf(search) >= 0;
+      var matchesFee = !feeFilter || profile.fees.some(function (fee) { return fee.fee_structure_id === feeFilter; });
+      var matchesStatus = !statusFilter || profile.fees.some(function (fee) { return fee.status === statusFilter; });
+      return matchesSearch && matchesFee && matchesStatus;
+    });
+    if (filteredProfiles.length && !filteredProfiles.some(function (profile) { return profile.student.id === financeState.selectedFinancialStudentId; })) {
+      financeState.selectedFinancialStudentId = filteredProfiles[0].student.id;
+    }
+    var selectedProfile = filteredProfiles.find(function (profile) { return profile.student.id === financeState.selectedFinancialStudentId; }) || null;
+    var feeOptions = [{ value: "", label: "Tous les types de frais" }].concat((financeState.feeTypes || []).map(function (fee) { return { value: fee.id, label: fee.name }; }));
+    var statusOptions = [
+      { value: "", label: "Tous les statuts" },
+      { value: "pending", label: "À payer" },
+      { value: "partial", label: "Paiement partiel" },
+      { value: "paid", label: "En règle" },
+      { value: "exempted", label: "Exempté" }
+    ];
+    var studentOptions = filteredProfiles.map(function (profile) {
+      var student = profile.student;
+      return { value: student.id, label: student.name + " · " + student.className };
+    });
+    var filters = '<section class="finance-panel"><div class="ss-form-grid">' +
+      window.ssField({ label: "Rechercher un élève", labelFor: "financeFinancialSearch", inputHtml: window.ssInput({ type: "search", id: "financeFinancialSearch", value: financeState.financialSearch, placeholder: "Nom, matricule ou classe", autocomplete: "off" }) }) +
+      window.ssField({ label: "Type de frais", labelFor: "financeFinancialFeeFilter", inputHtml: window.ssSelect({ id: "financeFinancialFeeFilter", value: feeFilter, options: feeOptions }) }) +
+      window.ssField({ label: "Statut", labelFor: "financeFinancialStatusFilter", inputHtml: window.ssSelect({ id: "financeFinancialStatusFilter", value: statusFilter, options: statusOptions }) }) +
+      '</div></section>';
+
+    if (!profiles.length) {
+      return '<section class="balance-register">' + filters + window.ssState({ type: "empty", title: "Aucune obligation financière affectée", message: "Aucun student_fee n’a été retourné par la source Finance." }) + '</section>';
+    }
+    if (!selectedProfile) {
+      return '<section class="balance-register">' + filters + window.ssState({ type: "empty", title: "Aucun élève ne correspond aux filtres", message: "Modifiez la recherche, le type de frais ou le statut." }) + '</section>';
+    }
+
+    var selectedStudent = selectedProfile.student;
+    var visibleFees = selectedProfile.fees.filter(function (fee) {
+      return (!feeFilter || fee.fee_structure_id === feeFilter) && (!statusFilter || fee.status === statusFilter);
+    });
+    var summary = selectedProfile.fees.reduce(function (result, fee) {
+      result.total += 1;
+      if (fee.status === "paid") result.paid += 1;
+      if (fee.status === "exempted") result.exempted += 1;
+      if (fee.status === "pending" || fee.status === "partial") result.toRegularize += 1;
+      result.expected += fee.expected;
+      result.paidAmount += fee.paid;
+      result.remaining += fee.remaining;
+      return result;
+    }, { total: 0, paid: 0, exempted: 0, toRegularize: 0, expected: 0, paidAmount: 0, remaining: 0 });
+    var rows = visibleFees.map(function (fee) {
+      var status = financialStatusDefinition(fee.status);
+      var feeLabel = '<b>' + escapeMarkup(fee.label) + '</b>' + (fee.feeStructureAvailable ? "" : '<small>ID technique : ' + escapeMarkup(fee.fee_structure_id || "—") + "</small>");
+      return '<tr data-student-id="' + escapeMarkup(fee.student_id) + '" data-student-fee-id="' + escapeMarkup(fee.student_fee_id) + '" data-fee-structure-id="' + escapeMarkup(fee.fee_structure_id) + '"><td>' + feeLabel + '</td><td>' + window.ssBadge({ variant: status.variant, label: status.label }) + '</td><td><b>' + formatFinancialAmount(fee.expected, fee.currency) + '</b></td><td>' + formatFinancialAmount(fee.paid, fee.currency) + '</td><td><b>' + formatFinancialAmount(fee.remaining, fee.currency) + '</b></td><td>' + escapeMarkup(fee.due) + '</td></tr>';
     }).join("");
-    var heading = statusOnly ? '<aside class="finance-status-boundary"><i data-lucide="shield-check"></i><div><b>Attribution administrative limitée</b><p>Le Responsable pédagogique voit uniquement l’identité scolaire, la classe et le statut. Montants, paiements, reçus et trésorerie restent masqués.</p></div></aside>' : '<div class="balance-summary"><article><small>Élèves en ordre</small><b>' + inOrder + '</b></article><article><small>À régulariser</small><b>' + (financeState.students.length - inOrder) + '</b></article><article><small>Taux des dossiers en ordre</small><b>' + Math.round(inOrder / financeState.students.length * 100) + ' %</b></article></div>';
-    var tableHead = statusOnly ? '<tr><th>Élève</th><th>Classe</th><th>Sexe</th><th>Statut administratif</th></tr>' : '<tr><th>Élève</th><th>Classe</th><th>Frais attendus</th><th>Enregistré</th><th>Solde</th><th>Statut</th></tr>';
-    return '<section class="finance-panel balance-register"><header><div><span>' + (statusOnly ? "Suivi scolaire autorisé" : "Recouvrement") + '</span><h3>' + (statusOnly ? "Régularité des élèves" : "Impayés et soldes") + '</h3><p>' + (statusOnly ? "Aucun chiffre financier n’est exposé dans ce profil." : "Situation calculée à partir des opérations enregistrées par l’école.") + '</p></div><b>' + financeState.students.length + ' dossiers</b></header>' + heading + window.ssTable({
-        headers: statusOnly ? ['Élève', 'Classe', 'Sexe', 'Statut administratif'] : ['Élève', 'Classe', 'Frais attendus', 'Enregistré', 'Solde', 'Statut'],
-        rows: rows,
-        empty: statusOnly ? 'Aucun élève à afficher dans ce profil.' : 'Aucun dossier avec solde.',
-        emptyTitle: statusOnly ? 'Régularité des élèves' : 'Recouvrement',
-        responsive: true,
-        className: statusOnly ? 'status-only-table' : ''
-      }) + '</section>';
+    var studentSelect = window.ssField({ label: "Élève", labelFor: "financeFinancialStudent", inputHtml: window.ssSelect({ id: "financeFinancialStudent", value: selectedStudent.id, options: studentOptions }) });
+    var identity = '<article class="student-finance-card"><span class="student-avatar large">' + escapeMarkup(selectedStudent.initials) + '</span><div><small>' + escapeMarkup(selectedStudent.className) + '</small><h3>' + escapeMarkup(selectedStudent.name) + '</h3><p>' + escapeMarkup(selectedStudent.guardian) + '</p></div></article>';
+    var summaryMarkup = '<div class="balance-summary"><article><small>Frais</small><b>' + summary.total + '</b></article><article><small>En règle</small><b>' + summary.paid + '</b></article><article><small>À régulariser</small><b>' + summary.toRegularize + '</b></article><article><small>Exemptés</small><b>' + summary.exempted + '</b></article></div>';
+    var currencies = selectedProfile.fees.map(function (fee) { return fee.currency; }).filter(Boolean).filter(function (currency, index, values) { return values.indexOf(currency) === index; });
+    var amountSummary = currencies.length === 1
+      ? '<dl class="student-finance-facts"><div><dt>Attendu cumulé</dt><dd>' + formatFinancialAmount(summary.expected, currencies[0]) + '</dd></div><div><dt>Payé cumulé</dt><dd>' + formatFinancialAmount(summary.paidAmount, currencies[0]) + '</dd></div><div><dt>Restant cumulé</dt><dd>' + formatFinancialAmount(summary.remaining, currencies[0]) + '</dd></div></dl>'
+      : '<aside class="finance-audit-note"><i data-lucide="circle-alert"></i><p>Montants cumulés indisponibles : les frais affichés utilisent plusieurs devises. Consultez chaque ligne individuellement.</p></aside>';
+    var feesTable = visibleFees.length ? window.ssTable({ headers: ["Type de frais", "Statut", "Attendu", "Payé", "Restant", "Échéance"], rows: rows, responsive: true }) : window.ssState({ type: "empty", title: "Aucune obligation financière affectée", message: "Aucun frais du profil ne correspond aux filtres actifs." });
+
+    return '<section class="balance-register"><header><div><span>Situation financière</span><h3>Frais de l’élève</h3><p>Chaque ligne représente un student_fee distinct ; les montants proviennent des données Finance chargées.</p></div><b>' + filteredProfiles.length + ' élève(s)</b></header>' + filters + '<section class="finance-two-column"><aside class="finance-panel">' + studentSelect + identity + summaryMarkup + '</aside><section class="finance-panel"><header><div><span>Résumé de l’élève</span><h3>Obligations financières</h3></div></header>' + summaryMarkup + amountSummary + '</section></section><section class="finance-panel"><header><div><span>Détail individuel</span><h3>Frais applicables</h3><p>Les frais restent indépendants ; la synthèse ne remplace pas cette liste.</p></div></header>' + feesTable + '</section></section>';
   }
 
   function renderReports() {
@@ -711,22 +894,28 @@
   }
 
   function renderFamilyFinance() {
-    var d = deps();
+    if (!isDemoMode()) {
+      return '<div class="family-finance">' + window.ssState({
+        type: "unavailable",
+        title: "Situation familiale non connectée",
+        message: "La projection own_children sécurisée n’est pas encore fournie par l’API Finance.",
+        details: "BACKEND_LATER — aucun frais, montant ou reçu ne peut être déduit côté navigateur pour un parent."
+      }) + '</div>';
+    }
     var guardianName = currentGuardianName();
-    var children = financeState.students.filter(function (student) { return student.guardian === guardianName; });
+    var children = (financeState.studentFinancialProfiles || []).filter(function (profile) { return profile.student.guardian === guardianName; });
     if (financeState.selectedFamilyStudent >= children.length) financeState.selectedFamilyStudent = 0;
-    var student = children[financeState.selectedFamilyStudent];
-    if (!student) {
+    var profile = children[financeState.selectedFamilyStudent];
+    if (!profile) {
       return '<div class="family-finance">' + window.ssState({ type: "empty", title: "Aucun enfant rattaché", message: "Aucun enfant rattaché à votre profil.", size: "compact" }) + '</div>';
     }
-    var options = children.map(function (item, index) { return '<option value="' + index + '"' + (index === financeState.selectedFamilyStudent ? " selected" : "") + '>' + escapeMarkup(item.name + " · " + item.className) + '</option>'; }).join("");
-    var receipts = financeState.transactions.map(function (transaction) { return { transaction: transaction }; }).filter(function (entry) { return entry.transaction.student === student.name; });
-    var receiptCards = receipts.map(function (entry) {
-      var transaction = entry.transaction;
-      var receiptButton = transaction.status === "Validé" ? window.ssIconButton({ icon: "file-down", variant: "light", title: "Télécharger le reçu PDF", attrs: { "data-export-receipt-id": escapeMarkup(transaction.id) } }) : '<span class="receipt-waiting"><i data-lucide="clock-3"></i></span>';
-      return '<article class="family-receipt"><span><i data-lucide="receipt-text"></i></span><div><small>' + escapeMarkup(transaction.date) + '</small><b>' + escapeMarkup(transaction.receipt) + '</b><p>' + escapeMarkup(transaction.fee + " · " + transaction.mode) + '</p></div><strong>' + d.money(transaction.amount) + '</strong>' + receiptButton + '</article>';
-    }).join("") || window.ssState({ type: "empty", title: "Aucun reçu", message: "Aucun reçu n’est encore rattaché à cet enfant.", size: "compact" });
-    return '<div class="family-finance"><header><div><span>Situation familiale</span><h3>Frais scolaires et reçus</h3><p>Vous voyez uniquement les enfants rattachés à votre profil.</p></div>' + window.ssBadge({ variant: "neutral", icon: "shield-check", label: "Aucun paiement en ligne" }) + '</header><label class="family-student-picker">Enfant suivi<select id="familyFinanceStudent">' + options + '</select></label><section class="family-finance-summary"><div><span class="student-avatar large">' + student.initials + '</span><div><small>' + escapeMarkup(student.className) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.status) + '</p></div></div><article><small>Frais attendus</small><b>' + d.money(student.expected) + '</b></article><article><small>Montants enregistrés</small><b>' + d.money(student.paid) + '</b></article><article><small>Solde restant</small><b>' + d.money(student.balance) + '</b></article></section><aside class="family-result-status ' + (student.balance === 0 ? "ready" : "pending") + '"><i data-lucide="' + (student.balance === 0 ? "badge-check" : "file-lock-2") + '"></i><div><b>Résultat officiel de fin de période</b><p>' + (student.balance === 0 ? "Situation en ordre. La publication reste soumise à la validation pédagogique et à la décision de la Direction." : "Le suivi quotidien reste visible. Le résultat officiel de fin de période reste suspendu jusqu’à la décision administrative.") + '</p></div></aside><section class="family-receipts"><header><h3>Reçus disponibles</h3><span>' + receipts.length + ' document(s)</span></header>' + receiptCards + '</section></div>';
+    var student = profile.student;
+    var options = children.map(function (item, index) { return '<option value="' + index + '"' + (index === financeState.selectedFamilyStudent ? " selected" : "") + '>' + escapeMarkup(item.student.name + " · " + item.student.className) + '</option>'; }).join("");
+    var rows = profile.fees.map(function (fee) {
+      var status = financialStatusDefinition(fee.status);
+      return '<tr data-student-id="' + escapeMarkup(fee.student_id) + '" data-student-fee-id="' + escapeMarkup(fee.student_fee_id) + '"><td><b>' + escapeMarkup(fee.label) + '</b></td><td>' + window.ssBadge({ variant: status.variant, label: status.label }) + '</td><td>' + formatFinancialAmount(fee.expected, fee.currency) + '</td><td>' + formatFinancialAmount(fee.paid, fee.currency) + '</td><td>' + formatFinancialAmount(fee.remaining, fee.currency) + '</td></tr>';
+    }).join("");
+    return '<div class="family-finance"><header><div><span>Situation familiale · démonstration</span><h3>Frais de mes enfants</h3><p>Les reçus réels exigent la projection own_children sécurisée.</p></div>' + window.ssBadge({ variant: "warning", icon: "plug-zap", label: "Démonstration" }) + '</header><label class="family-student-picker">Enfant suivi<select id="familyFinanceStudent">' + options + '</select></label><section class="family-finance-summary"><div><span class="student-avatar large">' + escapeMarkup(student.initials) + '</span><div><small>' + escapeMarkup(student.className) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + profile.fees.length + ' obligation(s) financière(s)</p></div></div></section>' + window.ssTable({ headers: ["Type de frais", "Statut", "Attendu", "Payé", "Restant"], rows: rows, empty: "Aucune obligation financière affectée.", emptyTitle: "Situation financière", responsive: true }) + '</div>';
   }
 
   // ---------------------------------------------------------------------------
@@ -801,6 +990,27 @@
 
     var familySelect = document.getElementById("familyFinanceStudent");
     if (familySelect) familySelect.addEventListener("change", function () { financeState.selectedFamilyStudent = Number(this.value); renderFinanceModule(); });
+
+    var financialStudentSelect = document.getElementById("financeFinancialStudent");
+    if (financialStudentSelect) financialStudentSelect.addEventListener("change", function () {
+      financeState.selectedFinancialStudentId = this.value;
+      renderFinanceModule();
+    });
+    var financialSearchInput = document.getElementById("financeFinancialSearch");
+    if (financialSearchInput) financialSearchInput.addEventListener("input", function () {
+      financeState.financialSearch = this.value;
+      renderFinanceModule();
+    });
+    var financialFeeFilter = document.getElementById("financeFinancialFeeFilter");
+    if (financialFeeFilter) financialFeeFilter.addEventListener("change", function () {
+      financeState.financialFeeFilter = this.value;
+      renderFinanceModule();
+    });
+    var financialStatusFilter = document.getElementById("financeFinancialStatusFilter");
+    if (financialStatusFilter) financialStatusFilter.addEventListener("change", function () {
+      financeState.financialStatusFilter = this.value;
+      renderFinanceModule();
+    });
 
     var feeForm = document.getElementById("financeFeeForm");
     if (feeForm) feeForm.addEventListener("submit", function (event) {
