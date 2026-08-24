@@ -2189,7 +2189,7 @@
     if (!definition) return;
     setBreadcrumb(definition.label);
     if (branchKey === "pedagogy") { openPedagogyModule("Devoirs et corrections"); return; }
-    if (branchKey === "finance") { openFinanceModule("Encaissements"); return; }
+    if (branchKey === "finance") { openFinanceModule(); return; }
     if (branchKey === "feeControl") { openFeeControlModule(); return; }
     if (branchKey === "security") { openSecurityModule("Scanner un QR"); return; }
     if (branchKey === "school") { openSchoolModule("school"); return; }
