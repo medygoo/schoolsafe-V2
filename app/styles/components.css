@@ -122,6 +122,10 @@
   color: var(--ss-text-primary);
 }
 
+[data-theme="dark"] .ss-button:not(.ss-button--secondary):not(.ss-button--ghost):not(.ss-button--accent):not(.ss-button--loading) {
+  color: var(--ss-text-primary);
+}
+
 @keyframes ss-spin {
   to { transform: rotate(360deg); }
 }
@@ -1177,6 +1181,8 @@
 .ss-state--loading .ss-state__icon { background: var(--ss-info-bg); color: var(--ss-info-text); }
 .ss-state--loading .ss-state__icon svg { animation: ss-spin 1s linear infinite; }
 .ss-state--empty .ss-state__icon { background: var(--ss-bg-secondary); color: var(--ss-text-muted); }
+.ss-state--error .ss-state__icon { background: var(--ss-error-bg); color: var(--ss-error-text); }
+.ss-state--error .ss-state__title { color: var(--ss-error-text); }
 .ss-state--unavailable .ss-state__icon { background: var(--ss-warning-bg); color: var(--ss-warning-text); }
 .ss-state--denied .ss-state__icon { background: var(--ss-error-bg); color: var(--ss-error-text); }
 .ss-state--denied .ss-state__title { color: var(--ss-error-text); }
@@ -1250,6 +1256,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--ss-space-1);
+}
+
+/* Security scan: cet état est déjà piloté par startCamera()/stopCamera(). */
+.camera-container.hidden {
+  display: none;
 }
 
 @keyframes ss-spin {

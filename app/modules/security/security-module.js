@@ -12,15 +12,23 @@
   var scanStream = null;
   var scanTimeout = null;
 
+  function refreshIcons() {
+    if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+  }
+
   function render(containerId) {
     var container = document.getElementById(containerId);
     if (!container) return;
     container.innerHTML =
       '<div class="security-scan-panel">' +
         '<header><span>Contrôle d’accès</span><h2>Scanner une carte SchoolSafe</h2><p>Saisissez le contenu du QR, utilisez un lecteur connecté ou activez la caméra.</p></header>' +
-        '<div class="scan-form">' +
-          '<label>QR payload<input type="text" id="qrPayloadInput" placeholder="schoolsafe://card/..." autocomplete="off"></label>' +
-          '<div class="scan-actions">' +
+        '<div class="scan-form ss-form-grid">' +
+          window.ssField({
+            label: "QR payload",
+            labelFor: "qrPayloadInput",
+            inputHtml: window.ssInput({ type: "text", id: "qrPayloadInput", placeholder: "schoolsafe://card/...", autocomplete: "off" })
+          }) +
+          '<div class="scan-actions ss-form-grid ss-form-grid--4">' +
             window.ssButton({ label: "Entrée", icon: "log-in", attrs: { "data-event-type": "entry" } }) +
             window.ssButton({ label: "Sortie", icon: "log-out", attrs: { "data-event-type": "exit" } }) +
             window.ssButton({ label: "Incident", variant: "secondary", icon: "siren", attrs: { "data-event-type": "incident" } }) +
@@ -88,7 +96,7 @@
         video.srcObject = stream;
         cameraContainer.classList.remove("hidden");
         toggle.outerHTML = window.ssButton({ label: "Arrêter", variant: "secondary", icon: "camera-off", attrs: { id: "cameraToggle" } });
-        if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+        refreshIcons();
         bindCameraToggle(containerId);
         detectLoop(containerId);
       })
@@ -115,7 +123,7 @@
     if (cameraContainer) cameraContainer.classList.add("hidden");
     if (toggle) {
       toggle.outerHTML = window.ssButton({ label: "Caméra", variant: "secondary", icon: "camera", attrs: { id: "cameraToggle" } });
-      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+      refreshIcons();
       bindCameraToggle(containerId);
     }
   }
@@ -168,6 +176,7 @@
     }
     resultBox.innerHTML = window.ssState(config);
     resultBox.classList.remove("hidden");
+    refreshIcons();
   }
 
   function performScan(containerId) {
@@ -218,9 +227,10 @@
       html += '</div>';
       resultBox.innerHTML = html;
       input.value = "";
-      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+      refreshIcons();
     }).catch(function (err) {
       resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: err.message, size: "compact" });
+      refreshIcons();
     });
   }
 
