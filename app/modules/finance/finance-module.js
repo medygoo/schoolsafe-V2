@@ -969,22 +969,28 @@
   }
 
   function renderReceipts() {
-    var d = deps();
-    var role = currentRole();
-    var canRequestCancellation = role === "cashier" || role === "admin";
-    var rows = financeState.transactions.map(function (transaction) {
-      var cancellationButton = canRequestCancellation && transaction.status === "Validé" ? window.ssIconButton({ icon: "circle-x", variant: "danger", title: "Demander l’annulation", attrs: { "data-cancel-payment-id": escapeMarkup(transaction.id) } }) : "";
-      var receiptAction = transaction.status === "Validé" ? window.ssIconButton({ icon: "file-down", variant: "light", title: "Télécharger le reçu PDF", attrs: { "data-export-receipt-id": escapeMarkup(transaction.id) } }) : transaction.status === "Démonstration" ? window.ssBadge({ variant: "info", icon: "flask-conical", label: "Démo — non officiel" }) : window.ssBadge({ variant: "warning", icon: "clock-3", label: "PDF après synchronisation" });
-      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td><b>' + escapeMarkup(transaction.student) + '</b><small>' + escapeMarkup(transaction.className) + '</small></td><td>' + escapeMarkup(transaction.fee) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + formatTransactionAmount(transaction) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td><td><div class="finance-row-actions">' + receiptAction + cancellationButton + '</div></td></tr>';
+    if (!isDemoMode()) {
+      return '<section class="finance-panel receipt-register"><header><div><span>Reçus</span><h3>Registre autorisé</h3><p>La consultation réelle attend une projection serveur dédiée.</p></div></header>' +
+        window.ssState({
+          type: "unavailable",
+          title: "Registre des reçus — BACKEND_LATER",
+          message: "La liste, la recherche et la consultation réelle exigent des filtres serveur, une permission appliquée et une pagination sûre.",
+          details: "Le rapport journalier n’est pas utilisé comme registre de reçus. Aucun PDF, téléchargement ou impression n’est proposé depuis cette surface."
+        }) +
+      '</section>';
+    }
+
+    var demoReceipts = [
+      { reference: "DÉMO-REC-001", date: "14 août 2026 · 10:20", student: "Emma Martin", matricule: "DEMO-002", fee: "Scolarité", amount: 300000, currency: "CDF", mode: "Espèces", status: "Valide", kind: "Paiement complet", transaction: "DÉMO-TX-001" },
+      { reference: "DÉMO-REC-002", date: "14 août 2026 · 09:15", student: "Lucas Martin", matricule: "DEMO-001", fee: "Transport scolaire", amount: 100000, currency: "USD", mode: "Virement constaté", status: "Valide", kind: "Paiement partiel", transaction: "DÉMO-TX-002" },
+      { reference: "DÉMO-REC-003", date: "13 août 2026 · 14:40", student: "Ethan Leroy", matricule: "DEMO-003", fee: "Scolarité", amount: 150000, currency: "CDF", mode: "Espèces", status: "Annulé", kind: "Paiement annulé", transaction: "DÉMO-TX-003" }
+    ];
+    var rows = demoReceipts.map(function (receipt) {
+      var statusVariant = receipt.status === "Annulé" ? "danger" : "success";
+      return '<tr><td><b>' + escapeMarkup(receipt.reference) + '</b><small>' + escapeMarkup(receipt.date) + '</small></td><td><b>' + escapeMarkup(receipt.student) + '</b><small>Matricule : ' + escapeMarkup(receipt.matricule) + '</small></td><td>' + escapeMarkup(receipt.fee) + '<small>' + escapeMarkup(receipt.kind) + '</small></td><td>' + escapeMarkup(receipt.mode) + '<small>Réf. transaction : ' + escapeMarkup(receipt.transaction) + '</small></td><td><b>' + formatFinancialAmount(receipt.amount, receipt.currency) + '</b></td><td>' + window.ssBadge({ variant: statusVariant, label: receipt.status }) + '</td></tr>';
     }).join("");
-    return '<section class="finance-panel receipt-register"><header><div><span>Documents financiers</span><h3>Reçus et opérations</h3><p>Un reçu reste traçable même lorsqu’une annulation est demandée.</p></div>' + window.ssBadge({ variant: "neutral", icon: "shield-check", label: "PDF avec logo" }) + '</header><aside class="finance-audit-note"><i data-lucide="history"></i><p>Une demande d’annulation ne supprime jamais l’écriture. Elle doit être contrôlée et approuvée dans le circuit financier.</p></aside>' +
-      window.ssTable({
-        headers: ['Reçu', 'Élève', 'Frais', 'Mode constaté', 'Montant', 'Statut', 'Actions'],
-        rows: rows,
-        empty: 'Aucun reçu ou opération enregistrée.',
-        emptyTitle: 'Reçus et opérations',
-        responsive: true
-      }) +
+    return '<section class="finance-panel receipt-register"><header><div><span>Reçus</span><h3>Projection de registre</h3><p>Ces reçus sont fictifs et servent uniquement à visualiser la future surface autorisée.</p></div>' + window.ssBadge({ variant: "info", icon: "flask-conical", label: "DÉMO" }) + '</header><aside class="finance-audit-note"><i data-lucide="info"></i><p>Un reçu annulé reste visible pour l’audit, mais aucune correction, aucun remboursement, aucun avoir et aucune génération officielle ne sont disponibles ici.</p></aside>' +
+      window.ssTable({ headers: ['Référence', 'Élève', 'Frais', 'Paiement', 'Montant', 'Statut'], rows: rows, empty: 'Aucun reçu démo.', emptyTitle: 'Reçus', responsive: true }) +
       '</section>';
   }
 
@@ -1890,7 +1896,7 @@
     financeState.activeTab = allowedTabs.indexOf(requestedTab) === -1 ? allowedTabs[0] : requestedTab;
 
     bindModuleTabs();
-    if ((financeState.activeTab === "family" && !isDemoMode()) || (financeState.activeTab === "balances" && !canReadFinancialDetails()) || (financeState.activeTab === "cash" && !isDemoMode() && canRecordPayment() && !canReadFeeCatalog()) || (financeState.activeTab === "exemptions" && !isDemoMode() && canPrepareExemption() && !canReadFinancialDetails())) {
+    if ((financeState.activeTab === "family" && !isDemoMode()) || (financeState.activeTab === "receipts" && !isDemoMode()) || (financeState.activeTab === "balances" && !canReadFinancialDetails()) || (financeState.activeTab === "cash" && !isDemoMode() && canRecordPayment() && !canReadFeeCatalog()) || (financeState.activeTab === "exemptions" && !isDemoMode() && canPrepareExemption() && !canReadFinancialDetails())) {
       // own_children et status-only n'ont pas de projection dédiée : ne jamais demander la liste globale des student_fees.
       renderFinanceModule();
     } else {
