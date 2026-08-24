@@ -138,6 +138,7 @@
         { id: "demo-4", name: "Transport scolaire", cycle: "Service facultatif", amount: 100000, currency: "USD", frequency: "Mois", due: "Chaque 5 du mois", active: true }
       ],
       feeAssignment: { feeStructureId: "", targetingMode: "cycle", classIds: [], studentIds: [], prepared: false },
+      campaignDraft: { feeStructureId: "", label: "", startsAt: "", endsAt: "", description: "", prepared: false, preparedSummary: null },
       studentFeeMap: {},
       // Legacy conservé jusqu'au remplacement validé de la Caisse / FE-FIN-05.
       legacyStudentRecords: [
@@ -204,6 +205,7 @@
       reportClosure: null,
       feeTypes: [],
       feeAssignment: { feeStructureId: "", targetingMode: "cycle", classIds: [], studentIds: [], prepared: false },
+      campaignDraft: { feeStructureId: "", label: "", startsAt: "", endsAt: "", description: "", prepared: false, preparedSummary: null },
       studentFeeMap: {},
       students: [],
       studentFees: [],
@@ -419,6 +421,12 @@
     return canManageFeeCatalog();
   }
 
+  // FE-FIN-07A : garde transitoire. Les permissions dédiées
+  // finance.control.campaign.* restent BACKEND_LATER ; aucun rôle ne décide seul.
+  function canManageControlCampaigns() {
+    return canAccessFeeCatalog("finance.control.manage");
+  }
+
   function exemptionDraftState() {
     if (!financeState.exemptionDraft) {
       financeState.exemptionDraft = { studentId: "", studentFeeId: "", type: "total", prepared: false, preparedSummary: null };
@@ -572,6 +580,22 @@
     return Number(fee.amount || 0).toLocaleString("fr-FR") + " " + escapeMarkup(fee.currency || "CDF");
   }
 
+  // FE-FIN-07A : intention de campagne en mémoire uniquement.
+  // Ni createCampaign(), ni offline, ni stockage local ne sont utilisés.
+  function campaignDraftState() {
+    if (!financeState.campaignDraft) {
+      financeState.campaignDraft = { feeStructureId: "", label: "", startsAt: "", endsAt: "", description: "", prepared: false, preparedSummary: null };
+    }
+    return financeState.campaignDraft;
+  }
+
+  function selectedFeeForCampaignDraft() {
+    var draft = campaignDraftState();
+    var feeTypes = financeState.feeTypes || [];
+    if (!draft.feeStructureId && feeTypes.length) draft.feeStructureId = feeTypes[0].id;
+    return feeTypes.find(function (fee) { return fee.id === draft.feeStructureId; }) || null;
+  }
+
   // ---------------------------------------------------------------------------
   // Chargement des données
   // ---------------------------------------------------------------------------
@@ -669,6 +693,7 @@
   // Onglets et autorisation des onglets
   // ---------------------------------------------------------------------------
   function financeTabForAction(actionName) {
+    if (/campagne/i.test(actionName)) return "campaigns";
     if (/exemption|exonération/i.test(actionName)) return "exemptions";
     if (/affectation des frais|affecter un frais/i.test(actionName)) return "assignments";
     if (/structure des frais|types de frais|contrôle des frais|échéance/i.test(actionName)) return "fees";
@@ -701,6 +726,8 @@
     if (!canRecordPayment()) tabs = tabs.filter(function (tab) { return tab !== "cash"; });
     if (canPrepareExemption() && tabs.indexOf("exemptions") === -1) tabs.push("exemptions");
     if (!canPrepareExemption()) tabs = tabs.filter(function (tab) { return tab !== "exemptions"; });
+    if (canManageControlCampaigns() && tabs.indexOf("campaigns") === -1) tabs.push("campaigns");
+    if (!canManageControlCampaigns()) tabs = tabs.filter(function (tab) { return tab !== "campaigns"; });
     return tabs;
   }
 
@@ -1122,6 +1149,66 @@
     return '<section class="balance-register"><header><div><span>Finance générale</span><h3>Exemptions</h3><p>Préparez une demande sur un student_fee précis. Cette surface est explicitement non connectée.</p></div>' + window.ssBadge({ variant: "warning", icon: "plug-zap", label: "BACKEND_LATER" }) + '</header><section class="finance-two-column">' + studentPanel + feeSummary + '</section><section class="finance-panel">' + preparation + form + '</section></section>';
   }
 
+  function renderControlCampaignManagement() {
+    if (!canManageControlCampaigns()) {
+      return window.ssState({
+        type: "denied",
+        title: "Gestion des campagnes non autorisée",
+        message: "La préparation d’une campagne nécessite temporairement finance.control.manage.",
+        details: "La permission cible finance.control.campaign.manage reste BACKEND_LATER."
+      });
+    }
+    if (!canReadFeeCatalog()) {
+      return window.ssState({
+        type: "unavailable",
+        title: "Catalogue des frais indisponible",
+        message: "La préparation exige un fee_structure réel et la permission finance.fee.read.",
+        details: "La surface ne contourne jamais la lecture Finance pour sélectionner un type de frais."
+      });
+    }
+    if (!financeState.feeTypes.length) {
+      return window.ssState({
+        type: "empty",
+        title: "Aucun type de frais disponible",
+        message: "Créez ou chargez d’abord un type de frais avant de préparer une campagne."
+      });
+    }
+
+    var draft = campaignDraftState();
+    var fee = selectedFeeForCampaignDraft();
+    var feeOptions = financeState.feeTypes.map(function (item) {
+      return { value: item.id, label: item.name + " · " + item.cycle };
+    });
+    var statuses = [
+      [window.ssBadge({ variant: "neutral", label: "Brouillon" }), "Préparation locale uniquement"],
+      [window.ssBadge({ variant: "info", label: "Publiée" }), "Publication serveur requise"],
+      [window.ssBadge({ variant: "warning", label: "Fermée" }), "Transition serveur requise"],
+      [window.ssBadge({ variant: "neutral", label: "Archivée" }), "Transition serveur requise"]
+    ].map(function (row) { return "<tr><td>" + row[0] + "</td><td>" + row[1] + "</td></tr>"; }).join("");
+    var unavailableTargets = window.ssState({
+      type: "unavailable",
+      title: "Classes · BACKEND_LATER",
+      message: "Projection Finance autorisée requise pour cibler une ou plusieurs classes.",
+      details: "Élèves individuels · BACKEND_LATER — Contrôleurs · BACKEND_LATER"
+    });
+    var prepared = draft.prepared ? window.ssState({
+      type: "success",
+      title: "Configuration prête — connexion backend requise pour publier/activer",
+      message: "Aucune campagne serveur n’a été créée. La préparation reste non connectée.",
+      details: "BACKEND_LATER : cibles, assignees, publication, activation, audit et historique."
+    }) : "";
+    var summary = '<aside class="finance-panel"><header><div><span>Résumé avant action</span><h3>Campagne préparée</h3></div>' + window.ssBadge({ variant: "warning", icon: "plug-zap", label: "Non connectée" }) + '</header><dl class="student-finance-facts"><div><dt>Type de frais</dt><dd>' + escapeMarkup(fee ? fee.name : "—") + '</dd></div><div><dt>Cycle (filtre du catalogue)</dt><dd>' + escapeMarkup(fee ? fee.cycle : "—") + '</dd></div><div><dt>Période</dt><dd>' + escapeMarkup(draft.startsAt && draft.endsAt ? formatIsoDateFr(draft.startsAt) + " → " + formatIsoDateFr(draft.endsAt) : "À compléter") + '</dd></div><div><dt>Classes / élèves / contrôleurs</dt><dd>BACKEND_LATER</dd></div><div><dt>Statut à préparer</dt><dd>Brouillon uniquement</dd></div></dl></aside>';
+    var form = '<form id="financeCampaignForm" class="finance-fee-form" novalidate><header><span><i data-lucide="calendar-plus"></i></span><div><h3>Préparer la campagne</h3><p>Une campagne ne devient jamais active depuis cette interface.</p></div></header><div class="ss-form-grid">' +
+      window.ssField({ label: "Nom de campagne", labelFor: "financeCampaignName", required: true, inputHtml: window.ssInput({ type: "text", id: "financeCampaignName", name: "label", required: true, maxlength: 200, value: draft.label, placeholder: "Ex. Contrôle excursion septembre" }) }) +
+      window.ssField({ label: "Type de frais", labelFor: "financeCampaignFee", required: true, inputHtml: window.ssSelect({ id: "financeCampaignFee", name: "fee_structure_id", required: true, value: fee ? fee.id : draft.feeStructureId, options: feeOptions }) }) +
+      window.ssField({ label: "Début", labelFor: "financeCampaignStart", required: true, inputHtml: window.ssInput({ type: "date", id: "financeCampaignStart", name: "starts_at", required: true, value: draft.startsAt }) }) +
+      window.ssField({ label: "Fin", labelFor: "financeCampaignEnd", required: true, inputHtml: window.ssInput({ type: "date", id: "financeCampaignEnd", name: "ends_at", required: true, value: draft.endsAt }) }) +
+      window.ssField({ label: "Consigne opérationnelle", labelFor: "financeCampaignInstruction", required: true, className: "wide", inputHtml: '<textarea id="financeCampaignInstruction" name="description" rows="3" required maxlength="1000" placeholder="Décrivez la consigne appliquée au contrôle…">' + escapeMarkup(draft.description) + '</textarea>' }) +
+      '</div>' + unavailableTargets + window.ssButton({ label: "Préparer la campagne", icon: "clipboard-check", type: "submit", disabled: !fee }) + '</form>';
+
+    return '<section class="balance-register"><header><div><span>Finance générale · FE-FIN-07A</span><h3>Campagnes de contrôle</h3><p>Configurez une campagne sur un type de frais réel. La publication et l’activation restent BACKEND_LATER.</p></div>' + window.ssBadge({ variant: "warning", icon: "plug-zap", label: "BACKEND_LATER" }) + '</header><section class="finance-panel"><header><div><span>États cibles</span><h3>Cycle de vie de campagne</h3></div></header>' + window.ssTable({ headers: ["Statut", "Connexion actuelle"], rows: statuses, responsive: true, compact: true }) + '</section><section class="finance-two-column">' + form + summary + '</section>' + prepared + '</section>';
+  }
+
   function renderReports() {
     var d = deps();
     var role = currentRole();
@@ -1207,7 +1294,7 @@
     var allowedTabs = financeTabsForRole();
     if (allowedTabs.indexOf(financeState.activeTab) === -1) financeState.activeTab = allowedTabs[0];
 
-    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", exemptions: "Exemptions", cash: "Encaissements", receipts: "Reçus", balances: "Soldes et régularité", reports: "Rapports de caisse", family: "Situation familiale" };
+    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", exemptions: "Exemptions", campaigns: "Campagnes de contrôle", cash: "Encaissements", receipts: "Reçus", balances: "Soldes et régularité", reports: "Rapports de caisse", family: "Situation familiale" };
     if (titleEl) titleEl.textContent = titles[financeState.activeTab];
     if (workspaceTitle) workspaceTitle.textContent = titles[financeState.activeTab];
 
@@ -1234,6 +1321,7 @@
       fees: renderFeeStructure,
       assignments: renderFeeAssignment,
       exemptions: renderExemptions,
+      campaigns: renderControlCampaignManagement,
       cash: renderCash,
       receipts: renderReceipts,
       balances: renderBalances,
@@ -1329,6 +1417,41 @@
       exemption.prepared = true;
       exemption.preparedSummary = { student_fee_id: fee.student_fee_id, type: type, amount: amount, currency: fee.currency };
       d.notify("Configuration prête. Aucune exemption n’a été appliquée : connexion backend requise.");
+      renderFinanceModule();
+    });
+
+    var campaignFeeSelect = document.getElementById("financeCampaignFee");
+    if (campaignFeeSelect) campaignFeeSelect.addEventListener("change", function () {
+      var campaign = campaignDraftState();
+      campaign.feeStructureId = this.value;
+      campaign.prepared = false;
+      campaign.preparedSummary = null;
+      renderFinanceModule();
+    });
+    var campaignForm = document.getElementById("financeCampaignForm");
+    if (campaignForm) campaignForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!canManageControlCampaigns()) { d.notify("Action non autorisée.", "error"); return; }
+      var campaign = campaignDraftState();
+      var data = new FormData(campaignForm);
+      var label = String(data.get("label") || "").trim();
+      var feeStructureId = String(data.get("fee_structure_id") || "");
+      var startsAt = String(data.get("starts_at") || "");
+      var endsAt = String(data.get("ends_at") || "");
+      var description = String(data.get("description") || "").trim();
+      var fee = (financeState.feeTypes || []).find(function (item) { return item.id === feeStructureId; }) || null;
+      if (!label || !fee || !/^\d{4}-\d{2}-\d{2}$/.test(startsAt) || !/^\d{4}-\d{2}-\d{2}$/.test(endsAt) || startsAt >= endsAt || !description) {
+        d.notify("Vérifiez le nom, le type de frais, la période et la consigne de la campagne.", "error");
+        return;
+      }
+      campaign.feeStructureId = feeStructureId;
+      campaign.label = label;
+      campaign.startsAt = startsAt;
+      campaign.endsAt = endsAt;
+      campaign.description = description;
+      campaign.prepared = true;
+      campaign.preparedSummary = { fee_structure_id: feeStructureId, label: label, starts_at: startsAt, ends_at: endsAt, description: description, status: "draft" };
+      d.notify("Configuration prête — connexion backend requise pour publier/activer.");
       renderFinanceModule();
     });
 
