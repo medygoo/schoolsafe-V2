@@ -22,6 +22,17 @@
     "schoolsafe://card/DEMO-EXEMPTED/verification": { name: "David Tshibangu", matricule: "DEMO-004", className: "6e primaire", studentFeeStatus: "exempted" },
     "schoolsafe://card/DEMO-NO-FEE/verification": { name: "Lina Kabasele", matricule: "DEMO-005", className: "2e primaire", studentFeeStatus: null }
   };
+  // FE-FIN-09A : projection locale explicitement démo de l'historique
+  // autorisé. Elle reste distincte de tout historique serveur futur et ne
+  // contient aucune donnée financière ou issue du module Sécurité.
+  var demoAuthorizedHistory = [
+    { reference: "DÉMO-HIST-001", scanned_at: "2026-09-08 07:42", campaign: { id: "demo-history-gate", label: "Portail · septembre" }, student: { display_name: "Amina Kalonji", matricule: "DEMO-001", class_name: "5e primaire" }, result: "ok", operational_status_snapshot: "paid", duplicate: { is_duplicate: false } },
+    { reference: "DÉMO-HIST-002", scanned_at: "2026-09-08 07:51", campaign: { id: "demo-history-gate", label: "Portail · septembre" }, student: { display_name: "Noah Ilunga", matricule: "DEMO-002", class_name: "4e primaire" }, result: "partial", operational_status_snapshot: "partial", duplicate: { is_duplicate: false } },
+    { reference: "DÉMO-HIST-003", scanned_at: "2026-09-08 08:03", campaign: { id: "demo-history-gate", label: "Portail · septembre" }, student: { display_name: "Sarah Mbuyi", matricule: "DEMO-003", class_name: "3e primaire" }, result: "unpaid", operational_status_snapshot: "pending", duplicate: { is_duplicate: true, reference: "DÉMO-HIST-002" } },
+    { reference: "DÉMO-HIST-004", scanned_at: "2026-09-08 08:16", campaign: { id: "demo-history-library", label: "Bibliothèque · septembre" }, student: { display_name: "David Tshibangu", matricule: "DEMO-004", class_name: "6e primaire" }, result: "exempted", operational_status_snapshot: "exempted", duplicate: { is_duplicate: false } },
+    { reference: "DÉMO-HIST-005", scanned_at: "2026-09-08 08:25", campaign: { id: "demo-history-gate", label: "Portail · septembre" }, student: { display_name: "Lina Kabasele", matricule: "DEMO-005", class_name: "2e primaire" }, result: "anomaly", anomaly: { code: "NO_STUDENT_FEE", note: "Aucune obligation démo configurée." }, duplicate: { is_duplicate: false } }
+  ];
+  var historyFilters = { campaign: "", result: "", search: "" };
 
   function escapeHtml(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
@@ -100,6 +111,102 @@
     return isDemoMode() ? renderDemoScanner() : renderScannerBacklog();
   }
 
+  function historyResult(result) {
+    return {
+      ok: { label: "En règle", variant: "success" },
+      partial: { label: "Paiement partiel", variant: "warning" },
+      unpaid: { label: "Non en règle", variant: "danger" },
+      exempted: { label: "Exempté", variant: "success" },
+      anomaly: { label: "Anomalie", variant: "danger" }
+    }[result] || { label: "Anomalie", variant: "danger" };
+  }
+
+  function renderHistoryBacklog() {
+    return '<section id="feeControlHistory" class="fee-control-history">' +
+      '<header><span>Historique autorisé</span><h3>Lecture réelle à venir</h3></header>' +
+      window.ssState({
+        type: "unavailable",
+        title: "Historique autorisé — BACKEND_LATER",
+        message: "La lecture réelle attend une permission dédiée, des filtres serveur et une pagination sûre.",
+        details: "Aucune liste globale, aucun scan et aucune donnée Sécurité ne sont chargés depuis cette surface."
+      }) +
+    '</section>';
+  }
+
+  function historyCampaignOptions() {
+    var seen = {};
+    var options = '<option value="">Toutes les campagnes démo</option>';
+    demoAuthorizedHistory.forEach(function (entry) {
+      if (seen[entry.campaign.id]) return;
+      seen[entry.campaign.id] = true;
+      options += '<option value="' + escapeHtml(entry.campaign.id) + '">' + escapeHtml(entry.campaign.label) + '</option>';
+    });
+    return options;
+  }
+
+  function historyResultOptions() {
+    return '<option value="">Tous les résultats démo</option>' +
+      '<option value="ok">En règle</option>' +
+      '<option value="partial">Paiement partiel</option>' +
+      '<option value="unpaid">Non en règle</option>' +
+      '<option value="exempted">Exempté</option>' +
+      '<option value="anomaly">Anomalie</option>';
+  }
+
+  function filteredDemoHistory() {
+    var query = String(historyFilters.search || "").trim().toLowerCase();
+    return demoAuthorizedHistory.filter(function (entry) {
+      if (historyFilters.campaign && entry.campaign.id !== historyFilters.campaign) return false;
+      if (historyFilters.result && entry.result !== historyFilters.result) return false;
+      if (!query) return true;
+      return (entry.student.display_name + " " + entry.student.matricule).toLowerCase().indexOf(query) !== -1;
+    });
+  }
+
+  function renderDemoHistoryRows() {
+    var entries = filteredDemoHistory();
+    if (!entries.length) {
+      return window.ssState({ type: "empty", title: "Aucun contrôle démo", message: "Aucun résultat ne correspond aux filtres locaux." });
+    }
+    var html = '<div class="ss-table-wrap"><table class="ss-table"><thead><tr><th>Référence</th><th>Date / heure</th><th>Campagne</th><th>Élève</th><th>Résultat</th></tr></thead><tbody>';
+    entries.forEach(function (entry) {
+      var result = historyResult(entry.result);
+      var duplicate = entry.duplicate && entry.duplicate.is_duplicate
+        ? '<small>Doublon démo · réf. ' + escapeHtml(entry.duplicate.reference) + '</small>'
+        : '';
+      var anomaly = entry.result === "anomaly" && entry.anomaly
+        ? '<small>' + escapeHtml(entry.anomaly.code) + (entry.anomaly.note ? ' · ' + escapeHtml(entry.anomaly.note) : '') + '</small>'
+        : '';
+      html += '<tr><td>' + escapeHtml(entry.reference) + duplicate + '</td>' +
+        '<td>' + escapeHtml(entry.scanned_at) + '</td>' +
+        '<td>' + escapeHtml(entry.campaign.label) + '</td>' +
+        '<td><strong>' + escapeHtml(entry.student.display_name) + '</strong><small>Matricule : ' + escapeHtml(entry.student.matricule) + (entry.student.class_name ? ' · ' + escapeHtml(entry.student.class_name) : '') + '</small></td>' +
+        '<td>' + window.ssBadge({ variant: result.variant, label: result.label }) + anomaly + '</td></tr>';
+    });
+    return html + '</tbody></table></div>';
+  }
+
+  function renderDemoHistory() {
+    return '<section id="feeControlHistory" class="fee-control-history">' +
+      '<header><div><span>Historique autorisé</span><h3>Projection locale non sensible</h3><p>Les lignes, filtres et références ci-dessous sont fictifs et servent uniquement à visualiser le futur historique autorisé.</p></div>' + window.ssBadge({ variant: "info", label: "DÉMO" }) + '</header>' +
+      '<div class="fee-control-history-filters">' +
+        '<label for="feeControlHistoryCampaign">Campagne démo<select id="feeControlHistoryCampaign">' + historyCampaignOptions() + '</select></label>' +
+        '<label for="feeControlHistoryResult">Résultat démo<select id="feeControlHistoryResult">' + historyResultOptions() + '</select></label>' +
+        '<label for="feeControlHistorySearch">Rechercher un élève démo<input type="search" id="feeControlHistorySearch" placeholder="Nom ou matricule" autocomplete="off"></label>' +
+      '</div>' +
+      '<div id="feeControlHistoryList" aria-live="polite">' + renderDemoHistoryRows() + '</div>' +
+    '</section>';
+  }
+
+  function renderHistory() {
+    return isDemoMode() ? renderDemoHistory() : renderHistoryBacklog();
+  }
+
+  function refreshDemoHistory() {
+    var list = document.getElementById("feeControlHistoryList");
+    if (list) list.innerHTML = renderDemoHistoryRows();
+  }
+
   function render(containerId) {
     var container = document.getElementById(containerId);
     if (!container) return;
@@ -108,6 +215,7 @@
         '<header><span>Contrôle des frais</span><h2>Mes campagnes autorisées</h2><p>Consultez la consigne de campagne. Le scan sécurisé et le résultat seront raccordés dans un lot distinct.</p></header>' +
         '<div id="feeControlCampaigns" class="fee-control-campaigns">' + window.ssState({ type: "loading", title: "Chargement...", message: "Chargement des campagnes…" }) + '</div>' +
         renderScanner() +
+        renderHistory() +
       '</div>';
     loadCampaigns();
     bind(containerId);
@@ -120,16 +228,23 @@
     });
     var demoForm = container.querySelector("#feeControlDemoScanForm");
     var qrInput = container.querySelector("#feeControlQrInput");
-    if (!demoForm || !qrInput) return;
-    demoForm.addEventListener("submit", function (event) {
-      event.preventDefault();
-      performDemoScan(containerId);
-    });
-    qrInput.addEventListener("keydown", function (event) {
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-      performDemoScan(containerId);
-    });
+    if (demoForm && qrInput) {
+      demoForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        performDemoScan(containerId);
+      });
+      qrInput.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        performDemoScan(containerId);
+      });
+    }
+    var historyCampaign = container.querySelector("#feeControlHistoryCampaign");
+    var historyResult = container.querySelector("#feeControlHistoryResult");
+    var historySearch = container.querySelector("#feeControlHistorySearch");
+    if (historyCampaign) historyCampaign.addEventListener("change", function () { historyFilters.campaign = this.value; refreshDemoHistory(); });
+    if (historyResult) historyResult.addEventListener("change", function () { historyFilters.result = this.value; refreshDemoHistory(); });
+    if (historySearch) historySearch.addEventListener("input", function () { historyFilters.search = this.value; refreshDemoHistory(); });
   }
 
   function loadCampaigns() {
