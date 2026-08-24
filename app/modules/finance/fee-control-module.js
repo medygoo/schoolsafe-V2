@@ -3,6 +3,16 @@
 
   var campaigns = [];
   var selectedCampaignId = null;
+  var demoAuthorizedCampaigns = [
+    {
+      id: "demo-control-september",
+      label: "Contrôle du portail · septembre",
+      starts_at: "2026-09-01",
+      ends_at: "2026-09-30",
+      status: "published",
+      description: "Vérifiez la carte de l’élève au portail et appliquez la consigne de contrôle affichée."
+    }
+  ];
 
   function escapeHtml(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
@@ -16,81 +26,111 @@
     return sym + " " + value.toLocaleString("fr-FR");
   }
 
+  function hasValidSessionToken() {
+    try {
+      var raw = root.localStorage.getItem("schoolsafe-v2-session");
+      if (!raw) return false;
+      var session = JSON.parse(raw);
+      return !!(session && session.token);
+    } catch (e) { return false; }
+  }
+
+  function isDemoMode() {
+    if (root.schoolSafeDemoMode === true) return true;
+    var host = String(root.location && root.location.hostname || "").toLowerCase();
+    return (host === "localhost" || host === "127.0.0.1") && !hasValidSessionToken();
+  }
+
+  function controlAccessUser() {
+    if (root.currentSession) return root.currentSession;
+    return { role: root.currentDemoRole || "", permissions: [] };
+  }
+
+  // FE-FIN-07B : garde transitoire, sans élargir les droits ni décider par rôle.
+  function canOpenFeeControl() {
+    var access = root.SchoolSafeAccess;
+    return !!(access && typeof access.canAccessAny === "function" && access.canAccessAny(controlAccessUser(), [
+      "finance.control.read",
+      "finance.control.manage",
+      "finance.control.scan"
+    ]));
+  }
+
+  function formatPeriod(campaign) {
+    if (!campaign.starts_at || !campaign.ends_at) return "Période à confirmer";
+    return escapeHtml(campaign.starts_at) + " → " + escapeHtml(campaign.ends_at);
+  }
+
+  function renderScannerBacklog() {
+    return '<div id="feeControlScan" class="fee-control-scan">' +
+      '<h3>Scanner un élève</h3>' +
+      window.ssState({
+        type: "unavailable",
+        title: "Scanner sécurisé — BACKEND_LATER",
+        message: "Le scan et le résultat opérationnel seront connectés après validation du contrat sécurisé.",
+        details: "Aucun appel Sécurité ni résultat financier n’est déclenché depuis cette surface."
+      }) +
+      '<label>QR payload<input type="text" id="feeControlQrInput" placeholder="schoolsafe://card/..." autocomplete="off" disabled></label>' +
+      '<div class="fee-control-result-options">' +
+        window.ssButton({ label: "En règle", icon: "badge-check", disabled: true, attrs: { "data-result": "ok" } }) +
+        window.ssButton({ label: "Paiement partiel", variant: "secondary", icon: "hand-coins", disabled: true, attrs: { "data-result": "partial" } }) +
+        window.ssButton({ label: "Non en règle", variant: "danger", icon: "badge-alert", disabled: true, attrs: { "data-result": "unpaid" } }) +
+        window.ssButton({ label: "Exempté", variant: "secondary", icon: "shield-check", disabled: true, attrs: { "data-result": "exempted" } }) +
+        window.ssButton({ label: "Anomalie", variant: "secondary", icon: "triangle-alert", disabled: true, attrs: { "data-result": "anomaly" } }) +
+      '</div>' +
+      '<div id="feeControlResult" class="scan-result hidden"></div>' +
+    '</div>';
+  }
+
   function render(containerId) {
     var container = document.getElementById(containerId);
     if (!container) return;
     container.innerHTML =
       '<div class="fee-control-panel">' +
-        '<header><span>Contrôle des frais</span><h2>Campagnes de contrôle par QR</h2><p>Sélectionnez une campagne publiée, scannez la carte d’un élève et enregistrez le résultat.</p></header>' +
+        '<header><span>Contrôle des frais</span><h2>Mes campagnes autorisées</h2><p>Consultez la consigne de campagne. Le scan sécurisé et le résultat seront raccordés dans un lot distinct.</p></header>' +
         '<div id="feeControlCampaigns" class="fee-control-campaigns">' + window.ssState({ type: "loading", title: "Chargement...", message: "Chargement des campagnes…" }) + '</div>' +
-        '<div id="feeControlScan" class="fee-control-scan hidden">' +
-          '<h3>Scanner un élève</h3>' +
-          '<label>QR payload<input type="text" id="feeControlQrInput" placeholder="schoolsafe://card/..." autocomplete="off"></label>' +
-          '<div class="fee-control-result-options">' +
-            window.ssButton({ label: "En règle", icon: "badge-check", attrs: { "data-result": "ok" } }) +
-            window.ssButton({ label: "Paiement partiel", variant: "secondary", icon: "hand-coins", attrs: { "data-result": "partial" } }) +
-            window.ssButton({ label: "Non en règle", variant: "danger", icon: "badge-alert", attrs: { "data-result": "unpaid" } }) +
-            window.ssButton({ label: "Exempté", variant: "secondary", icon: "shield-check", attrs: { "data-result": "exempted" } }) +
-            window.ssButton({ label: "Anomalie", variant: "secondary", icon: "triangle-alert", attrs: { "data-result": "anomaly" } }) +
-          '</div>' +
-          '<div id="feeControlResult" class="scan-result hidden"></div>' +
-        '</div>' +
+        renderScannerBacklog() +
       '</div>';
-    bind(containerId);
     loadCampaigns();
+    bind(containerId);
   }
 
   function bind(containerId) {
     var container = document.getElementById(containerId);
-    container.querySelectorAll("[data-result]").forEach(function (button) {
-      button.addEventListener("click", function () {
-        var result = button.getAttribute("data-result");
-        performScan(containerId, result);
-      });
+    container.querySelectorAll("input[name='feeControlCampaign']").forEach(function (radio) {
+      radio.addEventListener("change", function () { selectedCampaignId = this.value; });
     });
-    var input = container.querySelector("#feeControlQrInput");
-    if (input) {
-      input.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          performScan(containerId, "ok");
-        }
-      });
-    }
   }
 
   function loadCampaigns() {
     var box = document.getElementById("feeControlCampaigns");
-    if (!window.SchoolSafeFinanceAPI) {
-      box.innerHTML = window.ssState({ type: "unavailable", title: "Service indisponible", message: "API Finance non disponible." });
+    if (!canOpenFeeControl()) {
+      box.innerHTML = window.ssState({ type: "denied", title: "Contrôle des frais non autorisé", message: "Une permission de contrôle des frais est requise." });
       return;
     }
-    window.SchoolSafeFinanceAPI.listCampaigns().then(function (data) {
-      campaigns = data || [];
-      var published = campaigns.filter(function (c) { return c.status === "published"; });
-      if (!published.length) {
-        box.innerHTML = window.ssState({ type: "empty", title: "Aucune campagne publiée", message: "L’Administrateur général doit d’abord créer et publier une campagne." });
-        return;
-      }
-      var html = '<h3>Campagnes actives</h3><ul>';
-      published.forEach(function (c) {
-        var fee = c.fee_structures || {};
-        html += '<li><label><input type="radio" name="feeControlCampaign" value="' + escapeHtml(c.id) + '"' + (selectedCampaignId === c.id ? " checked" : "") + '> ' +
-          '<b>' + escapeHtml(c.label) + '</b> · ' + escapeHtml(fee.label || "Frais") + ' · ' + money(fee.amount, fee.currency) +
-          '</label></li>';
+    if (!isDemoMode()) {
+      box.innerHTML = window.ssState({
+        type: "unavailable",
+        title: "Mes campagnes autorisées — BACKEND_LATER",
+        message: "Le serveur doit filtrer les campagnes par contrôleur autorisé, portée et période avant leur affichage.",
+        details: "La liste globale de l’école n’est jamais présentée comme une liste autorisée."
       });
-      html += '</ul>';
-      box.innerHTML = html;
-      box.querySelectorAll("input[name='feeControlCampaign']").forEach(function (radio) {
-        radio.addEventListener("change", function () {
-          selectedCampaignId = this.value;
-          document.getElementById("feeControlScan").classList.remove("hidden");
-        });
-      });
-      if (selectedCampaignId) document.getElementById("feeControlScan").classList.remove("hidden");
-    }).catch(function (err) {
-      box.innerHTML = window.ssState({ type: "error", title: "Erreur", message: err.message });
+      return;
+    }
+
+    campaigns = demoAuthorizedCampaigns.slice();
+    if (!campaigns.length) {
+      box.innerHTML = window.ssState({ type: "empty", title: "Aucune campagne démo", message: "Aucune projection démo non sensible n’est disponible." });
+      return;
+    }
+    if (!campaigns.some(function (campaign) { return campaign.id === selectedCampaignId; })) selectedCampaignId = campaigns[0].id;
+    var html = '<header><div><span>Mes campagnes autorisées</span><h3>Projection non sensible</h3><p>Les campagnes ci-dessous sont uniquement une visualisation démo.</p></div>' + window.ssBadge({ variant: "info", label: "DÉMO" }) + '</header><ul>';
+    campaigns.forEach(function (campaign) {
+      html += '<li><label><input type="radio" name="feeControlCampaign" value="' + escapeHtml(campaign.id) + '"' + (selectedCampaignId === campaign.id ? " checked" : "") + '> ' +
+        '<b>' + escapeHtml(campaign.label) + '</b> · ' + formatPeriod(campaign) + ' · Statut déclaré : ' + escapeHtml(campaign.status) +
+        '</label><p><strong>Consigne :</strong> ' + escapeHtml(campaign.description) + '</p></li>';
     });
+    box.innerHTML = html + '</ul>';
   }
 
   function parseQrPayload(payload) {
