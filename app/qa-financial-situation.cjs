@@ -19,7 +19,8 @@ function primitive(tagName) {
   };
 }
 
-function loadDemoModule() {
+function loadModule(options) {
+  options = options || {};
   const elements = {
     financeModule: { hidden: true },
     financeContent: { innerHTML: "" },
@@ -28,14 +29,16 @@ function loadDemoModule() {
     cardsProtected: { hidden: false }
   };
   const window = {
-    schoolSafeDemoMode: true,
-    location: { hostname: "127.0.0.1" },
+    schoolSafeDemoMode: options.demoMode !== false,
+    location: { hostname: options.demoMode === false ? "schoolsafe.example" : "127.0.0.1" },
     localStorage: { getItem: function () { return null; } },
     SchoolSafeAccess: {
       canAccess: function (user, permission) {
         return user && user.role === "admin" || !!(user && user.permissions && user.permissions.includes(permission));
       }
     },
+    SchoolSafeFinanceAPI: options.api || null,
+    currentSession: options.session || null,
     ssState: primitive("state"),
     ssTable: primitive("table"),
     ssBadge: primitive("badge"),
@@ -61,6 +64,10 @@ function loadDemoModule() {
   };
   vm.runInNewContext(moduleSource, { window: window, document: document, console: console, Date: Date, Promise: Promise, Object: Object, Array: Array, Number: Number, String: String, RegExp: RegExp, JSON: JSON, setTimeout: setTimeout });
   return { module: window.SchoolSafeFinanceModule, elements: elements };
+}
+
+function loadDemoModule() {
+  return loadModule();
 }
 
 async function renderSituation(subject) {
@@ -90,6 +97,7 @@ async function main() {
   assert.match(html, /100[\s\u202f]000 USD/, "La devise doit être résolue depuis fee_structure.");
   assert.match(html, /À payer/, "pending doit être affiché comme À payer.");
   assert.match(html, /Paiement partiel/, "partial doit être affiché comme Paiement partiel.");
+  assert.match(html, /Montants cumulés indisponibles/, "Les devises manquantes ou multiples ne doivent jamais être cumulées.");
   const selectedOptions = html.match(/<select id="financeFinancialStudent">([\s\S]*?)<\/select>/)[1].match(/<option /g) || [];
   assert.equal(selectedOptions.length, state.studentFinancialProfiles.length, "Chaque élève doit apparaître une seule fois dans la sélection.");
 
@@ -110,6 +118,29 @@ async function main() {
   state.selectedFinancialStudentId = "demo-student-no-fee";
   html = await renderSituation(subject);
   assert.match(html, /Aucune obligation financière affectée/, "Un élève sans frais ne doit pas être présenté comme non en règle.");
+
+  let statusOnlyRequests = 0;
+  const statusOnly = loadModule({
+    demoMode: false,
+    session: { role: "pedagogy", permissions: ["finance.status.read"] },
+    api: { listStudentFees: function () { statusOnlyRequests += 1; return Promise.resolve([]); } }
+  });
+  statusOnly.module.setRole("pedagogy");
+  statusOnly.module.render("financeModule", { action: "soldes" });
+  await Promise.resolve();
+  assert.match(statusOnly.elements.financeContent.innerHTML, /Vue statut non connectée/, "finance.status.read seul doit rester non connecté sans projection serveur dédiée.");
+  assert.equal(statusOnlyRequests, 0, "La vue status-only ne doit jamais demander les student_fees détaillés.");
+
+  let parentRequests = 0;
+  const parent = loadModule({
+    demoMode: false,
+    api: { listStudentFees: function () { parentRequests += 1; return Promise.resolve([]); } }
+  });
+  parent.module.setRole("parent");
+  parent.module.render("financeModule", { action: "frais scolaires" });
+  await Promise.resolve();
+  assert.match(parent.elements.financeContent.innerHTML, /Situation familiale non connectée/, "Le parent réel doit recevoir l’état own_children indisponible.");
+  assert.equal(parentRequests, 0, "Le parent ne doit jamais déclencher une liste globale de student_fees.");
 }
 
 main().then(function () {

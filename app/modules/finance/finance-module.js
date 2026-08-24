@@ -305,6 +305,12 @@
     return Number(value || 0).toLocaleString("fr-FR") + " " + escapeMarkup(currency);
   }
 
+  function hasUnsynchronizedFinancialOperation() {
+    return (financeState.transactions || []).some(function (transaction) {
+      return transaction && transaction.status === "En attente de synchronisation";
+    });
+  }
+
   function mapStudentFee(sf) {
     var student = sf.students || {};
     var name = [student.first_name, student.last_name].filter(Boolean).join(" ") || "Élève";
@@ -384,7 +390,7 @@
   }
   function canReadFeeCatalog() { return canAccessFeeCatalog("finance.fee.read"); }
   function canManageFeeCatalog() { return canAccessFeeCatalog("finance.fee.manage"); }
-  function canReadFinancialDetails() { return isDemoMode() || canReadFeeCatalog(); }
+  function canReadFinancialDetails() { return canReadFeeCatalog(); }
   function canReadFinancialStatus() { return canAccessFeeCatalog("finance.status.read"); }
 
   /**
@@ -776,6 +782,15 @@
       });
     }
 
+    if (hasUnsynchronizedFinancialOperation()) {
+      return window.ssState({
+        type: "unavailable",
+        title: "Situation financière à actualiser",
+        message: "Une opération locale attend sa synchronisation. Les soldes détaillés ne sont pas affichés avant confirmation serveur.",
+        details: "Aucun montant ou statut local n’est déduit d’un paiement non confirmé."
+      });
+    }
+
     var profiles = financeState.studentFinancialProfiles || [];
     var search = String(financeState.financialSearch || "").trim().toLocaleLowerCase("fr-FR");
     var feeFilter = financeState.financialFeeFilter || "";
@@ -838,10 +853,11 @@
     var studentSelect = window.ssField({ label: "Élève", labelFor: "financeFinancialStudent", inputHtml: window.ssSelect({ id: "financeFinancialStudent", value: selectedStudent.id, options: studentOptions }) });
     var identity = '<article class="student-finance-card"><span class="student-avatar large">' + escapeMarkup(selectedStudent.initials) + '</span><div><small>' + escapeMarkup(selectedStudent.className) + '</small><h3>' + escapeMarkup(selectedStudent.name) + '</h3><p>' + escapeMarkup(selectedStudent.guardian) + '</p></div></article>';
     var summaryMarkup = '<div class="balance-summary"><article><small>Frais</small><b>' + summary.total + '</b></article><article><small>En règle</small><b>' + summary.paid + '</b></article><article><small>À régulariser</small><b>' + summary.toRegularize + '</b></article><article><small>Exemptés</small><b>' + summary.exempted + '</b></article></div>';
+    var hasUnknownCurrency = selectedProfile.fees.some(function (fee) { return !fee.currency; });
     var currencies = selectedProfile.fees.map(function (fee) { return fee.currency; }).filter(Boolean).filter(function (currency, index, values) { return values.indexOf(currency) === index; });
-    var amountSummary = currencies.length === 1
+    var amountSummary = currencies.length === 1 && !hasUnknownCurrency
       ? '<dl class="student-finance-facts"><div><dt>Attendu cumulé</dt><dd>' + formatFinancialAmount(summary.expected, currencies[0]) + '</dd></div><div><dt>Payé cumulé</dt><dd>' + formatFinancialAmount(summary.paidAmount, currencies[0]) + '</dd></div><div><dt>Restant cumulé</dt><dd>' + formatFinancialAmount(summary.remaining, currencies[0]) + '</dd></div></dl>'
-      : '<aside class="finance-audit-note"><i data-lucide="circle-alert"></i><p>Montants cumulés indisponibles : les frais affichés utilisent plusieurs devises. Consultez chaque ligne individuellement.</p></aside>';
+      : '<aside class="finance-audit-note"><i data-lucide="circle-alert"></i><p>Montants cumulés indisponibles : une devise ou une structure de frais manque, ou plusieurs devises sont utilisées. Consultez chaque ligne individuellement.</p></aside>';
     var feesTable = visibleFees.length ? window.ssTable({ headers: ["Type de frais", "Statut", "Attendu", "Payé", "Restant", "Échéance"], rows: rows, responsive: true }) : window.ssState({ type: "empty", title: "Aucune obligation financière affectée", message: "Aucun frais du profil ne correspond aux filtres actifs." });
 
     return '<section class="balance-register"><header><div><span>Situation financière</span><h3>Frais de l’élève</h3><p>Chaque ligne représente un student_fee distinct ; les montants proviennent des données Finance chargées.</p></div><b>' + filteredProfiles.length + ' élève(s)</b></header>' + filters + '<section class="finance-two-column"><aside class="finance-panel">' + studentSelect + identity + summaryMarkup + '</aside><section class="finance-panel"><header><div><span>Résumé de l’élève</span><h3>Obligations financières</h3></div></header>' + summaryMarkup + amountSummary + '</section></section><section class="finance-panel"><header><div><span>Détail individuel</span><h3>Frais applicables</h3><p>Les frais restent indépendants ; la synthèse ne remplace pas cette liste.</p></div></header>' + feesTable + '</section></section>';
@@ -1424,7 +1440,12 @@
     financeState.activeTab = allowedTabs.indexOf(requestedTab) === -1 ? allowedTabs[0] : requestedTab;
 
     bindModuleTabs();
-    loadFinanceData().then(function () { renderFinanceModule(); });
+    if ((financeState.activeTab === "family" && !isDemoMode()) || (financeState.activeTab === "balances" && !canReadFinancialDetails())) {
+      // own_children et status-only n'ont pas de projection dédiée : ne jamais demander la liste globale des student_fees.
+      renderFinanceModule();
+    } else {
+      loadFinanceData().then(function () { renderFinanceModule(); });
+    }
     var content = document.querySelector(".workspace-content");
     if (content) content.scrollTo({ top: 0, behavior: "smooth" });
   }
