@@ -64,10 +64,12 @@
       "finance.receipt.read",
       "finance.report.read",
       "finance.cash_register.close",
+      "finance.status.read"
+    ],
+    feeControl: [
       "finance.control.read",
       "finance.control.manage",
-      "finance.control.scan",
-      "finance.status.read"
+      "finance.control.scan"
     ],
     accounting: [
       "finance.report.read",

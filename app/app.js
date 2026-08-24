@@ -335,7 +335,8 @@
     school: { label: "École", icon: "school", color: "#2563eb", background: "#eff6ff" },
     pedagogy: { label: "Pédagogie", icon: "book-open-check", color: "#1e3a8a", background: "#dbeafe" },
     security: { label: "Sécurité et contrôle", icon: "shield-check", color: "#1d4ed8", background: "#dbeafe" },
-    finance: { label: "Finances", icon: "wallet-cards", color: "#d97706", background: "#fffbeb" },
+    finance: { label: "Finance", icon: "wallet-cards", color: "#d97706", background: "#fffbeb" },
+    feeControl: { label: "Contrôle des frais", icon: "badge-check", color: "#0f766e", background: "#f0fdfa" },
     accounting: { label: "Comptabilité", icon: "landmark", color: "#475569", background: "#f1f5f9" },
     people: { label: "Personnel", icon: "contact-round", color: "#64748b", background: "#f1f5f9" },
     communication: { label: "Communication", icon: "messages-square", color: "#3b82f6", background: "#eff6ff" },
@@ -2188,7 +2189,8 @@
     if (!definition) return;
     setBreadcrumb(definition.label);
     if (branchKey === "pedagogy") { openPedagogyModule("Devoirs et corrections"); return; }
-    if (branchKey === "finance") { openFinanceModule("Encaissements"); return; }
+    if (branchKey === "finance") { openFinanceModule(); return; }
+    if (branchKey === "feeControl") { openFeeControlModule(); return; }
     if (branchKey === "security") { openSecurityModule("Scanner un QR"); return; }
     if (branchKey === "school") { openSchoolModule("school"); return; }
     if (branchKey === "pilotage") { openPilotageModule("Tableau de bord"); return; }

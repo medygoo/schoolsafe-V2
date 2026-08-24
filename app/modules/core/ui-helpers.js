@@ -426,6 +426,7 @@
    *
    * @param {Object} p
    * @param {string} p.label - Label du champ
+   * @param {string} [p.labelFor] - Valeur de l'attribut for du label
    * @param {string} p.inputHtml - HTML du champ (input/select/textarea…)
    * @param {string} [p.help] - Texte d'aide
    * @param {string} [p.error] - Message d'erreur
@@ -436,6 +437,7 @@
   function ssField(p) {
     p = p || {};
     var label = p.label != null ? String(p.label) : "";
+    var labelFor = p.labelFor != null ? String(p.labelFor) : "";
     var inputHtml = p.inputHtml || "";
     var help = p.help != null ? String(p.help) : "";
     var error = p.error != null ? String(p.error) : "";
@@ -449,7 +451,7 @@
     attrs.class = classes.join(" ");
 
     var labelClass = "ss-label" + (required ? " ss-label--required" : "");
-    var labelHtml = label ? '<label class="' + labelClass + '">' + escapeHtml(label) + "</label>" : "";
+    var labelHtml = label ? '<label class="' + labelClass + '"' + (labelFor ? ' for="' + escapeHtml(labelFor) + '"' : "") + ">" + escapeHtml(label) + "</label>" : "";
     var helpHtml = help ? '<p class="ss-help-text">' + escapeHtml(help) + "</p>" : "";
     var errorHtml = error ? '<p class="ss-validation-message">' + escapeHtml(error) + "</p>" : "";
 
