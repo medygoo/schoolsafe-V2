@@ -42,19 +42,20 @@ async function domClick(page, selector) {
 
   await page.locator("#workspaceRoleSwitch").selectOption("cashier");
   await page.locator('[data-action="Enregistrer un paiement"]').evaluate((element) => element.click());
-  await page.locator("#financeStudentSelect").selectOption("0");
+  await page.locator("#financeCashStudent").selectOption("demo-s1");
+  await page.locator("#financeCashStudentFee").selectOption("demo-sf-lucas-school");
   await page.locator('#paymentForm input[name="amount"]').fill("50000");
   await page.locator('#paymentForm input[name="reference"]').fill("Tranche hors connexion");
   await domClick(page, '#paymentForm button[type="submit"]');
-  check(await page.getByText("Après synchronisation", { exact: true }).count(), "Un numéro de reçu est produit hors connexion");
-  check(await page.getByText("PDF après synchronisation", { exact: true }).count(), "L'attente du reçu officiel n'est pas indiquée");
+  check(await page.getByText("Démo — non officiel", { exact: true }).count(), "Le paiement de démonstration ne doit pas être présenté comme un reçu officiel");
+  check((await page.getByText("Après synchronisation", { exact: true }).count()) === 0, "Un paiement de démonstration ne doit pas promettre une synchronisation financière réelle");
 
   await page.evaluate(async () => {
     await window.SchoolSafeSync.enqueue({ type: "administration", label: "Configuration locale de test", role: "admin", payload: { test: true } });
     await window.SchoolSafeSync.enqueue({ type: "scan", label: "Scan prioritaire de test", role: "guard", payload: { test: true } });
   });
   const offlineState = await page.evaluate(() => window.SchoolSafeSync.state());
-  check(offlineState.pending >= 3, "Les opérations hors connexion ne restent pas en attente");
+  check(offlineState.pending >= 2, "Les opérations hors connexion non financières ne restent pas en attente");
   const pendingTypes = offlineState.operations.filter((item) => item.status === "pending").map((item) => item.type);
   check(pendingTypes.indexOf("scan") < pendingTypes.indexOf("administration"), "Le scan n'est pas prioritaire dans la file");
 
@@ -66,7 +67,7 @@ async function domClick(page, selector) {
   await page.waitForFunction(() => document.querySelector("#syncStatusLabel").textContent === "Synchronisé", null, { timeout: 15000 });
   const onlineState = await page.evaluate(() => window.SchoolSafeSync.state());
   check(onlineState.pending === 0, "La reprise automatique ne vide pas la file locale");
-  await page.getByText("REC-2026-0588", { exact: true }).waitFor({ timeout: 10000 });
+  check((await page.getByText("Démo — non officiel", { exact: true }).count()) >= 1, "La démonstration ne doit jamais devenir un reçu serveur lors de la reprise réseau");
 
   await page.reload({ waitUntil: "networkidle" });
   await page.evaluate(() => navigator.serviceWorker.ready);

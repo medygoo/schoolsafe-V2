@@ -132,9 +132,9 @@
       selectedPendingStudent: 0,
       reportClosure: null,
       feeTypes: [
-        { id: "demo-1", name: "Frais scolaires", cycle: "Primaire", amount: 300000, frequency: "Trimestre", due: "30 septembre 2026", active: true },
-        { id: "demo-2", name: "Frais scolaires", cycle: "Humanités", amount: 450000, frequency: "Trimestre", due: "30 septembre 2026", active: true },
-        { id: "demo-3", name: "Inscription", cycle: "Tous les cycles", amount: 50000, frequency: "Une fois", due: "À l’inscription", active: true },
+        { id: "demo-1", name: "Frais scolaires", cycle: "Primaire", amount: 300000, currency: "CDF", frequency: "Trimestre", due: "30 septembre 2026", active: true },
+        { id: "demo-2", name: "Frais scolaires", cycle: "Humanités", amount: 450000, currency: "CDF", frequency: "Trimestre", due: "30 septembre 2026", active: true },
+        { id: "demo-3", name: "Inscription", cycle: "Tous les cycles", amount: 50000, currency: "CDF", frequency: "Une fois", due: "À l’inscription", active: true },
         { id: "demo-4", name: "Transport scolaire", cycle: "Service facultatif", amount: 100000, currency: "USD", frequency: "Mois", due: "Chaque 5 du mois", active: true }
       ],
       feeAssignment: { feeStructureId: "", targetingMode: "cycle", classIds: [], studentIds: [], prepared: false },
@@ -165,16 +165,19 @@
       ],
       studentFinancialProfiles: [],
       selectedFinancialStudentId: "demo-s1",
+      selectedCashStudentId: "demo-s1",
+      selectedCashStudentFeeId: "demo-sf-lucas-school",
+      lastConfirmedPayment: null,
       financialSearch: "",
       financialFeeFilter: "",
       financialStatusFilter: "",
       transactions: [
-        { id: "demo-p1", receipt: "REC-2026-0587", date: "14 août 2026 · 10:20", day: "14 août 2026", student: "Ethan Leroy", className: "1re A", fee: "Frais scolaires", amount: 150000, mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
-        { id: "demo-p2", receipt: "REC-2026-0586", date: "14 août 2026 · 09:15", day: "14 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 150000, mode: "Espèces", cashier: "Mme K", reference: "Deuxième tranche", status: "Validé" },
-        { id: "demo-p3", receipt: "REC-2026-0585", date: "13 août 2026 · 14:40", day: "13 août 2026", student: "Emma Martin", className: "Maternelle 3", fee: "Frais scolaires", amount: 300000, mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
-        { id: "demo-p4", receipt: "REC-2026-0584", date: "12 août 2026 · 11:05", day: "12 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 200000, mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
-        { id: "demo-p5", receipt: "REC-2026-0583", date: "11 août 2026 · 08:55", day: "11 août 2026", student: "Chloé Bernard", className: "2e B", fee: "Frais scolaires", amount: 450000, mode: "Espèces", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
-        { id: "demo-p6", receipt: "REC-2026-0582", date: "10 août 2026 · 13:10", day: "10 août 2026", student: "Aline Martin", className: "4e Humanités A", fee: "Frais scolaires", amount: 600000, mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" }
+        { id: "demo-p1", receipt: "REC-2026-0587", date: "14 août 2026 · 10:20", day: "14 août 2026", student: "Ethan Leroy", className: "1re A", fee: "Frais scolaires", amount: 150000, currency: "CDF", mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
+        { id: "demo-p2", receipt: "REC-2026-0586", date: "14 août 2026 · 09:15", day: "14 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 150000, currency: "CDF", mode: "Espèces", cashier: "Mme K", reference: "Deuxième tranche", status: "Validé" },
+        { id: "demo-p3", receipt: "REC-2026-0585", date: "13 août 2026 · 14:40", day: "13 août 2026", student: "Emma Martin", className: "Maternelle 3", fee: "Frais scolaires", amount: 300000, currency: "CDF", mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
+        { id: "demo-p4", receipt: "REC-2026-0584", date: "12 août 2026 · 11:05", day: "12 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 200000, currency: "CDF", mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
+        { id: "demo-p5", receipt: "REC-2026-0583", date: "11 août 2026 · 08:55", day: "11 août 2026", student: "Chloé Bernard", className: "2e B", fee: "Frais scolaires", amount: 450000, currency: "CDF", mode: "Espèces", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
+        { id: "demo-p6", receipt: "REC-2026-0582", date: "10 août 2026 · 13:10", day: "10 août 2026", student: "Aline Martin", className: "4e Humanités A", fee: "Frais scolaires", amount: 600000, currency: "CDF", mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" }
       ],
       expenses: [
         { reference: "DEP-2026-011", date: "14 août 2026", label: "Fournitures administratives", amount: 120000, status: "Validée" },
@@ -205,6 +208,9 @@
       studentFees: [],
       studentFinancialProfiles: [],
       selectedFinancialStudentId: "",
+      selectedCashStudentId: "",
+      selectedCashStudentFeeId: "",
+      lastConfirmedPayment: null,
       financialSearch: "",
       financialFeeFilter: "",
       financialStatusFilter: "",
@@ -383,15 +389,104 @@
   /**
    * FE-FIN-02 : accès catalogue via ACCESS_LAW; aucun rôle ne décide seul.
    */
+  function financeAccessUser() {
+    var session = currentSession();
+    if (session) return session;
+    // Démo uniquement : le rôle fournit son modèle initial de permissions.
+    var demoPermissions = { cashier: ["finance.payment.record"] };
+    return { role: currentRole(), permissions: isDemoMode() ? (demoPermissions[currentRole()] || []) : [] };
+  }
+
   function canAccessFeeCatalog(permission) {
     var access = root.SchoolSafeAccess;
-    var user = currentSession() || { role: currentRole(), permissions: [] };
+    var user = financeAccessUser();
     return !!(access && typeof access.canAccess === "function" && access.canAccess(user, permission));
   }
   function canReadFeeCatalog() { return canAccessFeeCatalog("finance.fee.read"); }
   function canManageFeeCatalog() { return canAccessFeeCatalog("finance.fee.manage"); }
   function canReadFinancialDetails() { return canReadFeeCatalog(); }
   function canReadFinancialStatus() { return canAccessFeeCatalog("finance.status.read"); }
+
+  function canRecordPayment() {
+    return canAccessFeeCatalog("finance.payment.record");
+  }
+
+  function selectedCashProfile() {
+    var profiles = financeState.studentFinancialProfiles || [];
+    if (!profiles.length) return null;
+    var selected = profiles.find(function (profile) { return profile.student.id === financeState.selectedCashStudentId; });
+    if (selected) return selected;
+    if (!financeState.selectedCashStudentId) {
+      financeState.selectedCashStudentId = profiles[0].student.id;
+      return profiles[0];
+    }
+    return null;
+  }
+
+  function selectedCashStudentFee(profile) {
+    if (!profile || !Array.isArray(profile.fees) || !profile.fees.length) return null;
+    var selected = profile.fees.find(function (fee) { return fee.student_fee_id === financeState.selectedCashStudentFeeId; });
+    if (selected) return selected;
+    if (!financeState.selectedCashStudentFeeId) {
+      financeState.selectedCashStudentFeeId = profile.fees[0].student_fee_id;
+      return profile.fees[0];
+    }
+    return null;
+  }
+
+  function paymentAvailability(fee) {
+    if (!fee) return { allowed: false, message: "Sélectionnez une obligation financière précise." };
+    if (!fee.feeStructureAvailable || !fee.label || !fee.currency) return { allowed: false, message: "Le type de frais ou sa devise est indisponible." };
+    if (["CDF", "USD"].indexOf(fee.currency) === -1) return { allowed: false, message: "La devise de cette obligation est inconnue." };
+    if (fee.status === "paid") return { allowed: false, message: "Paiement normal indisponible : ce frais est déjà réglé." };
+    if (fee.status === "exempted") return { allowed: false, message: "Paiement normal indisponible : ce frais est exempté." };
+    if (["pending", "partial"].indexOf(fee.status) === -1) return { allowed: false, message: "Paiement normal indisponible : statut financier inconnu." };
+    if (!Number.isFinite(Number(fee.remaining)) || Number(fee.remaining) <= 0) return { allowed: false, message: "Paiement normal indisponible : aucun montant restant à encaisser." };
+    return { allowed: true, message: "" };
+  }
+
+  function paymentStepForCurrency(currency) {
+    return currency === "USD" ? 0.01 : 1;
+  }
+
+  function hasValidPaymentPrecision(amount, currency) {
+    var multiplier = currency === "USD" ? 100 : 1;
+    return Math.abs(Number(amount) * multiplier - Math.round(Number(amount) * multiplier)) < 0.0000001;
+  }
+
+  function formatTransactionAmount(transaction) {
+    return formatFinancialAmount(transaction && transaction.amount, transaction && transaction.currency);
+  }
+
+  function formatTransactionTotal(transactions) {
+    var rows = Array.isArray(transactions) ? transactions : [];
+    var currencies = Array.from(new Set(rows.map(function (transaction) { return transaction && transaction.currency; }).filter(Boolean)));
+    if (currencies.length !== 1) return "Montants mixtes non cumulés";
+    var amount = rows.reduce(function (sum, transaction) { return sum + Number(transaction.amount || 0); }, 0);
+    return formatFinancialAmount(amount, currencies[0]);
+  }
+
+  function recordDemoPayment(profile, fee, amount, mode, reference, d) {
+    var updatedStudentFee = financeState.studentFees.find(function (studentFee) { return studentFee.id === fee.student_fee_id; });
+    if (!updatedStudentFee) {
+      d.notify("Démonstration indisponible : l’obligation sélectionnée est introuvable.", "error");
+      return;
+    }
+    var nextPaid = Number(updatedStudentFee.amount_paid || 0) + amount;
+    var nextRemaining = Math.max(0, Number(updatedStudentFee.amount_expected || 0) - nextPaid);
+    var updated = Object.assign({}, updatedStudentFee, {
+      amount_paid: nextPaid,
+      amount_remaining: nextRemaining,
+      status: nextRemaining === 0 ? "paid" : "partial"
+    });
+    financeState.studentFees = financeState.studentFees.map(function (studentFee) {
+      return studentFee.id === updated.id ? updated : studentFee;
+    });
+    rebuildStudentFinancialProfiles();
+    financeState.transactions.unshift({ id: "demo-payment-" + Date.now(), receipt: "Démonstration — non officiel", date: formatIsoDateTimeFr(new Date().toISOString()), day: formatIsoDateFr(new Date().toISOString()), student: profile.student.name, className: profile.student.className, fee: fee.label, amount: amount, mode: modeLabel(mode), cashier: "—", reference: reference, status: "Démonstration", currency: fee.currency, studentId: profile.student.id, studentFeeId: fee.student_fee_id, feeStructureId: fee.fee_structure_id });
+    d.notify("Paiement simulé en démonstration. Aucun reçu officiel n’a été créé.");
+    renderFinanceModule();
+  }
 
   /**
    * FE-FIN-03 — prépare uniquement une intention d'affectation dans la vue.
@@ -550,6 +645,8 @@
     }
     if (canManageFeeCatalog() && tabs.indexOf("assignments") === -1) tabs.push("assignments");
     if (!canManageFeeCatalog()) tabs = tabs.filter(function (tab) { return tab !== "assignments"; });
+    if (canRecordPayment() && tabs.indexOf("cash") === -1) tabs.push("cash");
+    if (!canRecordPayment()) tabs = tabs.filter(function (tab) { return tab !== "cash"; });
     return tabs;
   }
 
@@ -585,7 +682,7 @@
     var d = deps();
     var totals = financeTotals();
     var recent = financeState.transactions.slice(0, 5).map(function (transaction) {
-      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + d.money(transaction.amount) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td></tr>';
+      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + formatTransactionAmount(transaction) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td></tr>';
     }).join("");
     return '<section class="finance-overview"><header><div><span>Pilotage financier</span><h3>Situation enregistrée par l’école</h3><p>Les chiffres proviennent des opérations consignées sur le serveur.</p></div>' + window.ssBadge({ variant: "neutral", icon: "hand-coins", label: "Aucun paiement en ligne" }) + '</header><div class="finance-kpis"><article class="blue"><small>Frais attendus</small><b>' + d.money(totals.expected) + '</b><span>' + financeState.students.length + ' élèves suivis</span></article><article class="green"><small>Montants enregistrés</small><b>' + d.money(totals.paid) + '</b><span>' + totals.rate + ' % de recouvrement</span></article><article class="gold"><small>Soldes à régulariser</small><b>' + d.money(totals.balance) + '</b><span>' + financeState.studentFees.filter(function (studentFee) { return Number(studentFee.amount_remaining || 0) > 0; }).length + ' dossiers</span></article><article class="purple"><small>Encaissements du jour</small><b>' + d.money(totals.todayTotal) + '</b><span>' + totals.today.length + ' opérations</span></article></div><div class="finance-overview-grid"><section class="finance-panel"><header><div><span>Activité récente</span><h3>Derniers enregistrements</h3></div>' + window.ssIconButton({ icon: "arrow-right", variant: "light", title: "Voir les reçus", attrs: { "data-finance-open": "receipts" } }) + '</header>' +
       window.ssTable({
@@ -717,23 +814,69 @@
 
   function renderCash() {
     var d = deps();
-    var role = currentRole();
-    var pending = financeState.pendingStudents;
-    var student = pending[financeState.selectedPendingStudent] || pending[0] || null;
-    var canRecord = (role === "cashier" || role === "admin") && financeState.dayStatus === "Ouverte";
-    var studentOptions = pending.map(function (item, index) {
-      return '<option value="' + index + '"' + (index === financeState.selectedPendingStudent ? " selected" : "") + '>' + escapeMarkup(item.name + " · " + item.className) + '</option>';
-    }).join("");
-    var feeOptions = financeState.feeTypes.filter(function (fee) { return fee.active; }).map(function (fee) {
-      return '<option>' + escapeMarkup(fee.name + " · " + fee.cycle) + '</option>';
-    }).join("");
+    var canRecord = canRecordPayment();
+    var isRealSession = !isDemoMode();
+    if (!canRecord) {
+      return window.ssState({
+        type: "denied",
+        title: "Encaissement non autorisé",
+        message: "La permission finance.payment.record est requise pour enregistrer un paiement."
+      });
+    }
+    if (isRealSession && !canReadFeeCatalog()) {
+      return window.ssState({
+        type: "unavailable",
+        title: "Encaissement indisponible",
+        message: "Connexion backend à finaliser : la projection minimale d’encaissement doit être fournie sous finance.payment.record.",
+        details: "La Caisse ne contourne jamais finance.fee.read pour récupérer les obligations financières."
+      });
+    }
+
+    var profiles = financeState.studentFinancialProfiles || [];
+    if (!profiles.length) {
+      return window.ssState({
+        type: "empty",
+        title: "Aucun élève disponible",
+        message: "Aucune obligation financière n’est disponible pour l’encaissement."
+      });
+    }
+
+    var profile = selectedCashProfile();
+    if (!profile) {
+      return window.ssState({
+        type: "unavailable",
+        title: "Élève indisponible",
+        message: "La sélection actuelle ne correspond à aucun élève autorisé."
+      });
+    }
+    var student = profile.student;
+    var fee = selectedCashStudentFee(profile);
+    var availability = paymentAvailability(fee);
+    var studentOptions = profiles.map(function (item) {
+      return { value: item.student.id, label: item.student.name + " · " + item.student.className };
+    });
+    var feeOptions = (profile.fees || []).map(function (item) {
+      var status = financialStatusDefinition(item.status);
+      return { value: item.student_fee_id, label: item.label + " · " + status.label + " · " + formatFinancialAmount(item.remaining, item.currency) };
+    });
     var todayRows = financeTotals().today.map(function (transaction) {
-      var pdfAction = transaction.status === "Validé" ? window.ssIconButton({ icon: "file-down", variant: "light", title: "Télécharger le reçu PDF", attrs: { "data-export-receipt-id": escapeMarkup(transaction.id) } }) : '' + window.ssBadge({ variant: "warning", icon: "clock-3", label: "Après synchronisation" }) + '';
-      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(String(transaction.date).split(" · ").pop()) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + d.money(transaction.amount) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td><td>' + pdfAction + '</td></tr>';
+      var pdfAction = transaction.status === "Validé" ? window.ssIconButton({ icon: "file-down", variant: "light", title: "Télécharger le reçu PDF", attrs: { "data-export-receipt-id": escapeMarkup(transaction.id) } }) : transaction.status === "Démonstration" ? window.ssBadge({ variant: "info", icon: "flask-conical", label: "Démo — non officiel" }) : window.ssBadge({ variant: "warning", icon: "clock-3", label: "Après synchronisation" });
+      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(String(transaction.date).split(" · ").pop()) + '</small></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + formatTransactionAmount(transaction) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td><td>' + pdfAction + '</td></tr>';
     }).join("") || '<tr><td colspan="6">Aucune opération enregistrée aujourd’hui.</td></tr>';
-    var paymentForm = canRecord && student ? '<form class="payment-form" id="paymentForm"><header><span><i data-lucide="hand-coins"></i></span><div><h3>Enregistrer une tranche</h3><p>L’argent est reçu hors de SchoolSafe; cette action consigne uniquement l’opération.</p></div></header><div><label>Type de frais<select name="fee" required>' + feeOptions + '</select></label><label>Montant reçu en FC<input name="amount" type="number" min="1000" max="' + student.balance + '" step="1000" required placeholder="Montant"></label><label>Mode constaté<select name="mode"><option value="cash">Espèces</option><option value="card">Carte bancaire</option><option value="check">Chèque</option><option value="bank_transfer">Virement constaté</option><option value="mobile_money">Mobile money</option><option value="other">Autre moyen constaté</option></select></label><label>Référence ou observation<input name="reference" required placeholder="Ex. Deuxième tranche"></label></div>' + window.ssButton({ label: "Enregistrer et préparer le reçu", icon: "badge-check", type: "submit", disabled: student.balance <= 0 }) + '</form>' : '<aside class="finance-readonly"><i data-lucide="' + (financeState.dayStatus === "Ouverte" ? "eye" : "lock-keyhole") + '"></i><p>' + (financeState.dayStatus === "Ouverte" ? "Consultation et contrôle uniquement. Les encaissements sont exécutés par l’Agent de caisse autorisé." : "La journée a été soumise. Aucun nouvel encaissement ne peut être ajouté dans cet aperçu.") + '</p></aside>';
-    var studentPanel = student ? '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div>' + window.ssBadge({ variant: d.certificationStatusClass(student.status), label: student.status }) + '</header><label class="finance-student-picker">Élève<select id="financeStudentSelect">' + studentOptions + '</select></label><article class="student-finance-card"><span class="student-avatar large">' + student.initials + '</span><div><small>' + escapeMarkup(student.className + " · " + student.sex) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.guardian) + '</p></div></article><dl class="student-finance-facts"><div><dt>Frais attendus</dt><dd>' + d.money(student.expected) + '</dd></div><div><dt>Enregistré</dt><dd>' + d.money(student.paid) + '</dd></div><div><dt>Solde</dt><dd>' + d.money(student.balance) + '</dd></div></dl></section>' : '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Situation de l’élève</h3></div></header>' + window.ssState({ type: "empty", title: "Aucun dossier", message: "Aucun dossier avec solde à encaisser.", size: "compact" }) + '</section>';
-    return '<div class="cash-workspace"><section class="cashier-layout">' + studentPanel + paymentForm + '</section><section class="finance-panel"><header><div><span>Journal de caisse</span><h3>Opérations du jour</h3></div><b>' + d.money(financeTotals().todayTotal) + '</b></header>' +
+    var studentPanel = '<section class="finance-panel student-finance-panel"><header><div><span>Recherche du dossier</span><h3>Élève et obligations</h3></div>' + window.ssBadge({ variant: "neutral", label: profile.fees.length + " obligation(s)" }) + '</header>' +
+      window.ssField({ label: "Élève", labelFor: "financeCashStudent", required: true, inputHtml: window.ssSelect({ id: "financeCashStudent", name: "student_id", value: student.id, options: studentOptions }) }) +
+      '<article class="student-finance-card"><span class="student-avatar large">' + escapeMarkup(student.initials) + '</span><div><small>' + escapeMarkup(student.className + " · " + student.sex) + '</small><h3>' + escapeMarkup(student.name) + '</h3><p>' + escapeMarkup(student.guardian) + '</p></div></article>' +
+      (profile.fees.length ? window.ssField({ label: "Obligation financière", labelFor: "financeCashStudentFee", required: true, inputHtml: window.ssSelect({ id: "financeCashStudentFee", name: "student_fee_id", value: fee ? fee.student_fee_id : financeState.selectedCashStudentFeeId, options: feeOptions }) }) : window.ssState({ type: "empty", title: "Aucune obligation financière affectée", message: "Cet élève ne possède aucun student_fee disponible." })) +
+      '</section>';
+    var feeSummary = fee ? '<section class="finance-panel"><header><div><span>Obligation sélectionnée</span><h3>' + escapeMarkup(fee.label) + '</h3></div>' + window.ssBadge({ variant: financialStatusDefinition(fee.status).variant, label: financialStatusDefinition(fee.status).label }) + '</header>' +
+      window.ssTable({ headers: ["Type de frais", "Attendu", "Déjà payé", "Restant", "Devise"], rows: '<tr data-student-id="' + escapeMarkup(fee.student_id) + '" data-student-fee-id="' + escapeMarkup(fee.student_fee_id) + '" data-fee-structure-id="' + escapeMarkup(fee.fee_structure_id) + '"><td><b>' + escapeMarkup(fee.label) + '</b></td><td>' + formatFinancialAmount(fee.expected, fee.currency) + '</td><td>' + formatFinancialAmount(fee.paid, fee.currency) + '</td><td><b>' + formatFinancialAmount(fee.remaining, fee.currency) + '</b></td><td>' + escapeMarkup(fee.currency || "Indisponible") + '</td></tr>', responsive: true, compact: true }) + '</section>' : window.ssState({ type: "unavailable", title: "Obligation indisponible", message: "La sélection du student_fee doit être rétablie avant tout paiement." });
+    var paymentForm = fee && availability.allowed && financeState.dayStatus === "Ouverte" ? '<form class="payment-form" id="paymentForm" data-student-id="' + escapeMarkup(student.id) + '" data-student-fee-id="' + escapeMarkup(fee.student_fee_id) + '" data-fee-structure-id="' + escapeMarkup(fee.fee_structure_id) + '" data-currency="' + escapeMarkup(fee.currency) + '"><header><span><i data-lucide="hand-coins"></i></span><div><h3>Enregistrer un paiement</h3><p>Le paiement sera rattaché uniquement à l’obligation sélectionnée.</p></div></header><div>' +
+      window.ssField({ label: "Montant reçu", labelFor: "financePaymentAmount", required: true, help: "Maximum : " + formatFinancialAmount(fee.remaining, fee.currency), inputHtml: window.ssInput({ type: "number", name: "amount", id: "financePaymentAmount", required: true, min: paymentStepForCurrency(fee.currency), max: fee.remaining, step: paymentStepForCurrency(fee.currency), inputmode: "decimal", placeholder: "Montant en " + fee.currency }) }) +
+      window.ssField({ label: "Devise", labelFor: "financePaymentCurrency", inputHtml: window.ssInput({ type: "text", id: "financePaymentCurrency", value: fee.currency, readonly: true }) }) +
+      window.ssField({ label: "Mode constaté", labelFor: "financePaymentMode", required: true, inputHtml: window.ssSelect({ name: "mode", id: "financePaymentMode", value: "cash", options: [{ value: "cash", label: "Espèces" }, { value: "card", label: "Carte bancaire" }, { value: "check", label: "Chèque" }, { value: "bank_transfer", label: "Virement constaté" }, { value: "mobile_money", label: "Mobile money" }, { value: "other", label: "Autre moyen constaté" }] }) }) +
+      window.ssField({ label: "Référence ou observation", labelFor: "financePaymentReference", required: true, inputHtml: window.ssInput({ type: "text", name: "reference", id: "financePaymentReference", required: true, maxlength: 200, placeholder: "Ex. Deuxième tranche" }) }) +
+      '</div>' + window.ssButton({ label: isDemoMode() ? "Simuler le paiement (démo)" : "Enregistrer et préparer le reçu", icon: "badge-check", type: "submit" }) + '</form>' : window.ssState({ type: availability.allowed ? "unavailable" : "denied", title: availability.allowed ? "Encaissement indisponible" : "Paiement normal indisponible", message: financeState.dayStatus !== "Ouverte" ? "La journée de caisse ne permet plus de nouvel encaissement." : availability.message });
+    return '<div class="cash-workspace"><section class="cashier-layout">' + studentPanel + paymentForm + '</section><section class="finance-panel"><header><div><span>Journal de caisse</span><h3>Opérations du jour</h3></div><b>' + formatTransactionTotal(financeTotals().today) + '</b></header>' +
       window.ssTable({
         headers: ['Reçu', 'Élève', 'Mode constaté', 'Montant', 'Statut', 'PDF'],
         rows: todayRows,
@@ -741,7 +884,7 @@
         emptyTitle: 'Journal de caisse',
         responsive: true
       }) +
-      '</section></div>';
+      '</section>' + feeSummary + '</div>';
   }
 
   function renderReceipts() {
@@ -750,8 +893,8 @@
     var canRequestCancellation = role === "cashier" || role === "admin";
     var rows = financeState.transactions.map(function (transaction) {
       var cancellationButton = canRequestCancellation && transaction.status === "Validé" ? window.ssIconButton({ icon: "circle-x", variant: "danger", title: "Demander l’annulation", attrs: { "data-cancel-payment-id": escapeMarkup(transaction.id) } }) : "";
-      var receiptAction = transaction.status === "Validé" ? window.ssIconButton({ icon: "file-down", variant: "light", title: "Télécharger le reçu PDF", attrs: { "data-export-receipt-id": escapeMarkup(transaction.id) } }) : '' + window.ssBadge({ variant: "warning", icon: "clock-3", label: "PDF après synchronisation" }) + '';
-      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td><b>' + escapeMarkup(transaction.student) + '</b><small>' + escapeMarkup(transaction.className) + '</small></td><td>' + escapeMarkup(transaction.fee) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + d.money(transaction.amount) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td><td><div class="finance-row-actions">' + receiptAction + cancellationButton + '</div></td></tr>';
+      var receiptAction = transaction.status === "Validé" ? window.ssIconButton({ icon: "file-down", variant: "light", title: "Télécharger le reçu PDF", attrs: { "data-export-receipt-id": escapeMarkup(transaction.id) } }) : transaction.status === "Démonstration" ? window.ssBadge({ variant: "info", icon: "flask-conical", label: "Démo — non officiel" }) : window.ssBadge({ variant: "warning", icon: "clock-3", label: "PDF après synchronisation" });
+      return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b><small>' + escapeMarkup(transaction.date) + '</small></td><td><b>' + escapeMarkup(transaction.student) + '</b><small>' + escapeMarkup(transaction.className) + '</small></td><td>' + escapeMarkup(transaction.fee) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + formatTransactionAmount(transaction) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td><td><div class="finance-row-actions">' + receiptAction + cancellationButton + '</div></td></tr>';
     }).join("");
     return '<section class="finance-panel receipt-register"><header><div><span>Documents financiers</span><h3>Reçus et opérations</h3><p>Un reçu reste traçable même lorsqu’une annulation est demandée.</p></div>' + window.ssBadge({ variant: "neutral", icon: "shield-check", label: "PDF avec logo" }) + '</header><aside class="finance-audit-note"><i data-lucide="history"></i><p>Une demande d’annulation ne supprime jamais l’écriture. Elle doit être contrôlée et approuvée dans le circuit financier.</p></aside>' +
       window.ssTable({
@@ -1004,6 +1147,18 @@
     var studentSelect = document.getElementById("financeStudentSelect");
     if (studentSelect) studentSelect.addEventListener("change", function () { financeState.selectedPendingStudent = Number(this.value); renderFinanceModule(); });
 
+    var cashStudentSelect = document.getElementById("financeCashStudent");
+    if (cashStudentSelect) cashStudentSelect.addEventListener("change", function () {
+      financeState.selectedCashStudentId = this.value;
+      financeState.selectedCashStudentFeeId = "";
+      renderFinanceModule();
+    });
+    var cashStudentFeeSelect = document.getElementById("financeCashStudentFee");
+    if (cashStudentFeeSelect) cashStudentFeeSelect.addEventListener("change", function () {
+      financeState.selectedCashStudentFeeId = this.value;
+      renderFinanceModule();
+    });
+
     var familySelect = document.getElementById("familyFinanceStudent");
     if (familySelect) familySelect.addEventListener("change", function () { financeState.selectedFamilyStudent = Number(this.value); renderFinanceModule(); });
 
@@ -1113,22 +1268,48 @@
     var paymentForm = document.getElementById("paymentForm");
     if (paymentForm) paymentForm.addEventListener("submit", function (event) {
       event.preventDefault();
-      var student = financeState.pendingStudents[financeState.selectedPendingStudent];
-      if (!student) { d.notify("Aucun dossier sélectionné."); return; }
+      if (!canRecordPayment()) { d.notify("Action non autorisée.", "error"); return; }
+      if (!isDemoMode() && typeof navigator !== "undefined" && navigator.onLine === false) {
+        d.notify("Connexion requise pour enregistrer cet encaissement.", "error");
+        return;
+      }
+      var profile = selectedCashProfile();
+      var fee = selectedCashStudentFee(profile);
+      var availability = paymentAvailability(fee);
+      if (!profile || !fee || fee.student_id !== profile.student.id || !availability.allowed) {
+        d.notify((availability && availability.message) || "Sélectionnez une obligation financière valide.", "error");
+        return;
+      }
       var data = new FormData(paymentForm);
       var amount = Number(data.get("amount"));
-      if (!amount || amount <= 0 || amount > student.balance) { d.notify("Le montant doit être positif et ne pas dépasser le solde de l’élève."); return; }
-      var mode = data.get("mode");
-      var reference = data.get("reference");
+      var mode = String(data.get("mode") || "");
+      var reference = String(data.get("reference") || "").trim();
+      if (!Number.isFinite(amount) || amount <= 0 || amount > Number(fee.remaining)) { d.notify("Le montant doit être positif et ne pas dépasser le restant de cette obligation.", "error"); return; }
+      if (["CDF", "USD"].indexOf(fee.currency) === -1) { d.notify("La devise de cette obligation est indisponible.", "error"); return; }
+      if (!hasValidPaymentPrecision(amount, fee.currency)) { d.notify("Le montant ne respecte pas la précision autorisée pour cette devise.", "error"); return; }
+      if (paymentForm.getAttribute("data-student-fee-id") !== fee.student_fee_id || paymentForm.getAttribute("data-student-id") !== profile.student.id || paymentForm.getAttribute("data-currency") !== fee.currency) {
+        d.notify("La sélection du paiement a changé. Vérifiez l’obligation financière avant de confirmer.", "error");
+        return;
+      }
       var api = d.api;
-      (api ? api.createPayment({
-        student_fee_id: student.id,
+      var input = {
+        student_fee_id: fee.student_fee_id,
         amount: amount,
-        currency: student.currency || "CDF",
+        currency: fee.currency,
         mode: mode,
         reference: reference,
         metadata: { mode: mode, reference: reference }
-      }) : Promise.reject(new Error("API indisponible"))).then(function (res) {
+      };
+      if (isDemoMode()) {
+        recordDemoPayment(profile, fee, amount, mode, reference, d);
+        return;
+      }
+      if (!api || typeof api.createPayment !== "function") {
+        d.notify("Connexion requise pour enregistrer cet encaissement.", "error");
+        return;
+      }
+      api.createPayment(input).then(function (res) {
+        financeState.lastConfirmedPayment = res || null;
         d.notify("Paiement enregistré sur le serveur.");
         financeState.loaded = false;
         return loadFinanceData();
@@ -1137,34 +1318,7 @@
         renderFinanceModule();
       }).catch(function (err) {
         console.warn("[Finance] paiement backend échoué", err);
-        if (!isDemoMode()) {
-          d.notify("Impossible d’enregistrer le paiement : " + (err.message || "erreur"), "error");
-          return;
-        }
-        var updatedStudent = Object.assign({}, student, {
-          paid: student.paid + amount,
-          balance: Math.max(0, student.expected - (student.paid + amount))
-        });
-        updatedStudent.status = updatedStudent.balance === 0 ? "En ordre" : "À régulariser";
-        financeState.pendingStudents = financeState.pendingStudents.slice();
-        financeState.pendingStudents[financeState.selectedPendingStudent] = updatedStudent;
-        financeState.students = financeState.students.map(function (s) {
-          return s.id === updatedStudent.id ? Object.assign({}, s, { paid: updatedStudent.paid, balance: updatedStudent.balance, status: updatedStudent.status }) : s;
-        });
-        var localReference = "PAY-LOCAL-" + Date.now();
-        financeState.transactions.unshift({ id: "local-" + Date.now(), receipt: "Après synchronisation", date: formatIsoDateTimeFr(new Date().toISOString()), day: formatIsoDateFr(new Date().toISOString()), student: student.name, className: student.className, fee: String(data.get("fee")).split(" · ")[0], amount: amount, mode: modeLabel(mode), cashier: "—", reference: reference, status: "En attente de synchronisation", localReference: localReference });
-        d.queueOfflineOperation("finance", "Paiement de " + student.name, {
-          kind: "payment",
-          localReference: localReference,
-          student: student.name,
-          amount: amount,
-          fee: String(data.get("fee")).split(" · ")[0]
-        }).then(function (operation) {
-          if (operation && financeState.transactions[0] && financeState.transactions[0].localReference === localReference) financeState.transactions[0].syncOperationId = operation.id;
-        });
-        financeState.activeTab = "receipts";
-        d.notify(navigator.onLine ? "Paiement consigné. Le reçu sera produit après confirmation." : "Paiement conservé sur cet appareil. Le reçu sera produit au retour de la connexion.");
-        renderFinanceModule();
+        d.notify("Impossible d’enregistrer le paiement : " + (err.message || "erreur"), "error");
       });
     });
 
@@ -1440,7 +1594,7 @@
     financeState.activeTab = allowedTabs.indexOf(requestedTab) === -1 ? allowedTabs[0] : requestedTab;
 
     bindModuleTabs();
-    if ((financeState.activeTab === "family" && !isDemoMode()) || (financeState.activeTab === "balances" && !canReadFinancialDetails())) {
+    if ((financeState.activeTab === "family" && !isDemoMode()) || (financeState.activeTab === "balances" && !canReadFinancialDetails()) || (financeState.activeTab === "cash" && !isDemoMode() && canRecordPayment() && !canReadFeeCatalog())) {
       // own_children et status-only n'ont pas de projection dédiée : ne jamais demander la liste globale des student_fees.
       renderFinanceModule();
     } else {
