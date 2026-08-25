@@ -1961,6 +1961,7 @@
         document.querySelectorAll("#workspaceNav button").forEach(function (b) { b.classList.remove("active"); });
         button.classList.add("active");
         closeWorkspaceMenu();
+        showDashboard();
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
     });

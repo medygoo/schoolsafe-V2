@@ -13,6 +13,13 @@
   background: var(--ss-navy-950);
 }
 
+/* Un écran auth inactif doit rester hors du flux (comme les autres .screen),
+   sinon il occupe 100svh au-dessus du workspace et décale le tableau de bord. */
+.auth-screen:not(.active) {
+  position: fixed;
+  inset: 0;
+}
+
 /* --------------------------------------------------------------------------
    Média de fond + shade
    -------------------------------------------------------------------------- */
