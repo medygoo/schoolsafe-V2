@@ -708,7 +708,7 @@
   }
 }
 
-@media (max-width: 620px) {
+@media (max-width: 768px) {
   .setup-sidebar #stepNav {
     justify-content: space-around;
   }

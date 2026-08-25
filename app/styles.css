@@ -55,7 +55,7 @@
 .workspace-screen .workspace-content .branch-head p { font-size: 12px; }
 .workspace-screen .workspace-content .work-group h4 { font-size: 12px; }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .workspace-demo-banner { margin: 12px 16px 0; font-size: 13px; }
   .workspace-screen .workspace-content .overview-stat small { font-size: 12px; }
   .workspace-screen .workspace-content .overview-stat b { font-size: 16px; }
@@ -91,7 +91,7 @@
 .remediation-nav button,
 .exam-switch button { min-height: 44px; font-size: 14px; line-height: 1.25; white-space: normal; overflow-wrap: anywhere; }
 
-@media (max-width: 620px) {
+@media (max-width: 768px) {
   .pedagogy-tabs:not(.finance-tabs),
   .pilotage-tabs { display: flex; grid-template-columns: none; overflow-x: auto; justify-content: flex-start; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
 

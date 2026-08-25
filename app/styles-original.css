@@ -382,7 +382,7 @@ html[lang="en"] .translation-fallback[data-source-language="en"] { display: none
 .finance-control dl div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 7px; border-bottom: 1px solid #d6e9e5; }
 .finance-control dt { color: #60706e; font-size: 12px; }
 .finance-control dd { margin: 0; color: #183a36; font-size: 12px; font-weight: 900; }
-.finance-table { width: 100%; border-collapse: collapse; min-width: 660px; }
+.finance-table { width: 100%; border-collapse: collapse; }
 .finance-table th { height: 34px; padding: 6px 9px; color: #667187; background: #f3f6fa; font-size: 12px; font-weight: 900; text-align: left; text-transform: uppercase; }
 .finance-table td { height: 47px; padding: 8px 9px; border-top: 1px solid #edf0f5; color: #35425a; font-size: 12px; vertical-align: middle; }
 .finance-table td > b, .finance-table td > small { display: block; }
@@ -423,7 +423,7 @@ html[lang="en"] .translation-fallback[data-source-language="en"] { display: none
 .finance-audit-note p, .finance-status-boundary p, .family-result-status p { margin: 0; font-size: 12px; line-height: 1.5; }
 .finance-status-boundary { margin: 12px 14px; border-left-color: #087a55; color: #245849; background: #f1faf7; }
 .finance-status-boundary b { display: block; margin-bottom: 3px; font-size: 12px; }
-.status-only-table { min-width: 520px; }
+.status-only-table { width: 100%; border-collapse: collapse; }
 .balance-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 12px 14px 4px; }
 .balance-summary article { min-height: 54px; padding: 9px; border-left: 3px solid #087a6b; background: #f4faf9; }
 .balance-summary small, .balance-summary b { display: block; }

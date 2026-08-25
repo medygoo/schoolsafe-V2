@@ -227,7 +227,7 @@
 .cards-preview-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:var(--ss-space-6);overflow:auto;background:linear-gradient(135deg,var(--ss-bg-secondary),var(--ss-bg-tertiary))}
 .cards-preview-wrap .ss-card-studio{transform-origin:center top}
 .cards-student-list{max-height:220px;overflow-y:auto;border:1.5px solid var(--ss-border-strong);border-radius:var(--ss-radius);padding:var(--ss-space-2);background:var(--ss-bg-primary)}
-.cards-student-list label{display:flex;align-items:center;gap:var(--ss-space-2);padding:var(--ss-space-1) var(--ss-space-1);font-size: var(--ss-text-sm);font-weight:var(--ss-font-medium);color:var(--ss-text-primary);cursor:pointer;border-radius:var(--ss-radius-sm)}
+.cards-student-list label{display:flex;align-items:center;min-height:44px;gap:var(--ss-space-2);padding:var(--ss-space-1) var(--ss-space-1);font-size: var(--ss-text-sm);font-weight:var(--ss-font-medium);color:var(--ss-text-primary);cursor:pointer;border-radius:var(--ss-radius-sm)}
 .cards-student-list label:hover{background:var(--ss-bg-secondary)}
 .cards-student-list input[type=checkbox]{flex:none;width:16px;height:16px}
 .cards-student-list .student-meta{margin-left:auto;font-size: var(--ss-text-xs);color:var(--ss-text-secondary);font-weight:var(--ss-font-regular)}

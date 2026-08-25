@@ -536,7 +536,7 @@
   }
 }
 
-@media (max-width: 620px) {
+@media (max-width: 768px) {
   .auth-topbar {
     left: var(--ss-space-4);
     right: var(--ss-space-4);

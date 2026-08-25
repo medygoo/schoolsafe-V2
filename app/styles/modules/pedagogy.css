@@ -680,10 +680,6 @@
   font-size: var(--ss-text-sm);
 }
 
-.grade-table td:first-child {
-  min-width: 180px;
-}
-
 .student-avatar {
   width: 30px;
   height: 30px;
@@ -1426,7 +1422,7 @@
 }
 
 .remediation-nav button {
-  min-height: 37px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: var(--ss-space-2);
@@ -1516,7 +1512,7 @@
 }
 
 .exam-switch button {
-  min-height: 35px;
+  min-height: 44px;
   border: 0;
   border-radius: var(--ss-radius-sm);
   padding: 0 var(--ss-space-3);
@@ -1666,15 +1662,10 @@
 }
 
 .certification-table td {
-  min-width: 90px;
   padding: var(--ss-space-2);
   border-top: 1px solid var(--ss-border-subtle);
   color: var(--ss-text-primary);
   font-size: var(--ss-text-sm);
-}
-
-.certification-table td:first-child {
-  min-width: 180px;
 }
 
 .certification-table td small {
@@ -2738,7 +2729,6 @@
   border-top: 1px solid var(--ss-border-subtle);
   text-align: left;
   font-size: var(--ss-text-sm);
-  white-space: nowrap;
 }
 
 .remediation-table th {
@@ -3021,6 +3011,7 @@
 }
 
 .palmares-view-toggle button {
+  min-height: 44px;
   padding: var(--ss-space-1) var(--ss-space-3);
   border: 1px solid var(--ss-border-strong);
   background: var(--ss-bg-primary);
@@ -3140,6 +3131,7 @@
 }
 
 .palmares-star-btn {
+  min-height: 44px;
   margin-top: var(--ss-space-2);
   padding: var(--ss-space-1) var(--ss-space-2);
   border: 1px solid var(--ss-gold-600);

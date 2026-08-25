@@ -1678,7 +1678,8 @@ body.screen-workspace {
   font-weight: var(--ss-font-bold);
 }
 
-/* --------------------------------------------------------------------------   Console Rôles et accès
+/* --------------------------------------------------------------------------
+   Console Rôles et accès
    -------------------------------------------------------------------------- */
 .access-console {
   display: flex;
@@ -1915,7 +1916,8 @@ body.screen-workspace {
   border-radius: var(--ss-radius-sm);
   color: var(--ss-text-primary);
   background: var(--ss-bg-primary);
-  font-size: var(--ss-text-sm);}
+  font-size: var(--ss-text-sm);
+}
 
 .access-data-policy {
   padding: var(--ss-space-4);
@@ -2493,7 +2495,7 @@ body.screen-workspace {
 /* --------------------------------------------------------------------------
    Responsive breadcrumb / dropdowns
    -------------------------------------------------------------------------- */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .workspace-breadcrumb {
     padding: var(--ss-space-2);
   }
@@ -2825,7 +2827,7 @@ body.screen-workspace {
   background: var(--ss-bg-primary);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .sync-panel {
     width: 100%;
     border-left: 0;

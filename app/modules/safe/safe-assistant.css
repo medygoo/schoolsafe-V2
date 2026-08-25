@@ -69,12 +69,12 @@
 
 .safe-bubble-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--ss-space-2); }
 .safe-bubble-header strong { color: var(--ss-violet-700); font-size: var(--ss-text-sm); }
-.safe-bubble-close { background: none; border: none; cursor: pointer; color: var(--ss-text-muted); min-height: 32px; min-width: 32px; }
+.safe-bubble-close { background: none; border: none; cursor: pointer; color: var(--ss-text-muted); min-height: 44px; min-width: 44px; }
 .safe-bubble-close:hover { color: var(--ss-text-primary); }
 .safe-bubble-body { font-size: var(--ss-text-sm); line-height: var(--ss-leading-normal); color: var(--ss-text-secondary); max-height: 220px; overflow-y: auto; }
 .safe-bubble-body p { margin: 0 0 var(--ss-space-2); }
 .safe-suggestions { display: flex; flex-wrap: wrap; gap: var(--ss-space-1); margin-top: var(--ss-space-2); }
-.safe-suggestions button { font-size: var(--ss-text-xs); padding: var(--ss-space-1) var(--ss-space-2); border: 1px solid var(--ss-violet-600); background: var(--ss-bg-primary); color: var(--ss-violet-700); border-radius: var(--ss-radius-full); cursor: pointer; font-weight: var(--ss-font-bold); transition: all var(--ss-transition-fast); }
+.safe-suggestions button { min-height: 44px; padding: var(--ss-space-1) var(--ss-space-2); border: 1px solid var(--ss-violet-600); background: var(--ss-bg-primary); color: var(--ss-violet-700); border-radius: var(--ss-radius-full); cursor: pointer; font-size: var(--ss-text-xs); font-weight: var(--ss-font-bold); transition: all var(--ss-transition-fast); }
 .safe-suggestions button:hover { background: var(--ss-violet-600); color: var(--ss-text-inverse); }
 .safe-input-row { display: flex; gap: var(--ss-space-1); margin-top: var(--ss-space-2); }
 .safe-input-row input { flex: 1; min-height: 44px; padding: var(--ss-space-2); border: 1px solid var(--ss-border-strong); border-radius: var(--ss-radius-sm); background: var(--ss-bg-primary); color: var(--ss-text-primary); font: inherit; font-size: var(--ss-text-sm); }

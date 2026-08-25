@@ -69,7 +69,7 @@ function main() {
   );
   assert.match(
     globalStyles,
-    /@media \(max-width: 620px\) \{[\s\S]*?\.pedagogy-tabs:not\(\.finance-tabs\) button,[\s\S]*?\.pilotage-tabs button\s*\{[\s\S]*?font-size:\s*12px/,
+    /@media \(max-width: 768px\) \{[\s\S]*?\.pedagogy-tabs:not\(\.finance-tabs\) button,[\s\S]*?\.pilotage-tabs button\s*\{[\s\S]*?font-size:\s*12px/,
     "Les onglets mobiles doivent rester à 12px minimum avec une stratégie responsive dédiée.",
   );
   console.log("UI-VIS-01 active typography floor: PASS");
