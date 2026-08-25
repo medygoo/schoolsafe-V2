@@ -8,6 +8,7 @@ const stylesheets = [
   "styles/design-tokens.css",
   "styles/components.css",
   "styles/dashboard.css",
+  "styles/modules/pedagogy.css",
   "modules/school/school.css",
   "modules/safe/safe-assistant.css",
   "modules/cards/assets/cards.css",
@@ -39,7 +40,12 @@ function main() {
     [],
     `Les CSS actifs ne doivent plus définir de texte fonctionnel sous 12px : ${undersized.join(", ")}`,
   );
-  const globalStyles = fs.readFileSync(path.join(__dirname, "styles.css"), "utf8");
+  const globalStyles = [
+    "styles.css",
+    "styles/modules/pedagogy.css",
+  ]
+    .map((file) => fs.readFileSync(path.join(__dirname, file), "utf8"))
+    .join("\n");
 
   assert.match(
     globalStyles,
