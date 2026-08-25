@@ -322,6 +322,7 @@
 
   function enterDemo() {
     notify("Accès de démonstration — ouverture de l’espace Administrateur principal.");
+    window.schoolSafeDemoMode = !currentApiToken();
     window.setTimeout(function () { showScreen("workspace"); }, 250);
   }
 
@@ -1799,6 +1800,9 @@
     currentDemoRole = roleCatalog[roleKey] ? roleKey : "admin";
     var accessUser = getCurrentUser();
     var access = window.SchoolSafeAccess;
+    // Source unique du mode démo pour les modules finance/fee-control
+    window.schoolSafeDemoMode = !currentApiToken();
+
     var demoBanner = document.getElementById("workspaceDemoBanner");
     if (demoBanner) {
       demoBanner.hidden = !!currentApiToken();
