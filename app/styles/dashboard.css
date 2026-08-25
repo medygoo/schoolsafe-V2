@@ -518,6 +518,14 @@ body.screen-workspace {
 
 /* Hero */
 .dashboard-hero {
+  --hero-text: var(--ss-text-inverse);
+  --hero-text-soft: color-mix(in srgb, var(--ss-text-inverse) 75%, transparent);
+  --hero-surface: color-mix(in srgb, var(--ss-text-inverse) 10%, transparent);
+  --hero-surface-strong: color-mix(in srgb, var(--ss-text-inverse) 18%, transparent);
+  --hero-border: color-mix(in srgb, var(--ss-text-inverse) 20%, transparent);
+  --hero-label-bg: color-mix(in srgb, var(--ss-text-inverse) 12%, transparent);
+  --hero-label-border: color-mix(in srgb, var(--ss-text-inverse) 10%, transparent);
+
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
   gap: var(--ss-space-6);
@@ -527,6 +535,16 @@ body.screen-workspace {
   border-radius: var(--ss-radius-xl);
   box-shadow: var(--ss-shadow-xl);
   overflow: hidden;
+}
+
+[data-theme="dark"] .dashboard-hero {
+  --hero-text: var(--ss-text-primary);
+  --hero-text-soft: var(--ss-text-secondary);
+  --hero-surface: color-mix(in srgb, var(--ss-text-primary) 10%, transparent);
+  --hero-surface-strong: color-mix(in srgb, var(--ss-text-primary) 18%, transparent);
+  --hero-border: color-mix(in srgb, var(--ss-text-primary) 20%, transparent);
+  --hero-label-bg: color-mix(in srgb, var(--ss-text-primary) 12%, transparent);
+  --hero-label-border: color-mix(in srgb, var(--ss-text-primary) 10%, transparent);
 }
 
 .hero-copy {
@@ -541,8 +559,8 @@ body.screen-workspace {
   align-items: center;
   gap: var(--ss-space-2);
   padding: var(--ss-space-1) var(--ss-space-3);
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--hero-label-bg);
+  border: 1px solid var(--hero-label-border);
   border-radius: var(--ss-radius-sm);
   color: var(--ss-gold-400);
   font-size: var(--ss-text-xs);
@@ -556,15 +574,32 @@ body.screen-workspace {
   font-size: clamp(var(--ss-text-3xl), 3vw, var(--ss-text-4xl));
   font-weight: var(--ss-font-extrabold);
   line-height: var(--ss-leading-tight);
-  color: #fff;
+  color: var(--hero-text);
 }
 
 .hero-copy > p {
   margin: 0;
   font-size: var(--ss-text-base);
   line-height: var(--ss-leading-normal);
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--hero-text-soft);
   max-width: 560px;
+}
+
+.hero-date {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ss-space-2);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-semibold);
+  color: var(--ss-gold-400);
+}
+
+.hero-date::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ss-gold-400);
 }
 
 .hero-actions {
@@ -593,8 +628,8 @@ body.screen-workspace {
 }
 
 .hero-cta--primary {
-  background: #fff;
-  color: var(--ss-blue-900);
+  background: var(--ss-bg-inverse);
+  color: var(--ss-text-brand);
   border: 0;
   box-shadow: var(--ss-shadow-lg);
 }
@@ -605,22 +640,19 @@ body.screen-workspace {
 }
 
 .hero-cta--secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--hero-surface);
+  color: var(--hero-text);
+  border: 1px solid var(--hero-border);
 }
 
 .hero-cta--secondary:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--hero-surface-strong);
 }
 
 .hero-visual {
-  position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  gap: var(--ss-space-4);
   min-height: 260px;
 }
 
@@ -630,44 +662,6 @@ body.screen-workspace {
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.2));
-}
-
-.hero-weather {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ss-space-3);
-  padding: var(--ss-space-3) var(--ss-space-4);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--ss-radius-lg);
-  color: #fff;
-}
-
-.hero-weather svg {
-  width: 28px;
-  height: 28px;
-  color: var(--ss-gold-400);
-}
-
-.hero-weather b {
-  display: block;
-  font-size: var(--ss-text-lg);
-  font-weight: var(--ss-font-bold);
-}
-
-.hero-weather span {
-  display: block;
-  font-size: var(--ss-text-sm);
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.hero-weather small {
-  display: block;
-  font-size: var(--ss-text-xs);
-  color: rgba(255, 255, 255, 0.6);
 }
 
 /* KPI */
@@ -1520,18 +1514,11 @@ body.screen-workspace {
 
   .hero-visual {
     order: -1;
-    align-items: center;
     min-height: auto;
   }
 
   .hero-illustration {
     max-width: 260px;
-  }
-
-  .hero-weather {
-    position: relative;
-    bottom: auto;
-    right: auto;
   }
 }
 

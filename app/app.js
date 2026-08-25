@@ -1804,6 +1804,13 @@
       demoBanner.hidden = !!currentApiToken();
       if (!demoBanner.hidden) icons();
     }
+
+    // Date honnête dans le hero
+    var heroDate = document.getElementById("heroDate");
+    if (heroDate) {
+      heroDate.textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("financeModule").hidden = true;
     document.getElementById("securityModule").hidden = true;
