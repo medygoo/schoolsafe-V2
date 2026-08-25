@@ -9,7 +9,9 @@ const stylesheets = [
   "styles/components.css",
   "styles/dashboard.css",
   "styles/modules/pedagogy.css",
-  "modules/school/school.css",
+  "styles/modules/school.css",
+  "styles/modules/security.css",
+  "styles/modules/pilotage.css",
   "modules/safe/safe-assistant.css",
   "modules/cards/assets/cards.css",
 ];
@@ -43,6 +45,9 @@ function main() {
   const globalStyles = [
     "styles.css",
     "styles/modules/pedagogy.css",
+    "styles/modules/school.css",
+    "styles/modules/security.css",
+    "styles/modules/pilotage.css",
   ]
     .map((file) => fs.readFileSync(path.join(__dirname, file), "utf8"))
     .join("\n");

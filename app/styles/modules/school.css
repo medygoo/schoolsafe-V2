@@ -1,0 +1,130 @@
+.school-module { padding: var(--ss-space-4); }
+
+.school-tabs {
+  display: flex;
+  gap: var(--ss-space-1);
+  border-bottom: 1px solid var(--ss-border-default);
+  margin-bottom: var(--ss-space-4);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.school-tabs button {
+  min-height: 44px;
+  padding: var(--ss-space-2) var(--ss-space-4);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-bold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--ss-transition-fast);
+}
+
+.school-tabs button.active {
+  color: var(--ss-text-brand);
+  border-bottom-color: var(--ss-text-brand);
+}
+
+.school-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ss-space-4);
+}
+
+.school-form .form-section {
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius);
+  padding: var(--ss-space-4);
+  background: var(--ss-bg-primary);
+}
+
+.school-form label {
+  display: block;
+  margin: var(--ss-space-1) 0;
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-xs);
+  font-weight: var(--ss-font-extrabold);
+}
+
+.school-form input,
+.school-form textarea,
+.school-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--ss-space-2);
+  border: 1px solid var(--ss-border-strong);
+  border-radius: var(--ss-radius-sm);
+  background: var(--ss-bg-primary);
+  color: var(--ss-text-primary);
+  font: inherit;
+  font-size: var(--ss-text-sm);
+}
+
+.school-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.school-table th,
+.school-table td {
+  padding: var(--ss-space-3);
+  border-bottom: 1px solid var(--ss-border-subtle);
+  text-align: left;
+  font-size: var(--ss-text-sm);
+}
+
+.school-table th {
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-xs);
+  font-weight: var(--ss-font-extrabold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.school-role-badge {
+  display: inline-flex;
+  align-items: center;
+  background: var(--ss-bg-secondary);
+  padding: var(--ss-space-1) var(--ss-space-2);
+  border-radius: var(--ss-radius-full);
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-xs);
+  font-weight: var(--ss-font-extrabold);
+  margin-right: var(--ss-space-1);
+}
+
+.school-status.active { color: var(--ss-emerald-700); }
+.school-status.inactive { color: var(--ss-coral-700); }
+
+.school-staff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ss-space-3);
+  margin-bottom: var(--ss-space-4);
+}
+
+.school-actions {
+  display: flex;
+  gap: var(--ss-space-2);
+}
+
+@media (max-width: 768px) {
+  .school-staff-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .school-actions {
+    flex-wrap: wrap;
+  }
+
+  .school-table th,
+  .school-table td {
+    padding: var(--ss-space-2);
+  }
+}
