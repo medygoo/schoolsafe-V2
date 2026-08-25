@@ -867,7 +867,7 @@
 /* Small variant */
 .ss-badge--sm {
   padding: 1px 6px;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 [data-theme="dark"] .ss-badge--primary { background: rgba(59, 130, 246, 0.2); color: var(--ss-blue-300); }

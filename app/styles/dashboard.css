@@ -364,7 +364,7 @@ body.screen-workspace {
   background: var(--ss-coral-500);
   color: #fff;
   border-radius: var(--ss-radius-full);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: var(--ss-font-bold);
   display: inline-flex;
   align-items: center;
