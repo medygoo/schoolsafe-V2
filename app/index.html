@@ -22,6 +22,12 @@
   <link rel="stylesheet" href="./styles/components.css">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./styles/dashboard.css">
+  <link rel="stylesheet" href="./styles/modules/pedagogy.css">
+  <link rel="stylesheet" href="./styles/modules/school.css">
+  <link rel="stylesheet" href="./styles/modules/security.css">
+  <link rel="stylesheet" href="./styles/modules/pilotage.css">
+  <link rel="stylesheet" href="./styles/screens/setup.css">
+  <link rel="stylesheet" href="./styles/screens/auth.css">
   <script>
     // Filet temporaire de comparaison legacy : ?legacy=1 recharge v4-theme.css APRÈS le Design System
     // pour permettre un A/B visuel avec l'ancien rendu Aura Blue.
@@ -31,7 +37,6 @@
   </script>
   <link rel="stylesheet" href="./modules/cards/assets/cards.css">
   <link rel="stylesheet" href="./modules/safe/safe-assistant.css">
-  <link rel="stylesheet" href="modules/school/school.css">
   <script src="./lucide.min.js" defer></script>
   <script src="./jspdf.umd.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
@@ -333,6 +338,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                 <span class="hero-label">Vue d'ensemble</span>
                 <h1 id="desktopHeroTitle">Pilotez votre établissement avec clarté et confiance.</h1>
                 <p>SchoolSafe centralise la gestion de votre école pour des décisions plus justes et un impact durable.</p>
+                <p class="hero-date" id="heroDate"></p>
                 <div class="hero-actions">
                   <button class="hero-cta hero-cta--primary" type="button"><i data-lucide="bar-chart-3"></i> Vue exécutive</button>
                   <button class="hero-cta hero-cta--secondary" type="button" id="desktopSetupBtn"><i data-lucide="settings"></i> Configurer mon école</button>
@@ -340,10 +346,6 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               </div>
               <div class="hero-visual">
                 <img src="./schoolsafe-logo.png" alt="" class="hero-illustration">
-                <div class="hero-weather">
-                  <i data-lucide="sun"></i>
-                  <div><b>28°C</b><span>Abidjan, Côte d'Ivoire</span><small>22 août 2025 - 04:39</small></div>
-                </div>
               </div>
             </div>
 

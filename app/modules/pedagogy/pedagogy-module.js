@@ -601,7 +601,12 @@
       else if (state.activeTab === "lesson-plans") content = renderLessonPlans();
       else if (state.activeTab === "parent-view") content = renderParentView();
     }
-    container.innerHTML = content;
+    var contentContainer = document.getElementById("pedagogyModuleContent");
+    if (contentContainer) {
+      contentContainer.innerHTML = content;
+    } else {
+      container.innerHTML = content;
+    }
     bindEvents();
     refreshIcons();
   }

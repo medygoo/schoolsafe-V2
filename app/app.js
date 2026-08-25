@@ -322,6 +322,7 @@
 
   function enterDemo() {
     notify("Accès de démonstration — ouverture de l’espace Administrateur principal.");
+    window.schoolSafeDemoMode = !currentApiToken();
     window.setTimeout(function () { showScreen("workspace"); }, 250);
   }
 
@@ -1799,11 +1800,21 @@
     currentDemoRole = roleCatalog[roleKey] ? roleKey : "admin";
     var accessUser = getCurrentUser();
     var access = window.SchoolSafeAccess;
+    // Source unique du mode démo pour les modules finance/fee-control
+    window.schoolSafeDemoMode = !currentApiToken();
+
     var demoBanner = document.getElementById("workspaceDemoBanner");
     if (demoBanner) {
       demoBanner.hidden = !!currentApiToken();
       if (!demoBanner.hidden) icons();
     }
+
+    // Date honnête dans le hero
+    var heroDate = document.getElementById("heroDate");
+    if (heroDate) {
+      heroDate.textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("financeModule").hidden = true;
     document.getElementById("securityModule").hidden = true;
@@ -2461,7 +2472,7 @@
             label: "Valider",
             variant: "primary",
             close: false,
-            onClick: async function (modalApi) {
+            onClick: async function (event, modalApi) {
               var input = document.getElementById("setup-token-input");
               var token = input ? input.value.trim() : "";
               if (!token) { modalApi.setError("Veuillez saisir un token."); return; }

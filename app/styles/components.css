@@ -785,7 +785,7 @@
   grid-template-columns: 1fr;
 }
 
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   .ss-form-grid--2 { grid-template-columns: repeat(2, 1fr); }
   .ss-form-grid--3 { grid-template-columns: repeat(3, 1fr); }
   .ss-form-grid--4 { grid-template-columns: repeat(4, 1fr); }
@@ -1108,7 +1108,7 @@
 }
 
 /* Mobile responsive columns */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .ss-table--responsive .ss-table__cell--hide-sm,
   .ss-table--responsive th.ss-table__cell--hide-sm,
   .ss-table--responsive td.ss-table__cell--hide-sm {

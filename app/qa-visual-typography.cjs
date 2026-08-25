@@ -8,7 +8,10 @@ const stylesheets = [
   "styles/design-tokens.css",
   "styles/components.css",
   "styles/dashboard.css",
-  "modules/school/school.css",
+  "styles/modules/pedagogy.css",
+  "styles/modules/school.css",
+  "styles/modules/security.css",
+  "styles/modules/pilotage.css",
   "modules/safe/safe-assistant.css",
   "modules/cards/assets/cards.css",
 ];
@@ -39,7 +42,15 @@ function main() {
     [],
     `Les CSS actifs ne doivent plus définir de texte fonctionnel sous 12px : ${undersized.join(", ")}`,
   );
-  const globalStyles = fs.readFileSync(path.join(__dirname, "styles.css"), "utf8");
+  const globalStyles = [
+    "styles.css",
+    "styles/modules/pedagogy.css",
+    "styles/modules/school.css",
+    "styles/modules/security.css",
+    "styles/modules/pilotage.css",
+  ]
+    .map((file) => fs.readFileSync(path.join(__dirname, file), "utf8"))
+    .join("\n");
 
   assert.match(
     globalStyles,
@@ -58,7 +69,7 @@ function main() {
   );
   assert.match(
     globalStyles,
-    /@media \(max-width: 620px\) \{[\s\S]*?\.pedagogy-tabs:not\(\.finance-tabs\) button,[\s\S]*?\.pilotage-tabs button\s*\{[\s\S]*?font-size:\s*12px/,
+    /@media \(max-width: 768px\) \{[\s\S]*?\.pedagogy-tabs:not\(\.finance-tabs\) button,[\s\S]*?\.pilotage-tabs button\s*\{[\s\S]*?font-size:\s*12px/,
     "Les onglets mobiles doivent rester à 12px minimum avec une stratégie responsive dédiée.",
   );
   console.log("UI-VIS-01 active typography floor: PASS");
