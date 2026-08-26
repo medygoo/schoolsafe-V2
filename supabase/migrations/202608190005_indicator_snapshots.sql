@@ -28,6 +28,7 @@ alter table public.indicator_snapshots enable row level security;
 revoke all on table public.indicator_snapshots from anon, authenticated;
 grant select, insert on table public.indicator_snapshots to authenticated;
 
+drop policy if exists indicator_snapshots_current_school on public.indicator_snapshots;
 create policy indicator_snapshots_current_school
   on public.indicator_snapshots
   for all
