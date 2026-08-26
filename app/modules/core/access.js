@@ -120,10 +120,10 @@
 
   /**
    * Vérifie une permission unique.
-   * Administrateur principal = toujours true.
+   * Aucun bypass : l’Administrateur principal passe par ses permissions réelles,
+   * comme tout le monde (Access_Law — un DENY explicite l’emporte toujours).
    */
   function canAccess(user, permissionCode) {
-    if (isAdmin(user)) return true;
     return userPermissions(user).indexOf(permissionCode) >= 0;
   }
 
@@ -131,7 +131,6 @@
    * Vérifie si au moins une permission de la liste est accordée.
    */
   function canAccessAny(user, permissionCodes) {
-    if (isAdmin(user)) return true;
     if (!Array.isArray(permissionCodes) || permissionCodes.length === 0) return false;
     var perms = userPermissions(user);
     for (var i = 0; i < permissionCodes.length; i += 1) {
