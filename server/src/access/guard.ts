@@ -1,11 +1,17 @@
 import type { FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
 import { SchoolSafeError } from "../http/errors.js";
 import type { AccessService } from "./service.js";
+import type { ScopeTarget } from "./scope-resolvers.js";
 import type { AuditService } from "../audit/service.js";
 
 export interface PermissionScope {
   type: string;
   id?: string | null;
+  /**
+   * Cible métier optionnelle. Si fournie et que l'AccessService expose checkScope,
+   * la vérification passe par les résolveurs métier ; sinon hasScope est utilisé.
+   */
+  target?: ScopeTarget;
 }
 
 export function extractBearerToken(header?: string): string | null {
@@ -43,7 +49,10 @@ export function requirePermission(
     }
 
     if (scope) {
-      const inScope = await access.hasScope(token, scope.type, scope.id ?? null);
+      const inScope =
+        scope.target && access.checkScope
+          ? await access.checkScope(token, scope.type, scope.target)
+          : await access.hasScope(token, scope.type, scope.id ?? null);
       if (!inScope) {
         if (audit) {
           await recordAccessDenial(
