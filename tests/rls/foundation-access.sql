@@ -54,7 +54,7 @@ insert into public.profile_roles (profile_id, role_id) values
   ('50000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000007');
 
 insert into public.role_permission_grants (role_id, permission_id, allowed)
-values ('20000000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000003', true);
+values ('20000000-0000-0000-0000-000000000004', (select id from public.permissions where code = 'school.student.read'), true);
 
 select set_config('request.jwt.claim.sub', '40000000-0000-0000-0000-000000000001', true);
 SET LOCAL ROLE authenticated;

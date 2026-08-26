@@ -15,7 +15,7 @@ insert into public.profile_roles (profile_id, role_id) values
   ('51000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000007');
 
 insert into public.role_permission_grants (role_id, permission_id, allowed)
-values ('20000000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000003', true)
+values ('20000000-0000-0000-0000-000000000004', (select id from public.permissions where code = 'school.student.read'), true)
 on conflict (role_id, permission_id) do update set allowed = excluded.allowed;
 
 insert into public.devices (id, profile_id, device_key, kind) values
@@ -75,7 +75,7 @@ BEGIN
     update public.role_permission_grants
     set allowed = false
     where role_id = '20000000-0000-0000-0000-000000000004'
-      and permission_id = '30000000-0000-0000-0000-000000000003';
+      and permission_id = (select id from public.permissions where code = 'school.student.read');
     RAISE EXCEPTION 'F1 RLS: user modified role grant';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
