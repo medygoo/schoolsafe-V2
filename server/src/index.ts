@@ -248,6 +248,7 @@ const app = buildApp({
         service: financeReportsService,
         resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
+        audit: auditService,
       }
     : undefined,
   pedagogy: pedagogyService && rankingsService

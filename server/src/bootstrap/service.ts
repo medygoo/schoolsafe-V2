@@ -84,6 +84,61 @@ export function createBootstrapService(
           ) ?? []) as Array<{ id: string; code: string }> )
         : [];
 
+      // Exceptions individuelles (profile_permission_exceptions), résolues par code :
+      // - exception ALLOW active AJOUTE la permission (sauf si un DENY de rôle la couvre) ;
+      // - exception DENY active la RETIRE (prioritaire sur ALLOW, cohérent avec has_permission SQL) ;
+      // - exception expirée (expires_at passée) ignorée.
+      // La table n'est pas forcément lisible en contexte utilisateur : en cas d'erreur,
+      // on dégrade gracieusement vers les permissions de rôle seules.
+      const exceptionsResult = await client
+        .from("profile_permission_exceptions")
+        .select("permission_code,allowed,expires_at");
+      if (exceptionsResult.error) {
+        console.error(
+          "[bootstrap] profile_permission_exceptions unreadable, role permissions only:",
+          (exceptionsResult.error as { message?: string }).message ?? exceptionsResult.error,
+        );
+      }
+      const exceptions = (exceptionsResult.error ? [] : exceptionsResult.data ?? []) as Array<{
+        permission_code: string;
+        allowed: boolean;
+        expires_at: string | null;
+      }>;
+
+      const now = Date.now();
+      const activeExceptions = exceptions.filter(
+        (row) => !row.expires_at || new Date(row.expires_at).getTime() > now,
+      );
+      const exceptionAllowCodes = new Set(
+        activeExceptions.filter((row) => row.allowed).map((row) => row.permission_code),
+      );
+      const exceptionDenyCodes = new Set(
+        activeExceptions.filter((row) => !row.allowed).map((row) => row.permission_code),
+      );
+
+      // Un DENY de rôle l'emporte même sur une exception ALLOW (cohérent avec has_permission SQL).
+      let roleDeniedCodes = new Set<string>();
+      if (deniedPermissionIds.size > 0 && exceptionAllowCodes.size > 0) {
+        const deniedRows = (assertQuery(
+          await client
+            .from("permissions")
+            .select("code")
+            .in("id", [...deniedPermissionIds]),
+          "permissions_denied",
+        ) ?? []) as Array<{ code: string }>;
+        roleDeniedCodes = new Set(deniedRows.map((row) => row.code));
+      }
+
+      const effectivePermissionCodes = new Set(permissions.map((row) => row.code));
+      for (const code of exceptionAllowCodes) {
+        if (!roleDeniedCodes.has(code) && !exceptionDenyCodes.has(code)) {
+          effectivePermissionCodes.add(code);
+        }
+      }
+      for (const code of exceptionDenyCodes) {
+        effectivePermissionCodes.delete(code);
+      }
+
       const scopes = (assertQuery(
         await client.from("scope_assignments").select("scope_type,scope_id,label"),
         "scope_assignments",
@@ -108,7 +163,7 @@ export function createBootstrapService(
         contract_version: "1",
         profile: { id: profile.id, display_name: profile.display_name },
         roles: roles.map((row) => row.code).sort(),
-        permissions: permissions.map((row) => row.code).sort(),
+        permissions: [...effectivePermissionCodes].sort(),
         scopes: scopes.map((row) => ({ type: row.scope_type, id: row.scope_id, label: row.label })),
         school: { id: school.id, name: school.name },
         academic_year: null,

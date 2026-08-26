@@ -71,6 +71,9 @@ const mockService: FinanceReportsService = {
   async getReceiptData(schoolId, paymentId) {
     return paymentId === "missing-payment-id" ? null : { ...mockReceipt, payment: { ...mockReceipt.payment, id: paymentId } };
   },
+  async getPaymentStudentId(schoolId, paymentId) {
+    return paymentId === "missing-payment-id" ? null : "student-1";
+  },
   async getDailyReport(schoolId, date) {
     return { ...mockDailyReport, date };
   },
@@ -136,6 +139,62 @@ describe("GET /finance/receipts/:paymentId", () => {
     });
     expect(res.statusCode).toBe(404);
     expect(res.json().code).toBe("NOT_FOUND");
+  });
+
+  it("returns 403 SCOPE_DENIED with audit when a guardian targets another child", async () => {
+    const audit = { insert: vi.fn().mockResolvedValue(undefined) };
+    const guardianAccess: AccessService = {
+      hasPermission: vi.fn().mockResolvedValue(true),
+      hasScope: vi.fn().mockResolvedValue(true),
+      checkScope: vi.fn().mockResolvedValue(false),
+      hasGuardianLinks: vi.fn().mockResolvedValue(true),
+    };
+    const app = buildApp({
+      financeReports: {
+        service: mockService,
+        resolveProfileAndSchool: mockResolve,
+        access: guardianAccess,
+        audit,
+      },
+    });
+    const res = await app.inject({
+      method: "GET",
+      url: "/finance/receipts/payment-1",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("SCOPE_DENIED");
+    expect(guardianAccess.checkScope).toHaveBeenCalledWith("valid-token", "own_children", { studentId: "student-1" });
+    expect(audit.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "access.denied",
+        payload: expect.objectContaining({ reason: "SCOPE_DENIED", scope_type: "own_children" }),
+      }),
+    );
+    await app.close();
+  });
+
+  it("lets staff (no guardian link) read any receipt", async () => {
+    const staffAccess: AccessService = {
+      hasPermission: vi.fn().mockResolvedValue(true),
+      hasScope: vi.fn().mockResolvedValue(true),
+      checkScope: vi.fn().mockResolvedValue(false),
+      hasGuardianLinks: vi.fn().mockResolvedValue(false),
+    };
+    const app = buildApp({
+      financeReports: {
+        service: mockService,
+        resolveProfileAndSchool: mockResolve,
+        access: staffAccess,
+      },
+    });
+    const res = await app.inject({
+      method: "GET",
+      url: "/finance/receipts/payment-1",
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(res.statusCode).toBe(200);
+    await app.close();
   });
 });
 

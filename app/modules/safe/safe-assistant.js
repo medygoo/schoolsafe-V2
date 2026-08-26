@@ -4,15 +4,24 @@
   var ASSET_BASE = "./safe2d/";
   var DEFAULT_POSE = "sourire";
 
+  // Branche de navigation associée à chaque entrée FAQ qui pointe vers une
+  // fonctionnalité (null = sujet général, toujours disponible).
   var faq = [
-    { keywords: ["ajouter", "élève"], question: "Comment ajouter un élève ?", answer: "Va dans Élèves, clique sur « + Ajouter », remplis les informations puis enregistre.", pose: "pointe" },
-    { keywords: ["présence", "appel"], question: "Comment faire l’appel ?", answer: "Va dans Présences, choisis ta classe et la date, marque les absents/retards, puis valide.", pose: "pointe" },
-    { keywords: ["paiement", "caisse"], question: "Comment enregistrer un paiement ?", answer: "Dans Caisse, clique « + Nouveau paiement », choisis l’élève, le type de frais et le montant.", pose: "pointe" },
-    { keywords: ["rapport"], question: "Comment générer un rapport ?", answer: "Va dans Rapports, choisis le type et la période, puis clique « Générer ».", pose: "pointe" },
-    { keywords: ["palmarès", "classement"], question: "C’est quoi le Palmarès ?", answer: "Le Palmarès montre le Top 10 de chaque classe et de toute l’école, basé sur les cotes publiées du mois.", pose: "trophy" },
-    { keywords: ["qui", "safe"], question: "Qui es-tu ?", answer: "Je suis Safe, ton assistante SchoolSafe ! Pose-moi tes questions.", pose: "clin" },
-    { keywords: ["bonjour", "salut"], question: "Bonjour !", answer: "Bonjour ! Que veux-tu faire aujourd’hui dans SchoolSafe ?", pose: "salue" },
-    { keywords: ["aide"], question: "J’ai besoin d’aide", answer: "Je suis là ! Choisis un sujet ci-dessous ou pose ta question.", pose: "accueil" },
+    { keywords: ["ajouter", "élève"], question: "Comment ajouter un élève ?", answer: "Va dans Élèves, clique sur « + Ajouter », remplis les informations puis enregistre.", pose: "pointe", branch: "school" },
+    { keywords: ["présence", "appel"], question: "Comment faire l’appel ?", answer: "Va dans Présences, choisis ta classe et la date, marque les absents/retards, puis valide.", pose: "pointe", branch: "pedagogy" },
+    { keywords: ["paiement", "caisse"], question: "Comment enregistrer un paiement ?", answer: "Dans Caisse, clique « + Nouveau paiement », choisis l’élève, le type de frais et le montant.", pose: "pointe", branch: "finance" },
+    { keywords: ["rapport"], question: "Comment générer un rapport ?", answer: "Va dans Rapports, choisis le type et la période, puis clique « Générer ».", pose: "pointe", branch: "reports" },
+    { keywords: ["palmarès", "classement"], question: "C’est quoi le Palmarès ?", answer: "Le Palmarès montre le Top 10 de chaque classe et de toute l’école, basé sur les cotes publiées du mois.", pose: "trophy", branch: "pedagogy" },
+    { keywords: ["qui", "safe"], question: "Qui es-tu ?", answer: "Je suis Safe, ton assistante SchoolSafe ! Pose-moi tes questions.", pose: "clin", branch: null },
+    { keywords: ["bonjour", "salut"], question: "Bonjour !", answer: "Bonjour ! Que veux-tu faire aujourd’hui dans SchoolSafe ?", pose: "salue", branch: null },
+    { keywords: ["aide"], question: "J’ai besoin d’aide", answer: "Je suis là ! Choisis un sujet ci-dessous ou pose ta question.", pose: "accueil", branch: null },
+  ];
+
+  // Suggestions par défaut, chacune rattachée à sa branche de navigation.
+  var DEFAULT_SUGGESTIONS = [
+    { text: "Comment ajouter un élève ?", branch: "school" },
+    { text: "Comment faire l’appel ?", branch: "pedagogy" },
+    { text: "Comment enregistrer un paiement ?", branch: "finance" },
   ];
 
   var onboardingSteps = [
@@ -21,12 +30,52 @@
     { pose: "saute", message: "Tu connais les bases ! Clique sur moi quand tu as une question. 🎉" },
   ];
 
+  // Session réelle = token présent (window.currentSession exposé par app.js,
+  // sinon session persistée en localStorage pendant la restauration asynchrone).
+  // Sans session : mode démo, comportement historique inchangé.
+  function sessionUser() {
+    var live = global.currentSession;
+    if (live && live.token) return live;
+    try {
+      var raw = global.localStorage && global.localStorage.getItem("schoolsafe-v2-session");
+      if (raw) {
+        var saved = JSON.parse(raw);
+        if (saved && saved.token) return saved;
+      }
+    } catch (e) { /* session illisible : traiter comme démo */ }
+    return null;
+  }
+
+  // En session réelle, Jaspe exige la permission safe.assistant.use (DENY par défaut).
+  function isAllowed() {
+    var user = sessionUser();
+    if (!user) return true; // démo
+    var access = global.SchoolSafeAccess;
+    if (!access || typeof access.canAccess !== "function") return false;
+    return access.canAccess(user, "safe.assistant.use");
+  }
+
+  // En session réelle, une branche n’est proposée que si elle est visible pour l’utilisateur.
+  function branchVisible(branchKey) {
+    if (!branchKey) return true;
+    var user = sessionUser();
+    if (!user) return true; // démo
+    var access = global.SchoolSafeAccess;
+    if (!access || typeof access.isBranchVisible !== "function") return false;
+    return access.isBranchVisible(user, branchKey);
+  }
+
+  function defaultSuggestions() {
+    return DEFAULT_SUGGESTIONS.filter(function (s) { return branchVisible(s.branch); })
+      .map(function (s) { return s.text; });
+  }
+
   var state = {
     open: false,
     minimized: false,
     pose: DEFAULT_POSE,
     currentMessage: "",
-    suggestions: ["Comment ajouter un élève ?", "Comment faire l’appel ?", "Comment enregistrer un paiement ?"],
+    suggestions: defaultSuggestions(),
     onboardingIndex: -1,
   };
 
@@ -34,6 +83,7 @@
 
   function init() {
     if (container) return;
+    if (!isAllowed()) return; // session réelle sans safe.assistant.use : Jaspe ne s’initialise pas
     container = document.createElement("div");
     container.className = "safe-assistant";
     container.setAttribute("aria-label", "Assistant Safe");
@@ -87,6 +137,12 @@
 
   function render() {
     if (!container) return;
+    if (!isAllowed()) { // session devenue réelle sans safe.assistant.use : masquer Jaspe
+      container.innerHTML = "";
+      container.hidden = true;
+      return;
+    }
+    container.hidden = false;
     var html = "";
     if (state.open) {
       html += '<div class="safe-bubble">';
@@ -128,11 +184,12 @@
   }
 
   function toggleOpen() {
+    if (!isAllowed()) { render(); return; }
     state.open = !state.open;
     if (state.open && !state.currentMessage) {
       state.currentMessage = "Bonjour ! Je suis Safe, ton assistante SchoolSafe. 😊";
       state.pose = "salue";
-      state.suggestions = ["Comment ajouter un élève ?", "Comment faire l’appel ?", "Comment enregistrer un paiement ?"];
+      state.suggestions = defaultSuggestions();
     }
     render();
   }
@@ -143,6 +200,7 @@
   }
 
   function openWithQuery(query) {
+    if (!isAllowed()) { render(); return; }
     state.open = true;
     state.currentMessage = "";
     if (query) {
@@ -150,7 +208,7 @@
     } else {
       state.currentMessage = "Bonjour ! Je suis Safe, ton assistante SchoolSafe. 😊";
       state.pose = "salue";
-      state.suggestions = ["Comment ajouter un élève ?", "Comment faire l’appel ?", "Comment enregistrer un paiement ?"];
+      state.suggestions = defaultSuggestions();
       render();
     }
   }
@@ -192,6 +250,11 @@
       if (score > bestScore) { bestScore = score; best = item; }
     }
 
+    if (best && bestScore >= 1 && !branchVisible(best.branch)) {
+      // La réponse pointe vers une branche inaccessible : ne pas la proposer.
+      best = null;
+    }
+
     if (best && bestScore >= 1) {
       state.currentMessage = best.answer;
       state.pose = best.pose;
@@ -199,7 +262,7 @@
       state.currentMessage = "Hmm, je ne suis pas sûre de comprendre. Essaie avec d’autres mots, ou choisis un sujet.";
       state.pose = "pense";
     }
-    state.suggestions = ["Comment ajouter un élève ?", "Comment faire l’appel ?", "Comment enregistrer un paiement ?"];
+    state.suggestions = defaultSuggestions();
     render();
   }
 

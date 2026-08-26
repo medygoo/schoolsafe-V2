@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS public.security_portals (
   UNIQUE (school_id, code)
 );
 
-COMMENT ON TABLE public.security_portals IS 'Portail de sécurité (contrôle d\'accès). is_open autorise les scans.';
+COMMENT ON TABLE public.security_portals IS 'Portail de sécurité (contrôle d''accès). is_open autorise les scans.';
 
 -- ============================================================
 -- 5. RPC d'évaluation d'une condition

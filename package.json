@@ -7,7 +7,8 @@
   "scripts": {
     "typecheck": "npm run typecheck --workspace server",
     "test": "npm run test --workspace server",
-    "ci": "npm run typecheck && npm test",
+    "ci": "node scripts/check-migration-versions.mjs && npm run typecheck && npm test",
+    "check:migration-versions": "node scripts/check-migration-versions.mjs",
     "build:auth-sdk": "esbuild frontend/vendor/supabase-entry.js --bundle --format=iife --global-name=SchoolSafeSupabaseSDK --outfile=app/vendor/supabase-sdk.js",
     "check:auth-sdk": "node scripts/check-auth-bundle.mjs",
     "test:qa": "npx vitest run tests/qa/unit tests/qa/rls tests/qa/integration && npx playwright test tests/qa/e2e",

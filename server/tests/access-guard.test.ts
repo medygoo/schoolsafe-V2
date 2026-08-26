@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import Fastify from "fastify";
 import { buildApp } from "../src/app.js";
+import { requirePermission } from "../src/access/guard.js";
+import { SchoolSafeError } from "../src/http/errors.js";
 import type { AccessService } from "../src/access/service.js";
 
 function accessService(mock: {
@@ -66,6 +69,43 @@ describe("Access guard", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "ok" });
+    await app.close();
+  });
+
+  it("uses checkScope when the scope carries a business target and checkScope is available", async () => {
+    const checkScope = vi.fn().mockResolvedValue(false);
+    const hasScope = vi.fn().mockResolvedValue(true);
+    const access: AccessService = {
+      hasPermission: vi.fn().mockResolvedValue(true),
+      hasScope,
+      checkScope,
+    };
+
+    const app = Fastify();
+    app.setErrorHandler((error, _request, reply) => {
+      const known = error instanceof SchoolSafeError;
+      reply.status(known ? error.statusCode : 500).send({ code: known ? error.code : "INTERNAL_ERROR" });
+    });
+    app.get(
+      "/scoped",
+      {
+        preHandler: [
+          requirePermission(access, "test.scoped", { type: "own_children", target: { studentId: "student-1" } }),
+        ],
+      },
+      async () => ({ status: "ok" as const }),
+    );
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/scoped",
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ code: "SCOPE_DENIED" });
+    expect(checkScope).toHaveBeenCalledWith("valid-token", "own_children", { studentId: "student-1" });
+    expect(hasScope).not.toHaveBeenCalled();
     await app.close();
   });
 });

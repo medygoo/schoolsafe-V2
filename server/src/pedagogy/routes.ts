@@ -39,7 +39,44 @@ async function authenticate(request: FastifyRequest, resolve: ResolveProfileAndS
   if (!profileId || !schoolId) {
     throw new SchoolSafeError(401, "AUTH_REQUIRED", "Profil ou école non trouvé", false);
   }
-  return { profileId, schoolId };
+  return { token, profileId, schoolId };
+}
+
+/**
+ * Scope own_children : un parent (profil avec lien student_guardians) ne peut viser
+ * que ses propres enfants. Le personnel sans aucun lien tuteur n'est pas restreint ici
+ * (sa permission de rôle a déjà été vérifiée par requirePermission).
+ */
+async function enforceOwnChildrenScope(
+  dependencies: PedagogyRouteDependencies,
+  context: { token: string; profileId: string; schoolId: string },
+  studentId: string,
+  resource: { type: string; id: string },
+  permission: string,
+): Promise<void> {
+  if (!dependencies.access.checkScope) return;
+  const inScope = await dependencies.access.checkScope(context.token, "own_children", { studentId });
+  if (inScope) return;
+  const isGuardian = dependencies.access.hasGuardianLinks
+    ? await dependencies.access.hasGuardianLinks(context.token)
+    : false;
+  if (!isGuardian) return;
+  if (dependencies.audit) {
+    await dependencies.audit.insert({
+      schoolId: context.schoolId,
+      actorProfileId: context.profileId,
+      eventType: "access.denied",
+      payload: {
+        permission,
+        resource_type: resource.type,
+        resource_id: resource.id,
+        reason: "SCOPE_DENIED",
+        scope_type: "own_children",
+        scope_id: studentId,
+      },
+    });
+  }
+  throw new SchoolSafeError(403, "SCOPE_DENIED", "Hors périmètre autorisé", false);
 }
 
 function parseQuery(request: FastifyRequest): Record<string, string> {
@@ -275,9 +312,16 @@ export function registerPedagogyRoutes(app: FastifyInstance, dependencies: Pedag
     "/pedagogy/students/:id/averages",
     { preHandler: [requirePermission(dependencies.access, "pedagogy.grade.read")] },
     async (request: FastifyRequest, _reply: FastifyReply) => {
-      const { schoolId } = await authenticate(request, dependencies.resolveProfileAndSchool);
+      const context = await authenticate(request, dependencies.resolveProfileAndSchool);
       const { id } = request.params as { id: string };
-      const result = await dependencies.service.computeStudentAverages(schoolId, id);
+      await enforceOwnChildrenScope(
+        dependencies,
+        context,
+        id,
+        { type: "pedagogy.student_averages", id },
+        "pedagogy.grade.read",
+      );
+      const result = await dependencies.service.computeStudentAverages(context.schoolId, id);
       return { data: result };
     },
   );

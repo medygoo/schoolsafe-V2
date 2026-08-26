@@ -34,6 +34,7 @@ alter table public.approval_requests enable row level security;
 revoke all on table public.approval_requests from anon, authenticated;
 grant select, insert, update on table public.approval_requests to authenticated;
 
+drop policy if exists approval_requests_current_school on public.approval_requests;
 create policy approval_requests_current_school
   on public.approval_requests
   for all

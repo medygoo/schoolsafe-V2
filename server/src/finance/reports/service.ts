@@ -74,6 +74,8 @@ export interface FinanceReportsService {
   getReceiptData(schoolId: string, paymentId: string): Promise<ReceiptData | null>;
   getDailyReport(schoolId: string, date: string): Promise<DailyReport>;
   closeCashRegister(schoolId: string, profileId: string, input: CloseCashRegisterInput): Promise<unknown>;
+  /** Résout paymentId → student_id (via student_fees). Null si le paiement est introuvable. */
+  getPaymentStudentId(schoolId: string, paymentId: string): Promise<string | null>;
 }
 
 function createServiceClient(supabaseUrl: string, serviceRoleKey: string): SupabaseClient {
@@ -107,6 +109,18 @@ export function createFinanceReportsService(
     }
 
     return data as string;
+  }
+
+  async function getPaymentStudentId(schoolId: string, paymentId: string): Promise<string | null> {
+    const { data, error } = await client
+      .from("fee_payments")
+      .select("student_fees!inner(student_id)")
+      .eq("id", paymentId)
+      .eq("school_id", schoolId)
+      .maybeSingle();
+    if (error || !data) return null;
+    const studentFee = (data as Record<string, unknown>).student_fees as Record<string, unknown> | undefined;
+    return (studentFee?.student_id as string | undefined) ?? null;
   }
 
   async function getReceiptData(schoolId: string, paymentId: string): Promise<ReceiptData | null> {
@@ -315,5 +329,5 @@ export function createFinanceReportsService(
     return { closure, alreadyClosed: false };
   }
 
-  return { getReceiptData, getDailyReport, closeCashRegister };
+  return { getReceiptData, getDailyReport, closeCashRegister, getPaymentStudentId };
 }

@@ -31,4 +31,6 @@ insert into public.permissions (id, code, description) values
   ('30000000-0000-0000-0000-000000000010', 'file.upload', 'Téléverser un fichier autorisé'),
   ('30000000-0000-0000-0000-000000000011', 'file.download', 'Télécharger un fichier autorisé'),
   ('30000000-0000-0000-0000-000000000012', 'notification.subscribe', 'Gérer un abonnement de notification')
-on conflict (id) do nothing;
+-- Le catalogue est déjà alimenté par la migration 202608260001 (conflit possible sur code) ;
+-- on conflict sans cible couvre aussi l'id (fixtures locales ré-exécutées).
+on conflict do nothing;
