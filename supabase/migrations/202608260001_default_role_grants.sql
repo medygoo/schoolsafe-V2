@@ -74,7 +74,23 @@ INSERT INTO public.permissions (code, description) VALUES
 ON CONFLICT (code) DO NOTHING;
 
 -- ============================================================
--- 2. Grants par défaut (allowed = true)
+-- 2. Rôles standards (données de référence, pas données métier)
+--    La table roles est vide sur une base neuve à ce stade :
+--    sans eux, la jointure des grants (section 3) ne produirait rien.
+--    UUID stables identiques à supabase/seed.sql ; idempotent.
+-- ============================================================
+INSERT INTO public.roles (id, code, label) VALUES
+  ('20000000-0000-0000-0000-000000000001', 'admin', 'Administrateur'),
+  ('20000000-0000-0000-0000-000000000002', 'school_head', 'Direction'),
+  ('20000000-0000-0000-0000-000000000003', 'pedagogy', 'Direction pédagogique'),
+  ('20000000-0000-0000-0000-000000000004', 'teacher', 'Enseignant'),
+  ('20000000-0000-0000-0000-000000000005', 'cashier', 'Caisse'),
+  ('20000000-0000-0000-0000-000000000006', 'guard', 'Gardien'),
+  ('20000000-0000-0000-0000-000000000007', 'parent', 'Parent')
+ON CONFLICT DO NOTHING;
+
+-- ============================================================
+-- 3. Grants par défaut (allowed = true)
 --    Jointure sur les codes (roles.code / permissions.code) :
 --    aucune hypothèse sur les UUID, idempotent.
 --    COMMUN à tous les rôles : session.bootstrap, sync.submit,
