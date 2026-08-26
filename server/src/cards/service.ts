@@ -5,6 +5,7 @@ import type { ControlAppConfig } from "../control-app/client.js";
 import { pushCardPrintRequest } from "../control-app/client.js";
 import { createR2Client, uploadBuffer, getSignedDownloadUrl, type R2Config } from "../storage/r2.js";
 import type { S3Client } from "@aws-sdk/client-s3";
+import { assertStudentOperational } from "../students/operational.js";
 
 export interface CardService {
   requestPrintBatch(requesterProfileId: string, inputs: RequestCardPrintItem[]): Promise<CardPrintBatchResult[]>;
@@ -65,6 +66,7 @@ export function createCardService(
   }
 
   async function getStudent(studentId: string): Promise<StudentInfo & { class_name: string | null; academic_year_name: string | null }> {
+    await assertStudentOperational(serviceClient, studentId);
     const { data: student, error: studentError } = await serviceClient
       .from("students")
       .select("id, school_id, matricule, first_name, last_name, class_id")

@@ -184,7 +184,11 @@ export function createRankingsService(supabaseUrl: string, serviceRoleKey: strin
         byStudent.get(grade.student_id)!.push(grade);
       }
 
-      let studentQuery = client.from("students").select("id, class_id").eq("school_id", schoolId);
+      let studentQuery = client
+        .from("students")
+        .select("id, class_id")
+        .eq("school_id", schoolId)
+        .eq("lifecycle_status", "active");
       if (classId) studentQuery = studentQuery.eq("class_id", classId);
       const { data: students, error: studentsError } = await studentQuery;
       if (studentsError) throw new Error(`Failed to load students: ${studentsError.message}`);
@@ -308,7 +312,8 @@ export function createRankingsService(supabaseUrl: string, serviceRoleKey: strin
         .from("students")
         .select("class_id")
         .in("id", studentIds)
-        .eq("school_id", schoolId);
+        .eq("school_id", schoolId)
+        .eq("lifecycle_status", "active");
       if (error) throw new Error(`Failed to load children classes: ${error.message}`);
       const classIds = new Set<string>();
       for (const row of data ?? []) {

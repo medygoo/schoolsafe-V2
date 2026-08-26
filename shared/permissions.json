@@ -2,6 +2,7 @@
   { "code": "session.bootstrap", "label": "Bootstrap initial de l'école", "scope": "none" },
   { "code": "school.class.read", "label": "Lire les classes", "scope": "assigned_classes" },
   { "code": "school.student.read", "label": "Lire les dossiers élèves", "scope": "assigned_classes" },
+  { "code": "school.student.create", "label": "Créer un dossier élève en préparation", "scope": "school" },
   { "code": "school.guardian.read", "label": "Lire les tuteurs", "scope": "own_children" },
   { "code": "school.guardian.manage", "label": "Gérer les tuteurs", "scope": "school" },
   { "code": "school.manage", "label": "Gérer l'école", "scope": "school" },

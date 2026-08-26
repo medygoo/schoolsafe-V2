@@ -587,6 +587,7 @@ export function createSchoolService(
         .from("students")
         .select("id, matricule, first_name, last_name, photo_path")
         .eq("school_id", schoolId)
+        .eq("lifecycle_status", "active")
         .eq("class_id", classId)
         .order("last_name", { ascending: true })
         .order("first_name", { ascending: true });

@@ -93,6 +93,7 @@ export function createScopeResolver(deps: ScopeResolverDeps): ScopeResolver {
               .from("students")
               .select("class_id")
               .eq("id", target.studentId)
+              .eq("lifecycle_status", "active")
               .maybeSingle();
             if (studentError) {
               console.error("[scope-resolver] assigned_classes student lookup error:", studentError.message);

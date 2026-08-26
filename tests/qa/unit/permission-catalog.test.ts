@@ -37,8 +37,9 @@ describe("Permission catalog completeness", () => {
   const catalog = loadCatalog();
   const codes = new Set(catalog.map((p) => p.code));
 
-  it("contains 59 permissions (44 historical + 15 missing modules)", () => {
-    expect(catalog.length).toBe(59);
+  it("contains 60 permissions including school.student.create", () => {
+    expect(catalog.length).toBe(60);
+    expect(catalog.some((permission) => permission.code === "school.student.create" && permission.scope === "school")).toBe(true);
   });
 
   it("has no duplicate codes", () => {

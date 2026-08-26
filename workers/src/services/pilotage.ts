@@ -15,13 +15,13 @@ export function createPilotageService(supabaseUrl: string, serviceRoleKey: strin
   const client = createServiceClient(supabaseUrl, serviceRoleKey);
   return {
     async loadDashboard(schoolId) {
-      const [{ data: alerts }, { data: students }, { data: staff }] = await Promise.all([
+      const [{ data: alerts }, { data: activeStudents }, { data: staff }] = await Promise.all([
         client.from("alerts").select("severity, status").eq("school_id", schoolId),
-        client.from("students").select("id", { count: "exact" }).eq("school_id", schoolId),
+        client.rpc("count_operational_students", { p_school_id: schoolId }),
         client.from("profiles").select("id", { count: "exact" }).eq("school_id", schoolId),
       ]);
       return {
-        counts: { students: students?.length ?? 0, staff: staff?.length ?? 0 },
+        counts: { students: activeStudents ?? 0, staff: staff?.length ?? 0 },
         open_alerts: (alerts ?? []).filter((a) => a.status === "open" || a.status === "acknowledged"),
       };
     },

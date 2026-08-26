@@ -414,9 +414,10 @@ export function createPedagogyService(supabaseUrl: string, serviceRoleKey: strin
     async getParentChildren(schoolId, profileId) {
       const { data, error } = await client
         .from("student_guardians")
-        .select("id, guardian_type, is_primary, students(id, matricule, first_name, last_name, photo_path, class_id, classes(name))")
+        .select("id, guardian_type, is_primary, students!inner(id, matricule, first_name, last_name, photo_path, class_id, lifecycle_status, classes(name))")
         .eq("profile_id", profileId)
-        .eq("students.school_id", schoolId);
+        .eq("students.school_id", schoolId)
+        .eq("students.lifecycle_status", "active");
       if (error) throw new Error(`Failed to list parent children: ${error.message}`);
       return data ?? [];
     },
@@ -439,6 +440,7 @@ export function createPedagogyService(supabaseUrl: string, serviceRoleKey: strin
         .select("id, matricule, first_name, last_name, photo_path, class_id, classes(name)")
         .eq("id", studentId)
         .eq("school_id", schoolId)
+        .eq("lifecycle_status", "active")
         .single();
       if (studentError || !student) throw new Error("Élève introuvable.");
 
@@ -460,6 +462,7 @@ export function createPedagogyService(supabaseUrl: string, serviceRoleKey: strin
         .select("id, matricule, first_name, last_name, class_id, classes(name)")
         .eq("id", studentId)
         .eq("school_id", schoolId)
+        .eq("lifecycle_status", "active")
         .single();
       if (studentError || !student) throw new Error("Élève introuvable.");
 

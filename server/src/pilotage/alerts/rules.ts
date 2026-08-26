@@ -72,6 +72,7 @@ async function loadStudent(client: SupabaseClient, schoolId: string, studentId: 
     .select("id, matricule, first_name, last_name, class_id, classes(name)")
     .eq("id", studentId)
     .eq("school_id", schoolId)
+    .eq("lifecycle_status", "active")
     .single();
   if (error || !data) return null;
   return data;

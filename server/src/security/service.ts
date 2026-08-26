@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { assertStudentOperational } from "../students/operational.js";
 import { createHmac, randomUUID } from "node:crypto";
 import type { EventService } from "../events/service.js";
 import type { SecurityScanInput, SecurityScanResult, SecurityEventDecision } from "./schema.js";
@@ -81,6 +82,7 @@ export function createSecurityService(
   }
 
   async function getStudentWithClass(studentId: string): Promise<StudentRow & { class_name: string | null }> {
+    await assertStudentOperational(client, studentId);
     const { data: student, error } = await client
       .from("students")
       .select("id, school_id, matricule, first_name, last_name, class_id, photo_path")

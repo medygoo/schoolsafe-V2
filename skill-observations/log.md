@@ -84,3 +84,33 @@ resolved statuses always carry their resolution date
 **Suggested improvement:** Use the native `BarcodeDetector` API first (supported in Chromium-based browsers), with a clear manual-entry fallback when unavailable. This keeps the frontend dependency-free and avoids loading third-party scripts for security-sensitive scanning.
 
 **Principle:** For security-critical frontend features, prefer native browser APIs over external libraries when coverage is acceptable; always provide a graceful manual fallback.
+
+### Observation 6: Database contract tests need an explicit unavailable-runtime outcome
+
+**Status:** OPEN
+**Date:** 2026-08-26
+**Session context:** Test-first implementation of a Supabase schema and RLS feature
+**Skill:** supabase / test-driven-development
+**Type:** open-source
+**Phase/Area:** RED verification and local database prerequisites
+
+**Issue:** The SQL contract was authored before implementation as required, but the local Supabase runtime could not execute it because neither Docker nor Podman was available. Treating that as a test failure would conflate missing infrastructure with a behavioral RED result; skipping it silently would overstate coverage.
+
+**Suggested improvement:** Add a preflight to Supabase TDD workflows that records one of three exact outcomes for database tests: behavioral RED, behavioral GREEN, or NOT EXECUTED with the missing runtime named. Continue with static and application-layer checks, then carry the database contract explicitly into the final unexecuted-tests report.
+
+**Principle:** Test evidence should distinguish product behavior from infrastructure availability; an unavailable runtime is a precise non-execution result, never a pass or a behavioral failure.
+
+### Observation 7: Scope E2E assertions when legacy screens remain mounted but hidden
+
+**Status:** OPEN
+**Date:** 2026-08-26
+**Session context:** B1 student workspace tests inside a multi-screen static application
+**Skill:** systematic-debugging / test-driven-development
+**Type:** open-source
+**Phase/Area:** Playwright selector design
+
+**Issue:** Global text, role, password-input, and overflow assertions matched controls from hidden login or legacy dashboard sections. The product behavior was correct, but strict locators either became ambiguous or reported hidden-screen content as a failure.
+
+**Suggested improvement:** Anchor assertions to the active feature root or dialog, use exact text for short status labels, and exclude deliberate accessibility helpers such as `.sr-only` from visual overflow detectors. Navigation helpers should follow the rendered branch-to-tab path instead of searching hidden legacy action markup.
+
+**Principle:** In applications that keep inactive screens in the DOM, E2E selectors must encode the active UI boundary; DOM presence is not equivalent to user-visible behavior.

@@ -22,6 +22,7 @@ import { registerSchoolRoutes, type SchoolRouteDependencies } from "./school/rou
 import { registerPushRoutes, type PushRouteDependencies } from "./push/routes.js";
 import { requirePermission } from "./access/guard.js";
 import type { AccessService } from "./access/service.js";
+import { registerStudentRoutes, type StudentRouteDependencies } from "./students/routes.js";
 
 export type BuildAppOptions = {
   testRoutes?: boolean;
@@ -40,6 +41,7 @@ export type BuildAppOptions = {
   financeReports?: FinanceReportsRouteDependencies;
   pedagogy?: PedagogyRouteDependencies;
   school?: SchoolRouteDependencies;
+  students?: StudentRouteDependencies;
   push?: PushRouteDependencies;
   access?: AccessService;
 };
@@ -145,6 +147,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.school) {
     registerSchoolRoutes(app, options.school);
+  }
+
+  if (options.students) {
+    registerStudentRoutes(app, options.students);
   }
 
   if (options.push) {

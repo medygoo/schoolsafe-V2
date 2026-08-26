@@ -74,6 +74,7 @@ async function loadStudents(classId) {
   const { data, error } = await client
     .from('students')
     .select('id, matricule, first_name, middle_name, last_name, date_of_birth, photo_path, card_print_count')
+    .eq('lifecycle_status', 'active')
     .eq('class_id', classId)
     .order('last_name');
   if (error) {

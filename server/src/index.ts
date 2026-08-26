@@ -1,6 +1,6 @@
 import { buildApp } from "./app.js";
 import { resolveProfileId, resolveProfileAndSchool } from "./auth/profile.js";
-import { createSupabaseAuthVerifier } from "./auth/supabase.js";
+import { createSupabaseAuthVerifier, createUserContextClient } from "./auth/supabase.js";
 import { createBootstrapService } from "./bootstrap/service.js";
 import { createCardService } from "./cards/service.js";
 import { parseEnv } from "./config/env.js";
@@ -31,6 +31,7 @@ import { createInAppProvider } from "./notifications/providers/in-app.js";
 import { createWebPushProvider } from "./notifications/providers/push.js";
 import { createPushSubscriptionService } from "./push/subscriptions.js";
 import { registerPushRoutes } from "./push/routes.js";
+import { createStudentsService } from "./students/service.js";
 
 const env = parseEnv(process.env);
 
@@ -166,6 +167,31 @@ const schoolService = env.SUPABASE_SERVICE_ROLE_KEY
     )
   : undefined;
 
+const studentsService = serviceClient
+  ? createStudentsService(
+      serviceClient,
+      (token: string) => createUserContextClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
+      {
+        async deliver(invitation) {
+          const activationUrl = `http://${env.HOST}:${env.PORT}/#parent-invitation=${encodeURIComponent(invitation.token)}`;
+          const result = await emailService.send({
+            to: [{ email: invitation.email, name: invitation.firstName }],
+            subject: "Activez votre compte Parent SchoolSafe",
+            text: [
+              `Bonjour ${invitation.firstName},`,
+              "Un dossier élève vous rattache comme Parent principal dans SchoolSafe.",
+              `Activez personnellement votre compte avant le ${invitation.expiresAt} : ${activationUrl}`,
+              "L’école ne connaît et ne définit jamais votre mot de passe.",
+            ].join("\n\n"),
+          });
+          if (result.status === "failed") {
+            throw new Error(result.error || "Échec de l’envoi de l’invitation Parent");
+          }
+        },
+      },
+    )
+  : undefined;
+
 const app = buildApp({
   bootstrap: {
     authVerifier: createSupabaseAuthVerifier(env.SUPABASE_URL, env.SUPABASE_ANON_KEY),
@@ -265,6 +291,14 @@ const app = buildApp({
         service: schoolService,
         resolveProfileAndSchool: (token: string) => resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
         access: accessService,
+      }
+    : undefined,
+  students: studentsService
+    ? {
+        service: studentsService,
+        access: accessService,
+        resolveProfileAndSchool: (token: string) =>
+          resolveProfileAndSchool(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, token),
       }
     : undefined,
   push: pushSubscriptionService

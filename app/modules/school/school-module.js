@@ -6,6 +6,11 @@
   var staffData = [];
   var rolesData = [];
   var permissionsData = [];
+  var studentsData = [];
+  var studentStatus = "draft";
+  var studentQuery = "";
+  var currentUser = null;
+  var studentSearchTimer = null;
   var tabsBound = false;
 
   function escapeMarkup(text) {
@@ -78,6 +83,252 @@
     } catch (e) {
       notify("Erreur chargement équipe : " + e.message);
     }
+  }
+
+  function canCreateStudent() {
+    if (window.SchoolSafeAccess && window.SchoolSafeAccess.canAccess) {
+      return window.SchoolSafeAccess.canAccess(currentUser, "school.student.create");
+    }
+    return !!(currentUser && Array.isArray(currentUser.permissions) && currentUser.permissions.indexOf("school.student.create") >= 0);
+  }
+
+  function studentBadge(status) {
+    return status === "draft"
+      ? window.ssBadge({ label: "EN PRÉPARATION", variant: "warning" })
+      : window.ssBadge({ label: "ACTIF", variant: "success" });
+  }
+
+  async function loadStudents() {
+    var container = document.getElementById("schoolContent");
+    if (!container) return;
+    renderStudentsTab(true);
+    try {
+      studentsData = await window.SchoolSafeSchoolAPI.listStudents(studentStatus, studentQuery);
+      renderStudentsTab(false);
+    } catch (e) {
+      container.innerHTML = window.ssState({
+        type: "error",
+        title: "Dossiers indisponibles",
+        message: "Impossible de charger les élèves. " + e.message,
+      });
+    }
+  }
+
+  function studentName(student) {
+    return [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ");
+  }
+
+  function renderStudentList() {
+    if (!studentsData.length) {
+      return window.ssState({
+        type: "empty",
+        title: studentStatus === "draft" ? "Aucun dossier en préparation" : "Aucun élève actif",
+        message: studentQuery ? "Aucun résultat ne correspond à cette recherche." : "La liste se remplira ici.",
+        size: "compact",
+      });
+    }
+    return '<div class="student-record-list">' + studentsData.map(function (student) {
+      var enrollment = student.enrollment || {};
+      var parent = student.primary_parent || {};
+      return (
+        '<article class="student-record" data-student-id="' + escapeMarkup(student.id) + '">' +
+          '<div class="student-record__identity"><span class="student-record__initials" aria-hidden="true">' +
+            escapeMarkup((student.first_name || "?").charAt(0) + (student.last_name || "").charAt(0)) +
+          '</span><div><h3>' + escapeMarkup(studentName(student)) + '</h3><p>Matricule ' + escapeMarkup(student.matricule) + '</p></div></div>' +
+          '<div class="student-record__facts"><span><b>Classe prévue</b>' + escapeMarkup(enrollment.planned_class_name || "Non renseignée") + '</span>' +
+          '<span><b>Parent principal</b>' + escapeMarkup(parent.display_name || "Non renseigné") +
+          (parent.account_status === "pending_activation" ? '<small>pending_activation</small>' : '') + '</span></div>' +
+          '<div class="student-record__status">' + studentBadge(student.lifecycle_status) +
+          window.ssButton({ label: "Consulter", variant: "secondary", size: "sm", attrs: { "data-student-detail": escapeMarkup(student.id) } }) + '</div>' +
+        '</article>'
+      );
+    }).join("") + '</div>';
+  }
+
+  function bindStudentWorkspace() {
+    var container = document.getElementById("schoolContent");
+    if (!container) return;
+    container.querySelectorAll("[data-student-status]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        studentStatus = button.getAttribute("data-student-status");
+        loadStudents();
+      });
+    });
+    var search = document.getElementById("studentSearch");
+    if (search) {
+      search.addEventListener("input", function () {
+        window.clearTimeout(studentSearchTimer);
+        studentSearchTimer = window.setTimeout(function () {
+          studentQuery = search.value.trim();
+          loadStudents();
+        }, 250);
+      });
+    }
+    var createButton = document.getElementById("newStudentDraftBtn");
+    if (createButton) createButton.addEventListener("click", openStudentDraftModal);
+    container.querySelectorAll("[data-student-detail]").forEach(function (button) {
+      button.addEventListener("click", function () { openStudentDetail(button.getAttribute("data-student-detail")); });
+    });
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  function renderStudentsTab(loading) {
+    var container = document.getElementById("schoolContent");
+    if (!container) return;
+    var warning = studentStatus === "draft"
+      ? '<div class="student-draft-warning" role="note"><i data-lucide="info"></i><div><b>Dossier non opérationnel</b><p>Ce brouillon n’est pas opérationnel. Il ne peut être utilisé ni par Cartes, QR, Sécurité, Finance, Pédagogie ou Documents.</p></div></div>'
+      : '';
+    container.innerHTML =
+      '<section id="studentWorkspace" class="student-workspace" aria-busy="' + (loading ? "true" : "false") + '">' +
+        '<header class="student-workspace__header"><div><h3>Dossiers élèves</h3><p>Préparez les dossiers administratifs et consultez séparément les élèves actifs.</p></div>' +
+        (canCreateStudent() ? window.ssButton({ label: "Nouveau dossier", icon: "user-plus", attrs: { id: "newStudentDraftBtn" } }) : '') + '</header>' +
+        '<div class="student-toolbar"><div class="student-status-filter" role="group" aria-label="Statut du dossier">' +
+          '<button type="button" data-student-status="draft" class="' + (studentStatus === "draft" ? "active" : "") + '">En préparation</button>' +
+          '<button type="button" data-student-status="active" class="' + (studentStatus === "active" ? "active" : "") + '">Actifs</button></div>' +
+          '<label class="student-search" for="studentSearch"><i data-lucide="search"></i><span class="sr-only">Rechercher un élève</span><input id="studentSearch" type="search" value="' + escapeMarkup(studentQuery) + '" placeholder="Rechercher par nom ou matricule"></label></div>' +
+        warning +
+        '<div id="studentListRegion" aria-live="polite">' + (loading
+          ? window.ssState({ type: "loading", title: "Chargement des dossiers", message: "Lecture sécurisée en cours.", size: "compact" })
+          : renderStudentList()) + '</div>' +
+      '</section>';
+    bindStudentWorkspace();
+  }
+
+  async function openStudentDetail(studentId) {
+    try {
+      var detail = await window.SchoolSafeSchoolAPI.getStudent(studentId);
+      var enrollment = detail.enrollment || {};
+      var parent = detail.primary_parent || {};
+      window.ssModal({
+        title: studentName(detail),
+        content: '<div class="student-detail-readonly">' + studentBadge(detail.lifecycle_status) +
+          '<dl><div><dt>Matricule</dt><dd>' + escapeMarkup(detail.matricule) + '</dd></div>' +
+          '<div><dt>Classe prévue</dt><dd>' + escapeMarkup(enrollment.planned_class_name || "—") + '</dd></div>' +
+          '<div><dt>Parent principal</dt><dd>' + escapeMarkup(parent.display_name || "—") + '</dd></div>' +
+          '<div><dt>Statut Parent</dt><dd>' + escapeMarkup(parent.account_status || "—") + '</dd></div></dl>' +
+          (detail.lifecycle_status === "draft" ? '<p class="student-detail-readonly__notice">Lecture seule · dossier non opérationnel.</p>' : '') + '</div>',
+        actions: [{ label: "Fermer", variant: "secondary" }],
+      });
+    } catch (e) {
+      notify("Erreur : " + e.message);
+    }
+  }
+
+  async function openStudentDraftModal() {
+    var resources;
+    try {
+      resources = await Promise.all([
+        window.SchoolSafeSchoolAPI.listAcademicYears(),
+        window.SchoolSafeSchoolAPI.listClasses(),
+      ]);
+    } catch (e) {
+      notify("Impossible de préparer le formulaire : " + e.message);
+      return;
+    }
+    var years = resources[0] || [];
+    var classes = resources[1] || [];
+    var today = new Date().toISOString().slice(0, 10);
+    var modal = window.ssModal({
+      title: "Nouveau dossier élève",
+      size: "lg",
+      content:
+        '<form id="studentDraftForm" class="ss-form-grid ss-form-grid--2">' +
+          formField("matricule", "Matricule", "text", "", { required: true }) +
+          formField("first_name", "Prénom", "text", "", { required: true }) +
+          formField("middle_name", "Deuxième prénom", "text", "") +
+          formField("last_name", "Nom", "text", "", { required: true }) +
+          formField("date_of_birth", "Date de naissance", "date", "") +
+          formField("gender", "Genre", "select", "", { options: [{ value: "", label: "Non renseigné" }, { value: "F", label: "Fille" }, { value: "M", label: "Garçon" }] }) +
+          formField("academic_year_id", "Année scolaire", "select", "", { required: true, options: years.map(function (year) { return { value: year.id, label: year.label }; }) }) +
+          formField("planned_class_id", "Classe prévue", "select", "", { required: true, options: classes.map(function (item) { return { value: item.id, label: item.name }; }) }) +
+          formField("enrollment_starts_on", "Début prévu", "date", today, { required: true }) +
+          formField("guardian_type", "Lien avec l’élève", "select", "mere", { required: true, options: [{ value: "mere", label: "Mère" }, { value: "pere", label: "Père" }, { value: "tuteur", label: "Tuteur" }, { value: "autre", label: "Autre" }] }) +
+          '<fieldset class="student-parent-choice ss-field--wide"><legend>Parent principal obligatoire</legend>' +
+            '<label for="studentParentExisting"><input id="studentParentExisting" type="radio" name="parent_mode" value="existing" checked> Parent existant</label>' +
+            '<label for="studentParentInvite"><input id="studentParentInvite" type="radio" name="parent_mode" value="invite"> Inviter un nouveau Parent</label>' +
+          '</fieldset>' +
+          '<div id="existingParentFields" class="student-parent-fields ss-field--wide"><label class="ss-label" for="parentSearch">Rechercher le Parent</label><input id="parentSearch" type="search" placeholder="Nom ou email"><input id="existingParentId" type="hidden"><div id="parentSearchResults" class="student-parent-results" aria-live="polite"></div></div>' +
+          '<div id="invitedParentFields" class="student-parent-fields ss-field--wide" hidden>' +
+            '<div class="student-invite-status"><b>pending_activation</b><span>Le Parent activera lui-même son compte.</span></div>' +
+            '<div class="ss-form-grid ss-form-grid--2">' +
+              formField("parent_first_name", "Prénom du Parent", "text", "") +
+              formField("parent_last_name", "Nom du Parent", "text", "") +
+              formField("parent_email", "Email du Parent", "email", "") +
+              formField("parent_phone", "Téléphone du Parent", "tel", "") +
+            '</div><p class="student-password-notice">Aucun mot de passe n’est demandé : l’école ne le saisit, ne l’affiche et ne le connaît jamais.</p></div>' +
+        '</form>',
+      actions: [
+        { label: "Annuler", variant: "secondary", onClick: function () { modal.close(); } },
+        { label: "Créer le brouillon", variant: "primary", type: "submit", closeOnClick: false, attrs: { form: "studentDraftForm" } },
+      ],
+    });
+    var form = modal.content.querySelector("#studentDraftForm");
+    var existingFields = form.querySelector("#existingParentFields");
+    var inviteFields = form.querySelector("#invitedParentFields");
+    function updateParentMode() {
+      var invited = form.parent_mode.value === "invite";
+      existingFields.hidden = invited;
+      inviteFields.hidden = !invited;
+      ["parent_first_name", "parent_last_name", "parent_email"].forEach(function (name) { form[name].required = invited; });
+    }
+    form.querySelectorAll('[name="parent_mode"]').forEach(function (radio) { radio.addEventListener("change", updateParentMode); });
+    var parentSearchTimer = null;
+    form.querySelector("#parentSearch").addEventListener("input", function (event) {
+      window.clearTimeout(parentSearchTimer);
+      parentSearchTimer = window.setTimeout(async function () {
+        var query = event.target.value.trim();
+        var results = form.querySelector("#parentSearchResults");
+        if (query.length < 2) { results.innerHTML = ""; return; }
+        try {
+          var parents = await window.SchoolSafeSchoolAPI.searchParents(query);
+          results.innerHTML = parents.map(function (parent) {
+            return '<button type="button" data-parent-id="' + escapeMarkup(parent.id) + '"><b>' + escapeMarkup(parent.display_name) + '</b><span>' + escapeMarkup(parent.email || "Compte actif") + '</span></button>';
+          }).join("") || '<p>Aucun Parent trouvé.</p>';
+          results.querySelectorAll("[data-parent-id]").forEach(function (button) {
+            button.addEventListener("click", function () {
+              form.existingParentId.value = button.getAttribute("data-parent-id");
+              results.querySelectorAll("button").forEach(function (item) { item.classList.toggle("selected", item === button); });
+            });
+          });
+        } catch (e) { modal.setError(e.message); }
+      }, 250);
+    });
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var invited = form.parent_mode.value === "invite";
+      if (!invited && !form.existingParentId.value) {
+        modal.setError("Sélectionnez un Parent existant de l’école.");
+        return;
+      }
+      modal.setLoading(true);
+      try {
+        await window.SchoolSafeSchoolAPI.createStudentDraft({
+          matricule: form.matricule.value,
+          first_name: form.first_name.value,
+          middle_name: form.middle_name.value || undefined,
+          last_name: form.last_name.value,
+          date_of_birth: form.date_of_birth.value || undefined,
+          gender: form.gender.value || undefined,
+          academic_year_id: form.academic_year_id.value,
+          planned_class_id: form.planned_class_id.value,
+          enrollment_starts_on: form.enrollment_starts_on.value,
+          primary_parent: invited ? {
+            mode: "invite", email: form.parent_email.value, first_name: form.parent_first_name.value,
+            last_name: form.parent_last_name.value, phone: form.parent_phone.value || undefined,
+            guardian_type: form.guardian_type.value,
+          } : { mode: "existing", profile_id: form.existingParentId.value, guardian_type: form.guardian_type.value },
+        });
+        modal.close();
+        studentStatus = "draft";
+        notify("Dossier élève créé en préparation.");
+        await loadStudents();
+      } catch (e) {
+        modal.setError(e.message);
+      } finally {
+        modal.setLoading(false);
+      }
+    });
+    updateParentMode();
   }
 
   function renderTabs() {
@@ -547,22 +798,25 @@
       renderTabs();
       if (currentTab === "school") loadSchool();
       if (currentTab === "staff") loadStaff();
+      if (currentTab === "students") loadStudents();
     });
   }
 
-  function render(tabName) {
-    if (tabName === "school" || tabName === "staff") {
+  function render(tabName, user) {
+    if (tabName === "school" || tabName === "staff" || tabName === "students") {
       currentTab = tabName;
     }
+    currentUser = user || currentUser || { permissions: [] };
     renderTabs();
     if (currentTab === "school") loadSchool();
     if (currentTab === "staff") loadStaff();
+    if (currentTab === "students") loadStudents();
   }
 
   window.SchoolSafeSchoolModule = {
-    render: function (tabName) {
+    render: function (tabName, user) {
       bindTabs();
-      render(tabName);
+      render(tabName, user);
     },
   };
 })();

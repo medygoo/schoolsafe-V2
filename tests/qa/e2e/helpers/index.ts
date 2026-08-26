@@ -92,6 +92,29 @@ const DEMO_SCAN_RESULT = {
   },
 };
 
+const DEMO_STUDENTS = [
+  {
+    id: "demo-draft-student",
+    matricule: "B1-0002",
+    first_name: "Amina",
+    last_name: "Mbuyi",
+    lifecycle_status: "draft",
+    class_id: null,
+    enrollment: { status: "draft", planned_class_id: "demo-class-2", planned_class_name: "5e A" },
+    primary_parent: { id: "demo-parent-1", display_name: "Sarah Mbuyi", account_status: "pending_activation" },
+  },
+  {
+    id: "demo-active-student",
+    matricule: "B1-0001",
+    first_name: "Lucas",
+    last_name: "Martin",
+    lifecycle_status: "active",
+    class_id: "demo-class-1",
+    enrollment: { status: "active", planned_class_id: "demo-class-1", planned_class_name: "6e A" },
+    primary_parent: { id: "demo-parent-2", display_name: "Sophie Martin", account_status: "active" },
+  },
+];
+
 async function setupRoutes(page: Page) {
   await page.route("**/*", (route) => {
     const url = route.request().url();
@@ -117,6 +140,32 @@ async function setupRoutes(page: Page) {
     }
     if (url.includes("/security/scan")) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(DEMO_SCAN_RESULT) });
+    }
+    if (url.includes("/school/students?") || /\/school\/students$/.test(new URL(url).pathname)) {
+      const status = new URL(url).searchParams.get("status");
+      const data = status ? DEMO_STUDENTS.filter((student) => student.lifecycle_status === status) : DEMO_STUDENTS;
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
+    }
+    if (url.includes("/school/parents?")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([{ id: "demo-parent-2", display_name: "Sophie Martin", account_status: "active" }]),
+      });
+    }
+    if (url.includes("/school/academic-years")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([{ id: "demo-year-1", label: "2026-2027", is_active: true }]),
+      });
+    }
+    if (url.includes("/pedagogy/classes")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([{ id: "demo-class-1", name: "6e A" }, { id: "demo-class-2", name: "5e A" }]),
+      });
     }
     return route.continue();
   });

@@ -1208,6 +1208,7 @@
   }
 
   function schoolTabForAction(actionName) {
+    if (/élèves|dossier élève/i.test(actionName)) return "students";
     if (/mon école|paramètres de l’école|configuration école|école & personnel/i.test(actionName)) return "school";
     if (/mon équipe|personnel|staff/i.test(actionName)) return "staff";
     return "";
@@ -1224,7 +1225,7 @@
     document.querySelector(".workspace-grid").hidden = true;
     document.getElementById("cardsProtected").hidden = true;
     if (window.SchoolSafeSchoolModule) {
-      window.SchoolSafeSchoolModule.render(tabName);
+      window.SchoolSafeSchoolModule.render(tabName, getCurrentUser());
     }
     document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
   }

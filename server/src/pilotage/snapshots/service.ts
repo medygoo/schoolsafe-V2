@@ -28,7 +28,7 @@ export function createSnapshotService(supabaseUrl: string, serviceRoleKey: strin
       const [
         { count: openAlerts },
         { count: todayEvents },
-        { count: activeStudents },
+        { data: activeStudents },
         { count: pendingApprovals },
         { count: todayPayments },
       ] = await Promise.all([
@@ -43,10 +43,7 @@ export function createSnapshotService(supabaseUrl: string, serviceRoleKey: strin
           .eq("school_id", schoolId)
           .gte("occurred_at", `${today}T00:00:00Z`)
           .lte("occurred_at", `${today}T23:59:59Z`),
-        client
-          .from("students")
-          .select("id", { count: "exact" })
-          .eq("school_id", schoolId),
+        client.rpc("count_operational_students", { p_school_id: schoolId }),
         client
           .from("approval_requests")
           .select("id", { count: "exact" })

@@ -108,5 +108,22 @@
     listStudentsByClass: function (classId) {
       return request("GET", "/school/classes/" + classId + "/students");
     },
+    listStudents: function (status, query) {
+      var params = new URLSearchParams({ status: status });
+      if (query) params.set("query", query);
+      return request("GET", "/school/students?" + params.toString());
+    },
+    getStudent: function (studentId) {
+      return request("GET", "/school/students/" + encodeURIComponent(studentId));
+    },
+    searchParents: function (query) {
+      return request("GET", "/school/parents?query=" + encodeURIComponent(query));
+    },
+    createStudentDraft: function (payload) {
+      return request("POST", "/school/students/drafts", payload);
+    },
+    listClasses: function () {
+      return request("GET", "/pedagogy/classes");
+    },
   };
 })();

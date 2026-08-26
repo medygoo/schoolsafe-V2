@@ -22,7 +22,7 @@ export function createDashboardService(supabaseUrl: string, serviceRoleKey: stri
         { count: criticalAlerts, data: latestAlerts },
         { count: openAlerts },
         { count: todayEvents },
-        { count: activeStudents },
+        { data: activeStudents },
         { data: schoolSettings },
       ] = await Promise.all([
         client
@@ -43,10 +43,7 @@ export function createDashboardService(supabaseUrl: string, serviceRoleKey: stri
           .eq("school_id", schoolId)
           .gte("occurred_at", `${today}T00:00:00Z`)
           .lte("occurred_at", `${today}T23:59:59Z`),
-        client
-          .from("students")
-          .select("id", { count: "exact" })
-          .eq("school_id", schoolId),
+        client.rpc("count_operational_students", { p_school_id: schoolId }),
         client
           .from("school_settings")
           .select("lockdown_active")
