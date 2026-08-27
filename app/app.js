@@ -180,6 +180,8 @@
       deniedPermissions: bootstrap.deniedPermissions || bootstrap.denied_permissions || [],
       permissionExceptions: bootstrap.permissionExceptions || bootstrap.permission_exceptions || [],
       childIds: bootstrap.childIds || bootstrap.child_ids || bootstrap.linked_child_ids,
+      assignedClassIds: bootstrap.assignedClassIds || bootstrap.assigned_class_ids,
+      assignedSubjectIds: bootstrap.assignedSubjectIds || bootstrap.assigned_subject_ids,
       school: bootstrap.school || null,
       offline_policy: bootstrap.offline_policy || { max_offline_hours: 24 }
     };
@@ -224,7 +226,7 @@
     admin: ["school.manage", "staff.read", "staff.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
-    teacher: ["school.student.read", "school.class.read", "pedagogy.grade.read"],
+    teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read"],
     guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
   };
 
@@ -251,11 +253,12 @@
       ]
     },
     teacher: {
-      assignedClassIds: ["demo-class-1"],
+      assignedClassIds: ["demo-class-1", "demo-class-2"],
+      assignedSubjectIds: ["demo-subject-math", "demo-subject-french"],
       scopes: [
         { permission: "school.student.read", type: "assigned_classes" },
         { permission: "school.class.read", type: "assigned_classes" },
-        { permission: "pedagogy.grade.read", type: "assigned_classes" }
+        { permission: "pedagogy.subject.read", type: "assigned_subjects" }
       ]
     },
     guard: { scopes: [{ permission: "security.pickup.read", type: "school" }, { permission: "security.pickup.manage", type: "school" }] }
@@ -271,6 +274,7 @@
       profile: context.profile || null,
       childIds: (context.childIds || []).slice(),
       assignedClassIds: (context.assignedClassIds || []).slice(),
+      assignedSubjectIds: (context.assignedSubjectIds || []).slice(),
       scopes: (context.scopes || []).map(function (scope) { return Object.assign({}, scope); })
     };
   }
@@ -279,6 +283,7 @@
     getAssistantContext: function () {
       return { activeRole: currentDemoRole, user: getCurrentUser() };
     },
+    getCurrentUser: getCurrentUser,
     showDashboard: function () {
       showDashboard();
     }
@@ -287,14 +292,24 @@
   function setWorkspaceDashboardVisible(visible) {
     var dashboardContainer = document.getElementById("dashboardContainer");
     var parentPortal = document.getElementById("parentPortal");
+    var teacherPortal = document.getElementById("teacherPedagogyPortal");
     var isParent = currentDemoRole === "parent";
-    if (dashboardContainer) dashboardContainer.hidden = !visible || isParent;
+    var isTeacher = currentDemoRole === "teacher";
+    if (dashboardContainer) dashboardContainer.hidden = !visible || isParent || isTeacher;
     if (parentPortal) {
       parentPortal.hidden = !visible || !isParent;
       if (visible && isParent && window.SchoolSafeParentPortal) {
         window.SchoolSafeParentPortal.render("parentPortal", getCurrentUser());
       } else if (!isParent && window.SchoolSafeParentPortal && typeof window.SchoolSafeParentPortal.clear === "function") {
         window.SchoolSafeParentPortal.clear();
+      }
+    }
+    if (teacherPortal) {
+      teacherPortal.hidden = !visible || !isTeacher;
+      if (visible && isTeacher && window.SchoolSafeTeacherPedagogy) {
+        window.SchoolSafeTeacherPedagogy.render("teacherPedagogyPortal", getCurrentUser());
+      } else if (!isTeacher && window.SchoolSafeTeacherPedagogy && typeof window.SchoolSafeTeacherPedagogy.clear === "function") {
+        window.SchoolSafeTeacherPedagogy.clear();
       }
     }
   }
