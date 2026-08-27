@@ -115,13 +115,14 @@ test.describe("B2-FE — dossier familial et urgence", () => {
   test("rend la checklist et les états de complétion sans activation", async ({ page }) => {
     await enterDemoWorkspace(page, "admin");
     const dossier = await openFamilyDossier(page);
+    const checklist = dossier.locator(".family-completion");
 
-    await expect(dossier.locator("[data-completion-item]")).toHaveCount(8);
-    await expect(dossier.getByText("INCOMPLET", { exact: true })).toBeVisible();
-    await expect(dossier.getByText("EN COURS", { exact: true })).toBeVisible();
-    await expect(dossier.getByText("PRÊT POUR VÉRIFICATION", { exact: true })).toBeVisible();
-    await expect(dossier.getByRole("button", { name: /activer/i })).toHaveCount(0);
-    await expect(dossier.getByRole("button", { name: /valider/i })).toHaveCount(0);
+    await expect(checklist.locator("[data-completion-item]")).toHaveCount(8);
+    await expect(checklist.getByText("INCOMPLET", { exact: true })).toBeVisible();
+    await expect(checklist.getByText("EN COURS", { exact: true })).toBeVisible();
+    await expect(checklist.getByText("PRÊT POUR VÉRIFICATION", { exact: true })).toBeVisible();
+    await expect(checklist.getByRole("button", { name: /activer/i })).toHaveCount(0);
+    await expect(checklist.getByRole("button", { name: /valider/i })).toHaveCount(0);
   });
 
   test("navigue sans débordement en clair et sombre aux trois largeurs", async ({ page }, testInfo) => {

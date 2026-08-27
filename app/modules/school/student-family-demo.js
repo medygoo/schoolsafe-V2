@@ -14,6 +14,7 @@
   var activeModal = null;
   var activeStudent = null;
   var activeState = null;
+  var activeUser = null;
 
   function escapeMarkup(value) {
     if (value == null) return "";
@@ -89,15 +90,22 @@
       },
       history: [
         { at: "Aujourd’hui · 09:40", label: "Dossier familial ouvert en démonstration" },
+        { at: "Aujourd’hui · 09:30", label: "Contact d’urgence ajouté" },
+        { at: "Aujourd’hui · 09:15", label: "Trois tuteurs secondaires ajoutés" },
         { at: "Hier · 16:15", label: "Parent principal rattaché au brouillon" },
         { at: "Hier · 15:52", label: "Dossier élève créé en préparation" }
-      ]
+      ],
+      verification: { status: "incomplete" }
     };
   }
 
   function stateFor(student) {
     var stored = readStore()[student.id];
-    return stored && stored.guardians && stored.guardians.length === 3 ? stored : createState(student);
+    if (stored && stored.guardians && stored.guardians.length === 3) {
+      stored.verification = stored.verification || { status: "incomplete" };
+      return stored;
+    }
+    return createState(student);
   }
 
   function relationLabel(value) {
@@ -262,7 +270,7 @@
       '<div class="family-dossier-hero"><div class="family-dossier-identity"><span class="family-avatar family-avatar--student">' + escapeMarkup(initials(student.first_name + " " + student.last_name)) + '</span><div><div class="family-dossier-badges">' + root.ssBadge({ label: "EN PRÉPARATION", variant: "warning" }) + root.ssBadge({ label: "DÉMO FRONTEND", variant: "info", icon: "flask-conical" }) + '</div><h2>' + escapeMarkup([student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ")) + '</h2><p>Matricule ' + escapeMarkup(student.matricule) + ' · ' + escapeMarkup(enrollment.planned_class_name || "Classe à confirmer") + '</p></div></div>' +
       '<div class="family-backend-note"><i data-lucide="database-zap"></i><div><b>BACKEND_LATER</b><span>Sauvegarde, photos, pièces, suspension, vérification et activation restent locales ou indisponibles.</span></div></div></div>' +
       '<nav class="family-dossier-nav" aria-label="Sections du dossier familial">' +
-        [["identity", "Identité"], ["schooling", "Scolarité prévue"], ["parent", "Parent principal"], ["guardians", "Tuteurs secondaires"], ["emergency", "Contact d’urgence"], ["proofs", "Photos et identités"], ["checklist", "Checklist"], ["history", "Historique"]].map(function (item) {
+        [["identity", "Identité"], ["schooling", "Scolarité prévue"], ["parent", "Parent principal"], ["guardians", "Tuteurs secondaires"], ["emergency", "Contact d’urgence"], ["proofs", "Photos et identités"], ["checklist", "Checklist"], ["verification", "Vérification et activation"], ["history", "Historique"]].map(function (item) {
           return '<button type="button" data-dossier-section="' + item[0] + '">' + item[1] + '</button>';
         }).join("") + '</nav>' +
       '<div class="family-dossier-content">' +
@@ -273,6 +281,7 @@
         section("emergency", "siren", "Contact d’urgence", emergencyCard(), "family-section--emergency") +
         section("proofs", "scan-face", "Photos et identités", '<div class="family-proof-heading"><p>Vue de contrôle des éléments de démonstration.</p>' + root.ssBadge({ label: "BACKEND_LATER", variant: "warning" }) + '</div>' + identityMatrix()) +
         section("checklist", "list-checks", "Checklist", checklist()) +
+        (root.SchoolSafeStudentVerification ? root.SchoolSafeStudentVerification.renderSection({ student: student, state: activeState, user: activeUser }) : "") +
         section("history", "history", "Historique du brouillon", history()) +
       '</div><footer class="family-dossier-footer"><i data-lucide="shield-alert"></i><p><b>Dossier non opérationnel.</b> Cette démonstration ne valide, n’active et ne transmet aucune donnée au serveur.</p></footer></div>';
   }
@@ -299,7 +308,7 @@
 
   function recordDemoChange(label) {
     activeState.history.unshift({ at: "À l’instant", label: label });
-    activeState.history = activeState.history.slice(0, 5);
+    activeState.history = activeState.history.slice(0, 12);
     saveStore();
   }
 
@@ -359,12 +368,26 @@
       });
     });
 
+    if (root.SchoolSafeStudentVerification) {
+      root.SchoolSafeStudentVerification.bind({
+        rootElement: rootElement,
+        student: activeStudent,
+        state: activeState,
+        user: activeUser,
+        onChange: function (label) {
+          recordDemoChange(label);
+          rerender();
+        }
+      });
+    }
+
     if (root.lucide) root.lucide.createIcons();
   }
 
-  function open(student) {
+  function open(student, user) {
     activeStudent = student;
     activeState = stateFor(student);
+    activeUser = user || { permissions: [] };
     activeModal = root.ssModal({
       title: "Dossier élève en préparation",
       subtitle: isDemoMode() ? "Données familiales fictives · aucune écriture serveur" : "Interface de préparation · persistance réelle BACKEND_LATER",
@@ -372,7 +395,7 @@
       className: "student-family-modal",
       content: renderDossier(),
       actions: [{ label: "Fermer le dossier", variant: "secondary" }],
-      onClose: function () { activeModal = null; activeStudent = null; activeState = null; }
+      onClose: function () { activeModal = null; activeStudent = null; activeState = null; activeUser = null; }
     });
     bindDossier();
   }

@@ -100,7 +100,13 @@ const DEMO_STUDENTS = [
     last_name: "Mbuyi",
     lifecycle_status: "draft",
     class_id: null,
-    enrollment: { status: "draft", planned_class_id: "demo-class-2", planned_class_name: "5e A" },
+    enrollment: {
+      status: "draft",
+      academic_year_label: "2026-2027",
+      planned_class_id: "demo-class-2",
+      planned_class_name: "5e A",
+      starts_on: "2026-09-01",
+    },
     primary_parent: {
       id: "demo-parent-1",
       display_name: "Sarah Mbuyi",

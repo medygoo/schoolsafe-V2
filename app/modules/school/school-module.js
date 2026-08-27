@@ -198,7 +198,7 @@
     try {
       var detail = await window.SchoolSafeSchoolAPI.getStudent(studentId);
       if (detail.lifecycle_status === "draft" && window.SchoolSafeStudentFamily) {
-        window.SchoolSafeStudentFamily.open(detail);
+        window.SchoolSafeStudentFamily.open(detail, currentUser);
         return;
       }
       var enrollment = detail.enrollment || {};

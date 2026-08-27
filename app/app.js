@@ -214,11 +214,18 @@
   /**
    * Construit le contexte utilisateur pour le moteur d’autorisation central.
    * En session réelle : currentSession.
-   * En démonstration sans session : rôle démo avec permissions vides (roleCatalog reste le mécanisme de démo).
+   * En démonstration sans session : projection frontend explicite des permissions.
+   * Elle ne crée aucun droit backend et permet aux modules de passer par Access_Law sans bypass de rôle.
    */
+  var DEMO_PERMISSIONS_BY_ROLE = {
+    admin: ["school.student.read", "school.student.create", "school.student.activate"],
+    admissions: ["school.student.read", "school.student.create"]
+  };
+
   function getCurrentUser() {
     if (currentSession && currentSession.token) return currentSession;
-    return { role: currentDemoRole || "admin", permissions: [] };
+    var role = currentDemoRole || "admin";
+    return { role: role, permissions: (DEMO_PERMISSIONS_BY_ROLE[role] || []).slice() };
   }
 
   /**

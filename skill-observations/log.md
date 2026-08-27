@@ -144,3 +144,20 @@ resolved statuses always carry their resolution date
 **Suggested improvement:** Identify the element that owns `overflow: auto`, attach a one-shot `scrollend` listener before triggering smooth navigation, and await that event before visual assertions or screenshots. For deterministic return-to-top captures, set both scroll axes on that same container and wait for several stable animation frames.
 
 **Principle:** Visual tests should synchronize with the browser state that produces the pixels; element visibility alone does not prove that scrolling and compositing are finished.
+
+### Observation 10: Demo roles should project permissions instead of bypassing the access engine
+
+**Status:** OPEN
+**Date:** 2026-08-27
+**Session context:** Adding a frontend-only privileged workflow before its backend permission exists
+**Skill:** test-driven-development / impeccable
+**Type:** open-source
+**Phase/Area:** Authorization simulations and honest prototypes
+
+**Issue:** A role-based demonstration needs privileged actions to be usable, but checking `role === admin` inside the feature would bypass the same permission mechanism the real product must enforce. Leaving demo permissions empty makes the surface impossible to exercise and encourages feature-local exceptions.
+
+**Suggested improvement:** Define an explicit frontend-only role-to-permission projection at the demo session boundary, pass the resulting user context into the feature, and require the central access engine to authorize every action. Label future permission contracts as backend-later and test both an allowed permission-bearing context and a denied context.
+
+**Principle:** A prototype may simulate grants, but it should never simulate authorization by skipping the authorization system.
+
+- 2026-08-27 checkpoint B3-FE: no additional observation after the targeted B1/B2 smoke; Observation 7 already covers feature-scoped selectors.
