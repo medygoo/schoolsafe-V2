@@ -226,8 +226,8 @@
     admin: ["school.manage", "staff.read", "staff.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
-    teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage"],
-    pedagogy: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.lesson-plan.read", "pedagogy.report.read", "pedagogy.report.manage", "palmarques.read"],
+    teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage", "pedagogy.remediation.manage", "safe.assistant.use"],
+    pedagogy: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.lesson-plan.read", "pedagogy.report.read", "pedagogy.report.manage", "palmarques.read", "safe.assistant.use"],
     guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
   };
 
@@ -265,7 +265,9 @@
         { permission: "pedagogy.grade.read", type: "assigned_classes" },
         { permission: "pedagogy.grade.manage", type: "assigned_classes" },
         { permission: "pedagogy.lesson-plan.read", type: "assigned_classes" },
-        { permission: "pedagogy.lesson-plan.manage", type: "assigned_classes" }
+        { permission: "pedagogy.lesson-plan.manage", type: "assigned_classes" },
+        { permission: "pedagogy.remediation.manage", type: "assigned_classes" },
+        { permission: "safe.assistant.use", type: "own" }
       ]
     },
     pedagogy: {
@@ -280,7 +282,8 @@
         { permission: "pedagogy.lesson-plan.read", type: "assigned_classes" },
         { permission: "pedagogy.report.read", type: "assigned_classes" },
         { permission: "pedagogy.report.manage", type: "assigned_classes" },
-        { permission: "palmarques.read", type: "assigned_classes" }
+        { permission: "palmarques.read", type: "assigned_classes" },
+        { permission: "safe.assistant.use", type: "own" }
       ]
     },
     guard: { scopes: [{ permission: "security.pickup.read", type: "school" }, { permission: "security.pickup.manage", type: "school" }] }
@@ -330,7 +333,7 @@
       teacherPortal.hidden = !visible || !isTeacher;
       if (visible && isTeacher && window.SchoolSafeTeacherPedagogy) {
         window.SchoolSafeTeacherPedagogy.render("teacherPedagogyPortal", getCurrentUser());
-      } else if (!isTeacher && window.SchoolSafeTeacherPedagogy && typeof window.SchoolSafeTeacherPedagogy.clear === "function") {
+      } else if ((!visible || !isTeacher) && window.SchoolSafeTeacherPedagogy && typeof window.SchoolSafeTeacherPedagogy.clear === "function") {
         window.SchoolSafeTeacherPedagogy.clear();
       }
     }
@@ -498,7 +501,7 @@
       today: [["Présence à effectuer","1 classe","clipboard-check"],["Cours prévus","4 aujourd’hui","calendar-clock"],["Devoirs à corriger","18 remises","notebook-tabs"],["Notifications","2 importantes","bell-ring"]],
       branches: [
         branch("school","Mes élèves et classes",[group("Périmètre affecté",[["Élèves de mes classes","users"],["Structure de mes classes","school"]])]),
-        branch("pedagogy","Classes et apprentissage",[group("Mes classes",[["1re A","users-round"],["2e B","users-round"],["Emploi du temps","calendar-range"]]),group("Travail pédagogique",[["Présences, absences et retards","clipboard-check"],["Devoirs et corrections","notebook-pen"],["Évaluations et notes","star"],["Cahier de préparation de l’enseignant","book-open-check"]]),group("Suivi des élèves",[["Résultats et moyennes","chart-no-axes-combined"],["Difficultés","triangle-alert"],["Rattrapage pédagogique","life-buoy"],["Bulletins à consulter","file-text"],["Préparation aux épreuves certificatives","scroll-text"]])]),
+        branch("pedagogy","Classes et apprentissage",[group("Mes classes",[["6e A","users-round"],["5e A","users-round"],["Emploi du temps","calendar-range"]]),group("Travail pédagogique",[["Présences, absences et retards","clipboard-check"],["Devoirs et corrections","notebook-pen"],["Évaluations et notes","star"],["Cahier de préparation de l’enseignant","book-open-check"]]),group("Suivi des élèves",[["Résultats et moyennes","chart-no-axes-combined"],["Difficultés","triangle-alert"],["Rattrapage pédagogique","life-buoy"],["Bulletins à consulter","file-text"],["Préparation aux épreuves certificatives","scroll-text"]])]),
         branch("communication","Échanges autorisés",[group("Communication",[["Direction","school"],["Parents autorisés","contact-round"],["Notifications","bell"]])])
       ]
     },
@@ -2323,10 +2326,27 @@
       '</button>';
   }
 
+  function openPhaseDPedagogy(view) {
+    if (!window.SchoolSafeTeacherPedagogy || (currentDemoRole !== "teacher" && currentDemoRole !== "pedagogy")) return false;
+    if (currentDemoRole === "pedagogy" && view !== "direction") return false;
+    setWorkspaceDashboardVisible(false);
+    ["pedagogyModule", "palmaresModule", "financeModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+      var module = document.getElementById(id);
+      if (module) module.hidden = true;
+    });
+    var portal = document.getElementById("teacherPedagogyPortal");
+    if (!portal) return false;
+    portal.hidden = false;
+    window.SchoolSafeTeacherPedagogy.render("teacherPedagogyPortal", getCurrentUser());
+    if (view && view !== "dashboard") window.SchoolSafeTeacherPedagogy.open(view);
+    return true;
+  }
+
   function openModuleByBranch(branchKey) {
     var definition = branchDefinitions[branchKey];
     if (!definition) return;
     setBreadcrumb(definition.label);
+    if (branchKey === "pedagogy" && openPhaseDPedagogy("dashboard")) return;
     if (branchKey === "pedagogy") { openPedagogyModule("Devoirs et corrections"); return; }
     if (branchKey === "finance") { openFinanceModule(); return; }
     if (branchKey === "feeControl") { openFeeControlModule(); return; }
@@ -2346,20 +2366,19 @@
     setBreadcrumb(definition.label);
     if (branchKey === "school" && pedagogyTabForAction(actionName)) { openPedagogyModule(actionName); return; }
     if (branchKey === "school" && securityTabForAction(actionName)) { openSecurityModule(actionName); return; }
-    if (branchKey === "pedagogy" && actionName === "Pilotage pédagogique") {
-      setWorkspaceDashboardVisible(false);
-      ["pedagogyModule", "palmaresModule", "financeModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
-        var module = document.getElementById(id);
-        if (module) module.hidden = true;
-      });
-      var directionPortal = document.getElementById("teacherPedagogyPortal");
-      if (directionPortal && window.SchoolSafeTeacherPedagogy) {
-        directionPortal.hidden = false;
-        window.SchoolSafeTeacherPedagogy.render("teacherPedagogyPortal", getCurrentUser());
-        window.SchoolSafeTeacherPedagogy.open("direction");
-      }
-      return;
-    }
+    var phaseDViews = {
+      "Devoirs et corrections": "assignments",
+      "Évaluations et notes": "evaluations",
+      "Résultats et moyennes": "results",
+      "Moyennes et coefficients": "results",
+      "Bulletins": "results",
+      "Bulletins à consulter": "results",
+      "Palmarès": "results",
+      "Difficultés": "difficulties",
+      "Rattrapage pédagogique": "remediation",
+      "Pilotage pédagogique": "direction"
+    };
+    if (branchKey === "pedagogy" && phaseDViews[actionName] && openPhaseDPedagogy(phaseDViews[actionName])) return;
     if (branchKey === "pedagogy") { openPedagogyModule(actionName); return; }
     if (branchKey === "finance") { openFinanceModule(actionName); return; }
     if (branchKey === "feeControl") { openFeeControlModule(actionName); return; }

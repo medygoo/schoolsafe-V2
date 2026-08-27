@@ -226,6 +226,29 @@
 .teacher-direction-metric small,
 .teacher-direction-metric em { overflow-wrap: anywhere; color: var(--ss-text-secondary); font-style: normal; }
 .teacher-direction-metric strong { font-size: 1.2rem; }
+.teacher-jaspe { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 1rem; padding: 1.2rem; border: 1px solid var(--ss-border-default); border-radius: 1rem; background: var(--ss-bg-primary); box-shadow: var(--ss-shadow-sm); }
+.teacher-jaspe-avatar { display: grid; place-items: center; border-radius: .9rem; background: var(--ss-info-bg); }
+.teacher-jaspe-avatar img { width: 5.5rem; height: 5.5rem; object-fit: contain; }
+.teacher-jaspe-content { min-width: 0; }
+.teacher-jaspe-content h2,
+.teacher-jaspe-content > p { margin: 0; }
+.teacher-jaspe-suggestions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .8rem 0; }
+.teacher-jaspe-suggestions button,
+.teacher-jaspe-input button { min-width: 2.75rem; min-height: 2.75rem; border: 1px solid var(--ss-border-default); border-radius: .7rem; background: var(--ss-info-bg); color: var(--ss-info-text); font-weight: 800; }
+.teacher-jaspe-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; }
+.teacher-jaspe-input input { width: 100%; min-height: 2.75rem; padding: .65rem .75rem; border: 1px solid var(--ss-border-default); border-radius: .7rem; background: var(--ss-bg-secondary); color: var(--ss-text-primary); }
+.teacher-jaspe-response,
+.teacher-jaspe-inline { margin: .65rem 0 0; padding: .7rem; border-left: 3px solid var(--ss-blue-500); border-radius: .45rem; background: var(--ss-bg-secondary); color: var(--ss-text-primary); }
+.teacher-jaspe-inline { margin: 0; }
+.teacher-pedagogy-state--loading { border-color: var(--ss-info-border); background: var(--ss-info-bg); color: var(--ss-info-text); }
+.teacher-pedagogy-state--error { border-color: var(--ss-error-border); background: var(--ss-error-bg); color: var(--ss-error-text); }
+.teacher-pedagogy-state--empty { color: var(--ss-text-secondary); }
+.teacher-pedagogy-portal button { min-height: 2.5rem; }
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .workspace-screen.teacher-pedagogy-active .workspace-topbar { padding-inline: var(--ss-space-4); }
+  .workspace-screen.teacher-pedagogy-active .topbar-search { display: none; }
+}
 
 @media (max-width: 900px) {
   .teacher-priority-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -248,4 +271,6 @@
   .teacher-result-grid,
   .teacher-timeline-item dl { grid-template-columns: 1fr; }
   .teacher-direction-grid { grid-template-columns: 1fr; }
+  .teacher-jaspe { grid-template-columns: 1fr; }
+  .teacher-jaspe-avatar { min-height: 6rem; }
 }

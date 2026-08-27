@@ -67,4 +67,21 @@ test.describe("Phase D3 — évaluations et notes", () => {
     await expect(page.locator("#teacherGradebookForm")).toHaveCount(0);
     await expect(page.locator("#teacherPedagogyPortal")).toContainText("Modification des notes refusée");
   });
+
+  test("refuse atomiquement une valeur hors barème sans effacer le brouillon", async ({ page }) => {
+    await enterDemoWorkspace(page, "teacher");
+    await page.locator('[data-teacher-open="evaluations"]').click();
+    const gradebook = page.locator("#teacherGradebookForm");
+    const lucas = gradebook.locator('[data-grade-value="demo-student-lucas"]');
+    await lucas.fill("8");
+    await gradebook.locator('button[type="submit"]').click();
+
+    await page.evaluate(() => {
+      const input = document.querySelector('[data-grade-value="demo-student-lucas"]') as HTMLInputElement;
+      input.value = "99";
+      input.form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    const stored = await page.evaluate(() => (window as any).SchoolSafeTeacherPedagogy.readGradeDrafts()["demo-evaluation-calcul"]["demo-student-lucas"].value);
+    expect(stored).toBe(8);
+  });
 });

@@ -4,15 +4,19 @@ import { enterDemoWorkspace } from "./helpers";
 test.describe("Phase D4 — résultats, bulletins et palmarès", () => {
   test("présente les résultats affectés sans inventer de bulletin officiel", async ({ page }) => {
     await enterDemoWorkspace(page, "teacher");
-    await page.evaluate(() => (window as any).SchoolSafeTeacherPedagogy.open("results"));
+    await page.locator('[data-teacher-open="results"]').click();
 
     const portal = page.locator("#teacherPedagogyPortal");
     await expect(portal).toContainText("Résultats et moyennes");
     await expect(portal).toContainText("Mathématiques");
     await expect(portal).toContainText("Français");
     await expect(portal).toContainText("DONNÉES DE DÉMONSTRATION");
-    await expect(portal).not.toContainText("3e C");
-    await expect(portal.locator('[data-ranking-scope="class"]')).toContainText("Top 10 classe");
+    await expect(portal).not.toContainText("3e Maternelle");
+    await expect(portal.locator('[data-ranking-scope="class"]')).toHaveCount(2);
+    await expect(portal.locator('[data-ranking-class="demo-class-1"]')).toContainText("Lucas Martin");
+    await expect(portal.locator('[data-ranking-class="demo-class-1"]')).not.toContainText("Ethan Leroy");
+    await expect(portal.locator('[data-ranking-class="demo-class-2"]')).toContainText("Ethan Leroy");
+    await expect(portal.locator('[data-ranking-class="demo-class-2"]')).not.toContainText("Lucas Martin");
     await expect(portal.locator('[data-ranking-scope="school"]')).toHaveCount(0);
     await expect(portal).not.toContainText("Modifier le classement");
     await expect(portal.locator('[data-bulletin-preview]')).toContainText("Bulletin officiel");

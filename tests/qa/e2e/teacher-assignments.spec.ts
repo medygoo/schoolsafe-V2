@@ -8,9 +8,9 @@ test.describe("Phase D2 — devoirs et travaux", () => {
 
     const form = page.locator("#teacherAssignmentForm");
     await expect(form).toBeVisible();
-    await expect(form.locator('[name="classId"] option')).toHaveText(["1re A", "2e B"]);
+    await expect(form.locator('[name="classId"] option')).toHaveText(["6e A", "5e A"]);
     await expect(form.locator('[name="subjectId"] option')).toHaveText(["Mathématiques", "Français"]);
-    await expect(form).not.toContainText("3e C");
+    await expect(form).not.toContainText("3e Maternelle");
     await expect(form).not.toContainText("Sciences physiques");
 
     await form.locator('[name="title"]').fill("Fractions — consolidation");

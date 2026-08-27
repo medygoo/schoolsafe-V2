@@ -55,4 +55,40 @@ test.describe("Phase D6 — rattrapage pédagogique", () => {
     await expect(form.locator('[name="amount"], [name="payment"], [name="fee"]')).toHaveCount(0);
     await expect(portal).toContainText("Aucune inscription financière");
   });
+
+  test("exige les permissions dédiées et applique ALLOW puis DENY individuel", async ({ page }) => {
+    await enterDemoWorkspace(page, "teacher");
+    const renderWith = async (permissionExceptions: any[]) => page.evaluate((exceptions) => {
+      const api = (window as any).SchoolSafeTeacherPedagogy;
+      api.render("teacherPedagogyPortal", {
+        permissions: ["school.class.read", "school.student.read", "pedagogy.subject.read", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage"],
+        permissionExceptions: exceptions,
+        assignedClassIds: ["demo-class-1"],
+        assignedSubjectIds: ["demo-subject-math"],
+        scopes: [
+          { permission: "school.class.read", type: "assigned_classes" },
+          { permission: "school.student.read", type: "assigned_classes" },
+          { permission: "pedagogy.subject.read", type: "assigned_subjects" },
+          { permission: "pedagogy.lesson-plan.read", type: "assigned_classes" },
+          { permission: "pedagogy.lesson-plan.manage", type: "assigned_classes" },
+        ],
+      });
+      api.open("remediation");
+    }, permissionExceptions);
+
+    await renderWith([]);
+    await expect(page.locator("#teacherRemediationForm")).toHaveCount(0);
+
+    await renderWith([
+      { permission: "pedagogy.remediation.manage", effect: "allow", scope: { type: "assigned_classes" } },
+    ]);
+    await expect(page.locator("#teacherRemediationForm")).toBeVisible();
+
+    await renderWith([
+      { permission: "pedagogy.remediation.manage", effect: "allow", scope: "assigned_classes" },
+      { permission: "pedagogy.remediation.manage", effect: "deny", scope: "assigned_classes" },
+    ]);
+    await expect(page.locator("#teacherRemediationForm")).toHaveCount(0);
+    await expect(page.locator("#teacherPedagogyPortal")).toContainText("Accès pédagogique refusé");
+  });
 });

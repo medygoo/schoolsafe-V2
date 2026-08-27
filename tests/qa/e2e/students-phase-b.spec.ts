@@ -39,8 +39,11 @@ test.describe("B9-FE — QA finale Phase B Élèves", () => {
     await expect(page.locator('[data-student-id="demo-draft-student"]')).toHaveCount(0);
 
     await page.locator('[data-school-tab="structure"]').click();
-    await expect(page.locator("[data-academic-class]")).toHaveCount(1);
-    await expect(page.getByText("6e A", { exact: true }).first()).toBeVisible();
+    await expect(page.locator("[data-academic-class]")).toHaveCount(2);
+    await expect(page.locator('[data-academic-class="demo-class-1"]')).toContainText("6e A");
+    await expect(page.locator('[data-academic-class="demo-class-2"]')).toContainText("5e A");
+    await expect(page.locator("[data-academic-class]").filter({ hasText: "3e Maternelle" })).toHaveCount(0);
+    await expect(page.locator("[data-academic-class]").filter({ hasText: "1re Secondaire B" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /préparer|modifier/i })).toHaveCount(0);
   });
 

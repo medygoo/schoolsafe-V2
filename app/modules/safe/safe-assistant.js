@@ -46,20 +46,29 @@
     return null;
   }
 
+  function assistantUser() {
+    var live = sessionUser();
+    if (live) return live;
+    if (global.document && global.document.body && global.document.body.classList.contains("screen-workspace") && global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getCurrentUser === "function") {
+      return global.SchoolSafeAppContext.getCurrentUser();
+    }
+    return null;
+  }
+
   // En session réelle, Jaspe exige la permission safe.assistant.use (DENY par défaut).
-  function isAllowed() {
-    var user = sessionUser();
-    if (!user) return true; // démo
+  function isAllowed(userOverride) {
+    var user = userOverride || assistantUser();
+    if (!user) return true;
     var access = global.SchoolSafeAccess;
-    if (!access || typeof access.canAccess !== "function") return false;
-    return access.canAccess(user, "safe.assistant.use");
+    if (!access || typeof access.allowsScope !== "function") return false;
+    return access.allowsScope(user, "safe.assistant.use", "own");
   }
 
   // En session réelle, une branche n’est proposée que si elle est visible pour l’utilisateur.
   function branchVisible(branchKey) {
     if (!branchKey) return true;
-    var user = sessionUser();
-    if (!user) return true; // démo
+    var user = assistantUser();
+    if (!user) return true;
     var access = global.SchoolSafeAccess;
     if (!access || typeof access.isBranchVisible !== "function") return false;
     return access.isBranchVisible(user, branchKey);
@@ -255,6 +264,22 @@
       }
     }
 
+    if (global.SchoolSafeTeacherPedagogy && typeof global.SchoolSafeTeacherPedagogy.answerJaspe === "function") {
+      var pedagogyContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
+        ? global.SchoolSafeAppContext.getAssistantContext()
+        : null;
+      var pedagogyAnswer = pedagogyContext && (pedagogyContext.activeRole === "teacher" || pedagogyContext.activeRole === "pedagogy")
+        ? global.SchoolSafeTeacherPedagogy.answerJaspe(raw, pedagogyContext)
+        : null;
+      if (pedagogyAnswer) {
+        state.currentMessage = pedagogyAnswer.message;
+        state.pose = pedagogyAnswer.refusal ? "reflechie" : "sourire";
+        state.suggestions = [];
+        render();
+        return;
+      }
+    }
+
     if (/autorise|autoriser|valide|valider/.test(text) && /sortie|remise|récup|recup/.test(text)) {
       state.currentMessage = "Je ne peux pas autoriser une sortie, valider une remise, suspendre ou rétablir une personne. Ces actions exigent les droits utilisateur correspondants et restent sous contrôle humain.";
       state.pose = "reflechie";
@@ -318,7 +343,7 @@
     });
   }
 
-  global.SafeAssistant = { init: init, openWithQuery: openWithQuery };
+  global.SafeAssistant = { init: init, isAllowed: isAllowed, openWithQuery: openWithQuery };
   if (global.document && (global.document.readyState === "complete" || global.document.readyState === "interactive")) {
     init();
   } else if (global.addEventListener) {

@@ -43,6 +43,7 @@
       "pedagogy.grade.manage",
       "pedagogy.lesson-plan.read",
       "pedagogy.lesson-plan.manage",
+      "pedagogy.remediation.manage",
       "pedagogy.report.read",
       "pedagogy.report.manage",
       "palmarques.read",
@@ -118,13 +119,54 @@
     return Array.isArray(user.permissions) ? user.permissions : [];
   }
 
+  function permissionExceptions(user) {
+    return Array.isArray(user && user.permissionExceptions) ? user.permissionExceptions : [];
+  }
+
+  function explicitDeny(user, permissionCode) {
+    if (Array.isArray(user && user.deniedPermissions) && user.deniedPermissions.indexOf(permissionCode) >= 0) return true;
+    return permissionExceptions(user).some(function (item) {
+      return item && item.permission === permissionCode && String(item.effect || "").toLowerCase() === "deny";
+    });
+  }
+
+  function allowedByException(user, permissionCode) {
+    return permissionExceptions(user).some(function (item) {
+      return item && item.permission === permissionCode && String(item.effect || "").toLowerCase() === "allow";
+    });
+  }
+
+  function normalizeScope(permissionCode, value) {
+    if (!value) return null;
+    if (typeof value === "string") return { permission: permissionCode, type: value };
+    if (typeof value === "object" && value.type) return Object.assign({ permission: permissionCode }, value);
+    return null;
+  }
+
+  function scopeFor(user, permissionCode) {
+    if (explicitDeny(user, permissionCode)) return null;
+    var exception = permissionExceptions(user).find(function (item) {
+      return item && item.permission === permissionCode && String(item.effect || "").toLowerCase() === "allow";
+    });
+    var exceptionScope = exception && normalizeScope(permissionCode, exception.scope || exception.scopeType || exception.scope_type);
+    if (exceptionScope) return exceptionScope;
+    var scopes = Array.isArray(user && user.scopes) ? user.scopes : [];
+    return scopes.find(function (scope) { return scope && scope.permission === permissionCode; }) || null;
+  }
+
+  function allowsScope(user, permissionCode, expectedScope) {
+    var scope = scopeFor(user, permissionCode);
+    return canAccess(user, permissionCode) && !!scope && scope.type === expectedScope;
+  }
+
   /**
    * Vérifie une permission unique.
    * Aucun bypass : l’Administrateur principal passe par ses permissions réelles,
    * comme tout le monde (Access_Law — un DENY explicite l’emporte toujours).
    */
   function canAccess(user, permissionCode) {
-    return userPermissions(user).indexOf(permissionCode) >= 0;
+    if (explicitDeny(user, permissionCode)) return false;
+    return userPermissions(user).indexOf(permissionCode) >= 0 || allowedByException(user, permissionCode);
   }
 
   /**
@@ -132,9 +174,8 @@
    */
   function canAccessAny(user, permissionCodes) {
     if (!Array.isArray(permissionCodes) || permissionCodes.length === 0) return false;
-    var perms = userPermissions(user);
     for (var i = 0; i < permissionCodes.length; i += 1) {
-      if (perms.indexOf(permissionCodes[i]) >= 0) return true;
+      if (canAccess(user, permissionCodes[i])) return true;
     }
     return false;
   }
@@ -143,7 +184,6 @@
    * Détermine si une branche de navigation doit être visible.
    */
   function isBranchVisible(user, branchKey) {
-    if (isAdmin(user)) return true;
     var perms = BRANCH_PERMISSIONS[branchKey];
     if (!perms || perms.length === 0) return false;
     return canAccessAny(user, perms);
@@ -163,7 +203,6 @@
    * Retourne les actions rapides autorisées pour le bouton +.
    */
   function getAllowedQuickActions(user) {
-    if (isAdmin(user)) return QUICK_ACTIONS.slice();
     return QUICK_ACTIONS.filter(function (action) {
       return canAccess(user, action.permission);
     });
@@ -203,7 +242,10 @@
   window.SchoolSafeAccess = {
     ADMIN_ROLE: ADMIN_ROLE,
     isAdmin: isAdmin,
+    explicitDeny: explicitDeny,
     canAccess: canAccess,
+    scopeFor: scopeFor,
+    allowsScope: allowsScope,
     canAccessAny: canAccessAny,
     isBranchVisible: isBranchVisible,
     filterBranches: filterBranches,
