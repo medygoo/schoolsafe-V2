@@ -228,7 +228,7 @@
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
     teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage", "safe.assistant.use"],
     pedagogy: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.lesson-plan.read", "pedagogy.report.read", "pedagogy.report.manage", "palmarques.read", "safe.assistant.use"],
-    guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
+    guard: ["security.scan", "security.pickup.manage"]
   };
 
   var DEMO_ACCESS_CONTEXT_BY_ROLE = {
@@ -285,7 +285,13 @@
         { permission: "safe.assistant.use", type: "own" }
       ]
     },
-    guard: { scopes: [{ permission: "security.pickup.read", type: "school" }, { permission: "security.pickup.manage", type: "school" }] }
+    guard: {
+      assignedPortalIds: ["demo-portal-main"],
+      scopes: [
+        { permission: "security.scan", type: "assigned_portal", portalIds: ["demo-portal-main"] },
+        { permission: "security.pickup.manage", type: "assigned_portal", portalIds: ["demo-portal-main"] }
+      ]
+    }
   };
 
   function getCurrentUser() {
@@ -299,6 +305,7 @@
       childIds: (context.childIds || []).slice(),
       assignedClassIds: (context.assignedClassIds || []).slice(),
       assignedSubjectIds: (context.assignedSubjectIds || []).slice(),
+      assignedPortalIds: (context.assignedPortalIds || []).slice(),
       scopes: (context.scopes || []).map(function (scope) { return Object.assign({}, scope); })
     };
   }
@@ -317,9 +324,11 @@
     var dashboardContainer = document.getElementById("dashboardContainer");
     var parentPortal = document.getElementById("parentPortal");
     var teacherPortal = document.getElementById("teacherPedagogyPortal");
+    var guardPortal = document.getElementById("guardSecurityPortal");
     var isParent = currentDemoRole === "parent";
     var isTeacher = currentDemoRole === "teacher";
-    if (dashboardContainer) dashboardContainer.hidden = !visible || isParent || isTeacher;
+    var isGuard = currentDemoRole === "guard";
+    if (dashboardContainer) dashboardContainer.hidden = !visible || isParent || isTeacher || isGuard;
     if (parentPortal) {
       parentPortal.hidden = !visible || !isParent;
       if (visible && isParent && window.SchoolSafeParentPortal) {
@@ -334,6 +343,14 @@
         window.SchoolSafeTeacherPedagogy.render("teacherPedagogyPortal", getCurrentUser());
       } else if ((!visible || !isTeacher) && window.SchoolSafeTeacherPedagogy && typeof window.SchoolSafeTeacherPedagogy.clear === "function") {
         window.SchoolSafeTeacherPedagogy.clear();
+      }
+    }
+    if (guardPortal) {
+      guardPortal.hidden = !visible || !isGuard;
+      if (visible && isGuard && window.SchoolSafeGuardSecurity) {
+        window.SchoolSafeGuardSecurity.render("guardSecurityPortal", getCurrentUser());
+      } else if ((!visible || !isGuard) && window.SchoolSafeGuardSecurity && typeof window.SchoolSafeGuardSecurity.clear === "function") {
+        window.SchoolSafeGuardSecurity.clear();
       }
     }
   }
