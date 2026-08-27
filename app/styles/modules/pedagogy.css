@@ -22,13 +22,8 @@
   align-items: center;
   gap: var(--ss-space-4);
   padding: var(--ss-space-5);
-  color: var(--ss-text-inverse);
-  background: linear-gradient(
-    120deg,
-    var(--ss-navy-900) 0%,
-    var(--ss-blue-700) 52%,
-    var(--ss-violet-700) 100%
-  );
+  color: var(--ss-text-on-brand);
+  background: var(--ss-gradient-module);
 }
 
 .pedagogy-module-header > div > span {
@@ -47,12 +42,13 @@
 
 .pedagogy-module-header p {
   margin: 0;
-  color: color-mix(in srgb, var(--ss-text-inverse) 72%, transparent);
+  color: color-mix(in srgb, var(--ss-text-on-brand-soft) 82%, transparent);
   font-size: var(--ss-text-sm);
 }
 
-.pedagogy-module-header .secondary-button {
-  color: var(--ss-text-inverse);
+.pedagogy-module-header .secondary-button,
+.pedagogy-module-header .ss-button--secondary {
+  color: var(--ss-text-on-brand);
   border-color: var(--ss-border-inverse);
   background: rgba(255, 255, 255, 0.1);
 }
@@ -65,7 +61,7 @@
   padding: 0 var(--ss-space-3);
   border: 1px solid var(--ss-border-inverse);
   border-radius: var(--ss-radius-sm);
-  color: var(--ss-text-inverse);
+  color: var(--ss-text-on-brand);
   background: rgba(0, 0, 0, 0.2);
   font-size: var(--ss-text-xs);
   font-weight: var(--ss-font-extrabold);

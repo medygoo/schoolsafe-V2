@@ -88,6 +88,12 @@
   --ss-bg-brand: var(--ss-blue-900);
   --ss-bg-brand-hover: var(--ss-blue-800);
   --ss-bg-accent: var(--ss-gold-400);
+  --ss-gradient-module: linear-gradient(
+    120deg,
+    var(--ss-navy-900) 0%,
+    var(--ss-blue-700) 52%,
+    var(--ss-violet-700) 100%
+  );
 
   /* Textes */
   --ss-text-primary: var(--ss-slate-900);
@@ -95,6 +101,8 @@
   --ss-text-tertiary: var(--ss-slate-500);
   --ss-text-muted: var(--ss-slate-400);
   --ss-text-inverse: #ffffff;
+  --ss-text-on-brand: #ffffff;
+  --ss-text-on-brand-soft: var(--ss-blue-100);
   --ss-text-brand: var(--ss-blue-900);
   --ss-text-accent: var(--ss-gold-600);
   --ss-text-link: var(--ss-blue-600);
@@ -105,6 +113,12 @@
   --ss-border-strong: var(--ss-slate-300);
   --ss-border-subtle: var(--ss-slate-100);
   --ss-border-inverse: rgba(255, 255, 255, 0.2);
+
+  /* Alias sémantiques utilisés par les modules récents */
+  --ss-surface: var(--ss-bg-primary);
+  --ss-surface-raised: var(--ss-bg-secondary);
+  --ss-border: var(--ss-border-default);
+  --ss-text: var(--ss-text-primary);
 
   /* États sémantiques */
   --ss-success-bg: var(--ss-emerald-50);
@@ -133,20 +147,28 @@
    Thème sombre
    -------------------------------------------------------------------------- */
 [data-theme="dark"] {
-  --ss-bg-canvas: var(--ss-slate-950);
-  --ss-bg-primary: var(--ss-slate-900);
-  --ss-bg-secondary: var(--ss-slate-800);
-  --ss-bg-tertiary: var(--ss-slate-700);
+  --ss-bg-canvas: #0b1630;
+  --ss-bg-primary: #111f3a;
+  --ss-bg-secondary: #182a4a;
+  --ss-bg-tertiary: #243a5f;
   --ss-bg-inverse: #ffffff;
   --ss-bg-brand: var(--ss-blue-900);
   --ss-bg-brand-hover: var(--ss-blue-800);
   --ss-bg-accent: var(--ss-gold-500);
+  --ss-gradient-module: linear-gradient(
+    120deg,
+    #102a56 0%,
+    #1f4f99 52%,
+    #315f9f 100%
+  );
 
   --ss-text-primary: #f8fafc;
   --ss-text-secondary: var(--ss-slate-300);
   --ss-text-tertiary: var(--ss-slate-400);
   --ss-text-muted: var(--ss-slate-500);
-  --ss-text-inverse: var(--ss-slate-900);
+  --ss-text-inverse: #ffffff;
+  --ss-text-on-brand: #f8fafc;
+  --ss-text-on-brand-soft: #dbeafe;
   --ss-text-brand: var(--ss-blue-300);
   --ss-text-accent: var(--ss-gold-400);
   --ss-text-link: var(--ss-blue-400);
@@ -156,6 +178,11 @@
   --ss-border-strong: rgba(255, 255, 255, 0.16);
   --ss-border-subtle: rgba(255, 255, 255, 0.06);
   --ss-border-inverse: rgba(0, 0, 0, 0.2);
+
+  --ss-surface: var(--ss-bg-primary);
+  --ss-surface-raised: var(--ss-bg-secondary);
+  --ss-border: var(--ss-border-default);
+  --ss-text: var(--ss-text-primary);
 
   --ss-success-bg: rgba(16, 185, 129, 0.12);
   --ss-success-text: #34d399;

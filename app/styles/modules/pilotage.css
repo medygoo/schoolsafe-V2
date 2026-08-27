@@ -11,8 +11,8 @@
   justify-content: center;
   padding: var(--ss-space-4);
   border-radius: var(--ss-radius);
-  color: var(--ss-text-inverse);
-  background: linear-gradient(120deg, var(--ss-navy-900), var(--ss-blue-700));
+  color: var(--ss-text-on-brand);
+  background: var(--ss-gradient-module);
 }
 
 .pilotage-dashboard header span {
