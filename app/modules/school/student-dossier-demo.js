@@ -79,7 +79,8 @@
     var name = studentName(activeStudent);
     var initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(function (part) { return part.charAt(0); }).join("");
     var draft = activeStudent.lifecycle_status !== "active";
-    return '<header class="student-dossier-hero"><div class="student-dossier-photo">' + escapeMarkup(initials) + '</div><div class="student-dossier-identity"><span>Dossier élève central</span><h2>' + escapeMarkup(name) + '</h2><div class="student-dossier-tags"><b>' + escapeMarkup(activeStudent.matricule) + '</b>' + root.ssBadge({ label: draft ? "EN PRÉPARATION" : "ACTIF", variant: draft ? "warning" : "success" }) + '</div></div><dl><div><dt>Classe</dt><dd>' + escapeMarkup(facts.className) + '</dd></div><div><dt>Année</dt><dd>' + escapeMarkup(facts.year) + '</dd></div><div><dt>Parent principal</dt><dd>' + escapeMarkup(parent.display_name || "Non renseigné") + '</dd></div></dl></header>';
+    var cardAction = root.SchoolSafeStudentCardPreparation && (root.SchoolSafeStudentCardPreparation.canView(activeStudent, activeUser) || root.SchoolSafeStudentCardPreparation.canPrepare(activeStudent, activeUser)) ? '<button class="student-dossier-card-action" type="button" data-open-student-card><i data-lucide="badge-check"></i> Carte élève</button>' : '';
+    return '<header class="student-dossier-hero"><div class="student-dossier-photo">' + escapeMarkup(initials) + '</div><div class="student-dossier-identity"><span>Dossier élève central</span><h2>' + escapeMarkup(name) + '</h2><div class="student-dossier-tags"><b>' + escapeMarkup(activeStudent.matricule) + '</b>' + root.ssBadge({ label: draft ? "EN PRÉPARATION" : "ACTIF", variant: draft ? "warning" : "success" }) + cardAction + '</div></div><dl><div><dt>Classe</dt><dd>' + escapeMarkup(facts.className) + '</dd></div><div><dt>Année</dt><dd>' + escapeMarkup(facts.year) + '</dd></div><div><dt>Parent principal</dt><dd>' + escapeMarkup(parent.display_name || "Non renseigné") + '</dd></div></dl></header>';
   }
 
   function draftWarning() {
@@ -148,6 +149,8 @@
         if (target === "schooling" && root.SchoolSafeStudentLifecycle) root.SchoolSafeStudentLifecycle.open(activeStudent, activeUser);
       });
     });
+    var cardButton = activeModal.content.querySelector("[data-open-student-card]");
+    if (cardButton) cardButton.addEventListener("click", function () { root.SchoolSafeStudentCardPreparation.open(activeStudent, activeUser); });
     if (root.lucide) root.lucide.createIcons();
   }
 

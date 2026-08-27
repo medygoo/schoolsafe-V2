@@ -218,7 +218,7 @@
    * Elle ne crée aucun droit backend et permet aux modules de passer par Access_Law sans bypass de rôle.
    */
   var DEMO_PERMISSIONS_BY_ROLE = {
-    admin: ["school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
+    admin: ["school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
     parent: ["school.student.read", "school.guardian.read", "school.guardian.manage", "finance.status.read"],
     teacher: ["school.student.read", "pedagogy.grade.read"],

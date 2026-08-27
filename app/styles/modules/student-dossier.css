@@ -5,6 +5,8 @@
 .student-dossier-identity h2 { margin: 4px 0 8px; font-size: clamp(24px, 3vw, 34px); overflow-wrap: anywhere; }
 .student-dossier-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .student-dossier-tags > b { padding: 5px 9px; border-radius: 8px; background: #ffffff1f; }
+.student-dossier-card-action { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 10px; border: 1px solid #ffffff55; border-radius: 9px; background: #fff; color: #173a8a; font-weight: 800; cursor: pointer; }
+.student-dossier-card-action svg { width: 17px; }
 .student-dossier-hero dl { display: grid; gap: 8px; margin: 0; }
 .student-dossier-hero dl div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; }
 .student-dossier-hero dt { color: #bfdbfe; }
