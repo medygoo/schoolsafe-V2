@@ -51,6 +51,11 @@
     { id: "demo-tracking-august", month: "2026-08", classId: "demo-class-1", subjectId: "demo-subject-math", objectives: "Consolider les opérations sur les nombres décimaux.", progress: 85, skills: "Calculer et expliquer une démarche.", collectiveDifficulty: "Alignement des décimales.", studentId: "", individualDifficulty: "", actions: "Atelier de correction guidée.", observation: "Progression collective satisfaisante.", status: "TERMINÉ", local: false },
     { id: "demo-tracking-foreign", month: "2026-08", classId: "demo-class-foreign", subjectId: "demo-subject-physics", objectives: "Hors périmètre.", progress: 50, skills: "Mesurer.", collectiveDifficulty: "Unités.", studentId: "demo-student-foreign", individualDifficulty: "Hors périmètre.", actions: "Aucune.", observation: "Hors périmètre.", status: "EN COURS", local: false }
   ];
+  var REMEDIATION_STORAGE_KEY = "schoolsafe-v2-teacher-remediation-drafts";
+  var REMEDIATIONS = [
+    { id: "demo-remediation-chloe", studentId: "demo-student-chloe", classId: "demo-class-1", subjectId: "demo-subject-math", difficulty: "Automatiser les tables de multiplication.", objective: "Réduire le temps de résolution.", plannedSessions: 2, calendar: "2026-09-08, 2026-09-11", progress: 50, observations: "Exercices courts et répétés.", result: "Progression à confirmer.", status: "EN COURS", local: false },
+    { id: "demo-remediation-foreign", studentId: "demo-student-foreign", classId: "demo-class-foreign", subjectId: "demo-subject-physics", difficulty: "Hors périmètre.", objective: "Hors périmètre.", plannedSessions: 1, calendar: "2026-09-10", progress: 0, observations: "Hors périmètre.", result: "Aucun.", status: "PROPOSÉ", local: false }
+  ];
 
   var activeContainerId = null;
   var activeUser = null;
@@ -174,6 +179,15 @@
     storageSet(TRACKING_STORAGE_KEY, JSON.stringify(items));
   }
 
+  function readRemediationDrafts() {
+    var items = readJson(REMEDIATION_STORAGE_KEY, []);
+    return Array.isArray(items) ? items : [];
+  }
+
+  function saveRemediationDrafts(items) {
+    storageSet(REMEDIATION_STORAGE_KEY, JSON.stringify(items));
+  }
+
   function labelFor(items, id) {
     var found = items.find(function (item) { return item.id === id; });
     return found ? found.name : "Indisponible";
@@ -243,6 +257,10 @@
         }
         if (target === "difficulties") {
           open("difficulties");
+          return;
+        }
+        if (target === "remediation") {
+          open("remediation");
           return;
         }
         var state = container.querySelector("[data-teacher-feature-state]");
@@ -567,6 +585,71 @@
     });
   }
 
+  function remediationCard(item) {
+    var student = STUDENTS.find(function (entry) { return entry.id === item.studentId; });
+    return '<article class="teacher-record-card teacher-remediation-card"><header><div><p class="teacher-eyebrow">' + escapeMarkup(labelFor(CLASSES, item.classId) + " · " + labelFor(SUBJECTS, item.subjectId)) + '</p><h3>' + escapeMarkup(student ? student.name : "Élève indisponible") + '</h3></div><span class="teacher-status">' + escapeMarkup(item.status) + '</span></header>' +
+      '<p><strong>Difficulté :</strong> ' + escapeMarkup(item.difficulty) + '</p><p><strong>Objectif :</strong> ' + escapeMarkup(item.objective) + '</p><dl><div><dt>Séances prévues</dt><dd>' + escapeMarkup(item.plannedSessions) + '</dd></div><div><dt>Calendrier</dt><dd>' + escapeMarkup(item.calendar) + '</dd></div><div><dt>Progression</dt><dd>' + escapeMarkup(item.progress) + ' %</dd></div></dl>' +
+      '<p><strong>Observations :</strong> ' + escapeMarkup(item.observations) + '</p><p><strong>Résultat pédagogique :</strong> ' + escapeMarkup(item.result) + '</p><footer><b>' + (item.local ? "BROUILLON LOCAL" : "DÉMONSTRATION") + '</b><span>PÉDAGOGIE UNIQUEMENT</span></footer></article>';
+  }
+
+  function remediationForm(projection) {
+    var classOptions = projection.classes.map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    var firstClass = projection.classes[0] && projection.classes[0].id;
+    var subjectOptions = projection.subjects.filter(function (item) { return item.classIds.indexOf(firstClass) >= 0; }).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    var studentOptions = projection.students.filter(function (item) { return item.classId === firstClass; }).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    return '<form class="teacher-form" id="teacherRemediationForm"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Proposition locale</p><h2>Nouveau rattrapage pédagogique</h2></div><span>BROUILLON LOCAL</span></div><div class="teacher-form-grid">' +
+      '<label><span>Classe</span><select name="classId">' + classOptions + '</select></label><label><span>Matière</span><select name="subjectId">' + subjectOptions + '</select></label><label><span>Élève actif</span><select name="studentId">' + studentOptions + '</select></label>' +
+      '<label><span>Statut</span><select name="status"><option>À ÉVALUER</option><option>PROPOSÉ</option><option>PLANIFIÉ</option><option>EN COURS</option><option>TERMINÉ</option><option>ANNULÉ</option></select></label>' +
+      '<label class="teacher-form-wide"><span>Difficulté constatée</span><textarea name="difficulty" rows="2" required></textarea></label><label class="teacher-form-wide"><span>Objectif</span><textarea name="objective" rows="2" required></textarea></label>' +
+      '<label><span>Séances prévues</span><input name="plannedSessions" type="number" min="1" max="30" value="1" required></label><label><span>Progression (%)</span><input name="progress" type="number" min="0" max="100" value="0"></label>' +
+      '<label class="teacher-form-wide"><span>Calendrier</span><input name="calendar" placeholder="Dates prévues" required></label><label class="teacher-form-wide"><span>Observations</span><textarea name="observations" rows="2"></textarea></label>' +
+      '<label class="teacher-form-wide"><span>Résultat pédagogique</span><textarea name="result" rows="2"></textarea></label></div>' +
+      '<aside class="teacher-access-note"><strong>Aucune inscription financière</strong><p>Ce parcours traite uniquement la pédagogie. Les frais, paiements et répartitions appartiennent à une phase financière ultérieure.</p></aside><button class="ss-button" type="submit">' + icon("save") + ' Préparer le parcours</button></form>';
+  }
+
+  function renderRemediation(container, projection) {
+    activeView = "remediation";
+    if (!allowsScope(activeUser, "pedagogy.lesson-plan.read", "assigned_classes")) {
+      renderDenied(container);
+      return;
+    }
+    var classIds = projection.classes.map(function (item) { return item.id; });
+    var subjectIds = projection.subjects.map(function (item) { return item.id; });
+    var studentIds = projection.students.map(function (item) { return item.id; });
+    var items = REMEDIATIONS.concat(readRemediationDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0 && studentIds.indexOf(item.studentId) >= 0; });
+    var canManage = allowsScope(activeUser, "pedagogy.lesson-plan.manage", "assigned_classes");
+    var composer = canManage ? '<section class="teacher-panel">' + remediationForm(projection) + '</section>' : '<aside class="teacher-access-note teacher-access-note--denied"><strong>Préparation du rattrapage refusée</strong><p>pedagogy.lesson-plan.manage avec assigned_classes est nécessaire.</p></aside>';
+    container.innerHTML = '<div class="teacher-pedagogy-shell"><header class="teacher-workspace-header"><button class="ss-button ss-button--secondary" type="button" data-teacher-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="teacher-eyebrow">D6 · Rattrapage pédagogique</p><h1>Accompagnement des élèves affectés</h1><p>Pédagogie uniquement · aucune inscription financière.</p></div><span class="teacher-boundary">assigned_classes</span></header><div class="teacher-workspace-grid">' + composer + '<section class="teacher-panel"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Parcours autorisés</p><h2>Rattrapages préparés</h2></div><span>' + items.length + ' parcours</span></div><div class="teacher-record-list" data-remediation-list>' + (items.length ? items.map(remediationCard).join("") : '<p class="teacher-empty">Aucun parcours préparé.</p>') + '</div></section></div></div>';
+    var back = container.querySelector("[data-teacher-back]");
+    if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
+    var form = container.querySelector("#teacherRemediationForm");
+    if (!form) return;
+    var classSelect = form.querySelector('[name="classId"]');
+    var subjectSelect = form.querySelector('[name="subjectId"]');
+    var studentSelect = form.querySelector('[name="studentId"]');
+    function syncOptions() {
+      var classId = classSelect.value;
+      subjectSelect.innerHTML = projection.subjects.filter(function (item) { return item.classIds.indexOf(classId) >= 0; }).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+      studentSelect.innerHTML = projection.students.filter(function (item) { return item.classId === classId && item.lifecycleStatus === "active"; }).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    }
+    classSelect.addEventListener("change", syncOptions);
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      var data = new FormData(form);
+      var classId = String(data.get("classId") || "");
+      var subjectId = String(data.get("subjectId") || "");
+      var studentId = String(data.get("studentId") || "");
+      var subject = projection.subjects.find(function (item) { return item.id === subjectId && item.classIds.indexOf(classId) >= 0; });
+      var student = projection.students.find(function (item) { return item.id === studentId && item.classId === classId && item.lifecycleStatus === "active"; });
+      if (!subject || !student) return;
+      var drafts = readRemediationDrafts();
+      drafts.unshift({ id: "teacher-remediation-" + Date.now(), studentId: studentId, classId: classId, subjectId: subjectId, difficulty: String(data.get("difficulty") || ""), objective: String(data.get("objective") || ""), plannedSessions: Number(data.get("plannedSessions") || 1), calendar: String(data.get("calendar") || ""), progress: Number(data.get("progress") || 0), observations: String(data.get("observations") || ""), result: String(data.get("result") || ""), status: String(data.get("status") || "À ÉVALUER"), local: true });
+      saveRemediationDrafts(drafts);
+      renderRemediation(container, projection);
+    });
+  }
+
   function open(view) {
     var container = document.getElementById(activeContainerId || "teacherPedagogyPortal");
     if (!container || !activeUser) return false;
@@ -579,6 +662,7 @@
     else if (view === "evaluations") renderEvaluations(container, projection);
     else if (view === "results") renderResults(container, projection);
     else if (view === "difficulties") renderDifficulties(container, projection);
+    else if (view === "remediation") renderRemediation(container, projection);
     else renderDashboard(container, projection);
     if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
     return true;
@@ -611,6 +695,7 @@
     readGradeDrafts: readGradeDrafts,
     readAppreciationDrafts: readAppreciationDrafts,
     readTrackingDrafts: readTrackingDrafts,
+    readRemediationDrafts: readRemediationDrafts,
     open: open,
     clear: clear,
     render: render
