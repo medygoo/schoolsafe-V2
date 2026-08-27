@@ -230,7 +230,7 @@
     admissions: { scopes: [{ type: "school" }] },
     parent: {
       profile: { id: "demo-parent-1" },
-      childIds: ["demo-draft-student"],
+      childIds: ["demo-parent-child-lucas", "demo-parent-child-emma", "demo-draft-student"],
       scopes: [
         { permission: "school.student.read", type: "own_children" },
         { permission: "school.guardian.read", type: "own_children" },
@@ -268,7 +268,13 @@
    */
   function showDashboard() {
     var dashboardContainer = document.getElementById("dashboardContainer");
-    if (dashboardContainer) dashboardContainer.hidden = false;
+    var parentPortal = document.getElementById("parentPortal");
+    var isParent = currentDemoRole === "parent";
+    if (dashboardContainer) dashboardContainer.hidden = isParent;
+    if (parentPortal) {
+      parentPortal.hidden = !isParent;
+      if (isParent && window.SchoolSafeParentPortal) window.SchoolSafeParentPortal.render("parentPortal", getCurrentUser());
+    }
     var modules = ["pedagogyModule", "financeModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
     modules.forEach(function (id) {
       var el = document.getElementById(id);
@@ -1871,7 +1877,13 @@
     document.getElementById("schoolModule").hidden = true;
 
     var dashboardContainer = document.getElementById("dashboardContainer");
-    if (dashboardContainer) dashboardContainer.hidden = false;
+    var parentPortal = document.getElementById("parentPortal");
+    var isParentWorkspace = currentDemoRole === "parent";
+    if (dashboardContainer) dashboardContainer.hidden = isParentWorkspace;
+    if (parentPortal) {
+      parentPortal.hidden = !isParentWorkspace;
+      if (isParentWorkspace && window.SchoolSafeParentPortal) window.SchoolSafeParentPortal.render("parentPortal", accessUser);
+    }
 
     var liveName = sessionDisplayName();
     var roleLabel = sessionRoleLabel(currentDemoRole);
