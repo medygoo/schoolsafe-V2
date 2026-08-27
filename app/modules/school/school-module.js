@@ -807,11 +807,12 @@
       if (currentTab === "school") loadSchool();
       if (currentTab === "staff") loadStaff();
       if (currentTab === "students") loadStudents();
+      if (currentTab === "structure" && window.SchoolSafeAcademicStructure) window.SchoolSafeAcademicStructure.render(document.getElementById("schoolContent"), currentUser);
     });
   }
 
   function render(tabName, user) {
-    if (tabName === "school" || tabName === "staff" || tabName === "students") {
+    if (tabName === "school" || tabName === "staff" || tabName === "students" || tabName === "structure") {
       currentTab = tabName;
     }
     currentUser = user || currentUser || { permissions: [] };
@@ -819,6 +820,7 @@
     if (currentTab === "school") loadSchool();
     if (currentTab === "staff") loadStaff();
     if (currentTab === "students") loadStudents();
+    if (currentTab === "structure" && window.SchoolSafeAcademicStructure) window.SchoolSafeAcademicStructure.render(document.getElementById("schoolContent"), currentUser);
   }
 
   window.SchoolSafeSchoolModule = {

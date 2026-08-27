@@ -143,7 +143,7 @@ test.describe("B2-FE — dossier familial et urgence", () => {
         const modal = page.locator(".student-family-modal .ss-modal");
         await settleModalScroll(modal, 0);
         await expect(dossier.locator(".family-dossier-hero")).toBeInViewport();
-        await expect(dossier.getByRole("heading", { name: "Amina Mbuyi", exact: true })).toBeInViewport();
+        await expect(dossier.getByRole("heading", { level: 2, name: "Amina Mbuyi", exact: true })).toBeInViewport();
         await page.screenshot({ path: testInfo.outputPath(`b2-family-top-${theme}-${viewport.width}.png`) });
         const scrollEnded = waitForModalScrollEnd(modal);
         await dossier.getByRole("button", { name: "Contact d’urgence" }).click();

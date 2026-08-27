@@ -419,6 +419,10 @@
     PERMISSIONS: [MANAGE_PERMISSION, TRANSFER_PERMISSION, ARCHIVE_PERMISSION],
     canView: canView,
     canPrepare: canPrepare,
+    getAcademicStructure: function () {
+      var structure = root.SchoolSafeAcademicStructure;
+      return structure ? { activeYear: structure.getActiveYear(), years: structure.getYears(), levels: structure.getLevels(), classes: structure.getClasses() } : { activeYear: null, years: [], levels: [], classes: [] };
+    },
     renderSection: renderSection,
     bind: bind,
     open: open

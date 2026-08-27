@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.SCHOOLSAFE_URL || "http://127.0.0.1:4175";
+const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
   testDir: "tests/qa/e2e",
@@ -13,9 +14,10 @@ export default defineConfig({
   expect: { timeout: 10000 },
   use: {
     baseURL,
+    ...(executablePath ? { launchOptions: { executablePath } } : {}),
     trace: "on-first-retry",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: executablePath ? "off" : "retain-on-failure",
     headless: true,
     locale: "fr-FR",
     serviceWorkers: "block",
