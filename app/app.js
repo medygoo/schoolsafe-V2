@@ -227,6 +227,7 @@
     admissions: ["school.student.read", "school.student.create"],
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
     teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage"],
+    pedagogy: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.lesson-plan.read", "pedagogy.report.read", "pedagogy.report.manage", "palmarques.read"],
     guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
   };
 
@@ -265,6 +266,21 @@
         { permission: "pedagogy.grade.manage", type: "assigned_classes" },
         { permission: "pedagogy.lesson-plan.read", type: "assigned_classes" },
         { permission: "pedagogy.lesson-plan.manage", type: "assigned_classes" }
+      ]
+    },
+    pedagogy: {
+      assignedClassIds: ["demo-class-1", "demo-class-2"],
+      assignedSubjectIds: ["demo-subject-math", "demo-subject-french"],
+      scopes: [
+        { permission: "school.student.read", type: "assigned_classes" },
+        { permission: "school.class.read", type: "assigned_classes" },
+        { permission: "pedagogy.subject.read", type: "assigned_subjects" },
+        { permission: "pedagogy.assignment.read", type: "assigned_classes" },
+        { permission: "pedagogy.grade.read", type: "assigned_classes" },
+        { permission: "pedagogy.lesson-plan.read", type: "assigned_classes" },
+        { permission: "pedagogy.report.read", type: "assigned_classes" },
+        { permission: "pedagogy.report.manage", type: "assigned_classes" },
+        { permission: "palmarques.read", type: "assigned_classes" }
       ]
     },
     guard: { scopes: [{ permission: "security.pickup.read", type: "school" }, { permission: "security.pickup.manage", type: "school" }] }
@@ -502,7 +518,7 @@
       label: "Responsable pédagogique", short: "Pédagogie", initials: "RP", scope: "Cycles et classes affectés", eyebrow: "Pilotage pédagogique",
       welcome: "Coordonnez les classes, les enseignants et les résultats.", copy: "Le périmètre pédagogique dépend des cycles attribués par l’Administrateur principal.",
       today: [["Présences","6 classes à suivre","clipboard-check"],["Évaluations","3 à valider","file-check-2"],["Rattrapage","14 élèves","life-buoy"],["Enseignants","2 suivis requis","graduation-cap"]],
-      branches: [branch("pedagogy","Organisation et résultats",[group("Organisation",[["Classes","school"],["Matières","book-open"],["Emplois du temps","calendar-range"],["Affectations","git-branch"]]),group("Présence et travail",[["Présences élèves","clipboard-check"],["Absences et retards","calendar-x"],["Devoirs et corrections","notebook-pen"],["Cahiers de préparation des enseignants","book-open-check"]]),group("Évaluation",[["Évaluations et notes","star"],["Moyennes et coefficients","calculator"],["Bulletins","file-text"],["Palmarès","trophy"]]),group("Accompagnement",[["Rattrapage pédagogique","life-buoy"],["Activité enseignants","activity"]]),group("Épreuves certificatives",[["ENAFEP","scroll-text"],["TENASOSP","compass"],["EXETAT","badge-check"]])]),branch("finance","Statut administratif utile au suivi scolaire · aucun montant visible",[group("Régularité scolaire",[["Voir les élèves en ordre ou à régulariser","badge-check","status"]])]),branch("reports","Suivi scolaire",[group("Rapports",[["Statistiques pédagogiques","chart-no-axes-combined"],["Résultats des épreuves certificatives","file-chart-column"]])])]
+      branches: [branch("pedagogy","Organisation et résultats",[group("Pilotage",[["Pilotage pédagogique","layout-dashboard"]]),group("Organisation",[["Classes","school"],["Matières","book-open"],["Emplois du temps","calendar-range"],["Affectations","git-branch"]]),group("Présence et travail",[["Présences élèves","clipboard-check"],["Absences et retards","calendar-x"],["Devoirs et corrections","notebook-pen"],["Cahiers de préparation des enseignants","book-open-check"]]),group("Évaluation",[["Évaluations et notes","star"],["Moyennes et coefficients","calculator"],["Bulletins","file-text"],["Palmarès","trophy"]]),group("Accompagnement",[["Rattrapage pédagogique","life-buoy"],["Activité enseignants","activity"]]),group("Épreuves certificatives",[["ENAFEP","scroll-text"],["TENASOSP","compass"],["EXETAT","badge-check"]])]),branch("finance","Statut administratif utile au suivi scolaire · aucun montant visible",[group("Régularité scolaire",[["Voir les élèves en ordre ou à régulariser","badge-check","status"]])]),branch("reports","Suivi scolaire",[group("Rapports",[["Statistiques pédagogiques","chart-no-axes-combined"],["Résultats des épreuves certificatives","file-chart-column"]])])]
     },
     admissions: {
       label: "Responsable administratif et admissions", short: "Admissions", initials: "RA", scope: "Admissions et dossiers élèves", eyebrow: "Admissions scolaires",
@@ -2330,6 +2346,20 @@
     setBreadcrumb(definition.label);
     if (branchKey === "school" && pedagogyTabForAction(actionName)) { openPedagogyModule(actionName); return; }
     if (branchKey === "school" && securityTabForAction(actionName)) { openSecurityModule(actionName); return; }
+    if (branchKey === "pedagogy" && actionName === "Pilotage pédagogique") {
+      setWorkspaceDashboardVisible(false);
+      ["pedagogyModule", "palmaresModule", "financeModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+        var module = document.getElementById(id);
+        if (module) module.hidden = true;
+      });
+      var directionPortal = document.getElementById("teacherPedagogyPortal");
+      if (directionPortal && window.SchoolSafeTeacherPedagogy) {
+        directionPortal.hidden = false;
+        window.SchoolSafeTeacherPedagogy.render("teacherPedagogyPortal", getCurrentUser());
+        window.SchoolSafeTeacherPedagogy.open("direction");
+      }
+      return;
+    }
     if (branchKey === "pedagogy") { openPedagogyModule(actionName); return; }
     if (branchKey === "finance") { openFinanceModule(actionName); return; }
     if (branchKey === "feeControl") { openFeeControlModule(actionName); return; }

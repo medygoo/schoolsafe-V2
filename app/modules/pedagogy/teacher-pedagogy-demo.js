@@ -56,6 +56,7 @@
     { id: "demo-remediation-chloe", studentId: "demo-student-chloe", classId: "demo-class-1", subjectId: "demo-subject-math", difficulty: "Automatiser les tables de multiplication.", objective: "Réduire le temps de résolution.", plannedSessions: 2, calendar: "2026-09-08, 2026-09-11", progress: 50, observations: "Exercices courts et répétés.", result: "Progression à confirmer.", status: "EN COURS", local: false },
     { id: "demo-remediation-foreign", studentId: "demo-student-foreign", classId: "demo-class-foreign", subjectId: "demo-subject-physics", difficulty: "Hors périmètre.", objective: "Hors périmètre.", plannedSessions: 1, calendar: "2026-09-10", progress: 0, observations: "Hors périmètre.", result: "Aucun.", status: "PROPOSÉ", local: false }
   ];
+  var DIRECTION_REVIEW_STORAGE_KEY = "schoolsafe-v2-pedagogy-direction-reviews";
 
   var activeContainerId = null;
   var activeUser = null;
@@ -186,6 +187,23 @@
 
   function saveRemediationDrafts(items) {
     storageSet(REMEDIATION_STORAGE_KEY, JSON.stringify(items));
+  }
+
+  function readDirectionReviews() {
+    var items = readJson(DIRECTION_REVIEW_STORAGE_KEY, []);
+    return Array.isArray(items) ? items : [];
+  }
+
+  function saveDirectionReviews(items) {
+    storageSet(DIRECTION_REVIEW_STORAGE_KEY, JSON.stringify(items));
+  }
+
+  function canOpenDirection(user) {
+    return allowsScope(user, "pedagogy.report.read", "assigned_classes") || allowsScope(user, "pedagogy.report.read", "school");
+  }
+
+  function canReviewDirection(user) {
+    return allowsScope(user, "pedagogy.report.manage", "assigned_classes") || allowsScope(user, "pedagogy.report.manage", "school");
   }
 
   function labelFor(items, id) {
@@ -650,11 +668,63 @@
     });
   }
 
+  function directionMetric(label, value, detail, iconName) {
+    return '<article class="teacher-direction-metric"><span>' + icon(iconName) + '</span><div><small>' + escapeMarkup(label) + '</small><strong>' + escapeMarkup(value) + '</strong><em>' + escapeMarkup(detail) + '</em></div></article>';
+  }
+
+  function renderDirection(container, projection) {
+    activeView = "direction";
+    if (!canOpenDirection(activeUser)) {
+      renderDenied(container);
+      return;
+    }
+    var classIds = projection.classes.map(function (item) { return item.id; });
+    var subjectIds = projection.subjects.map(function (item) { return item.id; });
+    var assignments = ASSIGNMENTS.concat(readAssignmentDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; });
+    var evaluations = EVALUATIONS.concat(readEvaluationDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; });
+    var tracking = MONTHLY_TRACKING.concat(readTrackingDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; });
+    var remediation = REMEDIATIONS.concat(readRemediationDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; });
+    var teachers = projection.subjects.map(function (item) { return item.id === "demo-subject-math" ? "Mme Y" : "M. Ilunga"; }).filter(function (name, index, items) { return items.indexOf(name) === index; });
+    var reviews = readDirectionReviews();
+    var reviewRows = reviews.map(function (item) { return '<li><strong>' + escapeMarkup(item.subject) + '</strong><span>' + escapeMarkup(item.observation) + '</span><small>' + escapeMarkup(item.status) + ' · BROUILLON LOCAL</small></li>'; }).join("");
+    var reviewForm = canReviewDirection(activeUser) ? '<form class="teacher-form" id="pedagogyDirectionReviewForm"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Revue locale</p><h2>Préparer une observation</h2></div><span>BACKEND_LATER</span></div><label><span>Objet</span><select name="subject"><option>Classes</option><option>Enseignants</option><option>Devoirs</option><option>Évaluations</option><option>Couverture des notes</option><option>Objectifs mensuels</option><option>Difficultés</option><option>Rattrapages</option><option>Bulletins en préparation</option><option>Palmarès</option><option>Alertes pédagogiques</option></select></label><label><span>État de revue</span><select name="status"><option>À EXAMINER</option><option>EN REVUE</option><option>OBSERVATION</option><option>PRÊT</option><option>VALIDATION BACKEND_LATER</option></select></label><label><span>Observation</span><textarea name="observation" rows="3" required></textarea></label><button class="ss-button" type="submit">' + icon("save") + ' Enregistrer la revue locale</button></form>' : '<aside class="teacher-access-note teacher-access-note--denied"><strong>Revue non autorisée</strong><p>Consultation seulement; aucune validation serveur.</p></aside>';
+
+    container.innerHTML = '<div class="teacher-pedagogy-shell" data-direction-workspace><header class="teacher-hero"><div><p class="teacher-eyebrow">D7 · Direction pédagogique</p><h1>Pilotage du périmètre projeté</h1><p>Consultation consolidée des données préparées D1 à D6.</p></div><span class="teacher-boundary">AUCUN SCOPE SCHOOL IMPLICITE</span></header>' +
+      '<button class="ss-button ss-button--secondary teacher-direction-back" type="button" data-direction-back>' + icon("arrow-left") + ' Tableau de bord</button>' +
+      '<section class="teacher-direction-grid">' +
+        directionMetric("Classes", projection.classes.length, projection.classes.map(function (item) { return item.name; }).join(" · "), "users-round") +
+        directionMetric("Enseignants", teachers.length, teachers.join(" · "), "graduation-cap") +
+        directionMetric("Matières", projection.subjects.length, projection.subjects.map(function (item) { return item.name; }).join(" · "), "book-open") +
+        directionMetric("Devoirs", assignments.length, "Préparés et aperçus", "notebook-pen") +
+        directionMetric("Évaluations", evaluations.length, "Aucune publication officielle", "star") +
+        directionMetric("Couverture des notes", "79 %", "DONNÉES DE DÉMONSTRATION", "chart-no-axes-combined") +
+        directionMetric("Objectifs mensuels", tracking.length, "Jalons conservés", "target") +
+        directionMetric("Difficultés", tracking.filter(function (item) { return item.collectiveDifficulty || item.individualDifficulty; }).length, "Collectives et individuelles", "triangle-alert") +
+        directionMetric("Rattrapages", remediation.length, "Pédagogie uniquement", "life-buoy") +
+        directionMetric("Bulletins en préparation", readAppreciationDrafts().length, "BACKEND_LATER", "file-text") +
+        directionMetric("Palmarès", "Classe", "Lecture seule", "trophy") +
+        directionMetric("Alertes pédagogiques", tracking.filter(function (item) { return Number(item.progress) < 60; }).length, "À examiner", "bell-ring") +
+      '</section><aside class="teacher-honesty-note">' + icon("shield-alert") + '<div><strong>VALIDATION BACKEND_LATER</strong><p>Les états de revue préparent le pilotage; aucun bouton ne valide une décision sur le serveur.</p></div></aside>' +
+      '<div class="teacher-workspace-grid"><section class="teacher-panel">' + reviewForm + '</section><section class="teacher-panel"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Historique local</p><h2>Revues préparées</h2></div></div><ul class="teacher-appreciation-list" data-direction-reviews>' + (reviewRows || '<li>Aucune revue préparée.</li>') + '</ul></section></div></div>';
+    var back = container.querySelector("[data-direction-back]");
+    if (back) back.addEventListener("click", function () { if (root.SchoolSafeAppContext && root.SchoolSafeAppContext.showDashboard) root.SchoolSafeAppContext.showDashboard(); });
+    var form = container.querySelector("#pedagogyDirectionReviewForm");
+    if (form) form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      var data = new FormData(form);
+      var items = readDirectionReviews();
+      items.unshift({ id: "direction-review-" + Date.now(), subject: String(data.get("subject") || ""), status: String(data.get("status") || "À EXAMINER"), observation: String(data.get("observation") || "") });
+      saveDirectionReviews(items);
+      renderDirection(container, projection);
+    });
+  }
+
   function open(view) {
     var container = document.getElementById(activeContainerId || "teacherPedagogyPortal");
     if (!container || !activeUser) return false;
     var projection = getAssignedProjection(activeUser);
-    if (!projection.allowed) {
+    if (!projection.allowed || (view === "direction" && !canOpenDirection(activeUser))) {
       renderDenied(container);
       return false;
     }
@@ -663,6 +733,7 @@
     else if (view === "results") renderResults(container, projection);
     else if (view === "difficulties") renderDifficulties(container, projection);
     else if (view === "remediation") renderRemediation(container, projection);
+    else if (view === "direction") renderDirection(container, projection);
     else renderDashboard(container, projection);
     if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
     return true;
@@ -696,6 +767,8 @@
     readAppreciationDrafts: readAppreciationDrafts,
     readTrackingDrafts: readTrackingDrafts,
     readRemediationDrafts: readRemediationDrafts,
+    readDirectionReviews: readDirectionReviews,
+    canOpenDirection: canOpenDirection,
     open: open,
     clear: clear,
     render: render

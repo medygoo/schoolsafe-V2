@@ -218,11 +218,20 @@
 .teacher-timeline-item footer { display: flex; gap: .5rem; color: var(--ss-text-accent); font-size: .72rem; }
 .teacher-progress { height: .45rem; margin-top: .65rem; overflow: hidden; border-radius: 999px; background: var(--ss-bg-tertiary); }
 .teacher-progress span { display: block; height: 100%; border-radius: inherit; background: var(--ss-blue-500); }
+.teacher-direction-back { justify-self: start; }
+.teacher-direction-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; }
+.teacher-direction-metric { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .7rem; padding: .9rem; border: 1px solid var(--ss-border-default); border-radius: .9rem; background: var(--ss-bg-primary); box-shadow: var(--ss-shadow-sm); }
+.teacher-direction-metric > span { display: grid; width: 2.5rem; height: 2.5rem; place-items: center; border-radius: .75rem; background: var(--ss-info-bg); color: var(--ss-info-text); }
+.teacher-direction-metric > div { display: grid; gap: .15rem; min-width: 0; }
+.teacher-direction-metric small,
+.teacher-direction-metric em { overflow-wrap: anywhere; color: var(--ss-text-secondary); font-style: normal; }
+.teacher-direction-metric strong { font-size: 1.2rem; }
 
 @media (max-width: 900px) {
   .teacher-priority-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .teacher-dashboard-columns { grid-template-columns: 1fr; }
   .teacher-workspace-grid { grid-template-columns: 1fr; }
+  .teacher-direction-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 520px) {
@@ -238,4 +247,5 @@
   .teacher-grade-row,
   .teacher-result-grid,
   .teacher-timeline-item dl { grid-template-columns: 1fr; }
+  .teacher-direction-grid { grid-template-columns: 1fr; }
 }
