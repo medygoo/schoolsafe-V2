@@ -285,6 +285,60 @@
   line-height: 1.55;
 }
 
+.pickup-preparation-note,
+.pickup-inactive-state {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ss-space-3);
+  min-width: 0;
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-error-bg);
+  color: var(--ss-error-text);
+}
+
+.pickup-preparation-note {
+  margin: var(--ss-space-4) 0 0;
+  padding: var(--ss-space-3) var(--ss-space-4);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-bold);
+  line-height: 1.55;
+}
+
+.pickup-preparation-note svg,
+.pickup-inactive-state > svg {
+  flex: 0 0 24px;
+}
+
+.pickup-inactive-state {
+  min-height: 210px;
+  padding: var(--ss-space-6);
+  box-shadow: var(--ss-shadow-md);
+}
+
+.pickup-inactive-state > svg {
+  width: 36px;
+  height: 36px;
+}
+
+.pickup-inactive-state > div {
+  min-width: 0;
+}
+
+.pickup-inactive-state h3 {
+  margin: 0 0 var(--ss-space-2);
+  color: inherit;
+  font-size: clamp(var(--ss-text-lg), 2.5vw, var(--ss-text-2xl));
+  letter-spacing: -0.02em;
+}
+
+.pickup-inactive-state p {
+  max-width: 72ch;
+  margin: 0;
+  color: inherit;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
 .pickup-scan-sim {
   justify-content: center;
   gap: var(--ss-space-4);
@@ -530,6 +584,7 @@
   .pickup-person,
   .pickup-person__heading,
   .pickup-scan-sim,
+  .pickup-inactive-state,
   .pickup-decision {
     align-items: stretch;
     flex-direction: column;
@@ -541,6 +596,11 @@
 
   .pickup-scan-sim {
     justify-content: flex-start;
+    min-height: 0;
+    padding: var(--ss-space-4);
+  }
+
+  .pickup-inactive-state {
     min-height: 0;
     padding: var(--ss-space-4);
   }

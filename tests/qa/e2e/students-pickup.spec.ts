@@ -21,6 +21,35 @@ async function openPickupControl(page: Page) {
   return control;
 }
 
+async function renderDraftPickupControl(page: Page) {
+  await page.evaluate(() => {
+    localStorage.removeItem("schoolsafe-b4-pickup-events-v1");
+    (window as any).SchoolSafeStudentPickup.resetControl();
+    (window as any).SchoolSafeStudentPickup.renderControl(
+      "securityModeContent",
+      {
+        role: "guard",
+        permissions: ["security.pickup.read", "security.pickup.manage"],
+        scopes: [
+          { permission: "security.pickup.read", type: "school" },
+          { permission: "security.pickup.manage", type: "school" },
+        ],
+      },
+      {
+        id: "demo-draft-student",
+        matricule: "B1-0002",
+        first_name: "Amina",
+        last_name: "Mbuyi",
+        lifecycle_status: "draft",
+        class_id: null,
+        enrollment: { status: "draft", planned_class_id: "demo-class-2", planned_class_name: "5e A" },
+        primary_parent: { id: "demo-parent-1", display_name: "Sarah Mbuyi", account_status: "pending_activation" },
+      },
+    );
+  });
+  return page.locator("[data-pickup-control]");
+}
+
 test.describe("B4-FE — personnes autorisées et contrôle Gardien", () => {
   test("affiche le Parent principal, exactement trois tuteurs et le contact d’urgence distinct", async ({ page }) => {
     await enterDemoWorkspace(page, "admin");
@@ -36,6 +65,22 @@ test.describe("B4-FE — personnes autorisées et contrôle Gardien", () => {
     await expect(section.getByText("SUSPENDU", { exact: true })).toHaveCount(1);
     await expect(section.getByText("À VÉRIFIER", { exact: true })).toHaveCount(1);
     await expect(section.getByText("BACKEND_LATER", { exact: true })).toBeVisible();
+    await expect(section.getByText("Configuration préalable — aucune récupération autorisée avant activation.", { exact: true })).toBeVisible();
+  });
+
+  test("bloque entièrement le contrôle Gardien et toute écriture locale pour un dossier draft", async ({ page }) => {
+    await enterDemoWorkspace(page, "guard");
+    await openPickupControl(page);
+    const control = await renderDraftPickupControl(page);
+
+    await expect(control.getByRole("heading", { name: "DOSSIER NON ACTIF", exact: true })).toBeVisible();
+    await expect(control.getByText("Le contrôle de récupération est indisponible tant que le dossier élève n’est pas officiellement activé.", { exact: true })).toBeVisible();
+    await expect(control.locator("[data-simulate-student-card]")).toHaveCount(0);
+    await expect(control.locator("[data-pickup-person]")).toHaveCount(0);
+    await expect(control.locator("[data-validate-pickup]")).toHaveCount(0);
+    await expect(control.locator("[data-pickup-local-record]")).toHaveCount(0);
+    await expect(control.locator("[data-pickup-notification-preview]")).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("schoolsafe-b4-pickup-events-v1"))).toBeNull();
   });
 
   test("le Parent principal suspend et rétablit seulement un tuteur de son propre enfant", async ({ page }) => {
@@ -76,7 +121,7 @@ test.describe("B4-FE — personnes autorisées et contrôle Gardien", () => {
     await expect(foreignSection.getByText("Consultation uniquement · enfant hors portée", { exact: true })).toBeVisible();
   });
 
-  test("valide localement une personne autorisée et prépare la notification Parent", async ({ page }) => {
+  test("un élève actif accepte une personne autorisée et prépare la notification Parent", async ({ page }) => {
     await enterDemoWorkspace(page, "guard");
     const writes: string[] = [];
     page.on("request", (request) => {
@@ -85,14 +130,15 @@ test.describe("B4-FE — personnes autorisées et contrôle Gardien", () => {
     const control = await openPickupControl(page);
 
     await control.getByRole("button", { name: "Simuler la lecture de la carte" }).click();
-    await expect(control.getByText("Amina Mbuyi", { exact: true })).toBeVisible();
+    await expect(control.getByText("Lucas Martin", { exact: true })).toBeVisible();
+    await expect(control.getByText("Matricule B1-0001 · 6e A", { exact: true })).toBeVisible();
     await control.locator('[data-pickup-person="guardian-1"]').click();
     await expect(control.getByText("PERSONNE AUTORISÉE", { exact: true })).toBeVisible();
     await expect(control.getByRole("button", { name: "Valider la remise locale" })).toBeEnabled();
     await control.getByRole("button", { name: "Valider la remise locale" }).click();
 
     await expect(control.locator("[data-pickup-local-record]")).toContainText("Mireille Wa Kalonji");
-    await expect(control.locator("[data-pickup-notification-preview]")).toContainText("Sarah Mbuyi");
+    await expect(control.locator("[data-pickup-notification-preview]")).toContainText("Sophie Martin");
     await expect(control.locator("[data-pickup-notification-preview]")).toContainText("Prévisualisation");
     expect(writes).toEqual([]);
   });
@@ -137,7 +183,7 @@ test.describe("B4-FE — personnes autorisées et contrôle Gardien", () => {
     await expect(control.getByRole("button", { name: "Valider la remise locale" })).toHaveCount(0);
   });
 
-  test("reste lisible sans débordement en clair et sombre à 390, 834 et 1440", async ({ page }, testInfo) => {
+  test("garde les états actif et draft bloqué lisibles en clair et sombre à 390, 834 et 1440", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "chromium-mobile", "La matrice utilise le navigateur desktop redimensionnable.");
     await enterDemoWorkspace(page, "guard");
     const control = await openPickupControl(page);
@@ -148,6 +194,10 @@ test.describe("B4-FE — personnes autorisées et contrôle Gardien", () => {
       await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
       for (const viewport of [{ width: 390, height: 844 }, { width: 834, height: 1112 }, { width: 1440, height: 900 }]) {
         await page.setViewportSize(viewport);
+        await page.evaluate(() => {
+          document.getElementById("workspaceSidebar")?.classList.remove("open");
+          document.getElementById("cubeMenu")?.setAttribute("aria-expanded", "false");
+        });
         await expect(control.getByText("PERSONNE AUTORISÉE", { exact: true })).toBeVisible();
         await page.screenshot({ path: testInfo.outputPath(`b4-pickup-${theme}-${viewport.width}.png`), fullPage: true });
         const layout = await page.evaluate(() => {
@@ -167,6 +217,33 @@ test.describe("B4-FE — personnes autorisées et contrôle Gardien", () => {
           return { viewport: width, root: rect(root), main: rect(main), overflow };
         });
         expect(layout.overflow, `${theme} ${viewport.width}: ${JSON.stringify(layout)}`).toEqual([]);
+      }
+    }
+
+    const blockedControl = await renderDraftPickupControl(page);
+    for (const theme of ["light", "dark"]) {
+      await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
+      for (const viewport of [{ width: 390, height: 844 }, { width: 834, height: 1112 }, { width: 1440, height: 900 }]) {
+        await page.setViewportSize(viewport);
+        await page.evaluate(() => {
+          document.getElementById("workspaceSidebar")?.classList.remove("open");
+          document.getElementById("cubeMenu")?.setAttribute("aria-expanded", "false");
+        });
+        await expect(blockedControl.getByRole("heading", { name: "DOSSIER NON ACTIF", exact: true })).toBeVisible();
+        await page.screenshot({ path: testInfo.outputPath(`b4-pickup-blocked-${theme}-${viewport.width}.png`), fullPage: true });
+        const layout = await page.evaluate(() => {
+          const width = document.documentElement.clientWidth;
+          const root = document.querySelector("[data-pickup-control]") as HTMLElement;
+          const overflow = Array.from(document.querySelectorAll("[data-pickup-control] *"))
+            .filter((element) => {
+              const rect = element.getBoundingClientRect();
+              return rect.right > width + 1 || rect.left < -1;
+            })
+            .map((element) => ({ tag: element.tagName, className: (element as HTMLElement).className }));
+          return { viewport: width, rootWidth: root.getBoundingClientRect().width, rootScrollWidth: root.scrollWidth, overflow };
+        });
+        expect(layout.overflow, `draft ${theme} ${viewport.width}: ${JSON.stringify(layout)}`).toEqual([]);
+        expect(layout.rootScrollWidth, `draft ${theme} ${viewport.width}: ${JSON.stringify(layout)}`).toBeLessThanOrEqual(Math.ceil(layout.rootWidth));
       }
     }
   });

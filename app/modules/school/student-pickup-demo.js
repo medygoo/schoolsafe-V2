@@ -5,24 +5,30 @@
   var PICKUP_STORAGE_KEY = "schoolsafe-b4-pickup-events-v1";
   var controlContainerId = null;
   var controlUser = null;
+  var controlStudent = null;
   var controlState = { scanned: false, selectedId: null, record: null };
 
-  var demoStudent = {
-    id: "demo-draft-student",
-    matricule: "B1-0002",
-    first_name: "Amina",
-    last_name: "Mbuyi",
-    lifecycle_status: "draft",
-    enrollment: { planned_class_name: "5e A" },
+  var demoActiveStudent = {
+    id: "demo-active-student",
+    matricule: "B1-0001",
+    first_name: "Lucas",
+    last_name: "Martin",
+    lifecycle_status: "active",
+    class_id: "demo-class-1",
+    enrollment: { status: "active", planned_class_id: "demo-class-1", planned_class_name: "6e A" },
     primary_parent: {
-      id: "demo-parent-1",
-      display_name: "Sarah Mbuyi",
+      id: "demo-parent-2",
+      display_name: "Sophie Martin",
       guardian_type: "mere",
-      phone: "+243 810 000 111",
-      email: "sarah.mbuyi@example.test",
-      account_status: "pending_activation"
+      phone: "+243 810 000 222",
+      email: "sophie.martin@example.test",
+      account_status: "active"
     }
   };
+
+  function isStudentActive(student) {
+    return !!student && student.lifecycle_status === "active";
+  }
 
   function escapeMarkup(value) {
     return String(value == null ? "" : value)
@@ -198,6 +204,7 @@
     return '<section id="student-dossier-pickup" class="family-section pickup-dossier-section" data-authorized-pickup-section>' +
       '<header><i data-lucide="contact-round"></i><h2>Personnes autorisées à récupérer l’enfant</h2></header>' +
       '<div class="pickup-section-intro"><p>Le Parent principal, trois tuteurs secondaires et le contact d’urgence sont séparés pour un contrôle immédiat.</p>' + root.ssBadge({ label: "BACKEND_LATER", variant: "warning" }) + '</div>' +
+      (student.lifecycle_status === "draft" ? '<p class="pickup-preparation-note" role="note"><i data-lucide="shield-alert"></i><span>Configuration préalable — aucune récupération autorisée avant activation.</span></p>' : '') +
       body + '<p class="pickup-scope-note"><i data-lucide="shield-check"></i>' + escapeMarkup(scopeMessage) + '</p></section>';
   }
 
@@ -254,11 +261,16 @@
   }
 
   function renderControlMarkup() {
-    var student = demoStudent;
+    var student = controlStudent || demoActiveStudent;
     var canRead = permissionAllowed(controlUser, "security.pickup.read") && hasScope(controlUser, "security.pickup.read", "school");
     if (!canRead) {
       return '<div class="pickup-control" data-pickup-control><header class="pickup-control__header"><div><h2>Contrôle Gardien</h2><p>Consultation limitée par la permission et la portée accordées.</p></div>' + root.ssBadge({ label: "ACCÈS LIMITÉ", variant: "warning", icon: "lock-keyhole" }) + '</header>' +
         '<div class="pickup-access-denied"><i data-lucide="lock-keyhole"></i><p><b>Accès non accordé.</b> security.pickup.read avec portée school est requis.</p></div></div>';
+    }
+    if (!isStudentActive(student)) {
+      return '<div class="pickup-control" data-pickup-control data-pickup-student-blocked="true">' +
+        '<header class="pickup-control__header"><div><h2>Contrôle Gardien</h2><p>La récupération est réservée aux dossiers élèves officiellement actifs.</p></div>' + root.ssBadge({ label: "DOSSIER NON ACTIF", variant: "error", icon: "shield-x" }) + '</header>' +
+        '<section class="pickup-inactive-state" role="status"><i data-lucide="shield-x"></i><div><h3>DOSSIER NON ACTIF</h3><p>Le contrôle de récupération est indisponible tant que le dossier élève n’est pas officiellement activé.</p></div></section></div>';
     }
     var familyState = familyStateFor(student);
     var people = peopleFor(student, familyState);
@@ -279,16 +291,21 @@
       recordMarkup(controlState.record) + notificationMarkup(controlState.record, familyState.parentSnapshot && familyState.parentSnapshot.name || student.primary_parent.display_name) + '</div>';
   }
 
-  function saveRecord(record) {
+  function saveRecord(record, student) {
+    if (!isStudentActive(student)) return false;
     var records = readJson(PICKUP_STORAGE_KEY, []);
     records.unshift(record);
     try { root.localStorage.setItem(PICKUP_STORAGE_KEY, JSON.stringify(records.slice(0, 20))); }
     catch (error) {}
+    return true;
   }
 
-  function renderControl(containerId, user) {
+  function renderControl(containerId, user, student) {
     controlContainerId = containerId;
     controlUser = user || { permissions: [] };
+    var nextStudent = student || demoActiveStudent;
+    if (!controlStudent || controlStudent.id !== nextStudent.id) controlState = { scanned: false, selectedId: null, record: null };
+    controlStudent = nextStudent;
     var container = root.document.getElementById(containerId);
     if (!container) return;
     container.innerHTML = renderControlMarkup();
@@ -296,27 +313,34 @@
   }
 
   function rerenderControl() {
-    renderControl(controlContainerId, controlUser);
+    renderControl(controlContainerId, controlUser, controlStudent);
   }
 
   function bindControl() {
     var container = root.document.getElementById(controlContainerId);
     if (!container) return;
     var scan = container.querySelector("[data-simulate-student-card]");
-    if (scan) scan.addEventListener("click", function () { controlState.scanned = true; controlState.selectedId = null; controlState.record = null; rerenderControl(); });
+    if (scan) scan.addEventListener("click", function () {
+      if (!isStudentActive(controlStudent)) return;
+      controlState.scanned = true; controlState.selectedId = null; controlState.record = null; rerenderControl();
+    });
     container.querySelectorAll("[data-pickup-person]").forEach(function (button) {
-      button.addEventListener("click", function () { controlState.selectedId = button.getAttribute("data-pickup-person"); controlState.record = null; rerenderControl(); });
+      button.addEventListener("click", function () {
+        if (!isStudentActive(controlStudent)) return;
+        controlState.selectedId = button.getAttribute("data-pickup-person"); controlState.record = null; rerenderControl();
+      });
     });
     var validate = container.querySelector("[data-validate-pickup]");
     if (validate) validate.addEventListener("click", function () {
-      var state = familyStateFor(demoStudent);
-      var person = selectedPerson(peopleFor(demoStudent, state));
+      if (!isStudentActive(controlStudent)) return;
+      var state = familyStateFor(controlStudent);
+      var person = selectedPerson(peopleFor(controlStudent, state));
       var decision = decisionFor(person);
       if (!decision.allowed || !permissionAllowed(controlUser, "security.pickup.manage") || !hasScope(controlUser, "security.pickup.manage", "school")) return;
       var now = new Date();
       controlState.record = {
-        student: demoStudent.first_name + " " + demoStudent.last_name,
-        studentId: demoStudent.id,
+        student: controlStudent.first_name + " " + controlStudent.last_name,
+        studentId: controlStudent.id,
         picker: fullName(person),
         pickerId: person.id,
         relation: relationLabel(person.relation),
@@ -325,7 +349,10 @@
         guardianUser: "Agent Gardien · Portail principal",
         result: decision.label
       };
-      saveRecord(controlState.record);
+      if (!saveRecord(controlState.record, controlStudent)) {
+        controlState.record = null;
+        return;
+      }
       rerenderControl();
     });
     if (root.lucide) root.lucide.createIcons();
@@ -333,6 +360,7 @@
 
   function resetControl() {
     controlState = { scanned: false, selectedId: null, record: null };
+    controlStudent = null;
   }
 
   root.SchoolSafeStudentPickup = {
