@@ -27,10 +27,18 @@
     { id: "demo-assignment-reading", title: "Lecture expressive", classId: "demo-class-2", subjectId: "demo-subject-french", instructions: "Préparer une lecture de deux minutes.", publishOn: "2026-09-02", dueOn: "2026-09-09", workType: "Travail individuel", status: "À PUBLIER", local: true },
     { id: "demo-assignment-foreign", title: "Forces et mouvements", classId: "demo-class-foreign", subjectId: "demo-subject-physics", instructions: "Hors périmètre.", publishOn: "2026-09-01", dueOn: "2026-09-08", workType: "TP", status: "BROUILLON", local: false }
   ];
+  var EVALUATION_STORAGE_KEY = "schoolsafe-v2-teacher-evaluation-drafts";
+  var GRADE_STORAGE_KEY = "schoolsafe-v2-teacher-grade-drafts";
+  var EVALUATIONS = [
+    { id: "demo-evaluation-calcul", title: "Calcul mental", classId: "demo-class-1", subjectId: "demo-subject-math", type: "interrogation", date: "2026-09-05", scale: 10, coefficient: 1, instructions: "Calculs rapides sans calculatrice.", status: "BROUILLON", local: true },
+    { id: "demo-evaluation-redaction", title: "Rédaction descriptive", classId: "demo-class-2", subjectId: "demo-subject-french", type: "devoir", date: "2026-09-06", scale: 20, coefficient: 1, instructions: "Décrire un lieu familier.", status: "À PRÉPARER", local: true },
+    { id: "demo-evaluation-foreign", title: "Mécanique", classId: "demo-class-foreign", subjectId: "demo-subject-physics", type: "TP", date: "2026-09-07", scale: 20, coefficient: 2, instructions: "Hors périmètre.", status: "BROUILLON", local: false }
+  ];
 
   var activeContainerId = null;
   var activeUser = null;
   var activeView = "dashboard";
+  var selectedEvaluationId = null;
 
   function escapeMarkup(value) {
     if (root.ssEscapeHtml) return root.ssEscapeHtml(value == null ? "" : String(value));
@@ -105,6 +113,31 @@
     storageSet(ASSIGNMENT_STORAGE_KEY, JSON.stringify(items));
   }
 
+  function readJson(key, fallback) {
+    try {
+      var parsed = JSON.parse(storageGet(key) || "null");
+      return parsed == null ? fallback : parsed;
+    } catch (error) { return fallback; }
+  }
+
+  function readEvaluationDrafts() {
+    var items = readJson(EVALUATION_STORAGE_KEY, []);
+    return Array.isArray(items) ? items : [];
+  }
+
+  function saveEvaluationDrafts(items) {
+    storageSet(EVALUATION_STORAGE_KEY, JSON.stringify(items));
+  }
+
+  function readGradeDrafts() {
+    var drafts = readJson(GRADE_STORAGE_KEY, {});
+    return drafts && typeof drafts === "object" && !Array.isArray(drafts) ? drafts : {};
+  }
+
+  function saveGradeDrafts(drafts) {
+    storageSet(GRADE_STORAGE_KEY, JSON.stringify(drafts));
+  }
+
   function labelFor(items, id) {
     var found = items.find(function (item) { return item.id === id; });
     return found ? found.name : "Indisponible";
@@ -166,6 +199,10 @@
         var target = button.getAttribute("data-teacher-open");
         if (target === "assignments") {
           open("assignments");
+          return;
+        }
+        if (target === "evaluations") {
+          open("evaluations");
           return;
         }
         var state = container.querySelector("[data-teacher-feature-state]");
@@ -258,6 +295,118 @@
     });
   }
 
+  function evaluationCard(item) {
+    return '<article class="teacher-record-card" data-evaluation-id="' + escapeMarkup(item.id) + '"><header><div><p class="teacher-eyebrow">' +
+      escapeMarkup(labelFor(CLASSES, item.classId) + " · " + labelFor(SUBJECTS, item.subjectId)) + '</p><h3>' + escapeMarkup(item.title) +
+      '</h3></div><span class="teacher-status">' + escapeMarkup(item.status) + '</span></header><p>' + escapeMarkup(item.instructions) +
+      '</p><dl><div><dt>Type</dt><dd>' + escapeMarkup(item.type) + '</dd></div><div><dt>Date</dt><dd>' + escapeMarkup(item.date) +
+      '</dd></div><div><dt>Barème</dt><dd>/' + escapeMarkup(item.scale) + ' · coef. ' + escapeMarkup(item.coefficient) + '</dd></div></dl>' +
+      '<footer><b>BROUILLON LOCAL</b><span>BACKEND_LATER</span></footer></article>';
+  }
+
+  function renderEvaluationForm(projection) {
+    var classOptions = projection.classes.map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    var subjectOptions = projection.subjects.map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    return '<form class="teacher-form" id="teacherEvaluationForm"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Préparation locale</p><h2>Nouvelle évaluation</h2></div><span>BACKEND_LATER</span></div>' +
+      '<div class="teacher-form-grid"><label><span>Titre</span><input name="title" required maxlength="120"></label>' +
+      '<label><span>Classe</span><select name="classId" required>' + classOptions + '</select></label><label><span>Matière</span><select name="subjectId" required>' + subjectOptions + '</select></label>' +
+      '<label><span>Type</span><select name="type"><option value="devoir">Devoir</option><option value="interrogation">Interrogation</option><option value="TP">TP</option><option value="examen">Examen</option><option value="autre">Autre</option></select></label>' +
+      '<label><span>Date</span><input name="date" type="date" required></label><label><span>Barème</span><input name="scale" type="number" min="1" max="100" value="20" required></label>' +
+      '<label><span>Coefficient</span><input name="coefficient" type="number" min="0.1" max="10" step="0.1" value="1"></label><label><span>Statut</span><select name="status"><option>BROUILLON</option><option>À PRÉPARER</option><option>TERMINÉ</option></select></label>' +
+      '<label class="teacher-form-wide"><span>Consigne</span><textarea name="instructions" rows="3" required></textarea></label></div>' +
+      '<button class="ss-button" type="submit">' + icon("save") + ' Enregistrer l’évaluation</button></form>';
+  }
+
+  function gradeRow(student, saved) {
+    saved = saved || {};
+    return '<fieldset class="teacher-grade-row" data-grade-student="' + escapeMarkup(student.id) + '"><legend>' + escapeMarkup(student.name) + '</legend>' +
+      '<label><span>Valeur</span><input type="number" min="0" step="0.25" data-grade-value="' + escapeMarkup(student.id) + '" value="' + escapeMarkup(saved.value == null ? "" : saved.value) + '"></label>' +
+      '<label class="teacher-check"><input type="checkbox" data-grade-absent="' + escapeMarkup(student.id) + '"' + (saved.absent ? " checked" : "") + '><span>Absent</span></label>' +
+      '<label class="teacher-check"><input type="checkbox" data-grade-unmarked="' + escapeMarkup(student.id) + '"' + (saved.unmarked ? " checked" : "") + '><span>Non noté</span></label>' +
+      '<label><span>Observation</span><input data-grade-observation="' + escapeMarkup(student.id) + '" value="' + escapeMarkup(saved.observation || "") + '"></label></fieldset>';
+  }
+
+  function renderGradebook(projection, evaluations) {
+    var selected = evaluations.find(function (item) { return item.id === selectedEvaluationId; }) || evaluations[0];
+    if (!selected) return '<p class="teacher-empty">Préparez une évaluation pour ouvrir la saisie locale.</p>';
+    selectedEvaluationId = selected.id;
+    var options = evaluations.map(function (item) { return '<option value="' + escapeMarkup(item.id) + '"' + (item.id === selected.id ? " selected" : "") + '>' + escapeMarkup(item.title) + '</option>'; }).join("");
+    var savedByEvaluation = readGradeDrafts()[selected.id] || {};
+    var students = projection.students.filter(function (item) { return item.classId === selected.classId && item.lifecycleStatus === "active"; });
+    return '<form class="teacher-form" id="teacherGradebookForm"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Saisie frontend</p><h2>Notes en préparation</h2></div><span>NON PUBLIÉ · BACKEND_LATER</span></div>' +
+      '<label><span>Évaluation</span><select id="teacherEvaluationSelect">' + options + '</select></label><div class="teacher-grade-list">' +
+      students.map(function (student) { return gradeRow(student, savedByEvaluation[student.id]); }).join("") + '</div>' +
+      '<button class="ss-button" type="submit">' + icon("save") + ' Sauvegarder les notes locales</button></form>';
+  }
+
+  function renderEvaluations(container, projection) {
+    activeView = "evaluations";
+    if (!allowsScope(activeUser, "pedagogy.grade.read", "assigned_classes")) {
+      renderDenied(container);
+      return;
+    }
+    var classIds = projection.classes.map(function (item) { return item.id; });
+    var subjectIds = projection.subjects.map(function (item) { return item.id; });
+    var evaluations = EVALUATIONS.concat(readEvaluationDrafts()).filter(function (item) {
+      return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0;
+    });
+    var canManage = allowsScope(activeUser, "pedagogy.grade.manage", "assigned_classes");
+    var controls = canManage ? '<div class="teacher-workspace-grid"><section class="teacher-panel">' + renderEvaluationForm(projection) + '</section><section class="teacher-panel">' + renderGradebook(projection, evaluations) + '</section></div>' :
+      '<aside class="teacher-access-note teacher-access-note--denied"><strong>Modification des notes refusée</strong><p>Le DENY explicite ou l’absence de pedagogy.grade.manage interdit toute préparation.</p></aside>';
+    container.innerHTML = '<div class="teacher-pedagogy-shell"><header class="teacher-workspace-header"><button class="ss-button ss-button--secondary" type="button" data-teacher-back>' + icon("arrow-left") + ' Tableau de bord</button>' +
+      '<div><p class="teacher-eyebrow">D3 · Évaluations et notes</p><h1>Évaluations de mes classes</h1><p>Saisie locale, jamais une publication officielle.</p></div><span class="teacher-boundary">BACKEND_LATER</span></header>' +
+      '<section class="teacher-panel"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Périmètre affecté</p><h2>Évaluations préparées</h2></div><span>' + evaluations.length + ' élément(s)</span></div>' +
+      '<div class="teacher-record-list" data-evaluation-list>' + evaluations.map(evaluationCard).join("") + '</div></section>' + controls + '</div>';
+    var back = container.querySelector("[data-teacher-back]");
+    if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
+    var evaluationForm = container.querySelector("#teacherEvaluationForm");
+    if (evaluationForm) evaluationForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!evaluationForm.reportValidity()) return;
+      var data = new FormData(evaluationForm);
+      var classId = String(data.get("classId") || "");
+      var subjectId = String(data.get("subjectId") || "");
+      var subject = projection.subjects.find(function (item) { return item.id === subjectId; });
+      if (!subject || subject.classIds.indexOf(classId) < 0) return;
+      var drafts = readEvaluationDrafts();
+      var item = { id: "teacher-evaluation-" + Date.now(), title: String(data.get("title") || ""), classId: classId, subjectId: subjectId, type: String(data.get("type") || "devoir"), date: String(data.get("date") || ""), scale: Number(data.get("scale") || 20), coefficient: Number(data.get("coefficient") || 1), instructions: String(data.get("instructions") || ""), status: String(data.get("status") || "BROUILLON"), local: true };
+      drafts.unshift(item);
+      selectedEvaluationId = item.id;
+      saveEvaluationDrafts(drafts);
+      renderEvaluations(container, projection);
+    });
+    var evaluationSelect = container.querySelector("#teacherEvaluationSelect");
+    if (evaluationSelect) evaluationSelect.addEventListener("change", function () { selectedEvaluationId = evaluationSelect.value; renderEvaluations(container, projection); });
+    container.querySelectorAll("[data-grade-absent], [data-grade-unmarked]").forEach(function (control) {
+      control.addEventListener("change", function () {
+        var studentId = control.getAttribute(control.hasAttribute("data-grade-absent") ? "data-grade-absent" : "data-grade-unmarked");
+        var row = container.querySelector('[data-grade-student="' + studentId + '"]');
+        if (!row || !control.checked) return;
+        var other = row.querySelector(control.hasAttribute("data-grade-absent") ? "[data-grade-unmarked]" : "[data-grade-absent]");
+        var value = row.querySelector("[data-grade-value]");
+        if (other) other.checked = false;
+        if (value) value.value = "";
+      });
+    });
+    var gradebook = container.querySelector("#teacherGradebookForm");
+    if (gradebook) gradebook.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var evaluation = evaluations.find(function (item) { return item.id === selectedEvaluationId; });
+      if (!evaluation) return;
+      var drafts = readGradeDrafts();
+      drafts[evaluation.id] = {};
+      gradebook.querySelectorAll("[data-grade-student]").forEach(function (row) {
+        var studentId = row.getAttribute("data-grade-student");
+        var rawValue = row.querySelector("[data-grade-value]").value;
+        var value = rawValue === "" ? null : Number(rawValue);
+        if (value != null && (value < 0 || value > evaluation.scale)) return;
+        drafts[evaluation.id][studentId] = { value: value, absent: row.querySelector("[data-grade-absent]").checked, unmarked: row.querySelector("[data-grade-unmarked]").checked, observation: row.querySelector("[data-grade-observation]").value };
+      });
+      saveGradeDrafts(drafts);
+      renderEvaluations(container, projection);
+    });
+  }
+
   function open(view) {
     var container = document.getElementById(activeContainerId || "teacherPedagogyPortal");
     if (!container || !activeUser) return false;
@@ -267,6 +416,7 @@
       return false;
     }
     if (view === "assignments") renderAssignments(container, projection);
+    else if (view === "evaluations") renderEvaluations(container, projection);
     else renderDashboard(container, projection);
     if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
     return true;
@@ -295,6 +445,8 @@
     STUDENTS: STUDENTS,
     getAssignedProjection: getAssignedProjection,
     readAssignmentDrafts: readAssignmentDrafts,
+    readEvaluationDrafts: readEvaluationDrafts,
+    readGradeDrafts: readGradeDrafts,
     open: open,
     clear: clear,
     render: render
