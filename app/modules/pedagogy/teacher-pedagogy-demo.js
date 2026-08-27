@@ -34,11 +34,24 @@
     { id: "demo-evaluation-redaction", title: "Rédaction descriptive", classId: "demo-class-2", subjectId: "demo-subject-french", type: "devoir", date: "2026-09-06", scale: 20, coefficient: 1, instructions: "Décrire un lieu familier.", status: "À PRÉPARER", local: true },
     { id: "demo-evaluation-foreign", title: "Mécanique", classId: "demo-class-foreign", subjectId: "demo-subject-physics", type: "TP", date: "2026-09-07", scale: 20, coefficient: 2, instructions: "Hors périmètre.", status: "BROUILLON", local: false }
   ];
+  var APPRECIATION_STORAGE_KEY = "schoolsafe-v2-teacher-appreciation-drafts";
+  var RESULT_SUMMARIES = [
+    { classId: "demo-class-1", subjectId: "demo-subject-math", monthlyAverage: "13,8 / 20", termAverage: "13,2 / 20", coverage: "82 %", source: "Devoirs · interrogations" },
+    { classId: "demo-class-2", subjectId: "demo-subject-french", monthlyAverage: "12,6 / 20", termAverage: "12,9 / 20", coverage: "76 %", source: "Devoirs · travaux" },
+    { classId: "demo-class-foreign", subjectId: "demo-subject-physics", monthlyAverage: "15,1 / 20", termAverage: "14,7 / 20", coverage: "91 %", source: "TP · examens" }
+  ];
+  var RANKING_SCORES = [
+    { studentId: "demo-student-chloe", name: "Chloé Bernard", classId: "demo-class-1", score: 16.2 },
+    { studentId: "demo-student-lucas", name: "Lucas Martin", classId: "demo-class-1", score: 14.8 },
+    { studentId: "demo-student-ethan", name: "Ethan Leroy", classId: "demo-class-2", score: 13.6 },
+    { studentId: "demo-student-foreign", name: "Noah Kasongo", classId: "demo-class-foreign", score: 17.4 }
+  ];
 
   var activeContainerId = null;
   var activeUser = null;
   var activeView = "dashboard";
   var selectedEvaluationId = null;
+  var resultsPeriod = "monthly";
 
   function escapeMarkup(value) {
     if (root.ssEscapeHtml) return root.ssEscapeHtml(value == null ? "" : String(value));
@@ -136,6 +149,15 @@
 
   function saveGradeDrafts(drafts) {
     storageSet(GRADE_STORAGE_KEY, JSON.stringify(drafts));
+  }
+
+  function readAppreciationDrafts() {
+    var items = readJson(APPRECIATION_STORAGE_KEY, []);
+    return Array.isArray(items) ? items : [];
+  }
+
+  function saveAppreciationDrafts(items) {
+    storageSet(APPRECIATION_STORAGE_KEY, JSON.stringify(items));
   }
 
   function labelFor(items, id) {
@@ -407,6 +429,58 @@
     });
   }
 
+  function renderRanking(title, scope, rows) {
+    var content = rows.slice().sort(function (a, b) { return b.score - a.score; }).slice(0, 10).map(function (item, index) {
+      return '<li><b>' + (index + 1) + '</b><span>' + escapeMarkup(item.name) + '<small>' + escapeMarkup(labelFor(CLASSES, item.classId)) + '</small></span><strong>' + escapeMarkup(item.score.toFixed(1)) + '</strong></li>';
+    }).join("");
+    return '<section class="teacher-panel teacher-ranking" data-ranking-scope="' + scope + '"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Classement calculé</p><h2>' + escapeMarkup(title) + '</h2></div><span>lecture seule</span></div><ol>' + content + '</ol><p class="teacher-demo-caption">Sources compatibles de démonstration : devoirs, interrogations, TP et autres évaluations. Aucun classement officiel n’est calculé.</p></section>';
+  }
+
+  function renderResults(container, projection) {
+    activeView = "results";
+    if (!allowsScope(activeUser, "pedagogy.grade.read", "assigned_classes")) {
+      renderDenied(container);
+      return;
+    }
+    var classIds = projection.classes.map(function (item) { return item.id; });
+    var subjectIds = projection.subjects.map(function (item) { return item.id; });
+    var summaries = RESULT_SUMMARIES.filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; });
+    var summaryCards = summaries.map(function (item) {
+      return '<article class="teacher-result-card"><p class="teacher-eyebrow">' + escapeMarkup(labelFor(CLASSES, item.classId)) + '</p><h3>' + escapeMarkup(labelFor(SUBJECTS, item.subjectId)) + '</h3>' +
+        '<strong>' + escapeMarkup(resultsPeriod === "monthly" ? item.monthlyAverage : item.termAverage) + '</strong><span>Couverture des notes : ' + escapeMarkup(item.coverage) + '</span><small>' + escapeMarkup(item.source) + '</small></article>';
+    }).join("");
+    var classRows = RANKING_SCORES.filter(function (item) { return classIds.indexOf(item.classId) >= 0; });
+    var canSeeSchoolRanking = allowsScope(activeUser, "palmarques.read", "school");
+    var schoolRanking = canSeeSchoolRanking ? renderRanking("Top 10 école", "school", RANKING_SCORES) : '<aside class="teacher-access-note"><strong>Top école non autorisé</strong><p>La permission palmarques.read avec scope school est nécessaire; aucun scope school n’est accordé automatiquement.</p></aside>';
+    var appreciations = readAppreciationDrafts().filter(function (item) { return classIds.indexOf(item.classId) >= 0; });
+    var appreciationRows = appreciations.map(function (item) { return '<li><strong>' + escapeMarkup(item.studentName) + '</strong><span>' + escapeMarkup(item.text) + '</span><small>BROUILLON LOCAL</small></li>'; }).join("");
+    var studentOptions = projection.students.map(function (student) { return '<option value="' + escapeMarkup(student.id) + '">' + escapeMarkup(student.name) + '</option>'; }).join("");
+    var appreciationForm = allowsScope(activeUser, "pedagogy.grade.manage", "assigned_classes") ? '<form class="teacher-form" id="teacherAppreciationForm"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Appréciation</p><h2>Préparer une appréciation</h2></div><span>BROUILLON LOCAL</span></div><label><span>Élève actif</span><select name="studentId">' + studentOptions + '</select></label><label><span>Texte</span><textarea name="text" rows="3" required></textarea></label><button class="ss-button" type="submit">' + icon("save") + ' Enregistrer localement</button></form>' : '<p>Préparation non autorisée.</p>';
+
+    container.innerHTML = '<div class="teacher-pedagogy-shell"><header class="teacher-workspace-header"><button class="ss-button ss-button--secondary" type="button" data-teacher-back>' + icon("arrow-left") + ' Tableau de bord</button>' +
+      '<div><p class="teacher-eyebrow">D4 · Résultats / bulletins / palmarès</p><h1>Résultats et moyennes</h1><p>DONNÉES DE DÉMONSTRATION · aucun calcul officiel.</p></div><span class="teacher-boundary">BACKEND_LATER</span></header>' +
+      '<nav class="teacher-period-tabs" aria-label="Période"><button type="button" data-results-period="monthly"' + (resultsPeriod === "monthly" ? ' class="active"' : "") + '>Mensuel</button><button type="button" data-results-period="term"' + (resultsPeriod === "term" ? ' class="active"' : "") + '>Trimestriel</button></nav>' +
+      '<section class="teacher-panel"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Synthèse par matière</p><h2>Moyennes de démonstration</h2></div><span>NON OFFICIEL</span></div><div class="teacher-result-grid">' + summaryCards + '</div></section>' +
+      '<div class="teacher-workspace-grid">' + renderRanking("Top 10 classe", "class", classRows) + schoolRanking + '</div>' +
+      '<section class="teacher-panel" data-bulletin-preview><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Aperçu uniquement</p><h2>Bulletin en préparation</h2></div><span>BACKEND_LATER</span></div><p>Le Bulletin officiel et sa publication restent une fonction serveur future. Cet aperçu reprend seulement les synthèses visibles du périmètre affecté.</p></section>' +
+      '<div class="teacher-workspace-grid"><section class="teacher-panel">' + appreciationForm + '</section><section class="teacher-panel"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Historique local</p><h2>Appréciations préparées</h2></div></div><ul class="teacher-appreciation-list" data-appreciation-list>' + (appreciationRows || '<li>Aucune appréciation préparée.</li>') + '</ul></section></div></div>';
+    var back = container.querySelector("[data-teacher-back]");
+    if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
+    container.querySelectorAll("[data-results-period]").forEach(function (button) { button.addEventListener("click", function () { resultsPeriod = button.getAttribute("data-results-period"); renderResults(container, projection); }); });
+    var form = container.querySelector("#teacherAppreciationForm");
+    if (form) form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      var data = new FormData(form);
+      var student = projection.students.find(function (item) { return item.id === String(data.get("studentId") || ""); });
+      if (!student || student.lifecycleStatus !== "active") return;
+      var items = readAppreciationDrafts();
+      items.unshift({ id: "teacher-appreciation-" + Date.now(), studentId: student.id, studentName: student.name, classId: student.classId, text: String(data.get("text") || "") });
+      saveAppreciationDrafts(items);
+      renderResults(container, projection);
+    });
+  }
+
   function open(view) {
     var container = document.getElementById(activeContainerId || "teacherPedagogyPortal");
     if (!container || !activeUser) return false;
@@ -417,6 +491,7 @@
     }
     if (view === "assignments") renderAssignments(container, projection);
     else if (view === "evaluations") renderEvaluations(container, projection);
+    else if (view === "results") renderResults(container, projection);
     else renderDashboard(container, projection);
     if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
     return true;
@@ -447,6 +522,7 @@
     readAssignmentDrafts: readAssignmentDrafts,
     readEvaluationDrafts: readEvaluationDrafts,
     readGradeDrafts: readGradeDrafts,
+    readAppreciationDrafts: readAppreciationDrafts,
     open: open,
     clear: clear,
     render: render

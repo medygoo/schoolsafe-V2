@@ -182,6 +182,26 @@
 .teacher-grade-row label { font-size: .75rem; }
 .teacher-check { display: flex !important; align-items: center; gap: .35rem; min-height: 2.75rem; }
 .teacher-check input { width: 1.15rem; min-height: 1.15rem; }
+.teacher-period-tabs { display: flex; gap: .5rem; overflow-x: auto; }
+.teacher-period-tabs button { min-height: 2.65rem; padding: .55rem .9rem; border: 1px solid var(--ss-border-default); border-radius: 999px; background: var(--ss-bg-primary); color: var(--ss-text-secondary); font-weight: 800; }
+.teacher-period-tabs button.active { border-color: var(--ss-blue-500); background: var(--ss-info-bg); color: var(--ss-info-text); }
+.teacher-result-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.teacher-result-card { display: grid; gap: .35rem; padding: 1rem; border: 1px solid var(--ss-border-default); border-radius: .85rem; background: var(--ss-bg-secondary); }
+.teacher-result-card h3,
+.teacher-result-card p { margin: 0; }
+.teacher-result-card > strong { font-size: 1.45rem; color: var(--ss-text-brand); }
+.teacher-result-card span,
+.teacher-result-card small { color: var(--ss-text-secondary); }
+.teacher-ranking ol,
+.teacher-appreciation-list { display: grid; gap: .55rem; margin: 0; padding: 0; list-style: none; }
+.teacher-ranking li { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .65rem; border-radius: .7rem; background: var(--ss-bg-secondary); }
+.teacher-ranking li > b { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 50%; background: var(--ss-info-bg); color: var(--ss-info-text); }
+.teacher-ranking li span { display: grid; }
+.teacher-ranking li small,
+.teacher-demo-caption { color: var(--ss-text-secondary); }
+.teacher-demo-caption { margin: .8rem 0 0; font-size: .8rem; }
+.teacher-appreciation-list li { display: grid; gap: .2rem; padding: .7rem; border-left: 3px solid var(--ss-blue-500); border-radius: .4rem; background: var(--ss-bg-secondary); }
+.teacher-appreciation-list small { color: var(--ss-text-accent); font-weight: 800; }
 
 @media (max-width: 900px) {
   .teacher-priority-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -199,5 +219,6 @@
   .teacher-workspace-header { grid-template-columns: 1fr; align-items: flex-start; }
   .teacher-form-grid,
   .teacher-record-card dl,
-  .teacher-grade-row { grid-template-columns: 1fr; }
+  .teacher-grade-row,
+  .teacher-result-grid { grid-template-columns: 1fr; }
 }
