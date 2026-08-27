@@ -21,6 +21,16 @@
         convocations: [{ title: "Entretien avec la Direction", detail: "Convocation de démonstration · réponse côté serveur indisponible", date: "2 septembre 2026" }],
         messages: [{ title: "Accueil de l’établissement", detail: "Historique de démonstration non synchronisé", date: "25 août 2026" }]
       },
+      pedagogy: {
+        assignments: [{ title: "Exercices sur les fractions", subject: "Mathématiques", due: "30 août 2026", state: "À faire" }],
+        evaluations: [{ title: "Interrogation de mathématiques", subject: "Mathématiques", grade: "14 / 20", comment: "Aperçu de démonstration" }],
+        averages: [{ subject: "Mathématiques", value: "14 / 20" }, { subject: "Français", value: "12 / 20" }],
+        overall: "13 / 20",
+        bulletin: "Aperçu disponible · document officiel BACKEND_LATER",
+        ranking: "7e position · aperçu autorisé",
+        difficulty: "Lecture des consignes longues",
+        remediation: "Fiche d’exercices guidés · information de démonstration"
+      },
       summary: {
         presence: "Présent",
         safety: "Sortie prévue à 16 h 15",
@@ -47,6 +57,16 @@
         convocations: [],
         messages: [{ title: "Accueil maternelle", detail: "Historique de démonstration non synchronisé", date: "24 août 2026" }]
       },
+      pedagogy: {
+        assignments: [{ title: "Activité de motricité", subject: "Éveil", due: "29 août 2026", state: "À découvrir" }],
+        evaluations: [{ title: "Observation langage", subject: "Langage", grade: "Acquis", comment: "Aperçu de démonstration" }],
+        averages: [{ subject: "Langage", value: "Acquis" }],
+        overall: "Suivi qualitatif",
+        bulletin: "Aperçu disponible · document officiel BACKEND_LATER",
+        ranking: "Non applicable en maternelle",
+        difficulty: "Aucune difficulté signalée dans cet aperçu",
+        remediation: "Aucun rattrapage signalé"
+      },
       summary: {
         presence: "Présente",
         safety: "Sortie prévue à 15 h 30",
@@ -69,6 +89,7 @@
       enrollment: { planned_class_id: "demo-class-4", planned_class_name: "5e A", academic_year_label: "2026-2027" },
       primary_parent: { display_name: "Sophie Martin", account_status: "À préparer" },
       communications: { notifications: [], convocations: [], messages: [] },
+      pedagogy: null,
       summary: null
     },
     {
@@ -84,6 +105,7 @@
       enrollment: { planned_class_id: "demo-class-3", planned_class_name: "4e B", academic_year_label: "2026-2027" },
       primary_parent: { display_name: "Autre famille", account_status: "Hors périmètre" },
       communications: { notifications: [], convocations: [], messages: [] },
+      pedagogy: null,
       summary: null
     }
   ];
@@ -207,6 +229,60 @@
     return true;
   }
 
+  function pedagogyList(items, renderItem, emptyText) {
+    if (!items || !items.length) return '<p class="parent-feature-empty">' + escapeMarkup(emptyText) + '</p>';
+    return '<div class="parent-readonly-list">' + items.map(renderItem).join("") + '</div>';
+  }
+
+  function pedagogyMarkup(child, user) {
+    var allowed = scopeAllowsChild(user, "pedagogy.grade.read", child);
+    var header = '<header class="parent-feature-header"><div><p class="parent-eyebrow">Suivi pédagogique · own_children</p><h1>' +
+      escapeMarkup(childName(child)) + '</h1><p>Consultation seule · composants Pédagogie partagés · aucune écriture.</p></div><span>DÉMO · BACKEND_LATER</span></header>';
+    if (!allowed) {
+      return '<div class="parent-pedagogy">' + header + '<aside class="parent-pedagogy-denied">' + icon("shield-x") +
+        '<div><strong>Suivi pédagogique non autorisé</strong><p>La permission, la portée own_children ou une exception individuelle bloque cette consultation.</p></div></aside></div>';
+    }
+    if (child.lifecycle_status !== "active" || !child.pedagogy) {
+      return '<div class="parent-pedagogy">' + header + '<aside class="parent-pedagogy-draft"><strong>EN PRÉPARATION</strong>' +
+        '<p>Aucune donnée pédagogique officielle n’est disponible pour ce dossier non opérationnel.</p></aside></div>';
+    }
+    var data = child.pedagogy;
+    var assignments = pedagogyList(data.assignments, function (item) {
+      return '<article><div><strong>' + escapeMarkup(item.title) + '</strong><p>' + escapeMarkup(item.subject) + '</p></div><span>' + escapeMarkup(item.state) + '<small>Échéance ' + escapeMarkup(item.due) + '</small></span></article>';
+    }, "Aucun devoir visible.");
+    var evaluations = pedagogyList(data.evaluations, function (item) {
+      return '<article><div><strong>' + escapeMarkup(item.title) + '</strong><p>' + escapeMarkup(item.subject) + ' · ' + escapeMarkup(item.comment) + '</p></div><span class="parent-grade">' + escapeMarkup(item.grade) + '</span></article>';
+    }, "Aucune évaluation visible.");
+    var averages = pedagogyList(data.averages, function (item) {
+      return '<article><div><strong>' + escapeMarkup(item.subject) + '</strong><p>Moyenne de démonstration</p></div><span class="parent-grade">' + escapeMarkup(item.value) + '</span></article>';
+    }, "Aucune moyenne calculable.");
+    return '<div class="parent-pedagogy">' + header + '<div class="parent-pedagogy-grid">' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Devoirs</h2>' + assignments + '</section>' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Évaluations</h2>' + evaluations + '</section>' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Moyennes</h2><p class="parent-overall">Moyenne générale <strong>' + escapeMarkup(data.overall) + '</strong></p>' + averages + '</section>' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Bulletin</h2><p>' + escapeMarkup(data.bulletin) + '</p><span class="parent-feature-source">FEATURE_LATER / BACKEND_LATER</span></section>' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Palmarès</h2><p>' + escapeMarkup(data.ranking) + '</p><span class="parent-feature-source">Visible uniquement si autorisé</span></section>' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Difficultés et suivi</h2><p>' + escapeMarkup(data.difficulty) + '</p><span class="parent-feature-source">Aperçu de démonstration</span></section>' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Rattrapage</h2><p>' + escapeMarkup(data.remediation) + '</p><span class="parent-feature-source">Information uniquement</span></section>' +
+      '</div><aside class="parent-readonly-boundary">' + icon("eye") + '<p>Consultation seule : aucune cote, moyenne, difficulté ou décision pédagogique ne peut être modifiée ici.</p></aside></div>';
+  }
+
+  function openPedagogy(childId, user) {
+    var linked = getLinkedChildren(user || {});
+    var child = linked.find(function (item) { return item.id === childId; });
+    if (!child || !root.ssModal) return false;
+    root.ssModal({
+      title: "Suivi pédagogique Parent",
+      subtitle: "Vue familiale en consultation seule",
+      size: "full",
+      className: "parent-pedagogy-modal",
+      content: pedagogyMarkup(child, user || {}),
+      actions: [{ label: "Fermer", variant: "secondary" }]
+    });
+    if (root.lucide) root.lucide.createIcons();
+    return true;
+  }
+
   function icon(name) {
     return '<i data-lucide="' + name + '" aria-hidden="true"></i>';
   }
@@ -316,6 +392,10 @@
           openCommunications(selectedChildId, activeUser);
           return;
         }
+        if (button.getAttribute("data-parent-shortcut") === "pédagogie") {
+          openPedagogy(selectedChildId, activeUser);
+          return;
+        }
         var label = button.querySelector("span");
         if (typeof root.schoolSafeNotify === "function") {
           root.schoolSafeNotify((label ? label.textContent : "Fonction") + " — disponible dans les prochains lots Parent.");
@@ -331,6 +411,7 @@
     getSelectedChild: getSelectedChild,
     openChildDossier: openChildDossier,
     openCommunications: openCommunications,
+    openPedagogy: openPedagogy,
     render: render
   };
 }(window));

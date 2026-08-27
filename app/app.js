@@ -220,7 +220,7 @@
   var DEMO_PERMISSIONS_BY_ROLE = {
     admin: ["school.manage", "staff.read", "staff.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
-    parent: ["school.student.read", "school.guardian.read", "school.guardian.manage", "finance.status.read"],
+    parent: ["school.student.read", "school.guardian.read", "school.guardian.manage", "pedagogy.grade.read", "finance.status.read"],
     teacher: ["school.student.read", "school.class.read", "pedagogy.grade.read"],
     guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
   };
@@ -235,6 +235,7 @@
         { permission: "school.student.read", type: "own_children" },
         { permission: "school.guardian.read", type: "own_children" },
         { permission: "school.guardian.manage", type: "own_children" },
+        { permission: "pedagogy.grade.read", type: "own_children" },
         { permission: "finance.status.read", type: "own_children" }
       ]
     },
