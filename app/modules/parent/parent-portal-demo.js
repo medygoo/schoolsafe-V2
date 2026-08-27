@@ -49,6 +49,17 @@
         ],
         history: ["Situation familiale consultée", "Reçu REC-2026-0586 enregistré dans l’aperçu", "Échéance de scolarité à consulter"]
       },
+      security: {
+        people: [
+          { name: "Mireille Wa Kalonji", relation: "Tante", status: "AUTORISÉ" },
+          { name: "Patrick Kabeya Mbuyi", relation: "Oncle", status: "SUSPENDU" },
+          { name: "Jeanne Tshibangu Mbuyi", relation: "Grand-parent", status: "AUTORISÉ" }
+        ],
+        emergency: { name: "Cécile Ngoie Lukusa", relation: "Voisine de confiance", phone: "+243 820 100 204" },
+        entryExit: ["Entrée enregistrée dans l’aperçu · 07 h 28", "Sortie attendue · 16 h 15"],
+        pickups: ["Récupération de démonstration · Mireille Wa Kalonji · 25 août 2026"],
+        alerts: ["Aucune alerte urgente dans cet aperçu"]
+      },
       summary: {
         presence: "Présent",
         safety: "Sortie prévue à 16 h 15",
@@ -94,6 +105,16 @@
         receipts: [{ id: "REC-2026-0585", label: "Frais de scolarité", amount: "120 000 CDF" }],
         history: ["Reçu REC-2026-0585 enregistré dans l’aperçu"]
       },
+      security: {
+        people: [
+          { name: "Sophie Martin", relation: "Mère", status: "AUTORISÉ" },
+          { name: "Jeanne Tshibangu Mbuyi", relation: "Grand-parent", status: "AUTORISÉ" }
+        ],
+        emergency: { name: "Claire Banza", relation: "Tante", phone: "+243 820 100 205" },
+        entryExit: ["Entrée enregistrée dans l’aperçu · 07 h 42", "Sortie attendue · 15 h 30"],
+        pickups: [],
+        alerts: ["Rappel de vérification du contact d’urgence · démonstration"]
+      },
       summary: {
         presence: "Présente",
         safety: "Sortie prévue à 15 h 30",
@@ -118,6 +139,7 @@
       communications: { notifications: [], convocations: [], messages: [] },
       pedagogy: null,
       finance: null,
+      security: null,
       summary: null
     },
     {
@@ -135,6 +157,7 @@
       communications: { notifications: [], convocations: [], messages: [] },
       pedagogy: null,
       finance: null,
+      security: null,
       summary: null
     }
   ];
@@ -373,6 +396,70 @@
     return true;
   }
 
+  function securityList(title, items, iconName) {
+    var rows = items.length ? items.map(function (item) {
+      return '<li><span>' + icon(iconName) + '</span><p>' + escapeMarkup(item) + '</p></li>';
+    }).join("") : '<li class="parent-feature-empty">Aucun élément dans cet aperçu.</li>';
+    return '<section class="parent-security-panel"><h2>' + escapeMarkup(title) + '</h2><ul>' + rows + '</ul></section>';
+  }
+
+  function securityMarkup(child, user) {
+    var peopleAllowed = scopeAllowsChild(user, "school.guardian.read", child);
+    var eventsAllowed = scopeAllowsChild(user, "security.events.read", child);
+    var header = '<header class="parent-feature-header"><div><p class="parent-eyebrow">Sécurité familiale · cadre B4 réutilisé</p><h1>' +
+      escapeMarkup(childName(child)) + '</h1><p>Consultation Parent limitée à own_children · aucun contrôle de sortie.</p></div><span>DÉMO · BACKEND_LATER</span></header>';
+    if (child.lifecycle_status !== "active" || !child.security) {
+      return '<div class="parent-security-family">' + header + '<aside class="parent-security-draft"><strong>EN PRÉPARATION</strong>' +
+        '<p>Aucun événement de sécurité officiel n’est disponible pour ce dossier non opérationnel.</p></aside></div>';
+    }
+    var data = child.security;
+    var people = peopleAllowed ? '<div class="parent-security-people"><section class="parent-security-panel"><h2>Personnes autorisées</h2><div class="parent-security-person-list">' + data.people.map(function (person) {
+      return '<article><span class="parent-person-avatar">' + escapeMarkup(person.name.split(/\s+/).slice(0, 2).map(function (part) { return part.charAt(0); }).join("")) + '</span>' +
+        '<div><strong>' + escapeMarkup(person.name) + '</strong><small>' + escapeMarkup(person.relation) + '</small></div><b class="parent-person-state parent-person-state--' + (person.status === "AUTORISÉ" ? "active" : "suspended") + '">' + escapeMarkup(person.status) + '</b></article>';
+    }).join("") + '</div></section><section class="parent-security-panel"><h2>Contact d’urgence</h2><article class="parent-emergency-contact">' + icon("phone-call") +
+      '<div><strong>' + escapeMarkup(data.emergency.name) + '</strong><small>' + escapeMarkup(data.emergency.relation) + ' · ' + escapeMarkup(data.emergency.phone) + '</small></div></article></section></div>' :
+      '<aside class="parent-security-people-denied">' + icon("shield-x") + '<div><strong>Personnes autorisées non visibles</strong><p>La permission school.guardian.read ou sa portée est refusée.</p></div></aside>';
+    var events = eventsAllowed ? '<div class="parent-security-events">' +
+      securityList("Entrées et sorties", data.entryExit, "log-in") +
+      securityList("Historique des récupérations", data.pickups, "contact-round") +
+      securityList("Alertes de sécurité", data.alerts, "shield-alert") + '</div>' :
+      '<aside class="parent-security-events-denied">' + icon("shield-x") + '<div><strong>Événements de sécurité non autorisés</strong><p>La permission security.events.read est absente ou explicitement refusée.</p></div></aside>';
+    return '<div class="parent-security-family">' + header + people + events + '<aside class="parent-security-boundary">' + icon("eye") +
+      '<div><strong>Consultation uniquement</strong><p>Le Parent ne peut ni scanner, autoriser une sortie, valider une remise, suspendre une personne ou agir comme Gardien.</p></div></aside></div>';
+  }
+
+  function openSecurity(childId, user) {
+    var linked = getLinkedChildren(user || {});
+    var child = linked.find(function (item) { return item.id === childId; });
+    if (!child || !root.ssModal) return false;
+    root.ssModal({
+      title: "Sécurité familiale",
+      subtitle: "Consultation Parent · cadre B4",
+      size: "full",
+      className: "parent-security-modal",
+      content: securityMarkup(child, user || {}),
+      actions: [{ label: "Fermer", variant: "secondary" }]
+    });
+    if (root.lucide) root.lucide.createIcons();
+    return true;
+  }
+
+  function openCanteen(childId, user) {
+    var linked = getLinkedChildren(user || {});
+    var child = linked.find(function (item) { return item.id === childId; });
+    if (!child || !root.ssModal) return false;
+    root.ssModal({
+      title: "Cantine Parent",
+      subtitle: "Limite fonctionnelle explicite",
+      className: "parent-canteen-modal",
+      content: '<div class="parent-canteen"><header><p class="parent-eyebrow">' + escapeMarkup(childName(child)) + ' · own_children</p><h1>Cantine</h1><span>FEATURE_LATER</span></header>' +
+        '<div>' + icon("utensils") + '<h2>Fonctionnalité non disponible</h2><p>Aucun repas, consommation, paiement ou solde n’est inventé dans cette prévisualisation.</p><small>BACKEND_LATER · aucune donnée officielle</small></div></div>',
+      actions: [{ label: "Fermer", variant: "secondary" }]
+    });
+    if (root.lucide) root.lucide.createIcons();
+    return true;
+  }
+
   function icon(name) {
     return '<i data-lucide="' + name + '" aria-hidden="true"></i>';
   }
@@ -490,6 +577,14 @@
           openFinance(selectedChildId, activeUser);
           return;
         }
+        if (button.getAttribute("data-parent-shortcut") === "sécurité") {
+          openSecurity(selectedChildId, activeUser);
+          return;
+        }
+        if (button.getAttribute("data-parent-shortcut") === "cantine") {
+          openCanteen(selectedChildId, activeUser);
+          return;
+        }
         var label = button.querySelector("span");
         if (typeof root.schoolSafeNotify === "function") {
           root.schoolSafeNotify((label ? label.textContent : "Fonction") + " — disponible dans les prochains lots Parent.");
@@ -507,6 +602,8 @@
     openCommunications: openCommunications,
     openPedagogy: openPedagogy,
     openFinance: openFinance,
+    openSecurity: openSecurity,
+    openCanteen: openCanteen,
     render: render
   };
 }(window));
