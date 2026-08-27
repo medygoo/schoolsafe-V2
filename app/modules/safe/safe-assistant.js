@@ -239,6 +239,22 @@
     var text = String(raw || "").toLowerCase();
     if (!text) return;
 
+    if (global.SchoolSafeParentPortal && typeof global.SchoolSafeParentPortal.answerJaspe === "function") {
+      var assistantContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
+        ? global.SchoolSafeAppContext.getAssistantContext()
+        : null;
+      var parentAnswer = assistantContext && assistantContext.activeRole === "parent"
+        ? global.SchoolSafeParentPortal.answerJaspe(raw, assistantContext)
+        : null;
+      if (parentAnswer) {
+        state.currentMessage = parentAnswer.message;
+        state.pose = parentAnswer.refusal ? "reflechie" : "sourire";
+        state.suggestions = [];
+        render();
+        return;
+      }
+    }
+
     if (/autorise|autoriser|valide|valider/.test(text) && /sortie|remise|récup|recup/.test(text)) {
       state.currentMessage = "Je ne peux pas autoriser une sortie, valider une remise, suspendre ou rétablir une personne. Ces actions exigent les droits utilisateur correspondants et restent sous contrôle humain.";
       state.pose = "reflechie";

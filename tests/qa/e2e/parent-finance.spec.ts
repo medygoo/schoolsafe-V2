@@ -56,7 +56,21 @@ test.describe("C5-FE — finance et reçus Parent", () => {
         ],
       });
     });
-    const view = await openFinance(page);
+    await expect(page.locator('[data-parent-shortcut="finance"]')).toHaveCount(0);
+    await page.evaluate(() => {
+      (window as any).SchoolSafeParentPortal.openFinance("demo-parent-child-lucas", {
+        role: "parent",
+        permissions: ["school.student.read", "finance.status.read"],
+        deniedPermissions: ["finance.status.read"],
+        childIds: ["demo-parent-child-lucas"],
+        scopes: [
+          { permission: "school.student.read", type: "own_children" },
+          { permission: "finance.status.read", type: "own_children" },
+        ],
+      });
+    });
+    const view = page.locator(".parent-finance");
+    await expect(view).toBeVisible();
     await expect(view.locator(".parent-finance-denied")).toContainText("Situation financière non autorisée");
     await expect(view.getByRole("heading", { name: "Reçus" })).toHaveCount(0);
   });

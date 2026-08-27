@@ -29,9 +29,10 @@ test.describe("C2-FE — dossier de l’enfant lié", () => {
       /Finance/,
       /Rattrapage/,
       /Documents/,
+      /Communications/,
       /Historique/,
     ]);
-    await expect(dossier.getByRole("button", { name: /Cantine|Communications/ })).toHaveCount(0);
+    await expect(dossier.getByRole("button", { name: /Cantine/ })).toHaveCount(0);
   });
 
   test("ouvre uniquement le dossier de l’enfant choisi", async ({ page }) => {

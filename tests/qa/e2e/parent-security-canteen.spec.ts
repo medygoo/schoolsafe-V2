@@ -47,12 +47,13 @@ test.describe("C6-FE — sécurité familiale et cantine", () => {
     await page.evaluate(() => {
       (window as any).SchoolSafeParentPortal.render("parentPortal", {
         role: "parent",
-        permissions: ["school.student.read", "school.guardian.read", "security.events.read"],
+        permissions: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read"],
         deniedPermissions: ["security.events.read"],
         childIds: ["demo-parent-child-lucas"],
         scopes: [
           { permission: "school.student.read", type: "own_children" },
           { permission: "school.guardian.read", type: "own_children" },
+          { permission: "security.pickup.read", type: "own_children" },
           { permission: "security.events.read", type: "own_children" },
         ],
       });

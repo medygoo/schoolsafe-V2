@@ -46,7 +46,21 @@ test.describe("C4-FE — suivi pédagogique Parent", () => {
         ],
       });
     });
-    const view = await openPedagogy(page);
+    await expect(page.locator('[data-parent-shortcut="pédagogie"]')).toHaveCount(0);
+    await page.evaluate(() => {
+      (window as any).SchoolSafeParentPortal.openPedagogy("demo-parent-child-lucas", {
+        role: "parent",
+        permissions: ["school.student.read", "pedagogy.grade.read"],
+        deniedPermissions: ["pedagogy.grade.read"],
+        childIds: ["demo-parent-child-lucas"],
+        scopes: [
+          { permission: "school.student.read", type: "own_children" },
+          { permission: "pedagogy.grade.read", type: "own_children" },
+        ],
+      });
+    });
+    const view = page.locator(".parent-pedagogy");
+    await expect(view).toBeVisible();
     await expect(view.locator(".parent-pedagogy-denied")).toContainText("Suivi pédagogique non autorisé");
     await expect(view.getByRole("heading", { name: "Évaluations" })).toHaveCount(0);
   });

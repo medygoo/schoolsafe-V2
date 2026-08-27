@@ -13,12 +13,11 @@ test.describe("C3-FE — communications, convocations et notifications", () => {
     await enterDemoWorkspace(page, "parent");
   });
 
-  test("affiche uniquement l’historique autorisé de l’enfant sélectionné", async ({ page }) => {
+  test("n’expose aucun historique sans permission de lecture définie", async ({ page }) => {
     const view = await openCommunications(page);
     await expect(view).toContainText("Lucas Martin");
-    await expect(view.getByRole("heading", { name: "Notifications" })).toBeVisible();
-    await expect(view.getByRole("heading", { name: "Convocations" })).toBeVisible();
-    await expect(view.getByRole("heading", { name: "Messages" })).toBeVisible();
+    await expect(view).toContainText("Historique non disponible · BACKEND_LATER");
+    await expect(view).not.toContainText("Réunion de rentrée");
     await expect(view).not.toContainText("Emma Martin");
     await expect(view).not.toContainText("Ethan Leroy");
   });
@@ -66,8 +65,22 @@ test.describe("C3-FE — communications, convocations et notifications", () => {
         ],
       });
     });
-    const view = await openCommunications(page);
-    await expect(view.locator(".parent-communication-denied")).toContainText("Préparation de message indisponible");
+    await expect(page.locator('[data-parent-shortcut="communications"]')).toHaveCount(0);
+    await page.evaluate(() => {
+      (window as any).SchoolSafeParentPortal.openCommunications("demo-parent-child-lucas", {
+        role: "parent",
+        permissions: ["school.student.read", "communication.message.send"],
+        deniedPermissions: ["communication.message.send"],
+        childIds: ["demo-parent-child-lucas"],
+        scopes: [
+          { permission: "school.student.read", type: "own_children" },
+          { permission: "communication.message.send", type: "own_children" },
+        ],
+      });
+    });
+    const view = page.locator(".parent-communications");
+    await expect(view).toBeVisible();
+    await expect(view.locator(".parent-communication-denied").filter({ hasText: "Préparation de message indisponible" })).toBeVisible();
     await expect(view.locator("#parentMessageDraft")).toHaveCount(0);
     await expect(view.getByRole("button", { name: "Préparer le message" })).toHaveCount(0);
   });

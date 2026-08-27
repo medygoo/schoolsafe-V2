@@ -177,6 +177,9 @@
       roles: bootstrap.roles,
       permissions: bootstrap.permissions || [],
       scopes: bootstrap.scopes || [],
+      deniedPermissions: bootstrap.deniedPermissions || bootstrap.denied_permissions || [],
+      permissionExceptions: bootstrap.permissionExceptions || bootstrap.permission_exceptions || [],
+      childIds: bootstrap.childIds || bootstrap.child_ids || bootstrap.linked_child_ids,
       school: bootstrap.school || null,
       offline_policy: bootstrap.offline_policy || { max_offline_hours: 24 }
     };
@@ -220,7 +223,7 @@
   var DEMO_PERMISSIONS_BY_ROLE = {
     admin: ["school.manage", "staff.read", "staff.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
-    parent: ["school.student.read", "school.guardian.read", "school.guardian.manage", "security.events.read", "pedagogy.grade.read", "finance.status.read"],
+    parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
     teacher: ["school.student.read", "school.class.read", "pedagogy.grade.read"],
     guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
   };
@@ -234,10 +237,17 @@
       scopes: [
         { permission: "school.student.read", type: "own_children" },
         { permission: "school.guardian.read", type: "own_children" },
-        { permission: "school.guardian.manage", type: "own_children" },
+        { permission: "security.pickup.read", type: "own_children" },
         { permission: "security.events.read", type: "own_children" },
+        { permission: "pedagogy.assignment.read", type: "own_children" },
         { permission: "pedagogy.grade.read", type: "own_children" },
-        { permission: "finance.status.read", type: "own_children" }
+        { permission: "pedagogy.report.read", type: "own_children" },
+        { permission: "palmarques.read", type: "own_children" },
+        { permission: "finance.status.read", type: "own_children" },
+        { permission: "finance.fee.read", type: "own_children" },
+        { permission: "finance.receipt.read", type: "own_children" },
+        { permission: "communication.message.send", type: "own_children" },
+        { permission: "safe.assistant.use", type: "own" }
       ]
     },
     teacher: {
@@ -252,7 +262,7 @@
   };
 
   function getCurrentUser() {
-    if (currentSession && currentSession.token) return currentSession;
+    if (currentSession && currentSession.token) return Object.assign({}, currentSession, { role: currentDemoRole });
     var role = currentDemoRole || "admin";
     var context = DEMO_ACCESS_CONTEXT_BY_ROLE[role] || {};
     return {
@@ -265,18 +275,35 @@
     };
   }
 
+  window.SchoolSafeAppContext = {
+    getAssistantContext: function () {
+      return { activeRole: currentDemoRole, user: getCurrentUser() };
+    },
+    showDashboard: function () {
+      showDashboard();
+    }
+  };
+
+  function setWorkspaceDashboardVisible(visible) {
+    var dashboardContainer = document.getElementById("dashboardContainer");
+    var parentPortal = document.getElementById("parentPortal");
+    var isParent = currentDemoRole === "parent";
+    if (dashboardContainer) dashboardContainer.hidden = !visible || isParent;
+    if (parentPortal) {
+      parentPortal.hidden = !visible || !isParent;
+      if (visible && isParent && window.SchoolSafeParentPortal) {
+        window.SchoolSafeParentPortal.render("parentPortal", getCurrentUser());
+      } else if (!isParent && window.SchoolSafeParentPortal && typeof window.SchoolSafeParentPortal.clear === "function") {
+        window.SchoolSafeParentPortal.clear();
+      }
+    }
+  }
+
   /**
    * Affiche le dashboard et masque les modules métier.
    */
   function showDashboard() {
-    var dashboardContainer = document.getElementById("dashboardContainer");
-    var parentPortal = document.getElementById("parentPortal");
-    var isParent = currentDemoRole === "parent";
-    if (dashboardContainer) dashboardContainer.hidden = isParent;
-    if (parentPortal) {
-      parentPortal.hidden = !isParent;
-      if (isParent && window.SchoolSafeParentPortal) window.SchoolSafeParentPortal.render("parentPortal", getCurrentUser());
-    }
+    setWorkspaceDashboardVisible(true);
     var modules = ["pedagogyModule", "financeModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
     modules.forEach(function (id) {
       var el = document.getElementById(id);
@@ -792,7 +819,7 @@
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("schoolModule").hidden = true;
     document.getElementById("palmaresModule").hidden = false;
-    document.querySelector(".workspace-grid").hidden = true;
+    setWorkspaceDashboardVisible(false);
     document.getElementById("cardsProtected").hidden = true;
     if (window.renderPalmaresModule) {
       window.renderPalmaresModule(document.getElementById("palmaresContent"), currentSession);
@@ -824,7 +851,7 @@
     document.getElementById("feeControlModule").hidden = true;
     document.getElementById("palmaresModule").hidden = true;
     document.getElementById("pedagogyModule").hidden = false;
-    document.querySelector(".workspace-grid").hidden = true;
+    setWorkspaceDashboardVisible(false);
     document.getElementById("cardsProtected").hidden = true;
     document.getElementById("pedagogyTabs").hidden = true;
     document.getElementById("pedagogyModuleTitle").textContent = "Pédagogie";
@@ -841,7 +868,7 @@
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("palmaresModule").hidden = true;
     document.getElementById("feeControlModule").hidden = true;
-    document.querySelector(".workspace-grid").hidden = false;
+    setWorkspaceDashboardVisible(true);
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
     setBreadcrumb(null);
@@ -849,7 +876,7 @@
 
   function closePalmaresModule() {
     document.getElementById("palmaresModule").hidden = true;
-    document.querySelector(".workspace-grid").hidden = false;
+    setWorkspaceDashboardVisible(true);
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
     setBreadcrumb(null);
@@ -925,7 +952,7 @@
     }).join("");
     var childOptions = pedagogyState.parentChildren.map(function (item, index) { return '<option value="' + index + '"' + (index === pedagogyState.selectedParentChild ? " selected" : "") + '>' + escapeMarkup(item.name + " · " + item.className) + '</option>'; }).join("");
     var officialCopy = child.paid ? "Visible après validation pédagogique et confirmation administrative. Les paiements ne transitent pas dans SchoolSafe." : "Le suivi quotidien reste disponible. Le résultat officiel attend une autorisation de la Direction.";
-    return '<div class="parent-learning"><div class="parent-child-picker"><label>Enfant suivi<select id="parentChildSelect">' + childOptions + '</select></label></div><header><div><span>Suivi pédagogique</span><h3>' + escapeMarkup(child.name) + '</h3><p>Les devoirs et cotations publiés par ses enseignants.</p></div><span class="payment-state ' + (child.paid ? "" : "pending") + '"><i data-lucide="' + (child.paid ? "badge-check" : "clock-3") + '"></i> ' + (child.paid ? "En règle" : "À régulariser") + '</span></header><div class="parent-summary"><article><small>Devoirs publiés</small><b>' + pedagogyState.assignments.filter(function (item) { return item.published; }).length + '</b></article><article><small>Moyenne officielle</small><b>' + escapeMarkup(child.average) + '</b></article><article><small>Classement validé</small><b>' + escapeMarkup(child.rank) + '</b></article></div><section class="parent-work-list"><header><h3>Travaux et cotations</h3><span>Mise à jour dans l’application</span></header>' + cards + '</section><aside class="official-result ' + (child.paid ? "" : "restricted") + '"><i data-lucide="file-lock-2"></i><div><b>Résultat officiel de fin de période</b><p>' + officialCopy + '</p></div>' + ssButton({ variant: "secondary", label: child.paid ? "Consulter" : "Accès suspendu", disabled: !child.paid, attrs: { "data-parent-bulletin": true } }) + '</aside></div>';
+    return '<div class="parent-learning"><div class="parent-child-picker"><label>Enfant suivi<select id="parentPedagogyChildSelect">' + childOptions + '</select></label></div><header><div><span>Suivi pédagogique</span><h3>' + escapeMarkup(child.name) + '</h3><p>Les devoirs et cotations publiés par ses enseignants.</p></div><span class="payment-state ' + (child.paid ? "" : "pending") + '"><i data-lucide="' + (child.paid ? "badge-check" : "clock-3") + '"></i> ' + (child.paid ? "En règle" : "À régulariser") + '</span></header><div class="parent-summary"><article><small>Devoirs publiés</small><b>' + pedagogyState.assignments.filter(function (item) { return item.published; }).length + '</b></article><article><small>Moyenne officielle</small><b>' + escapeMarkup(child.average) + '</b></article><article><small>Classement validé</small><b>' + escapeMarkup(child.rank) + '</b></article></div><section class="parent-work-list"><header><h3>Travaux et cotations</h3><span>Mise à jour dans l’application</span></header>' + cards + '</section><aside class="official-result ' + (child.paid ? "" : "restricted") + '"><i data-lucide="file-lock-2"></i><div><b>Résultat officiel de fin de période</b><p>' + officialCopy + '</p></div>' + ssButton({ variant: "secondary", label: child.paid ? "Consulter" : "Accès suspendu", disabled: !child.paid, attrs: { "data-parent-bulletin": true } }) + '</aside></div>';
   }
 
   function money(value) {
@@ -1146,7 +1173,7 @@
     document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.getElementById("financeModule").hidden = false;
-    document.querySelector(".workspace-grid").hidden = true;
+    setWorkspaceDashboardVisible(false);
     document.getElementById("cardsProtected").hidden = true;
     if (window.SchoolSafeFinanceModule && typeof window.SchoolSafeFinanceModule.render === "function") {
       window.SchoolSafeFinanceModule.render("financeModule", { action: actionName });
@@ -1160,11 +1187,11 @@
     } else {
       document.getElementById("financeModule").hidden = true;
       document.getElementById("feeControlModule").hidden = true;
-      document.querySelector(".workspace-grid").hidden = false;
-      document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
-      document.getElementById("workspaceTitle").textContent = "Tableau de bord";
-      setBreadcrumb(null);
+      setWorkspaceDashboardVisible(true);
     }
+    document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
+    document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    setBreadcrumb(null);
   }
 
   function securityTabForAction(actionName) {
@@ -1187,7 +1214,7 @@
     document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.getElementById("securityModule").hidden = false;
-    document.querySelector(".workspace-grid").hidden = true;
+    setWorkspaceDashboardVisible(false);
     document.getElementById("cardsProtected").hidden = true;
     if (window.SchoolSafeSecurityModule) window.SchoolSafeSecurityModule.render("securityContent", { mode: requestedMode, user: getCurrentUser() });
     document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
@@ -1196,7 +1223,7 @@
   function closeSecurityModule() {
     document.getElementById("securityModule").hidden = true;
     document.getElementById("feeControlModule").hidden = true;
-    document.querySelector(".workspace-grid").hidden = false;
+    setWorkspaceDashboardVisible(true);
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
     setBreadcrumb(null);
@@ -1210,7 +1237,7 @@
     document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.getElementById("pilotageModule").hidden = false;
-    document.querySelector(".workspace-grid").hidden = true;
+    setWorkspaceDashboardVisible(false);
     document.getElementById("cardsProtected").hidden = true;
     document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (button) {
       button.classList.toggle("active", button.getAttribute("data-pilotage-tab") === requestedTab);
@@ -1222,7 +1249,7 @@
   function closePilotageModule() {
     document.getElementById("pilotageModule").hidden = true;
     document.getElementById("feeControlModule").hidden = true;
-    document.querySelector(".workspace-grid").hidden = false;
+    setWorkspaceDashboardVisible(true);
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
     setBreadcrumb(null);
@@ -1246,7 +1273,7 @@
     document.getElementById("pilotageModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.getElementById("feeControlModule").hidden = false;
-    document.querySelector(".workspace-grid").hidden = true;
+    setWorkspaceDashboardVisible(false);
     document.getElementById("cardsProtected").hidden = true;
     if (window.SchoolSafeFeeControlModule) window.SchoolSafeFeeControlModule.render("feeControlContent");
     document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
@@ -1254,7 +1281,7 @@
 
   function closeFeeControlModule() {
     document.getElementById("feeControlModule").hidden = true;
-    document.querySelector(".workspace-grid").hidden = false;
+    setWorkspaceDashboardVisible(true);
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
     setBreadcrumb(null);
@@ -1276,7 +1303,7 @@
     document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
     document.getElementById("schoolModule").hidden = false;
-    document.querySelector(".workspace-grid").hidden = true;
+    setWorkspaceDashboardVisible(false);
     document.getElementById("cardsProtected").hidden = true;
     if (window.SchoolSafeSchoolModule) {
       window.SchoolSafeSchoolModule.render(tabName, getCurrentUser());
@@ -1286,7 +1313,7 @@
 
   function closeSchoolModule() {
     document.getElementById("schoolModule").hidden = true;
-    document.querySelector(".workspace-grid").hidden = false;
+    setWorkspaceDashboardVisible(true);
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     document.getElementById("workspaceTitle").textContent = "Tableau de bord";
     setBreadcrumb(null);
@@ -1638,7 +1665,7 @@
     if (prepareBulletin) prepareBulletin.addEventListener("click", function () { notify("Le PDF officiel attend la validation de la période et le logo de l’école."); });
     var validatePeriod = document.getElementById("validatePeriod");
     if (validatePeriod) validatePeriod.addEventListener("click", function () { var next = pedagogyState.periodStatuses.indexOf(false); if (next !== -1) pedagogyState.periodStatuses[next] = true; queueOfflineOperation("pedagogy", "Validation d’une période pédagogique", { kind: "period-validation", periodIndex: next }); notify("Période validée dans la démonstration locale."); renderPedagogyModule(); });
-    var parentChildSelect = document.getElementById("parentChildSelect");
+    var parentChildSelect = document.getElementById("parentPedagogyChildSelect");
     if (parentChildSelect) parentChildSelect.addEventListener("change", function () { pedagogyState.selectedParentChild = Number(this.value); renderPedagogyModule(); });
     var parentBulletin = document.querySelector("[data-parent-bulletin]");
     if (parentBulletin) parentBulletin.addEventListener("click", function () { pedagogyState.activeTab = "bulletin"; renderPedagogyModule(); });
@@ -1879,13 +1906,7 @@
     document.getElementById("schoolModule").hidden = true;
 
     var dashboardContainer = document.getElementById("dashboardContainer");
-    var parentPortal = document.getElementById("parentPortal");
-    var isParentWorkspace = currentDemoRole === "parent";
-    if (dashboardContainer) dashboardContainer.hidden = isParentWorkspace;
-    if (parentPortal) {
-      parentPortal.hidden = !isParentWorkspace;
-      if (isParentWorkspace && window.SchoolSafeParentPortal) window.SchoolSafeParentPortal.render("parentPortal", accessUser);
-    }
+    setWorkspaceDashboardVisible(true);
 
     var liveName = sessionDisplayName();
     var roleLabel = sessionRoleLabel(currentDemoRole);
@@ -2376,7 +2397,7 @@
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("financeModule").hidden = true;
     document.getElementById("accessConsole").hidden = false;
-    document.querySelector(".workspace-grid").hidden = true;
+    setWorkspaceDashboardVisible(false);
     document.getElementById("cardsProtected").hidden = true;
     closeWorkspaceMenu();
     renderPermissionEditor();
@@ -2385,7 +2406,7 @@
 
   function closeAccessConsole() {
     document.getElementById("accessConsole").hidden = true;
-    document.querySelector(".workspace-grid").hidden = false;
+    setWorkspaceDashboardVisible(true);
     document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
     setBreadcrumb(null);
   }

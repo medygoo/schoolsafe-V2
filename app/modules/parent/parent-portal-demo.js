@@ -2,6 +2,9 @@
   "use strict";
 
   var REQUIRED_PERMISSION = "school.student.read";
+  var PEDAGOGY_PERMISSIONS = ["pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read"];
+  var FINANCE_PERMISSIONS = ["finance.status.read", "finance.fee.read", "finance.receipt.read"];
+  var SECURITY_PERMISSIONS = ["school.guardian.read", "security.pickup.read", "security.events.read"];
 
   var CHILDREN = [
     {
@@ -226,31 +229,33 @@
       Array.isArray(user && user.childIds) && user.childIds.indexOf(child.id) >= 0);
   }
 
-  function communicationColumn(title, items, iconName) {
-    var rows = items.length ? items.map(function (item) {
-      return '<article><span>' + icon(iconName) + '</span><div><strong>' + escapeMarkup(item.title) + '</strong>' +
-        '<p>' + escapeMarkup(item.detail) + '</p><small>' + escapeMarkup(item.date) + ' · DÉMONSTRATION</small></div></article>';
-    }).join("") : '<p class="parent-communication-empty">Aucun élément disponible dans cet aperçu.</p>';
-    return '<section class="parent-communication-column"><h2>' + escapeMarkup(title) + '</h2><div>' + rows + '</div></section>';
+  function someScopeAllowsChild(user, permissions, child) {
+    return permissions.some(function (permission) { return scopeAllowsChild(user, permission, child); });
+  }
+
+  function canUseJaspe(user) {
+    var scope = scopeFor(user, "safe.assistant.use");
+    return hasPermission(user, "safe.assistant.use") && !!scope && scope.type === "own";
+  }
+
+  function unavailablePanel(title, detail, className) {
+    return '<section class="pedagogy-panel parent-readonly-panel ' + (className || "") + '"><h2>' + escapeMarkup(title) +
+      '</h2><p class="parent-feature-empty"><strong>' + escapeMarkup(detail) + '</strong></p></section>';
   }
 
   function communicationsMarkup(child, user) {
     var draft = child.lifecycle_status !== "active";
-    var data = child.communications || { notifications: [], convocations: [], messages: [] };
     var canPrepare = scopeAllowsChild(user, "communication.message.send", child);
     var history = draft ? '<div class="parent-communication-draft"><strong>EN PRÉPARATION</strong><p>Aucun historique officiel : le dossier n’est pas encore opérationnel.</p></div>' :
-      '<div class="parent-communication-history">' +
-        communicationColumn("Notifications", data.notifications || [], "bell") +
-        communicationColumn("Convocations", data.convocations || [], "mail-warning") +
-        communicationColumn("Messages", data.messages || [], "messages-square") +
-      '</div>';
+      '<aside class="parent-communication-denied"><span>' + icon("cloud-off") + '</span><div><strong>Historique non disponible · BACKEND_LATER</strong>' +
+      '<p>Aucune permission de lecture des notifications, convocations ou messages n’est définie dans le catalogue actuel. Aucun historique n’est exposé.</p></div></aside>';
     var composer = canPrepare ? '<section class="parent-message-composer"><header><div><p class="parent-eyebrow">Préparation locale uniquement</p><h2>Nouveau message</h2></div><span>BACKEND_LATER</span></header>' +
       '<div class="parent-message-recipient" data-parent-message-recipient><span>Destinataire autorisé</span><strong>Direction de l’établissement</strong><small>Aucun enseignant n’est ajouté implicitement.</small></div>' +
       '<label for="parentMessageDraft">Votre message</label><textarea id="parentMessageDraft" rows="5" placeholder="Rédigez un brouillon pour la Direction"></textarea>' +
       '<button class="ss-button" type="button" data-prepare-parent-message>Préparer le message</button><p class="parent-message-draft-state" role="status">Aucun envoi effectué.</p></section>' :
       '<aside class="parent-communication-denied"><span>' + icon("shield-x") + '</span><div><strong>Préparation de message indisponible</strong><p>La permission et la portée requises ne sont pas accordées, ou un DENY explicite s’applique.</p></div></aside>';
     return '<div class="parent-communications"><header class="parent-feature-header"><div><p class="parent-eyebrow">Communication familiale · own_children</p><h1>' +
-      escapeMarkup(childName(child)) + '</h1><p>Historique frontend autorisé · données de démonstration non synchronisées.</p></div><span>DÉMO · BACKEND_LATER</span></header>' +
+      escapeMarkup(childName(child)) + '</h1><p>Lecture limitée aux permissions définies · préparation locale sans envoi.</p></div><span>DÉMO · BACKEND_LATER</span></header>' +
       history + composer + '</div>';
   }
 
@@ -287,10 +292,13 @@
   }
 
   function pedagogyMarkup(child, user) {
-    var allowed = scopeAllowsChild(user, "pedagogy.grade.read", child);
+    var assignmentsAllowed = scopeAllowsChild(user, "pedagogy.assignment.read", child);
+    var gradesAllowed = scopeAllowsChild(user, "pedagogy.grade.read", child);
+    var reportsAllowed = scopeAllowsChild(user, "pedagogy.report.read", child);
+    var rankingAllowed = scopeAllowsChild(user, "palmarques.read", child);
     var header = '<header class="parent-feature-header"><div><p class="parent-eyebrow">Suivi pédagogique · own_children</p><h1>' +
       escapeMarkup(childName(child)) + '</h1><p>Consultation seule · composants Pédagogie partagés · aucune écriture.</p></div><span>DÉMO · BACKEND_LATER</span></header>';
-    if (!allowed) {
+    if (!assignmentsAllowed && !gradesAllowed && !reportsAllowed && !rankingAllowed) {
       return '<div class="parent-pedagogy">' + header + '<aside class="parent-pedagogy-denied">' + icon("shield-x") +
         '<div><strong>Suivi pédagogique non autorisé</strong><p>La permission, la portée own_children ou une exception individuelle bloque cette consultation.</p></div></aside></div>';
     }
@@ -299,23 +307,23 @@
         '<p>Aucune donnée pédagogique officielle n’est disponible pour ce dossier non opérationnel.</p></aside></div>';
     }
     var data = child.pedagogy;
-    var assignments = pedagogyList(data.assignments, function (item) {
+    var assignments = assignmentsAllowed ? pedagogyList(data.assignments, function (item) {
       return '<article><div><strong>' + escapeMarkup(item.title) + '</strong><p>' + escapeMarkup(item.subject) + '</p></div><span>' + escapeMarkup(item.state) + '<small>Échéance ' + escapeMarkup(item.due) + '</small></span></article>';
-    }, "Aucun devoir visible.");
-    var evaluations = pedagogyList(data.evaluations, function (item) {
+    }, "Aucun devoir visible.") : '<p class="parent-feature-empty"><strong>Devoirs non autorisés</strong></p>';
+    var evaluations = gradesAllowed ? pedagogyList(data.evaluations, function (item) {
       return '<article><div><strong>' + escapeMarkup(item.title) + '</strong><p>' + escapeMarkup(item.subject) + ' · ' + escapeMarkup(item.comment) + '</p></div><span class="parent-grade">' + escapeMarkup(item.grade) + '</span></article>';
-    }, "Aucune évaluation visible.");
-    var averages = pedagogyList(data.averages, function (item) {
+    }, "Aucune évaluation visible.") : '<p class="parent-feature-empty"><strong>Notes non autorisées</strong></p>';
+    var averages = gradesAllowed ? pedagogyList(data.averages, function (item) {
       return '<article><div><strong>' + escapeMarkup(item.subject) + '</strong><p>Moyenne de démonstration</p></div><span class="parent-grade">' + escapeMarkup(item.value) + '</span></article>';
-    }, "Aucune moyenne calculable.");
+    }, "Aucune moyenne calculable.") : '<p class="parent-feature-empty"><strong>Moyennes non autorisées</strong></p>';
     return '<div class="parent-pedagogy">' + header + '<div class="parent-pedagogy-grid">' +
       '<section class="pedagogy-panel parent-readonly-panel"><h2>Devoirs</h2>' + assignments + '</section>' +
       '<section class="pedagogy-panel parent-readonly-panel"><h2>Évaluations</h2>' + evaluations + '</section>' +
-      '<section class="pedagogy-panel parent-readonly-panel"><h2>Moyennes</h2><p class="parent-overall">Moyenne générale <strong>' + escapeMarkup(data.overall) + '</strong></p>' + averages + '</section>' +
-      '<section class="pedagogy-panel parent-readonly-panel"><h2>Bulletin</h2><p>' + escapeMarkup(data.bulletin) + '</p><span class="parent-feature-source">FEATURE_LATER / BACKEND_LATER</span></section>' +
-      '<section class="pedagogy-panel parent-readonly-panel"><h2>Palmarès</h2><p>' + escapeMarkup(data.ranking) + '</p><span class="parent-feature-source">Visible uniquement si autorisé</span></section>' +
-      '<section class="pedagogy-panel parent-readonly-panel"><h2>Difficultés et suivi</h2><p>' + escapeMarkup(data.difficulty) + '</p><span class="parent-feature-source">Aperçu de démonstration</span></section>' +
-      '<section class="pedagogy-panel parent-readonly-panel"><h2>Rattrapage</h2><p>' + escapeMarkup(data.remediation) + '</p><span class="parent-feature-source">Information uniquement</span></section>' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Moyennes</h2>' + (gradesAllowed ? '<p class="parent-overall">Moyenne générale <strong>' + escapeMarkup(data.overall) + '</strong></p>' : '') + averages + '</section>' +
+      (reportsAllowed ? '<section class="pedagogy-panel parent-readonly-panel"><h2>Bulletin</h2><p>' + escapeMarkup(data.bulletin) + '</p><span class="parent-feature-source">FEATURE_LATER / BACKEND_LATER</span></section>' : unavailablePanel("Bulletin", "Rapport pédagogique non autorisé")) +
+      (rankingAllowed ? '<section class="pedagogy-panel parent-readonly-panel"><h2>Palmarès</h2><p>' + escapeMarkup(data.ranking) + '</p><span class="parent-feature-source">Visible uniquement si autorisé</span></section>' : unavailablePanel("Palmarès", "Palmarès non autorisé")) +
+      (reportsAllowed ? '<section class="pedagogy-panel parent-readonly-panel"><h2>Difficultés et suivi</h2><p>' + escapeMarkup(data.difficulty) + '</p><span class="parent-feature-source">Aperçu de démonstration</span></section>' : unavailablePanel("Difficultés et suivi", "Rapport pédagogique non autorisé")) +
+      (reportsAllowed ? '<section class="pedagogy-panel parent-readonly-panel"><h2>Rattrapage</h2><p>' + escapeMarkup(data.remediation) + '</p><span class="parent-feature-source">Information uniquement</span></section>' : unavailablePanel("Rattrapage", "Rapport pédagogique non autorisé")) +
       '</div><aside class="parent-readonly-boundary">' + icon("eye") + '<p>Consultation seule : aucune cote, moyenne, difficulté ou décision pédagogique ne peut être modifiée ici.</p></aside></div>';
   }
 
@@ -346,10 +354,12 @@
   }
 
   function financeMarkup(child, user) {
-    var allowed = scopeAllowsChild(user, "finance.status.read", child);
+    var statusAllowed = scopeAllowsChild(user, "finance.status.read", child);
+    var feesAllowed = scopeAllowsChild(user, "finance.fee.read", child);
+    var receiptsAllowed = scopeAllowsChild(user, "finance.receipt.read", child);
     var header = '<header class="parent-feature-header"><div><p class="parent-eyebrow">Finance familiale · own_children</p><h1>' +
       escapeMarkup(childName(child)) + '</h1><p>Consultation des opérations enregistrées par l’école · aucun paiement en ligne.</p></div><span>DÉMO · BACKEND_LATER</span></header>';
-    if (!allowed) {
+    if (!statusAllowed && !feesAllowed && !receiptsAllowed) {
       return '<div class="parent-finance">' + header + '<aside class="parent-finance-denied">' + icon("shield-x") +
         '<div><strong>Situation financière non autorisée</strong><p>La permission, la portée own_children ou un DENY explicite bloque cette consultation.</p></div></aside></div>';
     }
@@ -358,25 +368,20 @@
         '<p>Aucune opération financière officielle n’est disponible pour ce dossier non opérationnel.</p></aside></div>';
     }
     var data = child.finance;
-    var fees = data.fees.map(function (item) {
+    var fees = feesAllowed ? data.fees.map(function (item) {
       return '<article class="parent-fee-row"><div><strong>' + escapeMarkup(item.label) + '</strong><small>Montant de démonstration</small></div>' +
         '<span>' + escapeMarkup(item.amount) + '</span><b class="parent-finance-state parent-finance-state--' + financeStateClass(item.state) + '">' + escapeMarkup(item.state) + '</b></article>';
-    }).join("");
-    var payments = data.payments.map(function (item) {
-      return '<li><span>' + icon("circle-check") + '</span><div><strong>' + escapeMarkup(item.label) + '</strong><small>' + escapeMarkup(item.date) + '</small></div><b>' + escapeMarkup(item.amount) + '</b></li>';
-    }).join("");
-    var receipts = data.receipts.map(function (item) {
+    }).join("") : '<p class="parent-feature-empty"><strong>Frais non autorisés</strong></p>';
+    var receipts = receiptsAllowed ? data.receipts.map(function (item) {
       return '<li><span>' + icon("receipt-text") + '</span><div><strong>' + escapeMarkup(item.id) + '</strong><small>' + escapeMarkup(item.label) + '</small></div><b>' + escapeMarkup(item.amount) + '</b></li>';
-    }).join("");
-    var history = data.history.map(function (item) {
-      return '<li><span>' + icon("history") + '</span><p>' + escapeMarkup(item) + '</p></li>';
-    }).join("");
+    }).join("") : '<li class="parent-feature-empty"><strong>Reçus non autorisés</strong></li>';
     return '<div class="parent-finance">' + header +
+      (statusAllowed ? '<section class="parent-finance-panel"><h2>Statut financier</h2><p>' + escapeMarkup(child.summary.finance) + '</p></section>' : unavailablePanel("Statut financier", "Statut financier non autorisé")) +
       '<section class="parent-finance-panel"><h2>Situation des frais</h2><div class="parent-fee-list">' + fees + '</div></section>' +
       '<div class="parent-finance-columns">' +
-        '<section class="parent-finance-panel"><h2>Paiements enregistrés</h2><ul>' + payments + '</ul></section>' +
+        '<section class="parent-finance-panel"><h2>Paiements enregistrés</h2><p class="parent-feature-empty"><strong>Paiements non disponibles · BACKEND_LATER</strong></p></section>' +
         '<section class="parent-finance-panel"><h2>Reçus</h2><ul>' + receipts + '</ul></section>' +
-        '<section class="parent-finance-panel"><h2>Historique</h2><ul class="parent-finance-history">' + history + '</ul></section>' +
+        '<section class="parent-finance-panel"><h2>Historique</h2><p class="parent-feature-empty"><strong>Historique non disponible · BACKEND_LATER</strong></p></section>' +
       '</div><aside class="parent-finance-boundary">' + icon("landmark") + '<div><strong>Consultation uniquement</strong><p>Aucun paiement en ligne, aucune création, modification ou annulation de caisse. Les données officielles viendront du backend.</p></div></aside></div>';
   }
 
@@ -404,7 +409,8 @@
   }
 
   function securityMarkup(child, user) {
-    var peopleAllowed = scopeAllowsChild(user, "school.guardian.read", child);
+    var guardianAllowed = scopeAllowsChild(user, "school.guardian.read", child);
+    var pickupAllowed = scopeAllowsChild(user, "security.pickup.read", child);
     var eventsAllowed = scopeAllowsChild(user, "security.events.read", child);
     var header = '<header class="parent-feature-header"><div><p class="parent-eyebrow">Sécurité familiale · cadre B4 réutilisé</p><h1>' +
       escapeMarkup(childName(child)) + '</h1><p>Consultation Parent limitée à own_children · aucun contrôle de sortie.</p></div><span>DÉMO · BACKEND_LATER</span></header>';
@@ -413,18 +419,20 @@
         '<p>Aucun événement de sécurité officiel n’est disponible pour ce dossier non opérationnel.</p></aside></div>';
     }
     var data = child.security;
-    var people = peopleAllowed ? '<div class="parent-security-people"><section class="parent-security-panel"><h2>Personnes autorisées</h2><div class="parent-security-person-list">' + data.people.map(function (person) {
+    var people = pickupAllowed ? '<section class="parent-security-panel"><h2>Personnes autorisées</h2><div class="parent-security-person-list">' + data.people.map(function (person) {
       return '<article><span class="parent-person-avatar">' + escapeMarkup(person.name.split(/\s+/).slice(0, 2).map(function (part) { return part.charAt(0); }).join("")) + '</span>' +
         '<div><strong>' + escapeMarkup(person.name) + '</strong><small>' + escapeMarkup(person.relation) + '</small></div><b class="parent-person-state parent-person-state--' + (person.status === "AUTORISÉ" ? "active" : "suspended") + '">' + escapeMarkup(person.status) + '</b></article>';
-    }).join("") + '</div></section><section class="parent-security-panel"><h2>Contact d’urgence</h2><article class="parent-emergency-contact">' + icon("phone-call") +
-      '<div><strong>' + escapeMarkup(data.emergency.name) + '</strong><small>' + escapeMarkup(data.emergency.relation) + ' · ' + escapeMarkup(data.emergency.phone) + '</small></div></article></section></div>' :
-      '<aside class="parent-security-people-denied">' + icon("shield-x") + '<div><strong>Personnes autorisées non visibles</strong><p>La permission school.guardian.read ou sa portée est refusée.</p></div></aside>';
+    }).join("") + '</div></section>' :
+      '<aside class="parent-security-people-denied">' + icon("shield-x") + '<div><strong>Récupérations non autorisées</strong><p>La permission security.pickup.read ou sa portée est refusée.</p></div></aside>';
+    var emergency = guardianAllowed ? '<section class="parent-security-panel"><h2>Contact d’urgence</h2><article class="parent-emergency-contact">' + icon("phone-call") +
+      '<div><strong>' + escapeMarkup(data.emergency.name) + '</strong><small>' + escapeMarkup(data.emergency.relation) + ' · ' + escapeMarkup(data.emergency.phone) + '</small></div></article></section>' :
+      '<aside class="parent-security-people-denied">' + icon("shield-x") + '<div><strong>Contact d’urgence non visible</strong><p>La permission school.guardian.read ou sa portée est refusée.</p></div></aside>';
     var events = eventsAllowed ? '<div class="parent-security-events">' +
       securityList("Entrées et sorties", data.entryExit, "log-in") +
-      securityList("Historique des récupérations", data.pickups, "contact-round") +
       securityList("Alertes de sécurité", data.alerts, "shield-alert") + '</div>' :
       '<aside class="parent-security-events-denied">' + icon("shield-x") + '<div><strong>Événements de sécurité non autorisés</strong><p>La permission security.events.read est absente ou explicitement refusée.</p></div></aside>';
-    return '<div class="parent-security-family">' + header + people + events + '<aside class="parent-security-boundary">' + icon("eye") +
+    var pickups = pickupAllowed ? securityList("Historique des récupérations", data.pickups, "contact-round") : '';
+    return '<div class="parent-security-family">' + header + '<div class="parent-security-people">' + people + emergency + '</div>' + events + pickups + '<aside class="parent-security-boundary">' + icon("eye") +
       '<div><strong>Consultation uniquement</strong><p>Le Parent ne peut ni scanner, autoriser une sortie, valider une remise, suspendre une personne ou agir comme Gardien.</p></div></aside></div>';
   }
 
@@ -460,6 +468,108 @@
     return true;
   }
 
+  function normalized(value) {
+    return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  function jaspeRefusal(reason) {
+    return { message: "REFUS — " + reason + " Jaspe ne peut pas dépasser les permissions et la portée du Parent.", refusal: true };
+  }
+
+  function answerJaspe(query, context) {
+    var user = context && context.user ? context.user : activeUser;
+    var activeRole = context && context.activeRole ? context.activeRole : (user && user.role);
+    if (!user || activeRole !== "parent") return null;
+    if (!canUseJaspe(user)) return jaspeRefusal("l’utilisation de Jaspe n’est pas autorisée pour cette session.");
+    var child = getSelectedChild(user);
+    if (!child) return jaspeRefusal("aucun enfant lié n’est accessible.");
+    var text = normalized(query);
+    if (!text) return { message: "Posez une question sur les informations visibles de l’enfant sélectionné." };
+
+    var asksOtherChild = /autre enfant|tous les enfants|n'importe quel enfant|hors perimetre/.test(text) || CHILDREN.some(function (item) {
+      if (item.id === child.id) return false;
+      var full = normalized(childName(item));
+      return (full && text.indexOf(full) >= 0) || text.indexOf(normalized(item.first_name)) >= 0;
+    });
+    if (asksOtherChild) return jaspeRefusal("la demande concerne un autre enfant que celui sélectionné.");
+
+    var mutation = /(modifi|change|ajout|supprim|publ|valid|autor|annul|enregistr|ignore|contourn|retir)/.test(text);
+    var protectedArea = /(cote|note|moyenne|paiement|recu|sortie|remise|permission|deny|droit|classe|dossier)/.test(text);
+    if (mutation && protectedArea) return jaspeRefusal("cette action modifierait une donnée scolaire, financière, de sécurité ou d’autorisation.");
+
+    if (/prepare|redige|brouillon/.test(text) && /message|direction/.test(text)) {
+      if (!scopeAllowsChild(user, "communication.message.send", child)) {
+        return jaspeRefusal("la préparation de message n’est pas autorisée.");
+      }
+      return { message: "Je peux ouvrir un brouillon local vers la Direction pour " + childName(child) + ". Aucun envoi ne sera effectué · BACKEND_LATER.", action: "communications" };
+    }
+
+    if (/devoir/.test(text)) {
+      if (!scopeAllowsChild(user, "pedagogy.assignment.read", child)) return jaspeRefusal("les devoirs ne sont pas visibles.");
+      if (!child.pedagogy) return { message: childName(child) + " est EN PRÉPARATION : aucune donnée pédagogique officielle n’est disponible." };
+      return { message: childName(child) + " · " + child.pedagogy.assignments.length + " devoir(s) visible(s) · consultation seule." };
+    }
+    if (/evaluation|cote|note|moyenne/.test(text)) {
+      if (!scopeAllowsChild(user, "pedagogy.grade.read", child)) return jaspeRefusal("les notes ne sont pas visibles.");
+      if (!child.pedagogy) return { message: childName(child) + " est EN PRÉPARATION : aucune donnée pédagogique officielle n’est disponible." };
+      return { message: childName(child) + " · moyenne générale " + child.pedagogy.overall + " · consultation seule." };
+    }
+    if (/bulletin|rattrapage|difficulte/.test(text)) {
+      if (!scopeAllowsChild(user, "pedagogy.report.read", child)) return jaspeRefusal("le rapport pédagogique n’est pas visible.");
+      if (!child.pedagogy) return { message: childName(child) + " est EN PRÉPARATION : aucune donnée pédagogique officielle n’est disponible." };
+      return { message: childName(child) + " · " + child.pedagogy.bulletin + " · consultation seule." };
+    }
+    if (/palmares|classement/.test(text)) {
+      if (!scopeAllowsChild(user, "palmarques.read", child)) return jaspeRefusal("le palmarès n’est pas visible.");
+      if (!child.pedagogy) return { message: childName(child) + " est EN PRÉPARATION : aucune donnée pédagogique officielle n’est disponible." };
+      return { message: childName(child) + " · " + child.pedagogy.ranking + " · consultation seule." };
+    }
+
+    if (/recu/.test(text)) {
+      if (!scopeAllowsChild(user, "finance.receipt.read", child)) return jaspeRefusal("les reçus ne sont pas visibles.");
+      if (!child.finance) return { message: childName(child) + " est EN PRÉPARATION : aucune opération financière officielle n’est disponible." };
+      return { message: childName(child) + " · " + child.finance.receipts.length + " reçu(s) visible(s) · aucun paiement en ligne." };
+    }
+    if (/frais/.test(text)) {
+      if (!scopeAllowsChild(user, "finance.fee.read", child)) return jaspeRefusal("les frais ne sont pas visibles.");
+      if (!child.finance) return { message: childName(child) + " est EN PRÉPARATION : aucune opération financière officielle n’est disponible." };
+      return { message: childName(child) + " · " + child.finance.fees.length + " frais visible(s) · aucun paiement en ligne." };
+    }
+    if (/finance|paiement|solde/.test(text)) {
+      if (!scopeAllowsChild(user, "finance.status.read", child)) return jaspeRefusal("le statut financier n’est pas visible.");
+      if (!child.finance) return { message: childName(child) + " est EN PRÉPARATION : aucune opération financière officielle n’est disponible." };
+      return { message: childName(child) + " · statut " + child.summary.finance + " · aucun paiement en ligne." };
+    }
+
+    if (/recuperation|personne autorisee/.test(text)) {
+      if (!scopeAllowsChild(user, "security.pickup.read", child)) return jaspeRefusal("les autorisations de récupération ne sont pas visibles.");
+      if (!child.security) return { message: childName(child) + " est EN PRÉPARATION : aucun événement de sécurité officiel n’est disponible." };
+      return { message: childName(child) + " · " + child.security.people.length + " personne(s) de récupération visible(s) · consultation seule." };
+    }
+    if (/securite|entree|sortie|alerte/.test(text)) {
+      if (!scopeAllowsChild(user, "security.events.read", child)) return jaspeRefusal("les événements de sécurité ne sont pas visibles.");
+      if (!child.security) return { message: childName(child) + " est EN PRÉPARATION : aucun événement de sécurité officiel n’est disponible." };
+      return { message: childName(child) + " · " + child.security.entryExit.join(" · ") + " · consultation seule, aucune autorisation de sortie." };
+    }
+
+    var summary = childName(child) + " · " + child.class_name + " · " + child.academic_year + " · " + (child.lifecycle_status === "active" ? "dossier actif" : "EN PRÉPARATION");
+    if (child.lifecycle_status === "active" && scopeAllowsChild(user, "pedagogy.grade.read", child) && child.pedagogy) summary += " · moyenne " + child.pedagogy.overall;
+    if (child.lifecycle_status === "active" && scopeAllowsChild(user, "finance.status.read", child) && child.summary) summary += " · statut financier " + child.summary.finance;
+    if (child.lifecycle_status === "active" && scopeAllowsChild(user, "finance.receipt.read", child) && child.finance) summary += " · " + child.finance.receipts.length + " reçu(s) visible(s)";
+    return { message: summary + ". Je résume uniquement les informations autorisées de l’enfant sélectionné." };
+  }
+
+  function jaspeMarkup(child) {
+    return '<section class="parent-jaspe-card" aria-labelledby="parentJaspeTitle"><div class="parent-jaspe-avatar"><img src="./safe2d/safe_sourire.png" alt="Jaspe"></div>' +
+      '<div class="parent-jaspe-content"><p class="parent-eyebrow">Jaspe Parent · périmètre contrôlé</p><h2 id="parentJaspeTitle">Comment puis-je vous aider pour ' + escapeMarkup(child.first_name) + ' ?</h2>' +
+      '<p>Je peux résumer, expliquer et préparer un message autorisé. Je ne peux modifier aucune donnée.</p><div class="parent-jaspe-suggestions">' +
+      '<button type="button" data-parent-jaspe-query="Résume la situation de mon enfant">Résumer la situation</button>' +
+      '<button type="button" data-parent-jaspe-query="Quels devoirs sont visibles ?">Voir les devoirs visibles</button>' +
+      '<button type="button" data-parent-jaspe-query="Prépare un message à la Direction">Préparer un message à la Direction</button></div>' +
+      '<div class="parent-jaspe-input"><input id="parentJaspeInput" type="text" placeholder="Posez une question sur l’enfant sélectionné"><button type="button" data-parent-jaspe-send aria-label="Interroger Jaspe">' + icon("send") + '</button></div>' +
+      '<p class="parent-jaspe-response" role="status">Jaspe respecte toujours permission, portée et DENY explicite.</p></div></section>';
+  }
+
   function icon(name) {
     return '<i data-lucide="' + name + '" aria-hidden="true"></i>';
   }
@@ -472,7 +582,7 @@
     '</article>';
   }
 
-  function renderSummary(child) {
+  function renderSummary(child, user) {
     if (child.lifecycle_status === "draft") {
       return [
         ["Présence du jour", "Indisponible · dossier EN PRÉPARATION", "calendar-clock"],
@@ -484,24 +594,24 @@
       ].map(function (item) { return summaryCard(item[0], item[1], item[2], "unavailable"); }).join("");
     }
     return [
-      ["Présence du jour", child.summary.presence, "calendar-check-2", "success"],
-      ["Sécurité", child.summary.safety, "shield-check", "info"],
-      ["Devoirs", child.summary.homework, "notebook-pen", "info"],
-      ["Notification", child.summary.notification, "bell", "info"],
-      ["Convocations", child.summary.convocation, "mail-check", "neutral"],
-      ["Situation financière", child.summary.finance, "receipt-text", "warning"]
+      ["Présence du jour", scopeAllowsChild(user, "school.student.read", child) ? child.summary.presence : "Indisponible", "calendar-check-2", "success"],
+      ["Sécurité", scopeAllowsChild(user, "security.events.read", child) ? child.summary.safety : "Indisponible · accès non autorisé", "shield-check", "info"],
+      ["Devoirs", scopeAllowsChild(user, "pedagogy.assignment.read", child) ? child.summary.homework : "Indisponible · accès non autorisé", "notebook-pen", "info"],
+      ["Notification", "Indisponible · permission de lecture non définie", "bell", "unavailable"],
+      ["Convocations", "Indisponible · permission de lecture non définie", "mail-check", "unavailable"],
+      ["Situation financière", scopeAllowsChild(user, "finance.status.read", child) ? child.summary.finance : "Indisponible · accès non autorisé", "receipt-text", "warning"]
     ].map(function (item) { return summaryCard(item[0], item[1], item[2], item[3]); }).join("");
   }
 
-  function renderShortcuts() {
+  function renderShortcuts(user, child) {
     return [
-      ["Dossier", "folder-user"],
-      ["Pédagogie", "book-open-check"],
-      ["Communications", "messages-square"],
-      ["Finance", "receipt-text"],
-      ["Sécurité", "shield-check"],
-      ["Cantine", "utensils"]
-    ].map(function (item) {
+      ["Dossier", "folder-user", scopeAllowsChild(user, "school.student.read", child)],
+      ["Pédagogie", "book-open-check", someScopeAllowsChild(user, PEDAGOGY_PERMISSIONS, child)],
+      ["Communications", "messages-square", scopeAllowsChild(user, "communication.message.send", child)],
+      ["Finance", "receipt-text", someScopeAllowsChild(user, FINANCE_PERMISSIONS, child)],
+      ["Sécurité", "shield-check", someScopeAllowsChild(user, SECURITY_PERMISSIONS, child)],
+      ["Cantine", "utensils", scopeAllowsChild(user, "school.student.read", child)]
+    ].filter(function (item) { return item[2]; }).map(function (item) {
       return '<button class="parent-shortcut" type="button" data-parent-shortcut="' + escapeMarkup(item[0].toLowerCase()) + '">' +
         icon(item[1]) + '<span>' + escapeMarkup(item[0]) + '</span><small>Consulter</small>' + icon("chevron-right") +
       '</button>';
@@ -515,15 +625,55 @@
     '</section>';
   }
 
+  function renderUnavailable(container) {
+    container.innerHTML = '<section class="parent-portal-unavailable" role="status">' +
+      '<span>' + icon("cloud-off") + '</span><div><p class="parent-eyebrow">Projection familiale indisponible</p>' +
+      '<h1>Enfants liés non chargés</h1><p>La session est autorisée, mais la projection des identifiants <code>own_children</code> n’est pas fournie. Aucune donnée n’est affichée · BACKEND_LATER.</p></div>' +
+    '</section>';
+  }
+
+  function renderEmpty(container) {
+    container.innerHTML = '<section class="parent-portal-empty" role="status">' +
+      '<span>' + icon("users-round") + '</span><div><p class="parent-eyebrow">Périmètre familial</p>' +
+      '<h1>Aucun enfant rattaché</h1><p>La session est autorisée et la projection <code>own_children</code> est vide. Aucune donnée d’un autre enfant n’est affichée.</p></div>' +
+    '</section>';
+  }
+
+  function clear() {
+    activeUser = null;
+    activeContainerId = null;
+    selectedChildId = null;
+  }
+
   function render(containerId, user) {
     var container = document.getElementById(containerId);
     if (!container) return;
     activeContainerId = containerId;
     activeUser = user || {};
+    var requiredScope = scopeFor(activeUser, REQUIRED_PERMISSION);
+    var baseAccessAllowed = hasPermission(activeUser, REQUIRED_PERMISSION) && requiredScope && requiredScope.type === "own_children";
+    if (!baseAccessAllowed) {
+      selectedChildId = null;
+      renderDenied(container);
+      if (root.lucide) root.lucide.createIcons();
+      return;
+    }
+    if (!Array.isArray(activeUser.childIds)) {
+      selectedChildId = null;
+      renderUnavailable(container);
+      if (root.lucide) root.lucide.createIcons();
+      return;
+    }
+    if (!activeUser.childIds.length) {
+      selectedChildId = null;
+      renderEmpty(container);
+      if (root.lucide) root.lucide.createIcons();
+      return;
+    }
     var linked = getLinkedChildren(activeUser);
     if (!linked.length) {
       selectedChildId = null;
-      renderDenied(container);
+      renderUnavailable(container);
       if (root.lucide) root.lucide.createIcons();
       return;
     }
@@ -549,9 +699,9 @@
       '</section>' +
       (isDraft ? '<aside class="parent-draft-boundary">' + icon("cloud-off") + '<div><strong>Dossier local en préparation</strong><p>Aucune opération scolaire officielle ne peut être affichée ou préparée pour cet enfant.</p></div></aside>' : '') +
       '<section aria-labelledby="parentSummaryTitle"><div class="parent-section-heading"><div><p class="parent-eyebrow">Aujourd’hui</p><h2 id="parentSummaryTitle">Vue d’ensemble autorisée</h2></div><span>DÉMONSTRATION · BACKEND_LATER</span></div>' +
-      '<div class="parent-dashboard-summary">' + renderSummary(child) + '</div></section>' +
+      '<div class="parent-dashboard-summary">' + renderSummary(child, activeUser) + '</div></section>' +
       '<section aria-labelledby="parentShortcutsTitle"><div class="parent-section-heading"><div><p class="parent-eyebrow">Navigation familiale</p><h2 id="parentShortcutsTitle">Accès rapides</h2></div></div>' +
-      '<div class="parent-shortcuts">' + renderShortcuts() + '</div></section>' +
+      '<div class="parent-shortcuts">' + renderShortcuts(activeUser, child) + '</div></section>' + (canUseJaspe(activeUser) ? jaspeMarkup(child) : '') +
     '</div>';
 
     var selector = container.querySelector("#parentChildSelect");
@@ -591,6 +741,21 @@
         }
       });
     });
+    function handleJaspeQuery(query) {
+      var answer = answerJaspe(query);
+      var response = container.querySelector(".parent-jaspe-response");
+      if (response && answer) response.textContent = answer.message;
+      if (answer && answer.action === "communications") openCommunications(selectedChildId, activeUser);
+    }
+    container.querySelectorAll("[data-parent-jaspe-query]").forEach(function (button) {
+      button.addEventListener("click", function () { handleJaspeQuery(button.getAttribute("data-parent-jaspe-query") || ""); });
+    });
+    var jaspeInput = container.querySelector("#parentJaspeInput");
+    var jaspeSend = container.querySelector("[data-parent-jaspe-send]");
+    if (jaspeSend) jaspeSend.addEventListener("click", function () { handleJaspeQuery(jaspeInput && jaspeInput.value); });
+    if (jaspeInput) jaspeInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") handleJaspeQuery(jaspeInput.value);
+    });
     if (root.lucide) root.lucide.createIcons();
   }
 
@@ -604,6 +769,8 @@
     openFinance: openFinance,
     openSecurity: openSecurity,
     openCanteen: openCanteen,
+    answerJaspe: answerJaspe,
+    clear: clear,
     render: render
   };
 }(window));

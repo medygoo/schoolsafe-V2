@@ -1960,8 +1960,12 @@
     if (moduleEl) moduleEl.hidden = true;
     var feeControl = document.getElementById("feeControlModule");
     if (feeControl) feeControl.hidden = true;
-    var grid = document.querySelector(".workspace-grid");
-    if (grid) grid.hidden = false;
+    if (root.SchoolSafeAppContext && typeof root.SchoolSafeAppContext.showDashboard === "function") {
+      root.SchoolSafeAppContext.showDashboard();
+    } else {
+      var grid = document.querySelector(".workspace-grid");
+      if (grid) grid.hidden = false;
+    }
     var cards = document.getElementById("cardsProtected");
     if (cards) cards.hidden = currentRole() !== "admin" && currentRole() !== "admissions";
     var workspaceTitle = document.getElementById("workspaceTitle");
