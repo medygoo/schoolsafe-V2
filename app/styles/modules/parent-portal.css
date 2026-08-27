@@ -618,6 +618,168 @@
   color: var(--ss-info-text);
 }
 
+.parent-finance {
+  display: grid;
+  gap: var(--ss-space-6);
+  color: var(--ss-text-primary);
+}
+
+.parent-finance-panel {
+  min-width: 0;
+  padding: var(--ss-space-5);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-bg-primary);
+}
+
+.parent-finance-panel h2,
+.parent-finance-panel ul,
+.parent-finance-panel p,
+.parent-finance-denied p,
+.parent-finance-draft p,
+.parent-finance-boundary p {
+  margin: 0;
+}
+
+.parent-finance-panel h2 {
+  margin-bottom: var(--ss-space-4);
+  font-size: var(--ss-text-lg);
+}
+
+.parent-fee-list {
+  display: grid;
+  gap: var(--ss-space-2);
+}
+
+.parent-fee-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--ss-space-4);
+  padding: var(--ss-space-4);
+  border-radius: var(--ss-radius);
+  background: var(--ss-bg-secondary);
+}
+
+.parent-fee-row div,
+.parent-fee-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.parent-fee-row small,
+.parent-finance-panel li small {
+  display: block;
+  margin-top: var(--ss-space-1);
+  color: var(--ss-text-secondary);
+}
+
+.parent-finance-state {
+  padding: var(--ss-space-2) var(--ss-space-3);
+  border-radius: 999px;
+  font-size: var(--ss-text-xs);
+  white-space: nowrap;
+}
+
+.parent-finance-state--success {
+  background: var(--ss-success-bg);
+  color: var(--ss-success-text);
+}
+
+.parent-finance-state--warning {
+  background: var(--ss-warning-bg);
+  color: var(--ss-warning-text);
+}
+
+.parent-finance-state--info {
+  background: var(--ss-info-bg);
+  color: var(--ss-info-text);
+}
+
+.parent-finance-state--error {
+  background: var(--ss-error-bg);
+  color: var(--ss-error-text);
+}
+
+.parent-finance-state--neutral {
+  background: var(--ss-bg-tertiary);
+  color: var(--ss-text-secondary);
+}
+
+.parent-finance-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ss-space-4);
+}
+
+.parent-finance-panel ul {
+  display: grid;
+  gap: var(--ss-space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.parent-finance-panel li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--ss-space-3);
+  padding-top: var(--ss-space-3);
+  border-top: 1px solid var(--ss-border-subtle);
+}
+
+.parent-finance-panel li > span {
+  color: var(--ss-info-text);
+}
+
+.parent-finance-panel li div,
+.parent-finance-panel li b,
+.parent-finance-panel li p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.parent-finance-panel li > b {
+  color: var(--ss-text-brand);
+  font-size: var(--ss-text-sm);
+  text-align: right;
+}
+
+.parent-finance-history li {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.parent-finance-denied,
+.parent-finance-draft,
+.parent-finance-boundary {
+  display: flex;
+  gap: var(--ss-space-4);
+  padding: var(--ss-space-5);
+  border: 1px solid var(--ss-error-border);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-error-bg);
+  color: var(--ss-error-text);
+}
+
+.parent-finance-draft {
+  display: block;
+  border-color: var(--ss-warning-border);
+  background: var(--ss-warning-bg);
+  color: var(--ss-warning-text);
+}
+
+.parent-finance-boundary {
+  border-color: var(--ss-info-border);
+  background: var(--ss-info-bg);
+  color: var(--ss-info-text);
+}
+
+.parent-finance-denied p,
+.parent-finance-draft p,
+.parent-finance-boundary p {
+  margin-top: var(--ss-space-1);
+}
+
 @media (max-width: 1100px) {
   .parent-dashboard-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -632,6 +794,10 @@
   }
 
   .parent-pedagogy-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .parent-finance-columns {
     grid-template-columns: 1fr;
   }
 }
@@ -667,6 +833,14 @@
   .parent-dashboard-summary,
   .parent-shortcuts {
     grid-template-columns: 1fr;
+  }
+
+  .parent-fee-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .parent-finance-state {
+    grid-column: 1 / -1;
   }
 
   .parent-shortcut small {

@@ -31,6 +31,24 @@
         difficulty: "Lecture des consignes longues",
         remediation: "Fiche d’exercices guidés · information de démonstration"
       },
+      finance: {
+        fees: [
+          { label: "Frais de scolarité", amount: "180 000 CDF", state: "PARTIEL" },
+          { label: "Transport scolaire", amount: "75 000 CDF", state: "PAYÉ" },
+          { label: "Fournitures", amount: "45 000 CDF", state: "EN ATTENTE" },
+          { label: "Activité culturelle", amount: "25 000 CDF", state: "EXEMPTÉ" },
+          { label: "Régularisation", amount: "À vérifier", state: "ANOMALIE" }
+        ],
+        payments: [
+          { label: "Versement scolarité", amount: "90 000 CDF", date: "20 août 2026" },
+          { label: "Transport scolaire", amount: "75 000 CDF", date: "18 août 2026" }
+        ],
+        receipts: [
+          { id: "REC-2026-0586", label: "Versement scolarité", amount: "90 000 CDF" },
+          { id: "REC-2026-0584", label: "Transport scolaire", amount: "75 000 CDF" }
+        ],
+        history: ["Situation familiale consultée", "Reçu REC-2026-0586 enregistré dans l’aperçu", "Échéance de scolarité à consulter"]
+      },
       summary: {
         presence: "Présent",
         safety: "Sortie prévue à 16 h 15",
@@ -67,6 +85,15 @@
         difficulty: "Aucune difficulté signalée dans cet aperçu",
         remediation: "Aucun rattrapage signalé"
       },
+      finance: {
+        fees: [
+          { label: "Frais de scolarité", amount: "120 000 CDF", state: "PAYÉ" },
+          { label: "Activité d’éveil", amount: "30 000 CDF", state: "EN ATTENTE" }
+        ],
+        payments: [{ label: "Frais de scolarité", amount: "120 000 CDF", date: "19 août 2026" }],
+        receipts: [{ id: "REC-2026-0585", label: "Frais de scolarité", amount: "120 000 CDF" }],
+        history: ["Reçu REC-2026-0585 enregistré dans l’aperçu"]
+      },
       summary: {
         presence: "Présente",
         safety: "Sortie prévue à 15 h 30",
@@ -90,6 +117,7 @@
       primary_parent: { display_name: "Sophie Martin", account_status: "À préparer" },
       communications: { notifications: [], convocations: [], messages: [] },
       pedagogy: null,
+      finance: null,
       summary: null
     },
     {
@@ -106,6 +134,7 @@
       primary_parent: { display_name: "Autre famille", account_status: "Hors périmètre" },
       communications: { notifications: [], convocations: [], messages: [] },
       pedagogy: null,
+      finance: null,
       summary: null
     }
   ];
@@ -283,6 +312,67 @@
     return true;
   }
 
+  function financeStateClass(state) {
+    return {
+      "PAYÉ": "success",
+      "PARTIEL": "warning",
+      "EN ATTENTE": "neutral",
+      "EXEMPTÉ": "info",
+      "ANOMALIE": "error"
+    }[state] || "neutral";
+  }
+
+  function financeMarkup(child, user) {
+    var allowed = scopeAllowsChild(user, "finance.status.read", child);
+    var header = '<header class="parent-feature-header"><div><p class="parent-eyebrow">Finance familiale · own_children</p><h1>' +
+      escapeMarkup(childName(child)) + '</h1><p>Consultation des opérations enregistrées par l’école · aucun paiement en ligne.</p></div><span>DÉMO · BACKEND_LATER</span></header>';
+    if (!allowed) {
+      return '<div class="parent-finance">' + header + '<aside class="parent-finance-denied">' + icon("shield-x") +
+        '<div><strong>Situation financière non autorisée</strong><p>La permission, la portée own_children ou un DENY explicite bloque cette consultation.</p></div></aside></div>';
+    }
+    if (child.lifecycle_status !== "active" || !child.finance) {
+      return '<div class="parent-finance">' + header + '<aside class="parent-finance-draft"><strong>EN PRÉPARATION</strong>' +
+        '<p>Aucune opération financière officielle n’est disponible pour ce dossier non opérationnel.</p></aside></div>';
+    }
+    var data = child.finance;
+    var fees = data.fees.map(function (item) {
+      return '<article class="parent-fee-row"><div><strong>' + escapeMarkup(item.label) + '</strong><small>Montant de démonstration</small></div>' +
+        '<span>' + escapeMarkup(item.amount) + '</span><b class="parent-finance-state parent-finance-state--' + financeStateClass(item.state) + '">' + escapeMarkup(item.state) + '</b></article>';
+    }).join("");
+    var payments = data.payments.map(function (item) {
+      return '<li><span>' + icon("circle-check") + '</span><div><strong>' + escapeMarkup(item.label) + '</strong><small>' + escapeMarkup(item.date) + '</small></div><b>' + escapeMarkup(item.amount) + '</b></li>';
+    }).join("");
+    var receipts = data.receipts.map(function (item) {
+      return '<li><span>' + icon("receipt-text") + '</span><div><strong>' + escapeMarkup(item.id) + '</strong><small>' + escapeMarkup(item.label) + '</small></div><b>' + escapeMarkup(item.amount) + '</b></li>';
+    }).join("");
+    var history = data.history.map(function (item) {
+      return '<li><span>' + icon("history") + '</span><p>' + escapeMarkup(item) + '</p></li>';
+    }).join("");
+    return '<div class="parent-finance">' + header +
+      '<section class="parent-finance-panel"><h2>Situation des frais</h2><div class="parent-fee-list">' + fees + '</div></section>' +
+      '<div class="parent-finance-columns">' +
+        '<section class="parent-finance-panel"><h2>Paiements enregistrés</h2><ul>' + payments + '</ul></section>' +
+        '<section class="parent-finance-panel"><h2>Reçus</h2><ul>' + receipts + '</ul></section>' +
+        '<section class="parent-finance-panel"><h2>Historique</h2><ul class="parent-finance-history">' + history + '</ul></section>' +
+      '</div><aside class="parent-finance-boundary">' + icon("landmark") + '<div><strong>Consultation uniquement</strong><p>Aucun paiement en ligne, aucune création, modification ou annulation de caisse. Les données officielles viendront du backend.</p></div></aside></div>';
+  }
+
+  function openFinance(childId, user) {
+    var linked = getLinkedChildren(user || {});
+    var child = linked.find(function (item) { return item.id === childId; });
+    if (!child || !root.ssModal) return false;
+    root.ssModal({
+      title: "Finance Parent",
+      subtitle: "Situation familiale en consultation seule",
+      size: "full",
+      className: "parent-finance-modal",
+      content: financeMarkup(child, user || {}),
+      actions: [{ label: "Fermer", variant: "secondary" }]
+    });
+    if (root.lucide) root.lucide.createIcons();
+    return true;
+  }
+
   function icon(name) {
     return '<i data-lucide="' + name + '" aria-hidden="true"></i>';
   }
@@ -396,6 +486,10 @@
           openPedagogy(selectedChildId, activeUser);
           return;
         }
+        if (button.getAttribute("data-parent-shortcut") === "finance") {
+          openFinance(selectedChildId, activeUser);
+          return;
+        }
         var label = button.querySelector("span");
         if (typeof root.schoolSafeNotify === "function") {
           root.schoolSafeNotify((label ? label.textContent : "Fonction") + " — disponible dans les prochains lots Parent.");
@@ -412,6 +506,7 @@
     openChildDossier: openChildDossier,
     openCommunications: openCommunications,
     openPedagogy: openPedagogy,
+    openFinance: openFinance,
     render: render
   };
 }(window));
