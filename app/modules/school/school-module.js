@@ -139,6 +139,7 @@
           '<span><b>Parent principal</b>' + escapeMarkup(parent.display_name || "Non renseigné") +
           (parent.account_status === "pending_activation" ? '<small>pending_activation</small>' : '') + '</span></div>' +
           '<div class="student-record__status">' + studentBadge(student.lifecycle_status) +
+          window.ssButton({ label: "Dossier central", variant: "primary", size: "sm", attrs: { "data-student-dossier": escapeMarkup(student.id) } }) +
           window.ssButton({ label: "Consulter", variant: "secondary", size: "sm", attrs: { "data-student-detail": escapeMarkup(student.id) } }) + '</div>' +
         '</article>'
       );
@@ -168,6 +169,14 @@
     if (createButton) createButton.addEventListener("click", openStudentDraftModal);
     container.querySelectorAll("[data-student-detail]").forEach(function (button) {
       button.addEventListener("click", function () { openStudentDetail(button.getAttribute("data-student-detail")); });
+    });
+    container.querySelectorAll("[data-student-dossier]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        try {
+          var detail = await window.SchoolSafeSchoolAPI.getStudent(button.getAttribute("data-student-dossier"));
+          if (window.SchoolSafeStudentDossier) window.SchoolSafeStudentDossier.open(detail, currentUser);
+        } catch (error) { notify("Erreur : " + error.message); }
+      });
     });
     if (window.lucide) window.lucide.createIcons();
   }

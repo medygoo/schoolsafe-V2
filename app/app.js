@@ -218,9 +218,10 @@
    * Elle ne crée aucun droit backend et permet aux modules de passer par Access_Law sans bypass de rôle.
    */
   var DEMO_PERMISSIONS_BY_ROLE = {
-    admin: ["school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage"],
+    admin: ["school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
-    parent: ["school.student.read", "school.guardian.read", "school.guardian.manage"],
+    parent: ["school.student.read", "school.guardian.read", "school.guardian.manage", "finance.status.read"],
+    teacher: ["school.student.read", "pedagogy.grade.read"],
     guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
   };
 
@@ -233,7 +234,15 @@
       scopes: [
         { permission: "school.student.read", type: "own_children" },
         { permission: "school.guardian.read", type: "own_children" },
-        { permission: "school.guardian.manage", type: "own_children" }
+        { permission: "school.guardian.manage", type: "own_children" },
+        { permission: "finance.status.read", type: "own_children" }
+      ]
+    },
+    teacher: {
+      assignedClassIds: ["demo-class-1"],
+      scopes: [
+        { permission: "school.student.read", type: "assigned_classes" },
+        { permission: "pedagogy.grade.read", type: "assigned_classes" }
       ]
     },
     guard: { scopes: [{ permission: "security.pickup.read", type: "school" }, { permission: "security.pickup.manage", type: "school" }] }
@@ -248,6 +257,7 @@
       permissions: (DEMO_PERMISSIONS_BY_ROLE[role] || []).slice(),
       profile: context.profile || null,
       childIds: (context.childIds || []).slice(),
+      assignedClassIds: (context.assignedClassIds || []).slice(),
       scopes: (context.scopes || []).map(function (scope) { return Object.assign({}, scope); })
     };
   }
