@@ -9,10 +9,13 @@
       profile_id: "demo-parent-child-lucas-profile",
       first_name: "Lucas",
       last_name: "Martin",
+      matricule: "P-C2-0001",
       class_id: "demo-class-1",
       class_name: "6e A",
       academic_year: "2026-2027",
       lifecycle_status: "active",
+      enrollment: { planned_class_id: "demo-class-1", planned_class_name: "6e A", academic_year_label: "2026-2027" },
+      primary_parent: { display_name: "Sophie Martin", account_status: "Compte Parent actif" },
       summary: {
         presence: "Présent",
         safety: "Sortie prévue à 16 h 15",
@@ -27,10 +30,13 @@
       profile_id: "demo-parent-child-emma-profile",
       first_name: "Emma",
       last_name: "Martin",
+      matricule: "P-C2-0002",
       class_id: "demo-class-2",
       class_name: "Maternelle 3",
       academic_year: "2026-2027",
       lifecycle_status: "active",
+      enrollment: { planned_class_id: "demo-class-2", planned_class_name: "Maternelle 3", academic_year_label: "2026-2027" },
+      primary_parent: { display_name: "Sophie Martin", account_status: "Compte Parent actif" },
       summary: {
         presence: "Présente",
         safety: "Sortie prévue à 15 h 30",
@@ -45,10 +51,13 @@
       profile_id: "demo-draft-student-profile",
       first_name: "Amina",
       last_name: "Mbuyi",
+      matricule: "BROUILLON-P-C2-0003",
       class_id: null,
       class_name: "5e A",
       academic_year: "2026-2027",
       lifecycle_status: "draft",
+      enrollment: { planned_class_id: "demo-class-4", planned_class_name: "5e A", academic_year_label: "2026-2027" },
+      primary_parent: { display_name: "Sophie Martin", account_status: "À préparer" },
       summary: null
     },
     {
@@ -56,10 +65,13 @@
       profile_id: "demo-unrelated-child-ethan-profile",
       first_name: "Ethan",
       last_name: "Leroy",
+      matricule: "HORS-PERIMETRE",
       class_id: "demo-class-3",
       class_name: "4e B",
       academic_year: "2026-2027",
       lifecycle_status: "active",
+      enrollment: { planned_class_id: "demo-class-3", planned_class_name: "4e B", academic_year_label: "2026-2027" },
+      primary_parent: { display_name: "Autre famille", account_status: "Hors périmètre" },
       summary: null
     }
   ];
@@ -112,6 +124,14 @@
     if (!linked.length) return null;
     var selected = linked.find(function (child) { return child.id === selectedChildId; });
     return selected || linked[0];
+  }
+
+  function openChildDossier(childId, user) {
+    var linked = getLinkedChildren(user || {});
+    var child = linked.find(function (item) { return item.id === childId; });
+    if (!child || !root.SchoolSafeStudentDossier) return false;
+    root.SchoolSafeStudentDossier.open(child, user || {});
+    return true;
   }
 
   function icon(name) {
@@ -215,6 +235,10 @@
     });
     container.querySelectorAll("[data-parent-shortcut]").forEach(function (button) {
       button.addEventListener("click", function () {
+        if (button.getAttribute("data-parent-shortcut") === "dossier") {
+          openChildDossier(selectedChildId, activeUser);
+          return;
+        }
         var label = button.querySelector("span");
         if (typeof root.schoolSafeNotify === "function") {
           root.schoolSafeNotify((label ? label.textContent : "Fonction") + " — disponible dans les prochains lots Parent.");
@@ -228,6 +252,7 @@
     CHILDREN: CHILDREN,
     getLinkedChildren: getLinkedChildren,
     getSelectedChild: getSelectedChild,
+    openChildDossier: openChildDossier,
     render: render
   };
 }(window));
