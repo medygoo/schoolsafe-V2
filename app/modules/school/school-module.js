@@ -201,6 +201,10 @@
         window.SchoolSafeStudentFamily.open(detail, currentUser);
         return;
       }
+      if (window.SchoolSafeStudentLifecycle) {
+        window.SchoolSafeStudentLifecycle.open(detail, currentUser);
+        return;
+      }
       var enrollment = detail.enrollment || {};
       var parent = detail.primary_parent || {};
       window.ssModal({

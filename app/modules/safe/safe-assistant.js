@@ -255,6 +255,14 @@
       return;
     }
 
+    if (/valid|change|transf|départ|depart|inactif|archiv/.test(text) && /réinscri|reinscri|classe|élève|eleve|dossier|départ|depart|archiv/.test(text)) {
+      state.currentMessage = "Je peux expliquer le parcours, préparer un résumé, une demande ou un brouillon. Je ne peux pas valider une réinscription, changer une classe, transférer un élève, enregistrer un départ, rendre un dossier inactif ou l’archiver.";
+      state.pose = "reflechie";
+      state.suggestions = defaultSuggestions();
+      render();
+      return;
+    }
+
     var best = null;
     var bestScore = 0;
     for (var i = 0; i < faq.length; i++) {
