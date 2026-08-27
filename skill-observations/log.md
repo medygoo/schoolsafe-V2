@@ -114,3 +114,33 @@ resolved statuses always carry their resolution date
 **Suggested improvement:** Anchor assertions to the active feature root or dialog, use exact text for short status labels, and exclude deliberate accessibility helpers such as `.sr-only` from visual overflow detectors. Navigation helpers should follow the rendered branch-to-tab path instead of searching hidden legacy action markup.
 
 **Principle:** In applications that keep inactive screens in the DOM, E2E selectors must encode the active UI boundary; DOM presence is not equivalent to user-visible behavior.
+
+### Observation 8: Frontend-only future-backend flows need three explicit boundaries
+
+**Status:** OPEN
+**Date:** 2026-08-27
+**Session context:** Building a family dossier UI while its backend contracts were intentionally frozen for a later phase
+**Skill:** impeccable / test-driven-development
+**Type:** open-source
+**Phase/Area:** Demo state, honest UX, and integration boundaries
+
+**Issue:** A rich editable demonstration can accidentally look authoritative or drift into backend scope unless state, copy, and network behavior all communicate the same boundary. A badge alone is insufficient if controls imply persistence, and a local store alone is insufficient if the interface omits the future contract.
+
+**Suggested improvement:** Add a frontend-only workflow checklist with three simultaneous controls: namespace all demonstration state separately from production state, label every unavailable persistence/verification action as `BACKEND_LATER`, and add an E2E assertion that user interactions do not expose activation or validation actions. Keep the integration point in a dedicated module so the future backend can replace the adapter without rewriting the surface.
+
+**Principle:** Honest prototypes align state isolation, user-facing language, and network boundaries; all three must agree that local interaction is not server success.
+
+### Observation 9: Visual navigation proofs must wait for the real scroll container to settle
+
+**Status:** OPEN
+**Date:** 2026-08-27
+**Session context:** Responsive light/dark screenshot verification of a long modal dossier
+**Skill:** systematic-debugging / impeccable
+**Type:** open-source
+**Phase/Area:** Playwright visual evidence and smooth scrolling
+
+**Issue:** A navigation click correctly reached its section, but the next screenshot could start while `scrollIntoView({ behavior: "smooth" })` was still compositing. Resetting `scrollTop` on a nested body did not help because the actual overflow container was the modal shell, and waiting for a few apparently stable frames could resolve before the deferred animation began.
+
+**Suggested improvement:** Identify the element that owns `overflow: auto`, attach a one-shot `scrollend` listener before triggering smooth navigation, and await that event before visual assertions or screenshots. For deterministic return-to-top captures, set both scroll axes on that same container and wait for several stable animation frames.
+
+**Principle:** Visual tests should synchronize with the browser state that produces the pixels; element visibility alone does not prove that scrolling and compositing are finished.

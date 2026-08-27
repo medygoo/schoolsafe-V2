@@ -197,6 +197,10 @@
   async function openStudentDetail(studentId) {
     try {
       var detail = await window.SchoolSafeSchoolAPI.getStudent(studentId);
+      if (detail.lifecycle_status === "draft" && window.SchoolSafeStudentFamily) {
+        window.SchoolSafeStudentFamily.open(detail);
+        return;
+      }
       var enrollment = detail.enrollment || {};
       var parent = detail.primary_parent || {};
       window.ssModal({

@@ -101,7 +101,16 @@ const DEMO_STUDENTS = [
     lifecycle_status: "draft",
     class_id: null,
     enrollment: { status: "draft", planned_class_id: "demo-class-2", planned_class_name: "5e A" },
-    primary_parent: { id: "demo-parent-1", display_name: "Sarah Mbuyi", account_status: "pending_activation" },
+    primary_parent: {
+      id: "demo-parent-1",
+      display_name: "Sarah Mbuyi",
+      first_name: "Sarah",
+      last_name: "Mbuyi",
+      phone: "+243 810 000 111",
+      email: "sarah.mbuyi@example.test",
+      guardian_type: "mere",
+      account_status: "pending_activation",
+    },
   },
   {
     id: "demo-active-student",
@@ -140,6 +149,28 @@ async function setupRoutes(page: Page) {
     }
     if (url.includes("/security/scan")) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(DEMO_SCAN_RESULT) });
+    }
+    if (url.includes("/school/settings")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          identity: { name: "École de démonstration", primary_color: "#071a3d", accent_color: "#e9a515" },
+          contact: { country: "RDC", province: "Kinshasa", city: "Kinshasa" },
+          brand: { primary_color: "#071a3d", accent_color: "#e9a515" },
+          academic_years: [],
+          cycles: [],
+        }),
+      });
+    }
+    if (/\/school\/students\/[^/]+$/.test(new URL(url).pathname)) {
+      const studentId = new URL(url).pathname.split("/").pop();
+      const student = DEMO_STUDENTS.find((item) => item.id === studentId);
+      return route.fulfill({
+        status: student ? 200 : 404,
+        contentType: "application/json",
+        body: JSON.stringify(student || { code: "STUDENT_NOT_FOUND" }),
+      });
     }
     if (url.includes("/school/students?") || /\/school\/students$/.test(new URL(url).pathname)) {
       const status = new URL(url).searchParams.get("status");
