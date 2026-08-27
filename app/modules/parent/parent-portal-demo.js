@@ -16,6 +16,11 @@
       lifecycle_status: "active",
       enrollment: { planned_class_id: "demo-class-1", planned_class_name: "6e A", academic_year_label: "2026-2027" },
       primary_parent: { display_name: "Sophie Martin", account_status: "Compte Parent actif" },
+      communications: {
+        notifications: [{ title: "Réunion de rentrée", detail: "Information de démonstration à consulter", date: "26 août 2026" }],
+        convocations: [{ title: "Entretien avec la Direction", detail: "Convocation de démonstration · réponse côté serveur indisponible", date: "2 septembre 2026" }],
+        messages: [{ title: "Accueil de l’établissement", detail: "Historique de démonstration non synchronisé", date: "25 août 2026" }]
+      },
       summary: {
         presence: "Présent",
         safety: "Sortie prévue à 16 h 15",
@@ -37,6 +42,11 @@
       lifecycle_status: "active",
       enrollment: { planned_class_id: "demo-class-2", planned_class_name: "Maternelle 3", academic_year_label: "2026-2027" },
       primary_parent: { display_name: "Sophie Martin", account_status: "Compte Parent actif" },
+      communications: {
+        notifications: [{ title: "Activité pédagogique", detail: "Information de démonstration à consulter", date: "27 août 2026" }],
+        convocations: [],
+        messages: [{ title: "Accueil maternelle", detail: "Historique de démonstration non synchronisé", date: "24 août 2026" }]
+      },
       summary: {
         presence: "Présente",
         safety: "Sortie prévue à 15 h 30",
@@ -58,6 +68,7 @@
       lifecycle_status: "draft",
       enrollment: { planned_class_id: "demo-class-4", planned_class_name: "5e A", academic_year_label: "2026-2027" },
       primary_parent: { display_name: "Sophie Martin", account_status: "À préparer" },
+      communications: { notifications: [], convocations: [], messages: [] },
       summary: null
     },
     {
@@ -72,6 +83,7 @@
       lifecycle_status: "active",
       enrollment: { planned_class_id: "demo-class-3", planned_class_name: "4e B", academic_year_label: "2026-2027" },
       primary_parent: { display_name: "Autre famille", account_status: "Hors périmètre" },
+      communications: { notifications: [], convocations: [], messages: [] },
       summary: null
     }
   ];
@@ -131,6 +143,67 @@
     var child = linked.find(function (item) { return item.id === childId; });
     if (!child || !root.SchoolSafeStudentDossier) return false;
     root.SchoolSafeStudentDossier.open(child, user || {});
+    return true;
+  }
+
+  function scopeAllowsChild(user, permission, child) {
+    var scope = scopeFor(user, permission);
+    return !!(child && hasPermission(user, permission) && scope && scope.type === "own_children" &&
+      Array.isArray(user && user.childIds) && user.childIds.indexOf(child.id) >= 0);
+  }
+
+  function communicationColumn(title, items, iconName) {
+    var rows = items.length ? items.map(function (item) {
+      return '<article><span>' + icon(iconName) + '</span><div><strong>' + escapeMarkup(item.title) + '</strong>' +
+        '<p>' + escapeMarkup(item.detail) + '</p><small>' + escapeMarkup(item.date) + ' · DÉMONSTRATION</small></div></article>';
+    }).join("") : '<p class="parent-communication-empty">Aucun élément disponible dans cet aperçu.</p>';
+    return '<section class="parent-communication-column"><h2>' + escapeMarkup(title) + '</h2><div>' + rows + '</div></section>';
+  }
+
+  function communicationsMarkup(child, user) {
+    var draft = child.lifecycle_status !== "active";
+    var data = child.communications || { notifications: [], convocations: [], messages: [] };
+    var canPrepare = scopeAllowsChild(user, "communication.message.send", child);
+    var history = draft ? '<div class="parent-communication-draft"><strong>EN PRÉPARATION</strong><p>Aucun historique officiel : le dossier n’est pas encore opérationnel.</p></div>' :
+      '<div class="parent-communication-history">' +
+        communicationColumn("Notifications", data.notifications || [], "bell") +
+        communicationColumn("Convocations", data.convocations || [], "mail-warning") +
+        communicationColumn("Messages", data.messages || [], "messages-square") +
+      '</div>';
+    var composer = canPrepare ? '<section class="parent-message-composer"><header><div><p class="parent-eyebrow">Préparation locale uniquement</p><h2>Nouveau message</h2></div><span>BACKEND_LATER</span></header>' +
+      '<div class="parent-message-recipient" data-parent-message-recipient><span>Destinataire autorisé</span><strong>Direction de l’établissement</strong><small>Aucun enseignant n’est ajouté implicitement.</small></div>' +
+      '<label for="parentMessageDraft">Votre message</label><textarea id="parentMessageDraft" rows="5" placeholder="Rédigez un brouillon pour la Direction"></textarea>' +
+      '<button class="ss-button" type="button" data-prepare-parent-message>Préparer le message</button><p class="parent-message-draft-state" role="status">Aucun envoi effectué.</p></section>' :
+      '<aside class="parent-communication-denied"><span>' + icon("shield-x") + '</span><div><strong>Préparation de message indisponible</strong><p>La permission et la portée requises ne sont pas accordées, ou un DENY explicite s’applique.</p></div></aside>';
+    return '<div class="parent-communications"><header class="parent-feature-header"><div><p class="parent-eyebrow">Communication familiale · own_children</p><h1>' +
+      escapeMarkup(childName(child)) + '</h1><p>Historique frontend autorisé · données de démonstration non synchronisées.</p></div><span>DÉMO · BACKEND_LATER</span></header>' +
+      history + composer + '</div>';
+  }
+
+  function openCommunications(childId, user) {
+    var linked = getLinkedChildren(user || {});
+    var child = linked.find(function (item) { return item.id === childId; });
+    if (!child || !root.ssModal) return false;
+    var modal = root.ssModal({
+      title: "Communications Parent",
+      subtitle: "Consultation et préparation locale selon Access_Law",
+      size: "full",
+      className: "parent-communications-modal",
+      content: communicationsMarkup(child, user || {}),
+      actions: [{ label: "Fermer", variant: "secondary" }]
+    });
+    var prepare = modal.content.querySelector("[data-prepare-parent-message]");
+    if (prepare) prepare.addEventListener("click", function () {
+      var textarea = modal.content.querySelector("#parentMessageDraft");
+      var state = modal.content.querySelector(".parent-message-draft-state");
+      if (!textarea || !state) return;
+      if (!String(textarea.value || "").trim()) {
+        state.textContent = "Rédigez un message avant de préparer le brouillon.";
+        return;
+      }
+      state.textContent = "Brouillon local préparé · aucun envoi effectué · BACKEND_LATER";
+    });
+    if (root.lucide) root.lucide.createIcons();
     return true;
   }
 
@@ -239,6 +312,10 @@
           openChildDossier(selectedChildId, activeUser);
           return;
         }
+        if (button.getAttribute("data-parent-shortcut") === "communications") {
+          openCommunications(selectedChildId, activeUser);
+          return;
+        }
         var label = button.querySelector("span");
         if (typeof root.schoolSafeNotify === "function") {
           root.schoolSafeNotify((label ? label.textContent : "Fonction") + " — disponible dans les prochains lots Parent.");
@@ -253,6 +330,7 @@
     getLinkedChildren: getLinkedChildren,
     getSelectedChild: getSelectedChild,
     openChildDossier: openChildDossier,
+    openCommunications: openCommunications,
     render: render
   };
 }(window));
