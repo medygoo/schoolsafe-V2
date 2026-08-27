@@ -77,16 +77,19 @@
         }
       ],
       emergency: {
-        relation: "Grand-mère", lastName: "Mbuyi", middleName: "Tshibangu", firstName: "Jeanne",
-        phonePrimary: "+243 820 100 203", phoneSecondary: "+243 890 300 203",
-        email: "", idType: "Carte d’électeur", idNumber: "EL-0076139", callOrder: "2", photo: photoState()
+        relation: "Voisine de confiance", lastName: "Lukusa", middleName: "Ngoie", firstName: "Cécile",
+        phonePrimary: "+243 820 100 204", phoneSecondary: "+243 890 300 204",
+        email: "", idType: "Carte d’électeur", idNumber: "EL-0064820", callOrder: "2", photo: photoState()
       },
       parentSnapshot: {
         name: parent.display_name || "Parent principal",
         relation: parent.guardian_type || "tuteur",
         phone: parent.phone || "Téléphone non renseigné",
         email: parent.email || "E-mail non renseigné",
-        accountStatus: parent.account_status || "pending_activation"
+        accountStatus: parent.account_status || "pending_activation",
+        idType: "Carte d’électeur",
+        idNumber: "EL-0052701",
+        photo: photoState()
       },
       history: [
         { at: "Aujourd’hui · 09:40", label: "Dossier familial ouvert en démonstration" },
@@ -103,6 +106,10 @@
     var stored = readStore()[student.id];
     if (stored && stored.guardians && stored.guardians.length === 3) {
       stored.verification = stored.verification || { status: "incomplete" };
+      stored.parentSnapshot = stored.parentSnapshot || {};
+      stored.parentSnapshot.idType = stored.parentSnapshot.idType || "Carte d’électeur";
+      stored.parentSnapshot.idNumber = stored.parentSnapshot.idNumber || "EL-0052701";
+      stored.parentSnapshot.photo = stored.parentSnapshot.photo || photoState();
       return stored;
     }
     return createState(student);
@@ -270,7 +277,7 @@
       '<div class="family-dossier-hero"><div class="family-dossier-identity"><span class="family-avatar family-avatar--student">' + escapeMarkup(initials(student.first_name + " " + student.last_name)) + '</span><div><div class="family-dossier-badges">' + root.ssBadge({ label: "EN PRÉPARATION", variant: "warning" }) + root.ssBadge({ label: "DÉMO FRONTEND", variant: "info", icon: "flask-conical" }) + '</div><h2>' + escapeMarkup([student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ")) + '</h2><p>Matricule ' + escapeMarkup(student.matricule) + ' · ' + escapeMarkup(enrollment.planned_class_name || "Classe à confirmer") + '</p></div></div>' +
       '<div class="family-backend-note"><i data-lucide="database-zap"></i><div><b>BACKEND_LATER</b><span>Sauvegarde, photos, pièces, suspension, vérification et activation restent locales ou indisponibles.</span></div></div></div>' +
       '<nav class="family-dossier-nav" aria-label="Sections du dossier familial">' +
-        [["identity", "Identité"], ["schooling", "Scolarité prévue"], ["parent", "Parent principal"], ["guardians", "Tuteurs secondaires"], ["emergency", "Contact d’urgence"], ["proofs", "Photos et identités"], ["checklist", "Checklist"], ["verification", "Vérification et activation"], ["history", "Historique"]].map(function (item) {
+        [["identity", "Identité"], ["schooling", "Scolarité prévue"], ["parent", "Parent principal"], ["guardians", "Tuteurs secondaires"], ["pickup", "Personnes autorisées"], ["emergency", "Contact d’urgence"], ["proofs", "Photos et identités"], ["checklist", "Checklist"], ["verification", "Vérification et activation"], ["history", "Historique"]].map(function (item) {
           return '<button type="button" data-dossier-section="' + item[0] + '">' + item[1] + '</button>';
         }).join("") + '</nav>' +
       '<div class="family-dossier-content">' +
@@ -278,6 +285,7 @@
         section("schooling", "school", "Scolarité prévue", '<dl class="family-facts family-facts--school"><div><dt>Année scolaire</dt><dd>' + escapeMarkup(enrollment.academic_year_label || "Non renseignée") + '</dd></div><div><dt>Classe prévue</dt><dd>' + escapeMarkup(enrollment.planned_class_name || "Non renseignée") + '</dd></div><div><dt>Début prévu</dt><dd>' + escapeMarkup(enrollment.starts_on || "Non renseigné") + '</dd></div><div><dt>Projection opérationnelle</dt><dd>Aucune · brouillon</dd></div></dl>') +
         section("parent", "shield-check", "Parent principal", parentCard()) +
         section("guardians", "users-round", "Tuteurs secondaires", '<p class="family-section-intro">Exactement trois personnes autorisées, sans compte SchoolSafe dans B2-FE.</p><div class="family-guardians">' + activeState.guardians.map(guardianCard).join("") + '</div>') +
+        (root.SchoolSafeStudentPickup ? root.SchoolSafeStudentPickup.renderDossierSection({ student: student, state: activeState, user: activeUser }) : "") +
         section("emergency", "siren", "Contact d’urgence", emergencyCard(), "family-section--emergency") +
         section("proofs", "scan-face", "Photos et identités", '<div class="family-proof-heading"><p>Vue de contrôle des éléments de démonstration.</p>' + root.ssBadge({ label: "BACKEND_LATER", variant: "warning" }) + '</div>' + identityMatrix()) +
         section("checklist", "list-checks", "Checklist", checklist()) +
@@ -370,6 +378,19 @@
 
     if (root.SchoolSafeStudentVerification) {
       root.SchoolSafeStudentVerification.bind({
+        rootElement: rootElement,
+        student: activeStudent,
+        state: activeState,
+        user: activeUser,
+        onChange: function (label) {
+          recordDemoChange(label);
+          rerender();
+        }
+      });
+    }
+
+    if (root.SchoolSafeStudentPickup) {
+      root.SchoolSafeStudentPickup.bindDossier({
         rootElement: rootElement,
         student: activeStudent,
         state: activeState,

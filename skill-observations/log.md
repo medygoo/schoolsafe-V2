@@ -161,3 +161,22 @@ resolved statuses always carry their resolution date
 **Principle:** A prototype may simulate grants, but it should never simulate authorization by skipping the authorization system.
 
 - 2026-08-27 checkpoint B3-FE: no additional observation after the targeted B1/B2 smoke; Observation 7 already covers feature-scoped selectors.
+
+- 2026-08-27 checkpoint B4-FE tests: no additional observation; the test contract reuses the active-surface selector and honest frontend-boundary principles captured in Observations 7, 8, and 10.
+
+### Observation 11: Responsive flex shells need an explicit zero minimum width
+
+**Status:** OPEN
+**Date:** 2026-08-27
+**Session context:** B4-FE Guardian control at the 834 px tablet breakpoint
+**Skill:** systematic-debugging / impeccable
+**Type:** open-source
+**Phase/Area:** Responsive layout and overflow diagnosis
+
+**Issue:** The feature children declared `min-width: 0` and responsive single-column layouts, yet the whole control still extended beyond the viewport at 834 px. Rectangle diagnostics showed the flex-based workspace main element retaining its descendants’ intrinsic minimum width, so every child appeared to overflow even though the immediate feature grid was responsive.
+
+**Suggested improvement:** Set `min-width: 0` on flexible application-shell content columns, then keep feature roots and nested grids constrained to `max-width: 100%`. When many descendants share the same overflow offset, record bounding rectangles for the feature root and each ancestor before changing child styles.
+
+**Principle:** In flex layouts, descendant responsiveness cannot overcome the parent flex item’s default `min-width: auto`; diagnose shared offsets at the highest overflowing ancestor and remove the intrinsic-width constraint there.
+
+- 2026-08-27 checkpoint B4-FE pre-commit: independent finish review confirmed the contact-uniqueness and permission-plus-scope blockers resolved; no additional observation beyond Observations 10 and 11.

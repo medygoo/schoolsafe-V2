@@ -218,14 +218,38 @@
    * Elle ne crée aucun droit backend et permet aux modules de passer par Access_Law sans bypass de rôle.
    */
   var DEMO_PERMISSIONS_BY_ROLE = {
-    admin: ["school.student.read", "school.student.create", "school.student.activate"],
-    admissions: ["school.student.read", "school.student.create"]
+    admin: ["school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read"],
+    admissions: ["school.student.read", "school.student.create"],
+    parent: ["school.student.read", "school.guardian.read", "school.guardian.manage"],
+    guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
+  };
+
+  var DEMO_ACCESS_CONTEXT_BY_ROLE = {
+    admin: { scopes: [{ type: "school" }] },
+    admissions: { scopes: [{ type: "school" }] },
+    parent: {
+      profile: { id: "demo-parent-1" },
+      childIds: ["demo-draft-student"],
+      scopes: [
+        { permission: "school.student.read", type: "own_children" },
+        { permission: "school.guardian.read", type: "own_children" },
+        { permission: "school.guardian.manage", type: "own_children" }
+      ]
+    },
+    guard: { scopes: [{ permission: "security.pickup.read", type: "school" }, { permission: "security.pickup.manage", type: "school" }] }
   };
 
   function getCurrentUser() {
     if (currentSession && currentSession.token) return currentSession;
     var role = currentDemoRole || "admin";
-    return { role: role, permissions: (DEMO_PERMISSIONS_BY_ROLE[role] || []).slice() };
+    var context = DEMO_ACCESS_CONTEXT_BY_ROLE[role] || {};
+    return {
+      role: role,
+      permissions: (DEMO_PERMISSIONS_BY_ROLE[role] || []).slice(),
+      profile: context.profile || null,
+      childIds: (context.childIds || []).slice(),
+      scopes: (context.scopes || []).map(function (scope) { return Object.assign({}, scope); })
+    };
   }
 
   /**
@@ -1124,7 +1148,8 @@
   }
 
   function securityTabForAction(actionName) {
-    if (/scanner un qr|enregistrer une entrée|enregistrer une sortie|préparer une sortie|personnes autorisées|vérifier l’identité|autoriser une sortie|refuser une sortie|élèves dans l’école|sorties en attente|historique des passages|incidents|alertes et anomalies/i.test(actionName)) return "scan";
+    if (/personnes autorisées|vérifier l’identité|autoriser une sortie|refuser une sortie|préparer une sortie|sorties en attente/i.test(actionName)) return "pickup";
+    if (/scanner un qr|enregistrer une entrée|enregistrer une sortie|élèves dans l’école|historique des passages|incidents|alertes et anomalies/i.test(actionName)) return "scan";
     return "";
   }
 
@@ -1135,6 +1160,7 @@
   }
 
   function openSecurityModule(actionName) {
+    var requestedMode = securityTabForAction(actionName || "") || (currentDemoRole === "guard" ? "pickup" : "scan");
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("financeModule").hidden = true;
     document.getElementById("pilotageModule").hidden = true;
@@ -1143,7 +1169,7 @@
     document.getElementById("securityModule").hidden = false;
     document.querySelector(".workspace-grid").hidden = true;
     document.getElementById("cardsProtected").hidden = true;
-    if (window.SchoolSafeSecurityModule) window.SchoolSafeSecurityModule.render("securityContent");
+    if (window.SchoolSafeSecurityModule) window.SchoolSafeSecurityModule.render("securityContent", { mode: requestedMode, user: getCurrentUser() });
     document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -2211,7 +2237,7 @@
     if (branchKey === "pedagogy") { openPedagogyModule("Devoirs et corrections"); return; }
     if (branchKey === "finance") { openFinanceModule(); return; }
     if (branchKey === "feeControl") { openFeeControlModule(); return; }
-    if (branchKey === "security") { openSecurityModule("Scanner un QR"); return; }
+    if (branchKey === "security") { openSecurityModule(currentDemoRole === "guard" ? "Personnes autorisées" : "Scanner un QR"); return; }
     if (branchKey === "school") { openSchoolModule("school"); return; }
     if (branchKey === "pilotage") { openPilotageModule("Tableau de bord"); return; }
     if (branchKey === "people") { notify("Personnel — ouverture dans une prochaine étape."); return; }

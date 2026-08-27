@@ -239,6 +239,14 @@
     var text = String(raw || "").toLowerCase();
     if (!text) return;
 
+    if (/autorise|autoriser|valide|valider/.test(text) && /sortie|remise|récup|recup/.test(text)) {
+      state.currentMessage = "Je ne peux pas autoriser une sortie, valider une remise, suspendre ou rétablir une personne. Ces actions exigent les droits utilisateur correspondants et restent sous contrôle humain.";
+      state.pose = "reflechie";
+      state.suggestions = defaultSuggestions();
+      render();
+      return;
+    }
+
     if (/activ/.test(text) && /dossier|élève|eleve/.test(text)) {
       state.currentMessage = "Je ne peux pas exécuter une activation. Ouvrez le dossier élève : l’action exige school.student.activate et reste BACKEND_LATER.";
       state.pose = "reflechie";

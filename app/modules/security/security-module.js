@@ -2,6 +2,8 @@
   "use strict";
 
   var currentEventType = "entry";
+  var currentMode = "scan";
+  var currentUser = null;
 
   function escapeHtml(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
@@ -16,7 +18,7 @@
     if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
   }
 
-  function render(containerId) {
+  function renderScanner(containerId) {
     var container = document.getElementById(containerId);
     if (!container) return;
     container.innerHTML =
@@ -43,6 +45,42 @@
       '</div>';
 
     bind(containerId);
+  }
+
+  function modeTabs() {
+    return '<nav class="security-mode-tabs" aria-label="Modes du contrôle de sécurité">' +
+      '<button type="button" data-security-mode="pickup" class="' + (currentMode === "pickup" ? "active" : "") + '"><i data-lucide="contact-round"></i>Contrôle Gardien</button>' +
+      '<button type="button" data-security-mode="scan" class="' + (currentMode === "scan" ? "active" : "") + '"><i data-lucide="scan-line"></i>Scanner existant</button>' +
+      '</nav><div id="securityModeContent"></div>';
+  }
+
+  function bindModeTabs(containerId) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    container.querySelectorAll("[data-security-mode]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        currentMode = button.getAttribute("data-security-mode");
+        render(containerId, { mode: currentMode, user: currentUser });
+      });
+    });
+  }
+
+  function render(containerId, options) {
+    options = options || {};
+    currentMode = options.mode || currentMode || "scan";
+    currentUser = options.user || currentUser || { permissions: [] };
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = modeTabs();
+    if (currentMode === "pickup" && root.SchoolSafeStudentPickup) {
+      root.SchoolSafeStudentPickup.resetControl();
+      root.SchoolSafeStudentPickup.renderControl("securityModeContent", currentUser);
+    } else {
+      currentMode = "scan";
+      renderScanner("securityModeContent");
+    }
+    bindModeTabs(containerId);
+    refreshIcons();
   }
 
   function bindCameraToggle(containerId) {
