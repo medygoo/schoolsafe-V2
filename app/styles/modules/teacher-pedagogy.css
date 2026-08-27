@@ -137,9 +137,50 @@
 .teacher-pedagogy-state h1,
 .teacher-pedagogy-state p { margin: 0; }
 
+.teacher-workspace-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.2rem;
+  border: 1px solid var(--ss-border-default);
+  border-radius: 1rem;
+  background: var(--ss-bg-primary);
+  box-shadow: var(--ss-shadow-sm);
+}
+.teacher-workspace-header h1,
+.teacher-workspace-header p { margin: 0; }
+.teacher-workspace-header .teacher-boundary { border-color: var(--ss-border-default); color: var(--ss-text-accent); }
+.teacher-workspace-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(20rem, .85fr); gap: 1rem; align-items: start; }
+.teacher-record-list { display: grid; gap: .8rem; }
+.teacher-record-card { padding: 1rem; border: 1px solid var(--ss-border-default); border-radius: .9rem; background: var(--ss-bg-secondary); }
+.teacher-record-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.teacher-record-card h3,
+.teacher-record-card p { margin: 0; }
+.teacher-record-card > p { margin-top: .6rem; color: var(--ss-text-secondary); }
+.teacher-record-card dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin: .8rem 0; }
+.teacher-record-card dl div { display: grid; gap: .15rem; }
+.teacher-record-card dt { color: var(--ss-text-tertiary); font-size: .75rem; }
+.teacher-record-card dd { margin: 0; font-weight: 700; }
+.teacher-record-card footer { display: flex; flex-wrap: wrap; gap: .45rem; }
+.teacher-record-card footer > * { padding: .3rem .55rem; border-radius: 999px; background: var(--ss-warning-bg); color: var(--ss-warning-text); font-size: .7rem; font-weight: 800; }
+.teacher-status { padding: .35rem .55rem; border-radius: 999px; background: var(--ss-info-bg); color: var(--ss-info-text); font-size: .7rem; font-weight: 800; white-space: nowrap; }
+.teacher-form { display: grid; gap: 1rem; }
+.teacher-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.teacher-form label { display: grid; gap: .35rem; min-width: 0; color: var(--ss-text-secondary); font-size: .8rem; font-weight: 700; }
+.teacher-form input,
+.teacher-form select,
+.teacher-form textarea { width: 100%; min-height: 2.75rem; padding: .65rem .75rem; border: 1px solid var(--ss-border-default); border-radius: .7rem; background: var(--ss-bg-primary); color: var(--ss-text-primary); font: inherit; }
+.teacher-form textarea { resize: vertical; }
+.teacher-form-wide { grid-column: 1 / -1; }
+.teacher-access-note { padding: .75rem; border: 1px solid var(--ss-warning-border); border-radius: .75rem; background: var(--ss-warning-bg); color: var(--ss-warning-text); }
+.teacher-access-note p { margin: .2rem 0 0; }
+.teacher-access-note--denied { border-color: var(--ss-error-border); background: var(--ss-error-bg); color: var(--ss-error-text); }
+
 @media (max-width: 900px) {
   .teacher-priority-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .teacher-dashboard-columns { grid-template-columns: 1fr; }
+  .teacher-workspace-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {
@@ -149,4 +190,7 @@
   .teacher-scope-grid { grid-template-columns: 1fr; }
   .teacher-priority-card { min-height: 6.5rem; }
   .teacher-section-heading { align-items: flex-start; flex-direction: column; }
+  .teacher-workspace-header { grid-template-columns: 1fr; align-items: flex-start; }
+  .teacher-form-grid,
+  .teacher-record-card dl { grid-template-columns: 1fr; }
 }

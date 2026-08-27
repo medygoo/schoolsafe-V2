@@ -226,7 +226,7 @@
     admin: ["school.manage", "staff.read", "staff.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
-    teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read"],
+    teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage"],
     guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
   };
 
@@ -258,7 +258,9 @@
       scopes: [
         { permission: "school.student.read", type: "assigned_classes" },
         { permission: "school.class.read", type: "assigned_classes" },
-        { permission: "pedagogy.subject.read", type: "assigned_subjects" }
+        { permission: "pedagogy.subject.read", type: "assigned_subjects" },
+        { permission: "pedagogy.assignment.read", type: "assigned_classes" },
+        { permission: "pedagogy.assignment.manage", type: "assigned_classes" }
       ]
     },
     guard: { scopes: [{ permission: "security.pickup.read", type: "school" }, { permission: "security.pickup.manage", type: "school" }] }
