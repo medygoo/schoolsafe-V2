@@ -46,6 +46,11 @@
     { studentId: "demo-student-ethan", name: "Ethan Leroy", classId: "demo-class-2", score: 13.6 },
     { studentId: "demo-student-foreign", name: "Noah Kasongo", classId: "demo-class-foreign", score: 17.4 }
   ];
+  var TRACKING_STORAGE_KEY = "schoolsafe-v2-teacher-monthly-tracking-drafts";
+  var MONTHLY_TRACKING = [
+    { id: "demo-tracking-august", month: "2026-08", classId: "demo-class-1", subjectId: "demo-subject-math", objectives: "Consolider les opérations sur les nombres décimaux.", progress: 85, skills: "Calculer et expliquer une démarche.", collectiveDifficulty: "Alignement des décimales.", studentId: "", individualDifficulty: "", actions: "Atelier de correction guidée.", observation: "Progression collective satisfaisante.", status: "TERMINÉ", local: false },
+    { id: "demo-tracking-foreign", month: "2026-08", classId: "demo-class-foreign", subjectId: "demo-subject-physics", objectives: "Hors périmètre.", progress: 50, skills: "Mesurer.", collectiveDifficulty: "Unités.", studentId: "demo-student-foreign", individualDifficulty: "Hors périmètre.", actions: "Aucune.", observation: "Hors périmètre.", status: "EN COURS", local: false }
+  ];
 
   var activeContainerId = null;
   var activeUser = null;
@@ -160,6 +165,15 @@
     storageSet(APPRECIATION_STORAGE_KEY, JSON.stringify(items));
   }
 
+  function readTrackingDrafts() {
+    var items = readJson(TRACKING_STORAGE_KEY, []);
+    return Array.isArray(items) ? items : [];
+  }
+
+  function saveTrackingDrafts(items) {
+    storageSet(TRACKING_STORAGE_KEY, JSON.stringify(items));
+  }
+
   function labelFor(items, id) {
     var found = items.find(function (item) { return item.id === id; });
     return found ? found.name : "Indisponible";
@@ -225,6 +239,10 @@
         }
         if (target === "evaluations") {
           open("evaluations");
+          return;
+        }
+        if (target === "difficulties") {
+          open("difficulties");
           return;
         }
         var state = container.querySelector("[data-teacher-feature-state]");
@@ -481,6 +499,74 @@
     });
   }
 
+  function trackingCard(item) {
+    var student = STUDENTS.find(function (entry) { return entry.id === item.studentId; });
+    return '<article class="teacher-timeline-item"><span class="teacher-timeline-dot"></span><div><header><div><p class="teacher-eyebrow">' + escapeMarkup(item.month + " · " + labelFor(CLASSES, item.classId)) + '</p><h3>' + escapeMarkup(labelFor(SUBJECTS, item.subjectId)) + '</h3></div><span class="teacher-status">' + escapeMarkup(item.status) + '</span></header>' +
+      '<p><strong>Objectifs :</strong> ' + escapeMarkup(item.objectives) + '</p><div class="teacher-progress"><span style="width:' + Math.max(0, Math.min(100, Number(item.progress) || 0)) + '%"></span></div><small>Progression : ' + escapeMarkup(item.progress) + ' %</small>' +
+      '<dl><div><dt>Compétences</dt><dd>' + escapeMarkup(item.skills) + '</dd></div><div><dt>Difficulté collective</dt><dd>' + escapeMarkup(item.collectiveDifficulty || "Non signalée") + '</dd></div>' +
+      '<div><dt>Suivi individuel</dt><dd>' + escapeMarkup(student ? student.name + " · " + item.individualDifficulty : "Aucun") + '</dd></div><div><dt>Actions prévues</dt><dd>' + escapeMarkup(item.actions) + '</dd></div></dl>' +
+      '<blockquote>' + escapeMarkup(item.observation) + '</blockquote><footer><b>' + (item.local ? "BROUILLON LOCAL" : "DÉMONSTRATION") + '</b><span>Historique conservé</span></footer></div></article>';
+  }
+
+  function trackingForm(projection) {
+    var classOptions = projection.classes.map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    var subjectOptions = projection.subjects.map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    var firstClass = projection.classes[0] && projection.classes[0].id;
+    var studentOptions = '<option value="">Suivi collectif</option>' + projection.students.filter(function (item) { return item.classId === firstClass; }).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    return '<form class="teacher-form" id="teacherMonthlyTrackingForm"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Nouveau jalon</p><h2>Suivi pédagogique mensuel</h2></div><span>BROUILLON LOCAL</span></div>' +
+      '<div class="teacher-form-grid"><label><span>Mois</span><input name="month" type="month" required></label><label><span>Classe</span><select name="classId">' + classOptions + '</select></label>' +
+      '<label><span>Matière</span><select name="subjectId">' + subjectOptions + '</select></label><label><span>Progression (%)</span><input name="progress" type="number" min="0" max="100" value="0" required></label>' +
+      '<label class="teacher-form-wide"><span>Objectifs du mois</span><textarea name="objectives" rows="2" required></textarea></label><label class="teacher-form-wide"><span>Compétences travaillées</span><textarea name="skills" rows="2" required></textarea></label>' +
+      '<label class="teacher-form-wide"><span>Difficultés collectives</span><textarea name="collectiveDifficulty" rows="2"></textarea></label><label><span>Élève nécessitant attention</span><select name="studentId">' + studentOptions + '</select></label>' +
+      '<label><span>Difficulté individuelle</span><input name="individualDifficulty"></label><label class="teacher-form-wide"><span>Actions prévues</span><textarea name="actions" rows="2" required></textarea></label>' +
+      '<label class="teacher-form-wide"><span>Observation</span><textarea name="observation" rows="2" required></textarea></label><label><span>Statut du suivi</span><select name="status"><option>À PRÉPARER</option><option>EN COURS</option><option>À REVOIR</option><option>TERMINÉ</option></select></label></div>' +
+      '<aside class="teacher-access-note"><strong>Aide Jaspe encadrée</strong><p>Jaspe pourra reformuler et proposer des exercices ou un plan; il ne pose jamais de diagnostic officiel.</p></aside><button class="ss-button" type="submit">' + icon("save") + ' Ajouter à la chronologie</button></form>';
+  }
+
+  function renderDifficulties(container, projection) {
+    activeView = "difficulties";
+    if (!allowsScope(activeUser, "pedagogy.lesson-plan.read", "assigned_classes")) {
+      renderDenied(container);
+      return;
+    }
+    var classIds = projection.classes.map(function (item) { return item.id; });
+    var subjectIds = projection.subjects.map(function (item) { return item.id; });
+    var items = MONTHLY_TRACKING.concat(readTrackingDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; }).sort(function (a, b) { return String(b.month).localeCompare(String(a.month)); });
+    var canManage = allowsScope(activeUser, "pedagogy.lesson-plan.manage", "assigned_classes");
+    var composer = canManage ? '<section class="teacher-panel">' + trackingForm(projection) + '</section>' : '<aside class="teacher-access-note teacher-access-note--denied"><strong>Préparation du suivi refusée</strong><p>Le DENY explicite ou l’absence de pedagogy.lesson-plan.manage interdit l’ajout de jalons.</p></aside>';
+    container.innerHTML = '<div class="teacher-pedagogy-shell"><header class="teacher-workspace-header"><button class="ss-button ss-button--secondary" type="button" data-teacher-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="teacher-eyebrow">D5 · Objectifs / difficultés / suivi</p><h1>Chronologie pédagogique mensuelle</h1><p>Chaque nouveau jalon s’ajoute sans supprimer les suivis antérieurs.</p></div><span class="teacher-boundary">assigned_classes</span></header>' +
+      '<div class="teacher-workspace-grid">' + composer + '<section class="teacher-panel"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Historique append-only</p><h2>Suivis mensuels</h2></div><span>' + items.length + ' jalon(s)</span></div><div class="teacher-timeline" data-monthly-timeline>' + (items.length ? items.map(trackingCard).join("") : '<p class="teacher-empty">Aucun suivi préparé.</p>') + '</div></section></div></div>';
+    var back = container.querySelector("[data-teacher-back]");
+    if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
+    var form = container.querySelector("#teacherMonthlyTrackingForm");
+    if (!form) return;
+    var classSelect = form.querySelector('[name="classId"]');
+    var subjectSelect = form.querySelector('[name="subjectId"]');
+    var studentSelect = form.querySelector('[name="studentId"]');
+    function syncOptions() {
+      var classId = classSelect.value;
+      var allowedSubjects = projection.subjects.filter(function (item) { return item.classIds.indexOf(classId) >= 0; });
+      subjectSelect.innerHTML = allowedSubjects.map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+      studentSelect.innerHTML = '<option value="">Suivi collectif</option>' + projection.students.filter(function (item) { return item.classId === classId && item.lifecycleStatus === "active"; }).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    }
+    classSelect.addEventListener("change", syncOptions);
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      var data = new FormData(form);
+      var classId = String(data.get("classId") || "");
+      var subjectId = String(data.get("subjectId") || "");
+      var studentId = String(data.get("studentId") || "");
+      var subject = projection.subjects.find(function (item) { return item.id === subjectId && item.classIds.indexOf(classId) >= 0; });
+      var student = studentId ? projection.students.find(function (item) { return item.id === studentId && item.classId === classId && item.lifecycleStatus === "active"; }) : null;
+      if (!subject || (studentId && !student)) return;
+      var drafts = readTrackingDrafts();
+      drafts.unshift({ id: "teacher-tracking-" + Date.now(), month: String(data.get("month") || ""), classId: classId, subjectId: subjectId, objectives: String(data.get("objectives") || ""), progress: Number(data.get("progress") || 0), skills: String(data.get("skills") || ""), collectiveDifficulty: String(data.get("collectiveDifficulty") || ""), studentId: studentId, individualDifficulty: String(data.get("individualDifficulty") || ""), actions: String(data.get("actions") || ""), observation: String(data.get("observation") || ""), status: String(data.get("status") || "À PRÉPARER"), local: true });
+      saveTrackingDrafts(drafts);
+      renderDifficulties(container, projection);
+    });
+  }
+
   function open(view) {
     var container = document.getElementById(activeContainerId || "teacherPedagogyPortal");
     if (!container || !activeUser) return false;
@@ -492,6 +578,7 @@
     if (view === "assignments") renderAssignments(container, projection);
     else if (view === "evaluations") renderEvaluations(container, projection);
     else if (view === "results") renderResults(container, projection);
+    else if (view === "difficulties") renderDifficulties(container, projection);
     else renderDashboard(container, projection);
     if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
     return true;
@@ -523,6 +610,7 @@
     readEvaluationDrafts: readEvaluationDrafts,
     readGradeDrafts: readGradeDrafts,
     readAppreciationDrafts: readAppreciationDrafts,
+    readTrackingDrafts: readTrackingDrafts,
     open: open,
     clear: clear,
     render: render
