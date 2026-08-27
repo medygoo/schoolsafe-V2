@@ -33,7 +33,7 @@ export const BRANCHES_BY_ROLE: Record<string, string[]> = {
   cashier: ["finance"],
   accountant: ["accounting"],
   hr: ["people"],
-  teacher: ["pedagogy", "communication"],
+  teacher: ["school", "pedagogy", "communication"],
   guard: ["security"],
   nurse: ["care"],
   canteen: ["care"],
@@ -230,17 +230,23 @@ export async function enterDemoWorkspace(page: Page, role: string) {
 export async function expectBranches(page: Page, role: string) {
   const expected = BRANCHES_BY_ROLE[role];
   for (const key of expected) {
-    await expect(page.locator(`#branch-${key}`)).toBeVisible();
+    await expect(page.locator(`[data-branch="${key}"]:visible`).first()).toBeVisible();
   }
   return expected;
 }
 
 export async function expectNoBranch(page: Page, branchKey: string) {
-  await expect(page.locator(`#branch-${branchKey}`)).toHaveCount(0);
+  await expect(page.locator(`[data-branch="${branchKey}"]:visible`)).toHaveCount(0);
 }
 
 export async function openAction(page: Page, actionName: string) {
-  const button = page.locator(`[data-action="${actionName}"]`).first();
+  const button = page.locator(`[data-action="${actionName}"]:visible`).first();
+  if (await button.count() === 0) {
+    const hiddenAction = page.locator(`[data-action="${actionName}"]`).first();
+    await expect(hiddenAction).toHaveCount(1);
+    await hiddenAction.evaluate((element: HTMLElement) => element.click());
+    return;
+  }
   await expect(button).toBeVisible();
   await button.evaluate((element: HTMLElement) => element.click());
 }

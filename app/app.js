@@ -218,10 +218,10 @@
    * Elle ne crée aucun droit backend et permet aux modules de passer par Access_Law sans bypass de rôle.
    */
   var DEMO_PERMISSIONS_BY_ROLE = {
-    admin: ["school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
+    admin: ["school.manage", "staff.read", "staff.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
     parent: ["school.student.read", "school.guardian.read", "school.guardian.manage", "finance.status.read"],
-    teacher: ["school.student.read", "pedagogy.grade.read"],
+    teacher: ["school.student.read", "school.class.read", "pedagogy.grade.read"],
     guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
   };
 
@@ -242,6 +242,7 @@
       assignedClassIds: ["demo-class-1"],
       scopes: [
         { permission: "school.student.read", type: "assigned_classes" },
+        { permission: "school.class.read", type: "assigned_classes" },
         { permission: "pedagogy.grade.read", type: "assigned_classes" }
       ]
     },
@@ -424,6 +425,7 @@
       welcome: "Retrouvez immédiatement vos classes et vos priorités.", copy: "SchoolSafe utilise les affectations pour limiter l’espace aux classes, matières et élèves confiés à l’enseignant.",
       today: [["Présence à effectuer","1 classe","clipboard-check"],["Cours prévus","4 aujourd’hui","calendar-clock"],["Devoirs à corriger","18 remises","notebook-tabs"],["Notifications","2 importantes","bell-ring"]],
       branches: [
+        branch("school","Mes élèves et classes",[group("Périmètre affecté",[["Élèves de mes classes","users"],["Structure de mes classes","school"]])]),
         branch("pedagogy","Classes et apprentissage",[group("Mes classes",[["1re A","users-round"],["2e B","users-round"],["Emploi du temps","calendar-range"]]),group("Travail pédagogique",[["Présences, absences et retards","clipboard-check"],["Devoirs et corrections","notebook-pen"],["Évaluations et notes","star"],["Cahier de préparation de l’enseignant","book-open-check"]]),group("Suivi des élèves",[["Résultats et moyennes","chart-no-axes-combined"],["Difficultés","triangle-alert"],["Rattrapage pédagogique","life-buoy"],["Bulletins à consulter","file-text"],["Préparation aux épreuves certificatives","scroll-text"]])]),
         branch("communication","Échanges autorisés",[group("Communication",[["Direction","school"],["Parents autorisés","contact-round"],["Notifications","bell"]])])
       ]
@@ -1252,6 +1254,7 @@
 
   function schoolTabForAction(actionName) {
     if (/élèves|dossier élève/i.test(actionName)) return "students";
+    if (/structure|classes|année scolaire/i.test(actionName)) return "structure";
     if (/mon école|paramètres de l’école|configuration école|école & personnel/i.test(actionName)) return "school";
     if (/mon équipe|personnel|staff/i.test(actionName)) return "staff";
     return "";
@@ -2032,6 +2035,14 @@
       });
     });
 
+    document.querySelectorAll("#workspaceBranches [data-action]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var section = button.closest("[id^='branch-']");
+        var branchKey = section ? section.id.replace(/^branch-/, "") : "";
+        openActionByBranch(branchKey, button.getAttribute("data-action") || "");
+      });
+    });
+
     var permissionsNav = document.getElementById("permissionsNav");
     if (permissionsNav) {
       permissionsNav.addEventListener("click", function () {
@@ -2255,6 +2266,21 @@
     if (branchKey === "communication") { notify("Communication — ouverture dans une prochaine étape."); return; }
     if (branchKey === "reports") { notify("Contrôle et rapports — ouverture dans une prochaine étape."); return; }
     notify(definition.label + " — ouverture dans une prochaine étape.");
+  }
+
+  function openActionByBranch(branchKey, actionName) {
+    var definition = branchDefinitions[branchKey];
+    if (!definition) return;
+    setBreadcrumb(definition.label);
+    if (branchKey === "school" && pedagogyTabForAction(actionName)) { openPedagogyModule(actionName); return; }
+    if (branchKey === "school" && securityTabForAction(actionName)) { openSecurityModule(actionName); return; }
+    if (branchKey === "pedagogy") { openPedagogyModule(actionName); return; }
+    if (branchKey === "finance") { openFinanceModule(actionName); return; }
+    if (branchKey === "feeControl") { openFeeControlModule(actionName); return; }
+    if (branchKey === "security") { openSecurityModule(actionName); return; }
+    if (branchKey === "school") { openSchoolModule(schoolTabForAction(actionName) || "school"); return; }
+    if (branchKey === "pilotage") { openPilotageModule(actionName); return; }
+    notify(actionName + " — ouverture dans une prochaine étape.");
   }
 
   function populateRoleSelect(select, value) {

@@ -32,12 +32,19 @@ test.describe("B1 — dossier élève en préparation", () => {
     await page.evaluate(() => {
       (window as any).SchoolSafeSchoolModule.render("students", {
         permissions: ["school.student.read", "school.student.create"],
+        scopes: [
+          { permission: "school.student.read", type: "school" },
+          { permission: "school.student.create", type: "school" },
+        ],
       });
     });
     await expect(page.getByRole("button", { name: "Nouveau dossier" })).toBeVisible();
 
     await page.evaluate(() => {
-      (window as any).SchoolSafeSchoolModule.render("students", { permissions: ["school.student.read"] });
+      (window as any).SchoolSafeSchoolModule.render("students", {
+        permissions: ["school.student.read"],
+        scopes: [{ permission: "school.student.read", type: "school" }],
+      });
     });
     await expect(page.getByRole("button", { name: "Nouveau dossier" })).toHaveCount(0);
   });
@@ -48,6 +55,10 @@ test.describe("B1 — dossier élève en préparation", () => {
     await page.evaluate(() => {
       (window as any).SchoolSafeSchoolModule.render("students", {
         permissions: ["school.student.read", "school.student.create"],
+        scopes: [
+          { permission: "school.student.read", type: "school" },
+          { permission: "school.student.create", type: "school" },
+        ],
       });
     });
     await page.getByRole("button", { name: "Nouveau dossier" }).click();

@@ -86,10 +86,47 @@
   }
 
   function canCreateStudent() {
-    if (window.SchoolSafeAccess && window.SchoolSafeAccess.canAccess) {
-      return window.SchoolSafeAccess.canAccess(currentUser, "school.student.create");
-    }
-    return !!(currentUser && Array.isArray(currentUser.permissions) && currentUser.permissions.indexOf("school.student.create") >= 0);
+    return hasScopedPermission("school.student.create", ["school"]);
+  }
+
+  function isExplicitlyDenied(permission) {
+    if (Array.isArray(currentUser && currentUser.deniedPermissions) && currentUser.deniedPermissions.indexOf(permission) >= 0) return true;
+    return Array.isArray(currentUser && currentUser.permissionExceptions) && currentUser.permissionExceptions.some(function (item) {
+      return item && item.permission === permission && String(item.effect || "").toLowerCase() === "deny";
+    });
+  }
+
+  function hasPermission(permission) {
+    if (isExplicitlyDenied(permission)) return false;
+    return !!(window.SchoolSafeAccess && window.SchoolSafeAccess.canAccess(currentUser || {}, permission));
+  }
+
+  function scopeFor(permission) {
+    var scopes = Array.isArray(currentUser && currentUser.scopes) ? currentUser.scopes : [];
+    return scopes.find(function (scope) { return scope.permission === permission; }) || scopes.find(function (scope) { return !scope.permission; }) || null;
+  }
+
+  function hasScopedPermission(permission, allowedScopes) {
+    var scope = scopeFor(permission);
+    return hasPermission(permission) && !!scope && allowedScopes.indexOf(scope.type) >= 0;
+  }
+
+  function canViewStudent(student) {
+    if (!hasPermission("school.student.read")) return false;
+    var scope = scopeFor("school.student.read");
+    if (!scope) return false;
+    if (scope.type === "school") return true;
+    if (scope.type === "own_children") return Array.isArray(currentUser.childIds) && currentUser.childIds.indexOf(student.id) >= 0;
+    if (scope.type === "assigned_classes") return student.lifecycle_status === "active" && Array.isArray(currentUser.assignedClassIds) && currentUser.assignedClassIds.indexOf(student.class_id) >= 0;
+    return false;
+  }
+
+  function canUseTab(tabName) {
+    if (tabName === "school") return hasScopedPermission("school.manage", ["school"]);
+    if (tabName === "staff") return hasScopedPermission("staff.read", ["school"]) || hasScopedPermission("staff.manage", ["school"]);
+    if (tabName === "students") return hasScopedPermission("school.student.read", ["school", "own_children", "assigned_classes", "assigned_subjects"]);
+    if (tabName === "structure") return !!(window.SchoolSafeAcademicStructure && window.SchoolSafeAcademicStructure.canRead(currentUser));
+    return false;
   }
 
   function studentBadge(status) {
@@ -119,7 +156,8 @@
   }
 
   function renderStudentList() {
-    if (!studentsData.length) {
+    var visibleStudents = studentsData.filter(canViewStudent);
+    if (!visibleStudents.length) {
       return window.ssState({
         type: "empty",
         title: studentStatus === "draft" ? "Aucun dossier en préparation" : "Aucun élève actif",
@@ -127,7 +165,7 @@
         size: "compact",
       });
     }
-    return '<div class="student-record-list">' + studentsData.map(function (student) {
+    return '<div class="student-record-list">' + visibleStudents.map(function (student) {
       var enrollment = student.enrollment || {};
       var parent = student.primary_parent || {};
       return (
@@ -352,7 +390,11 @@
     var container = document.getElementById("schoolTabs");
     if (!container) return;
     container.querySelectorAll("button").forEach(function (btn) {
-      btn.classList.toggle("active", btn.getAttribute("data-school-tab") === currentTab);
+      var tabName = btn.getAttribute("data-school-tab");
+      var allowed = canUseTab(tabName);
+      btn.hidden = !allowed;
+      btn.setAttribute("aria-hidden", allowed ? "false" : "true");
+      btn.classList.toggle("active", allowed && tabName === currentTab);
     });
   }
 
@@ -811,7 +853,9 @@
     container.addEventListener("click", function (e) {
       var btn = e.target.closest("[data-school-tab]");
       if (!btn) return;
-      currentTab = btn.getAttribute("data-school-tab");
+      var nextTab = btn.getAttribute("data-school-tab");
+      if (!canUseTab(nextTab)) return;
+      currentTab = nextTab;
       renderTabs();
       if (currentTab === "school") loadSchool();
       if (currentTab === "staff") loadStaff();
@@ -821,11 +865,19 @@
   }
 
   function render(tabName, user) {
-    if (tabName === "school" || tabName === "staff" || tabName === "students" || tabName === "structure") {
+    currentUser = user || currentUser || { permissions: [] };
+    if ((tabName === "school" || tabName === "staff" || tabName === "students" || tabName === "structure") && canUseTab(tabName)) {
       currentTab = tabName;
     }
-    currentUser = user || currentUser || { permissions: [] };
+    if (!canUseTab(currentTab)) {
+      currentTab = ["school", "staff", "students", "structure"].find(canUseTab) || "";
+    }
     renderTabs();
+    if (!currentTab) {
+      var deniedContainer = document.getElementById("schoolContent");
+      if (deniedContainer) deniedContainer.innerHTML = window.ssState({ type: "error", title: "Accès refusé", message: "Aucune permission et portée ne permettent d’afficher ce module." });
+      return;
+    }
     if (currentTab === "school") loadSchool();
     if (currentTab === "staff") loadStaff();
     if (currentTab === "students") loadStudents();

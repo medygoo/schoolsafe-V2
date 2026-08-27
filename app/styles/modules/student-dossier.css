@@ -60,7 +60,8 @@
   .student-dossier-hero dl { grid-template-columns: 1fr 1fr; }
   .student-dossier-hero dl div:last-child { grid-column: 1 / -1; }
   .student-dossier-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .student-dossier-nav button { min-height: 58px; padding: 9px; }
+  .student-dossier-nav button { min-height: 64px; padding: 9px; }
+  .student-dossier-nav b, .student-dossier-nav small { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
   .student-dossier-panel { min-height: 300px; padding: 16px; }
   .student-dossier-facts, .student-dossier-summary { grid-template-columns: 1fr; }
 }

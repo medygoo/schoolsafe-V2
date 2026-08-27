@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { enterDemoWorkspace, expectBranches, expectNoBranch, openAction } from "./helpers";
 
 test.describe("Profil enseignant", () => {
-  test("affiche uniquement pédagogie et communication", async ({ page }) => {
+  test("affiche ses élèves, la pédagogie et la communication", async ({ page }) => {
     await enterDemoWorkspace(page, "teacher");
     await expectBranches(page, "teacher");
     await expectNoBranch(page, "finance");
