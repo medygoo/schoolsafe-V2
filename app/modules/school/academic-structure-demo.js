@@ -59,14 +59,34 @@
     return hasPermission(user, READ_PERMISSION) && !!scope && (scope.type === "school" || scope.type === "assigned_classes");
   }
 
-  function readDrafts() {
-    try { return JSON.parse(root.localStorage.getItem(STORAGE_KEY) || "[]"); }
-    catch (error) { return []; }
+  function emptyDrafts() {
+    return { years: [], levels: [], classes: [] };
   }
 
-  function getYears() { return YEARS.map(function (item) { return Object.assign({}, item); }); }
-  function getLevels() { return LEVELS.map(function (item) { return Object.assign({}, item); }); }
-  function getClasses() { return CLASSES.concat(readDrafts()).map(function (item) { return Object.assign({}, item); }); }
+  function readDrafts() {
+    try {
+      var parsed = JSON.parse(root.localStorage.getItem(STORAGE_KEY) || "null");
+      if (Array.isArray(parsed)) return { years: [], levels: [], classes: parsed };
+      if (!parsed || typeof parsed !== "object") return emptyDrafts();
+      return {
+        years: Array.isArray(parsed.years) ? parsed.years : [],
+        levels: Array.isArray(parsed.levels) ? parsed.levels : [],
+        classes: Array.isArray(parsed.classes) ? parsed.classes : []
+      };
+    } catch (error) { return emptyDrafts(); }
+  }
+
+  function writeDrafts(drafts) {
+    root.localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts));
+  }
+
+  function draftId(kind) {
+    return "draft-" + kind + "-" + Date.now();
+  }
+
+  function getYears() { return YEARS.concat(readDrafts().years).map(function (item) { return Object.assign({}, item); }); }
+  function getLevels() { return LEVELS.concat(readDrafts().levels).map(function (item) { return Object.assign({}, item); }); }
+  function getClasses() { return CLASSES.concat(readDrafts().classes).map(function (item) { return Object.assign({}, item); }); }
   function getActiveYear() { return getYears().find(function (item) { return item.status === "ACTIVE"; }); }
 
   function getVisibleClasses(user) {
@@ -87,16 +107,22 @@
     return root.ssBadge({ label: status, variant: statusVariant(status), size: "sm" });
   }
 
+  function draftState(item) {
+    if (!item.isLocalDraft) return "";
+    var detail = item.draftAction === "update" ? "Modification préparée de " + item.sourceClassName : "Création préparée";
+    return '<div class="academic-draft-indicator"><span>BROUILLON LOCAL</span><strong>BACKEND_LATER</strong><small>' + escapeMarkup(detail) + '</small></div>';
+  }
+
   function renderYear(item) {
-    return '<article class="academic-year-card" data-academic-year="' + escapeMarkup(item.id) + '"><header><div><span>Année scolaire</span><h3>' + escapeMarkup(item.label) + '</h3></div>' + badge(item.status) + '</header><dl><div><dt>Début</dt><dd>' + escapeMarkup(item.startsOn) + '</dd></div><div><dt>Fin</dt><dd>' + escapeMarkup(item.endsOn) + '</dd></div></dl><footer>Historique conservé · aucune suppression</footer></article>';
+    return '<article class="academic-year-card" data-academic-year="' + escapeMarkup(item.id) + '"' + (item.isLocalDraft ? ' data-local-draft="true"' : '') + '><header><div><span>Année scolaire</span><h3>' + escapeMarkup(item.label) + '</h3></div>' + badge(item.status) + '</header><dl><div><dt>Début</dt><dd>' + escapeMarkup(item.startsOn) + '</dd></div><div><dt>Fin</dt><dd>' + escapeMarkup(item.endsOn) + '</dd></div></dl>' + draftState(item) + '<footer>Historique conservé · aucune suppression</footer></article>';
   }
 
   function renderLevel(item) {
-    return '<article class="academic-level-card" data-academic-level="' + escapeMarkup(item.id) + '"><span>' + escapeMarkup(item.cycle) + '</span><h3>' + escapeMarkup(item.name) + '</h3><p>Niveau configurable · ordre ' + item.order + '</p></article>';
+    return '<article class="academic-level-card" data-academic-level="' + escapeMarkup(item.id) + '"' + (item.isLocalDraft ? ' data-local-draft="true"' : '') + '><span>' + escapeMarkup(item.cycle) + '</span><h3>' + escapeMarkup(item.name) + '</h3><p>Niveau configurable · ordre ' + item.order + '</p>' + draftState(item) + '</article>';
   }
 
   function renderClass(item) {
-    return '<article class="academic-class-card" data-academic-class="' + escapeMarkup(item.id) + '"><header><div><span>' + escapeMarkup(item.level) + '</span><h3>' + escapeMarkup(item.name) + '</h3></div>' + badge(item.status) + '</header><dl><div><dt>Année scolaire</dt><dd>' + escapeMarkup(item.year) + '</dd></div><div><dt>Section</dt><dd>' + escapeMarkup(item.section || "—") + '</dd></div><div><dt>Enseignant principal</dt><dd>' + escapeMarkup(item.teacher || "À affecter") + '</dd></div><div><dt>Capacité indicative</dt><dd>' + escapeMarkup(item.capacity || "—") + '</dd></div><div><dt>Effectif visible</dt><dd>' + (item.enrollment == null ? "Indisponible" : escapeMarkup(item.enrollment)) + '</dd></div></dl>' + (canManage(activeUser) ? '<button type="button" class="academic-card-edit" data-edit-class="' + escapeMarkup(item.id) + '"><i data-lucide="pencil"></i> Modifier localement</button>' : '') + '</article>';
+    return '<article class="academic-class-card" data-academic-class="' + escapeMarkup(item.id) + '"' + (item.isLocalDraft ? ' data-local-draft="true" data-draft-action="' + escapeMarkup(item.draftAction) + '"' : '') + (item.sourceClassId ? ' data-source-class="' + escapeMarkup(item.sourceClassId) + '"' : '') + '><header><div><span>' + escapeMarkup(item.level) + '</span><h3>' + escapeMarkup(item.name) + '</h3></div>' + badge(item.status) + '</header><dl><div><dt>Année scolaire</dt><dd>' + escapeMarkup(item.year) + '</dd></div><div><dt>Section</dt><dd>' + escapeMarkup(item.section || "—") + '</dd></div><div><dt>Enseignant principal</dt><dd>' + escapeMarkup(item.teacher || "À affecter") + '</dd></div><div><dt>Capacité indicative</dt><dd>' + escapeMarkup(item.capacity || "—") + '</dd></div><div><dt>Effectif visible</dt><dd>' + (item.enrollment == null ? "Indisponible" : escapeMarkup(item.enrollment)) + '</dd></div></dl>' + draftState(item) + (canManage(activeUser) && !item.isLocalDraft ? '<button type="button" class="academic-card-edit" data-edit-class="' + escapeMarkup(item.id) + '"><i data-lucide="pencil"></i> Modifier localement</button>' : '') + '</article>';
   }
 
   function render(container, user) {
@@ -116,10 +142,12 @@
   function openDraftModal(kind, classId) {
     if (!canManage(activeUser)) return;
     var isClass = kind === "class";
+    var sourceClass = isClass && classId ? CLASSES.find(function (item) { return item.id === classId; }) : null;
+    if (classId && !sourceClass) return;
     var title = isClass ? (classId ? "Modifier une classe" : "Préparer une classe") : kind === "year" ? "Préparer une année scolaire" : "Préparer un niveau";
     var content = '<div class="academic-modal-state"><span>Brouillon local</span><strong>BACKEND_LATER</strong></div><form id="academicDraftForm" class="ss-form-grid">';
     if (isClass) {
-      content += '<label class="ss-field"><span class="ss-label">Nom de la classe</span><input class="ss-input" name="name" required value=""></label><label class="ss-field"><span class="ss-label">Niveau</span><select class="ss-select" name="level">' + getLevels().map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("") + '</select></label><label class="ss-field"><span class="ss-label">Capacité indicative</span><input class="ss-input" name="capacity" type="number" min="1" value="30"></label>';
+      content += '<label class="ss-field"><span class="ss-label">Nom de la classe</span><input class="ss-input" name="name" required value="' + escapeMarkup(sourceClass ? sourceClass.name : "") + '"></label><label class="ss-field"><span class="ss-label">Niveau</span><select class="ss-select" name="level">' + getLevels().map(function (item) { return '<option value="' + escapeMarkup(item.id) + '"' + (sourceClass && sourceClass.levelId === item.id ? " selected" : "") + '>' + escapeMarkup(item.name) + '</option>'; }).join("") + '</select></label><label class="ss-field"><span class="ss-label">Capacité indicative</span><input class="ss-input" name="capacity" type="number" min="1" value="' + escapeMarkup(sourceClass ? sourceClass.capacity : 30) + '"></label>';
     } else {
       content += '<label class="ss-field"><span class="ss-label">Libellé</span><input class="ss-input" name="name" required></label>';
     }
@@ -128,12 +156,18 @@
     var form = modal.content.querySelector("#academicDraftForm");
     form.addEventListener("submit", function (event) {
       event.preventDefault();
+      var drafts = readDrafts();
       if (isClass) {
         var level = getLevels().find(function (item) { return item.id === form.level.value; }) || getLevels()[0];
-        var drafts = readDrafts().filter(function (item) { return item.id !== "draft-class"; });
-        drafts.push({ id: "draft-class", name: form.name.value.trim(), levelId: level.id, level: level.name, yearId: getActiveYear().id, year: getActiveYear().label, section: "", teacher: "À affecter", capacity: Number(form.capacity.value), enrollment: null, status: "BROUILLON LOCAL" });
-        root.localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts));
+        var activeYear = getActiveYear();
+        if (sourceClass) drafts.classes = drafts.classes.filter(function (item) { return item.sourceClassId !== sourceClass.id; });
+        drafts.classes.push({ id: sourceClass ? "draft-class-update-" + sourceClass.id : draftId("class"), name: form.name.value.trim(), levelId: level.id, level: level.name, yearId: sourceClass ? sourceClass.yearId : activeYear.id, year: sourceClass ? sourceClass.year : activeYear.label, section: sourceClass ? sourceClass.section : "", teacher: sourceClass ? sourceClass.teacher : "À affecter", capacity: Number(form.capacity.value), enrollment: sourceClass ? sourceClass.enrollment : null, status: "BROUILLON LOCAL", backendState: "BACKEND_LATER", isLocalDraft: true, draftAction: sourceClass ? "update" : "create", sourceClassId: sourceClass ? sourceClass.id : null, sourceClassName: sourceClass ? sourceClass.name : null });
+      } else if (kind === "year") {
+        drafts.years.push({ id: draftId("year"), label: form.name.value.trim(), startsOn: "À définir", endsOn: "À définir", status: "BROUILLON LOCAL", backendState: "BACKEND_LATER", isLocalDraft: true, draftAction: "create" });
+      } else if (kind === "level") {
+        drafts.levels.push({ id: draftId("level"), name: form.name.value.trim(), cycle: "À définir", order: getLevels().length + 1, status: "BROUILLON LOCAL", backendState: "BACKEND_LATER", isLocalDraft: true, draftAction: "create" });
       }
+      writeDrafts(drafts);
       modal.close();
       render(activeContainer, activeUser);
     });

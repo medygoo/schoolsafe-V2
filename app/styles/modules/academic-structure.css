@@ -24,10 +24,14 @@
 .academic-level-card p { margin: 8px 0 0; color: var(--ss-text-muted, #64748b); }
 .academic-card-edit { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; border: 0; background: transparent; color: #1d4ed8; font-weight: 800; cursor: pointer; }
 .academic-card-edit svg { width: 17px; }
+.academic-draft-indicator { display: grid; grid-template-columns: auto auto; gap: 5px 10px; margin: 14px 0; padding: 10px 12px; border: 1px solid #f59e0b66; border-radius: 12px; background: #fffbeb; color: #92400e; }
+.academic-draft-indicator span, .academic-draft-indicator strong { font-size: 12px; font-weight: 900; letter-spacing: .04em; }
+.academic-draft-indicator strong { text-align: right; }
+.academic-draft-indicator small { grid-column: 1 / -1; }
 .academic-readonly { display: inline-flex; align-items: center; gap: 8px; padding: 10px 13px; border-radius: 999px; background: #ffffff18; color: #fff !important; }
 .academic-modal-state { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 18px; padding: 12px 14px; border-radius: 12px; background: #fffbeb; color: #92400e; font-weight: 800; }
 .academic-modal-copy { color: var(--ss-text-muted, #64748b); line-height: 1.5; }
-[data-theme="dark"] .academic-local-notice, [data-theme="dark"] .academic-jaspe, [data-theme="dark"] .academic-denied, [data-theme="dark"] .academic-modal-state { background: #422006; color: #fde68a; }
+[data-theme="dark"] .academic-local-notice, [data-theme="dark"] .academic-jaspe, [data-theme="dark"] .academic-denied, [data-theme="dark"] .academic-modal-state, [data-theme="dark"] .academic-draft-indicator { background: #422006; color: #fde68a; }
 @media (max-width: 720px) {
   .academic-structure { gap: 16px; }
   .academic-structure__hero { flex-direction: column; padding: 20px; }
