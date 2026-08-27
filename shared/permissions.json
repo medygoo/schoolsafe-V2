@@ -39,7 +39,6 @@
   { "code": "pedagogy.grade.manage", "label": "Gérer les notes", "scope": "assigned_classes" },
   { "code": "pedagogy.lesson-plan.read", "label": "Lire le cahier de préparation", "scope": "assigned_classes" },
   { "code": "pedagogy.lesson-plan.manage", "label": "Gérer le cahier de préparation", "scope": "assigned_classes" },
-  { "code": "pedagogy.remediation.manage", "label": "Gérer le rattrapage pédagogique", "scope": "assigned_classes" },
   { "code": "pedagogy.report.read", "label": "Lire les rapports pédagogiques", "scope": "school" },
   { "code": "pedagogy.report.manage", "label": "Gérer les rapports pédagogiques", "scope": "school" },
   { "code": "palmarques.read", "label": "Consulter le palmarès", "scope": "school" },

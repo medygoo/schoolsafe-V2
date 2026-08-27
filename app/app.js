@@ -226,7 +226,7 @@
     admin: ["school.manage", "staff.read", "staff.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
-    teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage", "pedagogy.remediation.manage", "safe.assistant.use"],
+    teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage", "safe.assistant.use"],
     pedagogy: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.lesson-plan.read", "pedagogy.report.read", "pedagogy.report.manage", "palmarques.read", "safe.assistant.use"],
     guard: ["school.guardian.read", "security.pickup.read", "security.pickup.manage"]
   };
@@ -266,7 +266,6 @@
         { permission: "pedagogy.grade.manage", type: "assigned_classes" },
         { permission: "pedagogy.lesson-plan.read", type: "assigned_classes" },
         { permission: "pedagogy.lesson-plan.manage", type: "assigned_classes" },
-        { permission: "pedagogy.remediation.manage", type: "assigned_classes" },
         { permission: "safe.assistant.use", type: "own" }
       ]
     },

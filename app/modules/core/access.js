@@ -43,7 +43,6 @@
       "pedagogy.grade.manage",
       "pedagogy.lesson-plan.read",
       "pedagogy.lesson-plan.manage",
-      "pedagogy.remediation.manage",
       "pedagogy.report.read",
       "pedagogy.report.manage",
       "palmarques.read",

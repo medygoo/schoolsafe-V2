@@ -42,6 +42,10 @@ describe("Permission catalog completeness", () => {
     expect(catalog.some((permission) => permission.code === "school.student.create" && permission.scope === "school")).toBe(true);
   });
 
+  it("does not create a dedicated remediation permission for the frontend draft", () => {
+    expect(codes.has("pedagogy.remediation.manage")).toBe(false);
+  });
+
   it("has no duplicate codes", () => {
     expect(codes.size).toBe(catalog.length);
   });

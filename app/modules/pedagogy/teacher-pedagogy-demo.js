@@ -117,6 +117,10 @@
     return allowsScope(user, "safe.assistant.use", "own");
   }
 
+  function canPrepareRemediation(user) {
+    return allowsScope(user, "pedagogy.lesson-plan.manage", "assigned_classes");
+  }
+
   function getAssignedProjection(user) {
     var canReadClasses = allowsScope(user, "school.class.read", "assigned_classes");
     var canReadSubjects = allowsScope(user, "pedagogy.subject.read", "assigned_subjects");
@@ -186,8 +190,8 @@
       return { allowed: true, refusal: false, action: "difficulties", message: "Résumé limité aux difficultés des classes affectées; aucun diagnostic officiel." };
     }
     if (/rattrapage|accompagnement/.test(text)) {
-      if (!allowsScope(user, "pedagogy.remediation.manage", "assigned_classes")) return jaspeRefusal("pedagogy.remediation.manage avec assigned_classes est nécessaire.");
-      return { allowed: true, refusal: false, action: "remediation", message: "Plan de rattrapage pédagogique proposé en BROUILLON LOCAL, sans finance." };
+      if (!canPrepareRemediation(user)) return jaspeRefusal("pedagogy.lesson-plan.manage avec assigned_classes est nécessaire pour préparer ce brouillon local.");
+      return { allowed: true, refusal: false, action: "remediation", message: "Plan de rattrapage proposé en BROUILLON LOCAL · BACKEND_LATER · PÉDAGOGIE UNIQUEMENT." };
     }
     if (canOpenDirection(user) && /pilotage|direction|synthese/.test(text)) return { allowed: true, refusal: false, action: "direction", message: "Synthèse limitée aux scopes pédagogiques réellement projetés." };
     return { allowed: true, refusal: false, action: null, message: "Je peux expliquer, résumer et préparer des brouillons dans " + projection.classes.map(function (item) { return item.name; }).join(", ") + "." };
@@ -721,7 +725,7 @@
     var student = STUDENTS.find(function (entry) { return entry.id === item.studentId; });
     return '<article class="teacher-record-card teacher-remediation-card"><header><div><p class="teacher-eyebrow">' + escapeMarkup(labelFor(CLASSES, item.classId) + " · " + labelFor(SUBJECTS, item.subjectId)) + '</p><h3>' + escapeMarkup(student ? student.name : "Élève indisponible") + '</h3></div><span class="teacher-status">' + escapeMarkup(item.status) + '</span></header>' +
       '<p><strong>Difficulté :</strong> ' + escapeMarkup(item.difficulty) + '</p><p><strong>Objectif :</strong> ' + escapeMarkup(item.objective) + '</p><dl><div><dt>Séances prévues</dt><dd>' + escapeMarkup(item.plannedSessions) + '</dd></div><div><dt>Calendrier</dt><dd>' + escapeMarkup(item.calendar) + '</dd></div><div><dt>Progression</dt><dd>' + escapeMarkup(item.progress) + ' %</dd></div></dl>' +
-      '<p><strong>Observations :</strong> ' + escapeMarkup(item.observations) + '</p><p><strong>Résultat pédagogique :</strong> ' + escapeMarkup(item.result) + '</p><footer><b>' + (item.local ? "BROUILLON LOCAL" : "DÉMONSTRATION") + '</b><span>PÉDAGOGIE UNIQUEMENT</span></footer></article>';
+      '<p><strong>Observations :</strong> ' + escapeMarkup(item.observations) + '</p><p><strong>Résultat pédagogique :</strong> ' + escapeMarkup(item.result) + '</p><footer><b>' + (item.local ? "BROUILLON LOCAL" : "DÉMONSTRATION") + '</b><span>BACKEND_LATER · PÉDAGOGIE UNIQUEMENT</span></footer></article>';
   }
 
   function remediationForm(projection) {
@@ -736,12 +740,12 @@
       '<label><span>Séances prévues</span><input name="plannedSessions" type="number" min="1" max="30" value="1" required></label><label><span>Progression (%)</span><input name="progress" type="number" min="0" max="100" value="0"></label>' +
       '<label class="teacher-form-wide"><span>Calendrier</span><input name="calendar" placeholder="Dates prévues" required></label><label class="teacher-form-wide"><span>Observations</span><textarea name="observations" rows="2"></textarea></label>' +
       '<label class="teacher-form-wide"><span>Résultat pédagogique</span><textarea name="result" rows="2"></textarea></label></div>' +
-      '<aside class="teacher-access-note"><strong>Aucune inscription financière</strong><p>Ce parcours traite uniquement la pédagogie. Les frais, paiements et répartitions appartiennent à une phase financière ultérieure.</p></aside><button class="ss-button" type="submit">' + icon("save") + ' Préparer le parcours</button></form>';
+      '<aside class="teacher-access-note"><strong>BACKEND_LATER · PÉDAGOGIE UNIQUEMENT</strong><p>Aucune inscription financière. Les frais, paiements et répartitions appartiennent à une phase financière ultérieure.</p></aside><button class="ss-button" type="submit">' + icon("save") + ' Préparer le parcours</button></form>';
   }
 
   function renderRemediation(container, projection) {
     activeView = "remediation";
-    if (!allowsScope(activeUser, "pedagogy.remediation.manage", "assigned_classes")) {
+    if (!canPrepareRemediation(activeUser)) {
       renderDenied(container);
       return;
     }
@@ -749,8 +753,8 @@
     var subjectIds = projection.subjects.map(function (item) { return item.id; });
     var studentIds = projection.students.map(function (item) { return item.id; });
     var items = REMEDIATIONS.concat(readRemediationDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0 && studentIds.indexOf(item.studentId) >= 0; });
-    var canManage = allowsScope(activeUser, "pedagogy.remediation.manage", "assigned_classes");
-    var composer = canManage ? '<section class="teacher-panel">' + remediationForm(projection) + '</section>' : '<aside class="teacher-access-note teacher-access-note--denied"><strong>Préparation du rattrapage refusée</strong><p>pedagogy.remediation.manage avec assigned_classes est nécessaire.</p></aside>';
+    var canManage = canPrepareRemediation(activeUser);
+    var composer = canManage ? '<section class="teacher-panel">' + remediationForm(projection) + '</section>' : '<aside class="teacher-access-note teacher-access-note--denied"><strong>Préparation du rattrapage refusée</strong><p>pedagogy.lesson-plan.manage avec assigned_classes est nécessaire.</p></aside>';
     container.innerHTML = '<div class="teacher-pedagogy-shell"><header class="teacher-workspace-header"><button class="ss-button ss-button--secondary" type="button" data-teacher-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="teacher-eyebrow">D6 · Rattrapage pédagogique</p><h1>Accompagnement des élèves affectés</h1><p>Pédagogie uniquement · aucune inscription financière.</p></div><span class="teacher-boundary">assigned_classes</span></header><div class="teacher-workspace-grid">' + composer + '<section class="teacher-panel"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Parcours autorisés</p><h2>Rattrapages préparés</h2></div><span>' + items.length + ' parcours</span></div><div class="teacher-record-list" data-remediation-list>' + (items.length ? items.map(remediationCard).join("") : '<p class="teacher-empty">Aucun parcours préparé.</p>') + '</div></section></div></div>';
     var back = container.querySelector("[data-teacher-back]");
     if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
@@ -916,6 +920,7 @@
     readTrackingDrafts: readTrackingDrafts,
     readRemediationDrafts: readRemediationDrafts,
     readDirectionReviews: readDirectionReviews,
+    canPrepareRemediation: canPrepareRemediation,
     canOpenDirection: canOpenDirection,
     supportsJaspeContext: supportsJaspeContext,
     answerJaspe: answerJaspe,

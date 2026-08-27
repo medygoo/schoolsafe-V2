@@ -8,6 +8,8 @@ test.describe("Phase D6 — rattrapage pédagogique", () => {
 
     const form = page.locator("#teacherRemediationForm");
     await expect(form).toBeVisible();
+    await expect(form.locator('[name="classId"] option')).toHaveText(["6e A", "5e A"]);
+    await expect(form).not.toContainText("3e Maternelle");
     await expect(form.locator('[name="studentId"] option')).toHaveText(["Lucas Martin", "Chloé Bernard"]);
     await expect(form).not.toContainText("Amina Mbuyi");
     await expect(form).not.toContainText("Noah Kasongo");
@@ -29,6 +31,8 @@ test.describe("Phase D6 — rattrapage pédagogique", () => {
     await expect(prepared).toContainText("Lucas Martin");
     await expect(prepared).toContainText("PLANIFIÉ");
     await expect(prepared).toContainText("BROUILLON LOCAL");
+    await expect(page.locator("#teacherPedagogyPortal")).toContainText("BACKEND_LATER");
+    await expect(page.locator("#teacherPedagogyPortal")).toContainText("PÉDAGOGIE UNIQUEMENT");
 
     await page.evaluate(() => {
       const api = (window as any).SchoolSafeTeacherPedagogy;
@@ -56,12 +60,12 @@ test.describe("Phase D6 — rattrapage pédagogique", () => {
     await expect(portal).toContainText("Aucune inscription financière");
   });
 
-  test("exige les permissions dédiées et applique ALLOW puis DENY individuel", async ({ page }) => {
+  test("utilise lesson-plan.manage avec assigned_classes et donne priorité au DENY", async ({ page }) => {
     await enterDemoWorkspace(page, "teacher");
-    const renderWith = async (permissionExceptions: any[]) => page.evaluate((exceptions) => {
+    const renderWith = async ({ manage = true, permissionExceptions = [] }: { manage?: boolean; permissionExceptions?: any[] }) => page.evaluate(({ hasManage, exceptions }) => {
       const api = (window as any).SchoolSafeTeacherPedagogy;
       api.render("teacherPedagogyPortal", {
-        permissions: ["school.class.read", "school.student.read", "pedagogy.subject.read", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage"],
+        permissions: ["school.class.read", "school.student.read", "pedagogy.subject.read", "pedagogy.lesson-plan.read"].concat(hasManage ? ["pedagogy.lesson-plan.manage"] : []),
         permissionExceptions: exceptions,
         assignedClassIds: ["demo-class-1"],
         assignedSubjectIds: ["demo-subject-math"],
@@ -70,24 +74,22 @@ test.describe("Phase D6 — rattrapage pédagogique", () => {
           { permission: "school.student.read", type: "assigned_classes" },
           { permission: "pedagogy.subject.read", type: "assigned_subjects" },
           { permission: "pedagogy.lesson-plan.read", type: "assigned_classes" },
-          { permission: "pedagogy.lesson-plan.manage", type: "assigned_classes" },
-        ],
+        ].concat(hasManage ? [{ permission: "pedagogy.lesson-plan.manage", type: "assigned_classes" }] : []),
       });
       api.open("remediation");
-    }, permissionExceptions);
+    }, { hasManage: manage, exceptions: permissionExceptions });
 
-    await renderWith([]);
-    await expect(page.locator("#teacherRemediationForm")).toHaveCount(0);
-
-    await renderWith([
-      { permission: "pedagogy.remediation.manage", effect: "allow", scope: { type: "assigned_classes" } },
-    ]);
+    await renderWith({ manage: true });
     await expect(page.locator("#teacherRemediationForm")).toBeVisible();
 
-    await renderWith([
-      { permission: "pedagogy.remediation.manage", effect: "allow", scope: "assigned_classes" },
-      { permission: "pedagogy.remediation.manage", effect: "deny", scope: "assigned_classes" },
-    ]);
+    await renderWith({ manage: false, permissionExceptions: [
+      { permission: "pedagogy.lesson-plan.manage", effect: "allow", scope: { type: "assigned_classes" } },
+    ] });
+    await expect(page.locator("#teacherRemediationForm")).toBeVisible();
+
+    await renderWith({ manage: true, permissionExceptions: [
+      { permission: "pedagogy.lesson-plan.manage", effect: "deny", scope: "assigned_classes" },
+    ] });
     await expect(page.locator("#teacherRemediationForm")).toHaveCount(0);
     await expect(page.locator("#teacherPedagogyPortal")).toContainText("Accès pédagogique refusé");
   });

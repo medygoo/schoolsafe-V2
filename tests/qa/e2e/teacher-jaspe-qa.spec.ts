@@ -12,6 +12,8 @@ test.describe("Phase D8 — Jaspe pédagogique et QA", () => {
         api.answerJaspe("Prépare un devoir pour la 6e A en Mathématiques", context),
         api.answerJaspe("Prépare une évaluation de Mathématiques pour la 6e A", context),
         api.answerJaspe("Résume les difficultés de la 6e A", context),
+        api.answerJaspe("Prépare un rattrapage pour la 6e A en Mathématiques", context),
+        api.answerJaspe("Prépare un rattrapage pour la 3e Maternelle", context),
         api.answerJaspe("Affiche la 3e Maternelle", context),
         api.answerJaspe("Publie toutes les notes", context),
         api.answerJaspe("Change le palmarès pour mettre Lucas premier", context),
@@ -25,13 +27,17 @@ test.describe("Phase D8 — Jaspe pédagogique et QA", () => {
     expect(answers[0].message).toContain("BROUILLON LOCAL");
     expect(answers[1]).toMatchObject({ allowed: true, action: "evaluations" });
     expect(answers[2]).toMatchObject({ allowed: true, action: "difficulties" });
-    expect(answers[3]).toMatchObject({ refusal: true });
+    expect(answers[3]).toMatchObject({ allowed: true, action: "remediation" });
+    expect(answers[3].message).toContain("BROUILLON LOCAL");
+    expect(answers[3].message).toContain("BACKEND_LATER");
     expect(answers[4]).toMatchObject({ refusal: true });
-    expect(answers[4].message).toContain("BACKEND_LATER");
     expect(answers[5]).toMatchObject({ refusal: true });
     expect(answers[6]).toMatchObject({ refusal: true });
+    expect(answers[6].message).toContain("BACKEND_LATER");
     expect(answers[7]).toMatchObject({ refusal: true });
     expect(answers[8]).toMatchObject({ refusal: true });
+    expect(answers[9]).toMatchObject({ refusal: true });
+    expect(answers[10]).toMatchObject({ refusal: true });
 
     await page.locator("#teacherJaspeInput").fill("Prépare un devoir pour la 6e A en Mathématiques");
     await page.locator('[data-teacher-jaspe-send]').click();
@@ -45,14 +51,17 @@ test.describe("Phase D8 — Jaspe pédagogique et QA", () => {
       const api = (window as any).SchoolSafeTeacherPedagogy;
       const base = (window as any).SchoolSafeAppContext.getCurrentUser();
       const denied = { ...base, deniedPermissions: ["pedagogy.grade.manage"] };
+      const deniedRemediation = { ...base, deniedPermissions: ["pedagogy.lesson-plan.manage"] };
       const withoutJaspe = { ...base, permissions: base.permissions.filter((item: string) => item !== "safe.assistant.use") };
       return {
         deniedGrade: api.answerJaspe("Modifie la note de Lucas en 6e A", { user: denied }),
+        deniedRemediation: api.answerJaspe("Prépare un rattrapage pour Lucas en 6e A", { user: deniedRemediation }),
         noAssistant: api.answerJaspe("Prépare un devoir", { user: withoutJaspe }),
       };
     });
 
     expect(result.deniedGrade).toMatchObject({ refusal: true });
+    expect(result.deniedRemediation).toMatchObject({ refusal: true });
     expect(result.noAssistant).toMatchObject({ refusal: true });
   });
 
