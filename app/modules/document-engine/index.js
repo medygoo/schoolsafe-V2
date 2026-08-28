@@ -21,8 +21,9 @@ export { createDocumentDataResolver } from "./document-data-resolver.js";
 export { createSchoolSafeIdentityProvider } from "./schoolsafe-identity-provider.js";
 export { createTemplateRegistry } from "./template-registry.js";
 export { RenderContext } from "./render-context.js";
-export { createLayoutEngine, LAYOUTS, MM_TO_PT } from "./layout-engine.js";
+export { createLayoutEngine, LAYOUTS, MM_TO_PT, getUniversalContentBounds, isProtectedCardLayout } from "./layout-engine.js";
 export { createFrontendRenderer } from "./frontend-renderer.js";
+export { createUniversalDocumentTemplate, selectUniversalLayout } from "./templates/universal-document-template.js";
 export { registerDefaultTemplates } from "./bootstrap-templates.js";
 export {
   buildFilename,

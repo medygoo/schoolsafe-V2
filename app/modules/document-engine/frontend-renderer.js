@@ -4,6 +4,7 @@
 import { JspdfRenderContext } from "./adapters/jspdf-render-context.js";
 import { DOCUMENT_FORMATS, DOCUMENT_AUTHORITY_LEVELS, DOCUMENT_SENSITIVITY_LEVELS } from "./contracts.js";
 import { buildFilename, formatDate } from "./file-policy.js";
+import { getUniversalContentBounds, isProtectedCardLayout } from "./layout-engine.js";
 
 export function createFrontendRenderer(deps = {}) {
   const layoutEngine = deps.layoutEngine;
@@ -41,29 +42,49 @@ async function renderPdf(model, layoutEngine) {
   if (!jsPDF) throw new Error("jsPDF not loaded");
 
   const layout = layoutEngine.getLayout(model.meta.layout || undefined);
-  const doc = new jsPDF({ unit: "pt", format: layout.dimensionsToJsPdfFormat || "a4" });
+  const protectedCard = isProtectedCardLayout(layout.name);
+  const doc = new jsPDF({
+    unit: "pt",
+    format: protectedCard ? (layout.dimensionsToJsPdfFormat || "a4") : [layout.dimensions.width, layout.dimensions.height],
+    orientation: protectedCard ? undefined : (layout.dimensions.width > layout.dimensions.height ? "landscape" : "portrait"),
+  });
   const ctx = new JspdfRenderContext(doc, layout);
+  const frontendModel = ensureFrontendPreview(model);
 
-  ctx.setTitle(`${model.meta.documentType} ${model.meta.reference || ""}`.trim());
-  ctx.setAuthor(model.meta.author.name || "SchoolSafe");
+  ctx.setTitle(`${frontendModel.meta.documentType} ${frontendModel.meta.reference || ""}`.trim());
+  ctx.setAuthor(frontendModel.meta.author.name || "SchoolSafe");
 
-  layoutEngine.applyHeader(ctx, model);
-  layoutEngine.applyFooter(ctx, model);
+  await layoutEngine.applyHeader(ctx, frontendModel);
+  if (protectedCard) layoutEngine.applyFooter(ctx, frontendModel);
 
-  // Content area starts below header and ends above footer.
-  const contentTop = layout.margins.top + 28 * 2.83465;
-  const contentBottom = ctx.getDimensions().height - layout.margins.bottom - 12 * 2.83465;
+  const bounds = getUniversalContentBounds(layout);
+  const contentTop = bounds.top;
+  const contentBottom = bounds.bottom;
 
   // Draft/preview watermark is drawn behind the content so it never hides text.
-  applyDraftWatermark(ctx, model, contentTop, contentBottom);
+  applyDraftWatermark(ctx, frontendModel, contentTop, contentBottom);
 
   // Render content via template
-  const template = model._template; // injected by engine
+  const template = frontendModel._template; // injected by engine
   if (template && typeof template.render === "function") {
-    await template.render(ctx, model, { ...layout, contentTop, contentBottom });
+    await template.render(ctx, frontendModel, { ...layout, contentTop, contentBottom });
   }
 
-  applySensitivityWatermark(ctx, model, contentTop, contentBottom);
+  const totalPages = doc.internal.getNumberOfPages();
+  if (protectedCard) {
+    applySensitivityWatermark(ctx, frontendModel, contentTop, contentBottom);
+  } else {
+    for (let page = 1; page <= totalPages; page += 1) {
+      ctx.setPage(page);
+      if (page > 1) {
+        await layoutEngine.applyHeader(ctx, frontendModel);
+        applyDraftWatermark(ctx, frontendModel, contentTop, contentBottom);
+      }
+      layoutEngine.applyFooter(ctx, frontendModel);
+      layoutEngine.applyPageNumber(ctx, frontendModel, { page, totalPages });
+      applySensitivityWatermark(ctx, frontendModel, contentTop, contentBottom);
+    }
+  }
 
   const blob = doc.output("blob");
   const filename = buildFilename({
@@ -79,8 +100,10 @@ async function renderPdf(model, layoutEngine) {
     blob,
     objectUrl: URL.createObjectURL(blob),
     filename,
-    pages: doc.internal.getNumberOfPages(),
+    pages: totalPages,
     size: blob.size,
+    layout: layout.name,
+    dimensions: { ...layout.dimensions },
   };
 }
 
@@ -235,6 +258,17 @@ function applySensitivityWatermark(ctx, model, contentTop, contentBottom) {
       color: "#cc0000",
     });
   }
+}
+
+function ensureFrontendPreview(model) {
+  return {
+    ...model,
+    meta: {
+      ...model.meta,
+      authority: DOCUMENT_AUTHORITY_LEVELS.PREVIEW,
+      generatedBy: "frontend",
+    },
+  };
 }
 
 /**

@@ -2,6 +2,8 @@
 // Page dimensions, header, footer and pagination.
 
 export const MM_TO_PT = 2.83465;
+const UNIVERSAL_HEADER_HEIGHT = 37 * MM_TO_PT;
+const UNIVERSAL_FOOTER_HEIGHT = 20 * MM_TO_PT;
 
 export const LAYOUTS = Object.freeze({
   A4_PORTRAIT: {
@@ -64,29 +66,68 @@ export function createLayoutEngine(options = {}) {
      * @param {import("./render-context.js").RenderContext} ctx
      * @param {import("./contracts.js").DocumentModel} model
      */
-    applyHeader(ctx, model) {
+    async applyHeader(ctx, model) {
       const dims = ctx.getDimensions();
       const primary = model.school.primaryColor || "#071a3d";
       const rgb = hexToRgb(primary);
-      const h = 28 * MM_TO_PT;
+      const protectedCard = isProtectedCardLayout(ctx.layout && ctx.layout.name);
+      const h = (protectedCard ? 28 : 24) * MM_TO_PT;
 
       ctx.drawRect(0, 0, dims.width, h, { fill: rgb });
 
-      // School name
-      ctx.drawText(model.school.name, 15 * MM_TO_PT, 11 * MM_TO_PT, {
-        fontSize: 16,
+      if (protectedCard) {
+        ctx.drawText(model.school.name, 15 * MM_TO_PT, 11 * MM_TO_PT, {
+          fontSize: 16,
+          fontStyle: "bold",
+          color: "#ffffff",
+          maxWidth: dims.width - 30 * MM_TO_PT,
+        });
+        const legacyParts = [model.school.address, model.school.city, model.school.phone, model.school.email].filter(Boolean);
+        ctx.drawText(legacyParts.join(" · "), 15 * MM_TO_PT, 16 * MM_TO_PT, {
+          fontSize: 8,
+          color: "#ffffff",
+          maxWidth: dims.width - 30 * MM_TO_PT,
+        });
+        return;
+      }
+
+      const logoWidth = model.school.logoUrl ? 16 * MM_TO_PT : 0;
+      if (logoWidth) {
+        await ctx.drawImage(model.school.logoUrl, 12 * MM_TO_PT, 4 * MM_TO_PT, logoWidth, 16 * MM_TO_PT, { fit: "contain" });
+      }
+      const identityX = (logoWidth ? 32 : 15) * MM_TO_PT;
+      ctx.drawText(model.school.name, identityX, 10 * MM_TO_PT, {
+        fontSize: protectedCard ? 16 : 15,
         fontStyle: "bold",
         color: "#ffffff",
-        maxWidth: dims.width - 30 * MM_TO_PT,
+        maxWidth: dims.width - identityX - 12 * MM_TO_PT,
       });
 
-      // Contact line
-      const parts = [model.school.address, model.school.city, model.school.phone, model.school.email].filter(Boolean);
-      ctx.drawText(parts.join(" · "), 15 * MM_TO_PT, 16 * MM_TO_PT, {
+      const parts = [model.school.address, model.school.city, model.school.phone, model.school.email, model.school.website].filter(Boolean);
+      ctx.drawText(parts.join(" · "), identityX, 16 * MM_TO_PT, {
         fontSize: 8,
         color: "#ffffff",
-        maxWidth: dims.width - 30 * MM_TO_PT,
+        maxWidth: dims.width - identityX - 12 * MM_TO_PT,
       });
+
+      const label = model.meta.documentLabel || model.content?.title || model.meta.documentType || "Document";
+      const date = formatDate(model.meta.generatedAt || model.meta.createdAt, model.meta.locale);
+      const status = model.meta.generatedBy === "frontend" ? "BROUILLON" : "APERÇU";
+      const sensitivity = String(model.meta.sensitivity || "internal").toUpperCase();
+      const reference = model.meta.reference ? `Réf. ${model.meta.reference}` : "Réf. BACKEND_LATER";
+      ctx.drawText(label, 15 * MM_TO_PT, 29 * MM_TO_PT, {
+        fontSize: 11,
+        fontStyle: "bold",
+        color: "#071a3d",
+        maxWidth: dims.width * 0.48,
+      });
+      ctx.drawText(`${status} · ${sensitivity} · ${reference} · ${date}`, dims.width - 15 * MM_TO_PT, 29 * MM_TO_PT, {
+        fontSize: 8,
+        align: "right",
+        color: "#4b5563",
+        maxWidth: dims.width * 0.48,
+      });
+      ctx.drawLine(15 * MM_TO_PT, 33 * MM_TO_PT, dims.width - 15 * MM_TO_PT, 33 * MM_TO_PT, { color: "#d1d5db" });
     },
 
     /**
@@ -95,19 +136,38 @@ export function createLayoutEngine(options = {}) {
      */
     applyFooter(ctx, model) {
       const dims = ctx.getDimensions();
-      const footerY = dims.height - 12 * MM_TO_PT;
+      if (isProtectedCardLayout(ctx.layout && ctx.layout.name)) {
+        const legacyFooterY = dims.height - 12 * MM_TO_PT;
+        ctx.drawLine(15 * MM_TO_PT, legacyFooterY - 2 * MM_TO_PT, dims.width - 15 * MM_TO_PT, legacyFooterY - 2 * MM_TO_PT, { color: "#cccccc" });
+        const legacyParts = [model.school.name, model.school.address, model.school.city, model.school.phone, model.school.email].filter(Boolean);
+        ctx.drawText(legacyParts.join(" · "), dims.width / 2, legacyFooterY, {
+          fontSize: 8,
+          align: "center",
+          maxWidth: dims.width - 30 * MM_TO_PT,
+        });
+        const legacyGeneratedAt = model.meta.generatedAt || model.meta.createdAt;
+        ctx.drawText(`Document généré par SchoolSafe — ${formatDate(legacyGeneratedAt, model.meta.locale)}`, dims.width / 2, legacyFooterY + 5 * MM_TO_PT, {
+          fontSize: 7,
+          align: "center",
+          color: "#888888",
+          maxWidth: dims.width - 30 * MM_TO_PT,
+        });
+        return;
+      }
+      const footerY = dims.height - 16 * MM_TO_PT;
 
       ctx.drawLine(15 * MM_TO_PT, footerY - 2 * MM_TO_PT, dims.width - 15 * MM_TO_PT, footerY - 2 * MM_TO_PT, { color: "#cccccc" });
 
-      const parts = [model.school.name, model.school.address, model.school.city, model.school.phone, model.school.email].filter(Boolean);
-      ctx.drawText(parts.join(" · "), dims.width / 2, footerY, {
+      const configuredFooter = model.school.documentFooter || model.schoolsafe.documentFooter || "";
+      ctx.drawText(configuredFooter, dims.width / 2, footerY, {
         fontSize: 8,
         align: "center",
         maxWidth: dims.width - 30 * MM_TO_PT,
       });
 
       const generatedAt = model.meta.generatedAt || model.meta.createdAt;
-      ctx.drawText(`Document généré par SchoolSafe — ${formatDate(generatedAt, model.meta.locale)}`, dims.width / 2, footerY + 5 * MM_TO_PT, {
+      const secondaryIdentity = [model.schoolsafe.name || "SchoolSafe", model.schoolsafe.website, model.schoolsafe.legalMention].filter(Boolean).join(" · ");
+      ctx.drawText(`${secondaryIdentity} — ${formatDate(generatedAt, model.meta.locale)}`, dims.width / 2, footerY + 5 * MM_TO_PT, {
         fontSize: 7,
         align: "center",
         color: "#888888",
@@ -122,13 +182,30 @@ export function createLayoutEngine(options = {}) {
      */
     applyPageNumber(ctx, model, pagination) {
       const dims = ctx.getDimensions();
-      const footerY = dims.height - 12 * MM_TO_PT;
-      ctx.drawText(`Page ${pagination.page} / ${pagination.totalPages}`, dims.width - 15 * MM_TO_PT, footerY + 4 * MM_TO_PT, {
+      const footerY = dims.height - 16 * MM_TO_PT;
+      ctx.drawText(`Page ${pagination.page} / ${pagination.totalPages}`, dims.width - 15 * MM_TO_PT, footerY + 9 * MM_TO_PT, {
         fontSize: 8,
         align: "right",
       });
     },
   };
+}
+
+export function getUniversalContentBounds(layout) {
+  if (isProtectedCardLayout(layout && layout.name)) {
+    return {
+      top: layout.margins.top + 28 * MM_TO_PT,
+      bottom: layout.dimensions.height - layout.margins.bottom - 12 * MM_TO_PT,
+    };
+  }
+  return {
+    top: Math.max(layout.margins.top, UNIVERSAL_HEADER_HEIGHT),
+    bottom: layout.dimensions.height - Math.max(layout.margins.bottom, UNIVERSAL_FOOTER_HEIGHT),
+  };
+}
+
+export function isProtectedCardLayout(layoutName) {
+  return layoutName === LAYOUTS.STUDENT_CARD_HORIZONTAL.name || layoutName === LAYOUTS.STUDENT_BADGE_VERTICAL.name;
 }
 
 function hexToRgb(hex) {
