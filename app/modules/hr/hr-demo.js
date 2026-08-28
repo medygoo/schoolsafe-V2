@@ -25,8 +25,14 @@
     { id: "assignment-demo-2", staffId: "hr-demo-2", service: "Secondaire", job: "Enseignant", className: "6e A", subject: "Mathématiques", site: "Bâtiment B", startDate: "2026-09-01", endDate: "" },
     { id: "assignment-demo-3", staffId: "hr-demo-4", service: "Sécurité", job: "Gardien", className: "Sans objet", subject: "Sans objet", site: "Portail principal", startDate: "2026-01-08", endDate: "" }
   ];
+  var ABSENCES = [
+    { id: "absence-demo-1", staffId: "hr-demo-2", type: "Absence démo", reason: "Motif administratif non sensible", startDate: "2026-08-27", endDate: "2026-08-27", duration: "1 jour indicatif", observation: "Justificatif non sensible à examiner", status: "SOUMIS — simulation", history: ["Brouillon créé · simulation", "Soumis · simulation"] },
+    { id: "absence-demo-2", staffId: "hr-demo-5", type: "Congé préparatoire", reason: "Organisation personnelle", startDate: "2026-09-03", endDate: "2026-09-05", duration: "3 jours indicatifs", observation: "Calendrier à contrôler", status: "EN REVUE", history: ["Demande préparée", "Passage en revue · simulation"] },
+    { id: "absence-demo-3", staffId: "hr-demo-4", type: "Absence démo", reason: "Démarche administrative", startDate: "2026-09-12", endDate: "2026-09-12", duration: "1 jour indicatif", observation: "Prêt pour examen humain", status: "PRÊT POUR DÉCISION", history: ["Demande préparée", "Observation ajoutée", "Prêt pour décision · simulation"] }
+  ];
   var CONTRACT_DRAFTS_STORAGE_KEY = "schoolsafe-v2-hr-contract-drafts";
   var ASSIGNMENT_DRAFTS_STORAGE_KEY = "schoolsafe-v2-hr-assignment-drafts";
+  var ABSENCE_DRAFTS_STORAGE_KEY = "schoolsafe-v2-hr-absence-drafts";
 
   function readStaffDrafts() {
     try {
@@ -54,6 +60,7 @@
 
   var contractDrafts = readDraftList(CONTRACT_DRAFTS_STORAGE_KEY);
   var assignmentDrafts = readDraftList(ASSIGNMENT_DRAFTS_STORAGE_KEY);
+  var absenceDrafts = readDraftList(ABSENCE_DRAFTS_STORAGE_KEY);
 
   function escapeMarkup(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
@@ -81,7 +88,8 @@
 
   function tabAllowed(tab) {
     if (tab === "dashboard") return canAccessHr();
-    if (tab === "staff" || tab === "contracts" || tab === "assignments" || tab === "absence") return canReadStaff() || canManageStaff();
+    if (tab === "staff" || tab === "contracts" || tab === "assignments") return canReadStaff() || canManageStaff();
+    if (tab === "absence") return canReadStaff() || canManageStaff() || canReadReports();
     if (tab === "attendance" || tab === "biometric") return canReadAttendance();
     if (tab === "payroll" || tab === "reports") return canReadReports();
     return false;
@@ -204,6 +212,36 @@
     return '<section class="hr-records" data-hr-assignments><header><div><span>Affectations du personnel</span><h3>Projections visibles</h3><p>Lecture RH des affectations fictives sans mutation pédagogique.</p></div><span class="hr-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><div class="hr-table-wrap"><table class="hr-table"><thead><tr><th>Personnel</th><th>Service</th><th>Fonction</th><th>Classe</th><th>Matière</th><th>Site / poste</th><th>Période</th></tr></thead><tbody>' + ASSIGNMENTS.map(function (assignment) { var member = staffById(assignment.staffId); return '<tr data-hr-assignment-row="' + assignment.id + '"><td>' + escapeMarkup(member.firstName + " " + member.lastName) + '</td><td>' + escapeMarkup(assignment.service) + '</td><td>' + escapeMarkup(assignment.job) + '</td><td>' + escapeMarkup(assignment.className) + '</td><td>' + escapeMarkup(assignment.subject) + '</td><td>' + escapeMarkup(assignment.site) + '</td><td>' + escapeMarkup(assignment.startDate + " → " + (assignment.endDate || "En cours")) + '</td></tr>'; }).join("") + '</tbody></table></div>' + renderAssignmentDrafts() + renderAssignmentForm() + '<aside class="hr-boundary"><i data-lucide="shield-check"></i><p>teacher_assignments backend inchangé · aucune affectation pédagogique officielle n’est écrite.</p></aside></section>';
   }
 
+  function absenceDuration(startDate, endDate) {
+    var start = String(startDate || "").split("-").map(Number);
+    var end = String(endDate || "").split("-").map(Number);
+    if (start.length !== 3 || end.length !== 3 || start.some(isNaN) || end.some(isNaN)) return "Durée à confirmer";
+    var days = Math.floor((Date.UTC(end[0], end[1] - 1, end[2]) - Date.UTC(start[0], start[1] - 1, start[2])) / 86400000) + 1;
+    return days > 0 ? days + (days === 1 ? " jour indicatif" : " jours indicatifs") : "Dates à vérifier";
+  }
+
+  function renderAbsenceSummary() {
+    var counts = { review: ABSENCES.filter(function (item) { return item.status === "EN REVUE"; }).length, ready: ABSENCES.filter(function (item) { return item.status === "PRÊT POUR DÉCISION"; }).length };
+    return '<section class="hr-absence-summary" data-hr-absence-summary><article><small>Demandes visibles</small><b>' + ABSENCES.length + '</b></article><article><small>En revue</small><b>' + counts.review + '</b></article><article><small>Prêtes pour examen humain</small><b>' + counts.ready + '</b></article></section>';
+  }
+
+  function renderAbsenceDrafts() {
+    if (!absenceDrafts.length) return "";
+    return '<section class="hr-draft-list"><header><div><span>BROUILLONS LOCAUX</span><h4>Absences / congés préparés</h4></div><span class="hr-boundary-chip">BACKEND_LATER</span></header>' + absenceDrafts.map(function (draft) { var member = staffById(draft.staffId); return '<article data-hr-absence-draft><small>BROUILLON LOCAL · BACKEND_LATER</small><b>' + escapeMarkup(member.firstName + " " + member.lastName + " · " + draft.type) + '</b><span>' + escapeMarkup(draft.startDate + " → " + draft.endDate + " · " + draft.duration) + '</span><span>' + escapeMarkup(draft.status) + '</span><p>' + escapeMarkup(draft.observation || draft.reason) + '</p></article>'; }).join("") + '</section>';
+  }
+
+  function renderAbsenceForm() {
+    if (!canManageStaff() || !canReadStaff()) return '<aside class="hr-boundary"><i data-lucide="lock-keyhole"></i><p>Lecture seule · staff.manage et staff.read avec portée school sont requis pour préparer une demande.</p></aside>';
+    return '<form class="hr-preparation-form" data-hr-absence-form><header><div><span>Préparation locale</span><h4>Nouvelle absence / demande de congé</h4></div><span class="hr-boundary-chip">BROUILLON LOCAL</span></header><label>Membre<select name="staffId">' + staffMemberOptions(STAFF[0].id) + '</select></label><label>Type<select name="type">' + staffOptions(["Absence démo", "Congé préparatoire", "Observation d’absence"], "Absence démo") + '</select></label><label>Motif non sensible<input name="reason" required></label><label>Date début<input name="startDate" type="date" required></label><label>Date fin<input name="endDate" type="date" required></label><label>Statut<select name="status">' + staffOptions(["BROUILLON", "SOUMIS — simulation", "EN REVUE", "OBSERVATION", "PRÊT POUR DÉCISION"], "BROUILLON") + '</select></label><label class="hr-form-wide">Observation<textarea name="observation" rows="3"></textarea></label><button class="ss-button ss-button--primary" type="submit">Préparer la demande</button><p class="hr-form-wide">Aucune logique légale automatique · DÉCISION OFFICIELLE — BACKEND_LATER.</p></form>';
+  }
+
+  function renderAbsence() {
+    if (!canReadStaff() && !canReadReports()) return '<section>' + renderStaffDenied() + '</section>';
+    var summaryOnly = !canReadStaff() && canReadReports();
+    var table = summaryOnly ? "" : '<div class="hr-table-wrap"><table class="hr-table"><thead><tr><th>Personnel</th><th>Type / motif</th><th>Période</th><th>Durée</th><th>Observation</th><th>Statut</th><th>Historique</th></tr></thead><tbody>' + ABSENCES.map(function (absence) { var member = staffById(absence.staffId); return '<tr data-hr-absence-row="' + absence.id + '"><td>' + escapeMarkup(member.firstName + " " + member.lastName) + '</td><td>' + escapeMarkup(absence.type + " · " + absence.reason) + '</td><td>' + escapeMarkup(absence.startDate + " → " + absence.endDate) + '</td><td>' + escapeMarkup(absence.duration) + '</td><td>' + escapeMarkup(absence.observation) + '</td><td><span class="hr-status">' + escapeMarkup(absence.status) + '</span></td><td><b>Historique</b><br>' + absence.history.map(escapeMarkup).join(" · ") + '</td></tr>'; }).join("") + '</tbody></table></div>';
+    return '<section class="hr-records" data-hr-absence><header><div><span>Absences / congés</span><h3>Suivi préparatoire</h3><p>' + (summaryOnly ? "Synthèse uniquement avec reports.hr.read." : "Données fictives non sensibles visibles avec staff.read.") + '</p></div><span class="hr-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header>' + renderAbsenceSummary() + table + (summaryOnly ? '<aside class="hr-boundary"><i data-lucide="lock-keyhole"></i><p>Synthèse uniquement · aucune fiche individuelle, préparation ou décision.</p></aside>' : renderAbsenceDrafts() + renderAbsenceForm()) + '<aside class="hr-boundary"><i data-lucide="shield-alert"></i><p>DÉCISION OFFICIELLE — BACKEND_LATER · aucune approbation automatique ou juridique.</p></aside></section>';
+  }
+
   function bindStaff() {
     var search = document.querySelector('[data-hr-staff-filter="search"]');
     var status = document.querySelector('[data-hr-staff-filter="status"]');
@@ -263,6 +301,24 @@
     };
   }
 
+  function bindAbsence() {
+    var form = document.querySelector("[data-hr-absence-form]");
+    if (!form) return;
+    form.onsubmit = function (event) {
+      event.preventDefault();
+      var data = new root.FormData(form);
+      var startDate = String(data.get("startDate") || "");
+      var endDate = String(data.get("endDate") || "");
+      absenceDrafts.push({
+        id: "absence-draft-" + Date.now(), staffId: String(data.get("staffId") || ""), type: String(data.get("type") || ""),
+        reason: String(data.get("reason") || ""), startDate: startDate, endDate: endDate, duration: absenceDuration(startDate, endDate),
+        observation: String(data.get("observation") || ""), status: String(data.get("status") || "BROUILLON"), history: ["Brouillon préparé localement"]
+      });
+      persistDraftList(ABSENCE_DRAFTS_STORAGE_KEY, absenceDrafts);
+      renderContent();
+    };
+  }
+
   function renderFuture() {
     var labels = { staff: "Dossier personnel", contracts: "Contrats", assignments: "Affectations", absence: "Absences / congés", attendance: "Présence personnel", biometric: "Biométrie", payroll: "Paie", reports: "Rapports RH" };
     return '<section class="hr-future"><span>Phase H</span><h3>' + escapeMarkup(labels[activeTab] || "Ressources humaines") + '</h3><p>Surface frontend prévue dans le lot dédié, sans opération officielle.</p><span class="hr-boundary-chip">FEATURE_LATER · BACKEND_LATER</span></section>';
@@ -285,11 +341,12 @@
       button.hidden = !tabAllowed(tab);
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = !canAccessHr() ? renderDenied() : !tabAllowed(activeTab) ? renderDenied() : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : renderFuture();
+    content.innerHTML = !canAccessHr() ? renderDenied() : !tabAllowed(activeTab) ? renderDenied() : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : activeTab === "absence" ? renderAbsence() : renderFuture();
     bindNavigation();
     if (activeTab === "staff") bindStaff();
     if (activeTab === "contracts") bindContracts();
     if (activeTab === "assignments") bindAssignments();
+    if (activeTab === "absence") bindAbsence();
     if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
   }
 
