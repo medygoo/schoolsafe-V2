@@ -167,7 +167,8 @@
         { id: "demo-sf-emma-school", student_id: "demo-s2", fee_structure_id: "demo-1", amount_expected: 300000, amount_paid: 300000, amount_remaining: 0, status: "paid" },
         { id: "demo-sf-ethan-school", student_id: "demo-s3", fee_structure_id: "demo-2", amount_expected: 450000, amount_paid: 150000, amount_remaining: 300000, status: "partial" },
         { id: "demo-sf-chloe-school", student_id: "demo-s4", fee_structure_id: "demo-2", amount_expected: 450000, amount_paid: 450000, amount_remaining: 0, status: "paid" },
-        { id: "demo-sf-aline-school", student_id: "demo-s5", fee_structure_id: "demo-2", amount_expected: 600000, amount_paid: 0, amount_remaining: 0, status: "exempted" }
+        { id: "demo-sf-aline-school", student_id: "demo-s5", fee_structure_id: "demo-2", amount_expected: 600000, amount_paid: 0, amount_remaining: 0, status: "exempted" },
+        { id: "demo-sf-noah-anomaly", student_id: "demo-student-no-fee", fee_structure_id: "demo-missing-fee", amount_expected: 0, amount_paid: 0, amount_remaining: 0, status: "anomaly" }
       ],
       studentFinancialProfiles: [],
       selectedFinancialStudentId: "demo-s1",
@@ -180,9 +181,9 @@
       financialStatusFilter: "",
       transactions: [
         { id: "demo-p1", receipt: "REC-2026-0587", date: "14 août 2026 · 10:20", day: "14 août 2026", student: "Ethan Leroy", className: "1re A", fee: "Frais scolaires", amount: 150000, currency: "CDF", mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
-        { id: "demo-p2", receipt: "REC-2026-0586", date: "14 août 2026 · 09:15", day: "14 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 150000, currency: "CDF", mode: "Espèces", cashier: "Mme K", reference: "Deuxième tranche", status: "Validé" },
+        { id: "demo-p2", receipt: "REC-2026-0586", date: "14 août 2026 · 09:15", day: "14 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 150000, currency: "CDF", mode: "Espèces", cashier: "Mme K", reference: "Deuxième tranche", status: "Validé", studentId: "demo-s1", studentFeeId: "demo-sf-lucas-school" },
         { id: "demo-p3", receipt: "REC-2026-0585", date: "13 août 2026 · 14:40", day: "13 août 2026", student: "Emma Martin", className: "Maternelle 3", fee: "Frais scolaires", amount: 300000, currency: "CDF", mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
-        { id: "demo-p4", receipt: "REC-2026-0584", date: "12 août 2026 · 11:05", day: "12 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 200000, currency: "CDF", mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé" },
+        { id: "demo-p4", receipt: "REC-2026-0584", date: "12 août 2026 · 11:05", day: "12 août 2026", student: "Lucas Martin", className: "6e A", fee: "Frais scolaires", amount: 200000, currency: "CDF", mode: "Espèces", cashier: "Mme K", reference: "Première tranche", status: "Validé", studentId: "demo-s1", studentFeeId: "demo-sf-lucas-school" },
         { id: "demo-p5", receipt: "REC-2026-0583", date: "11 août 2026 · 08:55", day: "11 août 2026", student: "Chloé Bernard", className: "2e B", fee: "Frais scolaires", amount: 450000, currency: "CDF", mode: "Espèces", cashier: "Mme K", reference: "Paiement complet", status: "Validé" },
         { id: "demo-p6", receipt: "REC-2026-0582", date: "10 août 2026 · 13:10", day: "10 août 2026", student: "Aline Martin", className: "4e Humanités A", fee: "Frais scolaires", amount: 600000, currency: "CDF", mode: "Virement constaté", cashier: "Mme K", reference: "Paiement complet", status: "Validé" }
       ],
@@ -234,6 +235,7 @@
   var financeState = isDemoMode() ? createDemoState() : createRealState();
   var FEE_TYPE_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-fee-type-drafts";
   var FEE_ASSIGNMENT_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-assignment-drafts";
+  var FEE_EXEMPTION_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-exemption-drafts";
 
   function readLocalDrafts(key) {
     try {
@@ -254,6 +256,7 @@
 
   financeState.feeTypeDrafts = readLocalDrafts(FEE_TYPE_DRAFT_STORAGE_KEY);
   financeState.assignmentDrafts = readLocalDrafts(FEE_ASSIGNMENT_DRAFT_STORAGE_KEY);
+  financeState.exemptionDrafts = readLocalDrafts(FEE_EXEMPTION_DRAFT_STORAGE_KEY);
 
   // ---------------------------------------------------------------------------
   // Mapping données backend
@@ -305,7 +308,7 @@
     studentFee = studentFee || {};
     var feeStructureId = studentFee.fee_structure_id || null;
     var feeStructure = feeStructureById(feeStructureId);
-    var status = ["pending", "partial", "paid", "exempted"].indexOf(studentFee.status) >= 0 ? studentFee.status : "unknown";
+    var status = ["pending", "partial", "paid", "exempted", "anomaly"].indexOf(studentFee.status) >= 0 ? studentFee.status : "anomaly";
     return {
       student_fee_id: studentFee.id || null,
       fee_structure_id: feeStructureId,
@@ -1173,7 +1176,8 @@
       { value: "pending", label: "À payer" },
       { value: "partial", label: "Paiement partiel" },
       { value: "paid", label: "En règle" },
-      { value: "exempted", label: "Exempté" }
+      { value: "exempted", label: "Exempté" },
+      { value: "anomaly", label: "Anomalie à examiner" }
     ];
     var studentOptions = filteredProfiles.map(function (profile) {
       var student = profile.student;
@@ -1200,12 +1204,13 @@
       result.total += 1;
       if (fee.status === "paid") result.paid += 1;
       if (fee.status === "exempted") result.exempted += 1;
+      if (fee.status === "anomaly") result.anomalies += 1;
       if (fee.status === "pending" || fee.status === "partial") result.toRegularize += 1;
       result.expected += fee.expected;
       result.paidAmount += fee.paid;
       result.remaining += fee.remaining;
       return result;
-    }, { total: 0, paid: 0, exempted: 0, toRegularize: 0, expected: 0, paidAmount: 0, remaining: 0 });
+    }, { total: 0, paid: 0, exempted: 0, anomalies: 0, toRegularize: 0, expected: 0, paidAmount: 0, remaining: 0 });
     var rows = visibleFees.map(function (fee) {
       var status = financialStatusDefinition(fee.status);
       var feeLabel = '<b>' + escapeMarkup(fee.label) + '</b>' + (fee.feeStructureAvailable ? "" : '<small>ID technique : ' + escapeMarkup(fee.fee_structure_id || "—") + "</small>");
@@ -1213,15 +1218,26 @@
     }).join("");
     var studentSelect = window.ssField({ label: "Élève", labelFor: "financeFinancialStudent", inputHtml: window.ssSelect({ id: "financeFinancialStudent", value: selectedStudent.id, options: studentOptions }) });
     var identity = '<article class="student-finance-card"><span class="student-avatar large">' + escapeMarkup(selectedStudent.initials) + '</span><div><small>' + escapeMarkup(selectedStudent.className) + '</small><h3>' + escapeMarkup(selectedStudent.name) + '</h3><p>' + escapeMarkup(selectedStudent.guardian) + '</p></div></article>';
-    var summaryMarkup = '<div class="balance-summary"><article><small>Frais</small><b>' + summary.total + '</b></article><article><small>En règle</small><b>' + summary.paid + '</b></article><article><small>À régulariser</small><b>' + summary.toRegularize + '</b></article><article><small>Exemptés</small><b>' + summary.exempted + '</b></article></div>';
+    var summaryMarkup = '<div class="balance-summary"><article><small>Frais</small><b>' + summary.total + '</b></article><article><small>En règle</small><b>' + summary.paid + '</b></article><article><small>À régulariser</small><b>' + summary.toRegularize + '</b></article><article><small>Exemptés</small><b>' + summary.exempted + '</b></article><article><small>Anomalies</small><b>' + summary.anomalies + '</b></article></div>';
     var hasUnknownCurrency = selectedProfile.fees.some(function (fee) { return !fee.currency; });
     var currencies = selectedProfile.fees.map(function (fee) { return fee.currency; }).filter(Boolean).filter(function (currency, index, values) { return values.indexOf(currency) === index; });
     var amountSummary = currencies.length === 1 && !hasUnknownCurrency
       ? '<dl class="student-finance-facts"><div><dt>Attendu cumulé</dt><dd>' + formatFinancialAmount(summary.expected, currencies[0]) + '</dd></div><div><dt>Payé cumulé</dt><dd>' + formatFinancialAmount(summary.paidAmount, currencies[0]) + '</dd></div><div><dt>Restant cumulé</dt><dd>' + formatFinancialAmount(summary.remaining, currencies[0]) + '</dd></div></dl>'
       : '<aside class="finance-audit-note"><i data-lucide="circle-alert"></i><p>Montants cumulés indisponibles : une devise ou une structure de frais manque, ou plusieurs devises sont utilisées. Consultez chaque ligne individuellement.</p></aside>';
     var feesTable = visibleFees.length ? window.ssTable({ headers: ["Type de frais", "Statut", "Attendu", "Payé", "Restant", "Échéance"], rows: rows, responsive: true }) : window.ssState({ type: "empty", title: "Aucune obligation financière affectée", message: "Aucun frais du profil ne correspond aux filtres actifs." });
+    var linkedTransactions = (financeState.transactions || []).filter(function (transaction) {
+      return transaction.studentId === selectedStudent.id || (!transaction.studentId && transaction.student === selectedStudent.name);
+    });
+    var transactionRows = linkedTransactions.map(function (transaction) {
+      return '<tr><td><b>' + escapeMarkup(transaction.receipt || transaction.id) + '</b></td><td>' + escapeMarkup(transaction.fee || "Frais") + '</td><td>' + formatTransactionAmount(transaction) + '</td><td>' + escapeMarkup(transaction.mode || "—") + '</td><td>' + window.ssBadge({ label: transaction.status || "Démonstration", variant: transaction.status === "Annulé" ? "danger" : "success" }) + '</td></tr>';
+    }).join("");
+    var linkedExemptions = (financeState.exemptionDrafts || []).filter(function (draft) { return draft.studentId === selectedStudent.id; });
+    var exemptionRows = linkedExemptions.map(function (draft) {
+      return '<tr><td><b>' + escapeMarkup(draft.studentFeeId) + '</b></td><td>' + escapeMarkup(draft.type === "partial" ? "Partielle" : "Totale") + '</td><td>' + escapeMarkup(draft.reason) + '</td><td>' + window.ssBadge({ label: "BROUILLON LOCAL", variant: "warning" }) + '</td></tr>';
+    }).join("");
+    var linkedPanels = '<section class="finance-two-column"><section class="finance-panel"><header><div><span>Preuves de paiement</span><h3>Transactions liées</h3></div><b>' + linkedTransactions.length + '</b></header>' + window.ssTable({ headers: ["Reçu", "Type de frais", "Montant", "Mode", "Statut"], rows: transactionRows, empty: "Aucune transaction liée.", emptyTitle: "Transactions", responsive: true, compact: true }) + '</section><section class="finance-panel"><header><div><span>Documents disponibles</span><h3>Reçus disponibles</h3></div><b>' + linkedTransactions.filter(function (transaction) { return !!transaction.receipt; }).length + '</b></header>' + (linkedTransactions.length ? '<ul class="finance-receipt-links">' + linkedTransactions.filter(function (transaction) { return !!transaction.receipt; }).map(function (transaction) { return '<li><b>' + escapeMarkup(transaction.receipt) + '</b><span>' + escapeMarkup(transaction.date || "—") + '</span></li>'; }).join("") + '</ul>' : window.ssState({ type: "empty", title: "Aucun reçu", message: "Aucun reçu de démonstration n’est lié à cet élève." })) + '</section></section><section class="finance-panel"><header><div><span>Préparations locales</span><h3>Exemptions</h3></div><b>' + linkedExemptions.length + '</b></header>' + window.ssTable({ headers: ["student_fee", "Type", "Motif", "Statut"], rows: exemptionRows, empty: "Aucune exemption préparée.", emptyTitle: "Exemptions", responsive: true, compact: true }) + '</section>';
 
-    return '<section class="balance-register"><header><div><span>Situation financière</span><h3>Frais de l’élève</h3><p>Chaque ligne représente un student_fee distinct ; les montants proviennent des données Finance chargées.</p></div><b>' + filteredProfiles.length + ' élève(s)</b></header>' + filters + '<section class="finance-two-column"><aside class="finance-panel">' + studentSelect + identity + summaryMarkup + '</aside><section class="finance-panel"><header><div><span>Résumé de l’élève</span><h3>Obligations financières</h3></div></header>' + summaryMarkup + amountSummary + '</section></section><section class="finance-panel"><header><div><span>Détail individuel</span><h3>Frais applicables</h3><p>Les frais restent indépendants ; la synthèse ne remplace pas cette liste.</p></div></header>' + feesTable + '</section></section>';
+    return '<section class="balance-register" data-student-financial-situation><header><div><span>Situation financière</span><h3>Frais de l’élève</h3><p>Chaque ligne représente un student_fee distinct ; les montants proviennent des données Finance chargées.</p></div><b>' + filteredProfiles.length + ' élève(s)</b></header>' + filters + '<section class="finance-two-column"><aside class="finance-panel">' + studentSelect + identity + summaryMarkup + '</aside><section class="finance-panel"><header><div><span>Résumé de l’élève</span><h3>Obligations financières</h3></div></header>' + summaryMarkup + amountSummary + '</section></section><section class="finance-panel"><header><div><span>Détail individuel</span><h3>Frais applicables</h3><p>Les frais restent indépendants ; la synthèse ne remplace pas cette liste.</p></div></header>' + feesTable + '</section>' + linkedPanels + '</section>';
   }
 
   function renderExemptions() {
@@ -1277,13 +1293,18 @@
       message: "Aucune exemption n’a été appliquée. La demande préparée reste non connectée.",
       details: "BACKEND_LATER : validation, persistance, audit et révocation doivent être effectués côté serveur."
     }) : "";
+    var preparedDrafts = (financeState.exemptionDrafts || []).map(function (item) {
+      var typeLabel = item.type === "partial" ? "Exemption partielle" : "Exemption totale";
+      var amountLabel = item.type === "partial" ? formatFinancialAmount(item.amount, item.currency) : "Total du restant préparé";
+      return '<article class="finance-exemption-draft" data-finance-exemption-draft><header><div><span>' + escapeMarkup(item.studentName) + '</span><h4>' + typeLabel + '</h4></div>' + window.ssBadge({ label: "BROUILLON LOCAL", variant: "warning" }) + '</header><p><b>' + escapeMarkup(item.feeLabel) + '</b> · ' + amountLabel + '</p><p>' + escapeMarkup(item.reason) + '</p><small>BACKEND_LATER · Aucune exemption appliquée · aucun paiement créé</small></article>';
+    }).join("");
     var form = fee && availability.allowed ? '<form class="payment-form" id="financeExemptionForm" data-student-id="' + escapeMarkup(student.id) + '" data-student-fee-id="' + escapeMarkup(fee.student_fee_id) + '" data-fee-structure-id="' + escapeMarkup(fee.fee_structure_id) + '" data-currency="' + escapeMarkup(fee.currency) + '"><header><span><i data-lucide="shield-check"></i></span><div><h3>Préparer une demande</h3><p>Aucune exonération ni modification de montant ne sera enregistrée depuis cet écran.</p></div></header><div>' +
       window.ssField({ label: "Type d’exemption", labelFor: "financeExemptionType", required: true, inputHtml: window.ssSelect({ id: "financeExemptionType", name: "exemption_type", value: draft.type, options: [{ value: "total", label: "Totale" }, { value: "partial", label: "Partielle" }] }) }) +
       (draft.type === "partial" ? window.ssField({ label: "Montant exonéré", labelFor: "financeExemptionAmount", required: true, help: "Maximum : " + formatFinancialAmount(fee.remaining, fee.currency), inputHtml: window.ssInput({ type: "number", id: "financeExemptionAmount", name: "amount", required: true, min: paymentStepForCurrency(fee.currency), max: fee.remaining, step: paymentStepForCurrency(fee.currency), inputmode: "decimal", placeholder: "Montant en " + fee.currency }) }) : "") +
       window.ssField({ label: "Motif", labelFor: "financeExemptionReason", required: true, inputHtml: '<textarea id="financeExemptionReason" name="reason" rows="3" required maxlength="1000" placeholder="Expliquez le motif de la demande…"></textarea>' }) +
       '</div>' + window.ssButton({ label: "Préparer la demande", icon: "clipboard-check", type: "submit" }) + '</form>' : window.ssState({ type: availability.allowed ? "unavailable" : "unavailable", title: "Préparation indisponible", message: availability.message, details: "Aucune exemption réelle n’est appliquée." });
 
-    return '<section class="balance-register"><header><div><span>Finance générale</span><h3>Exemptions</h3><p>Préparez une demande sur un student_fee précis. Cette surface est explicitement non connectée.</p></div>' + window.ssBadge({ variant: "warning", icon: "plug-zap", label: "BACKEND_LATER" }) + '</header><section class="finance-two-column">' + studentPanel + feeSummary + '</section><section class="finance-panel">' + preparation + form + '</section></section>';
+    return '<section class="balance-register"><header><div><span>Finance générale</span><h3>Exemptions</h3><p>Préparez une demande sur un student_fee précis. Cette surface est explicitement non connectée.</p></div>' + window.ssBadge({ variant: "warning", icon: "plug-zap", label: "BACKEND_LATER" }) + '</header><section class="finance-two-column">' + studentPanel + feeSummary + '</section><section class="finance-panel">' + preparation + form + '</section><section class="finance-exemption-drafts"><header><span>Aperçu avant application</span><h3>Exemptions préparées</h3></header>' + (preparedDrafts || window.ssState({ type: "empty", title: "Aucune exemption préparée", message: "Les demandes apparaîtront ici sans modifier l’obligation." })) + '</section></section>';
   }
 
   function renderControlCampaignManagement() {
@@ -1560,7 +1581,9 @@
       }
       exemption.type = type;
       exemption.prepared = true;
-      exemption.preparedSummary = { student_fee_id: fee.student_fee_id, type: type, amount: amount, currency: fee.currency };
+      exemption.preparedSummary = { student_fee_id: fee.student_fee_id, type: type, amount: amount, currency: fee.currency, reason: reason };
+      financeState.exemptionDrafts.unshift({ id: "local-exemption-" + Date.now(), studentId: profile.student.id, studentName: profile.student.name, studentFeeId: fee.student_fee_id, feeStructureId: fee.fee_structure_id, feeLabel: fee.label, type: type, amount: amount, currency: fee.currency, reason: reason, status: "prepared", local: true, backendLater: true });
+      persistLocalDrafts(FEE_EXEMPTION_DRAFT_STORAGE_KEY, financeState.exemptionDrafts);
       d.notify("Configuration prête. Aucune exemption n’a été appliquée : connexion backend requise.");
       renderFinanceModule();
     });

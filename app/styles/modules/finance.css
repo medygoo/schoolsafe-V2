@@ -180,6 +180,69 @@
   font-weight: var(--ss-font-bold);
 }
 
+.finance-receipt-links {
+  display: grid;
+  gap: var(--ss-space-2);
+  margin: 0;
+  padding: var(--ss-space-4);
+  list-style: none;
+}
+
+.finance-receipt-links li {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ss-space-3);
+  padding-bottom: var(--ss-space-2);
+  border-bottom: 1px solid var(--ss-border-subtle);
+}
+
+.finance-receipt-links span {
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-sm);
+}
+
+.finance-exemption-drafts {
+  display: grid;
+  gap: var(--ss-space-3);
+}
+
+.finance-exemption-drafts > header span {
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-xs);
+  font-weight: var(--ss-font-extrabold);
+  text-transform: uppercase;
+}
+
+.finance-exemption-drafts > header h3 {
+  margin: var(--ss-space-1) 0 0;
+}
+
+.finance-exemption-draft {
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-warning-border);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-warning-bg);
+  color: var(--ss-text-primary);
+}
+
+.finance-exemption-draft > header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ss-space-3);
+}
+
+.finance-exemption-draft h4,
+.finance-exemption-draft p {
+  margin: var(--ss-space-1) 0 0;
+}
+
+.finance-exemption-draft small {
+  color: var(--ss-warning-text);
+  font-weight: var(--ss-font-bold);
+}
+
 @media (max-width: 1180px) {
   .finance-dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
