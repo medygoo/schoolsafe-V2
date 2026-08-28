@@ -140,7 +140,8 @@
         { id: "demo-2", name: "Frais scolaires", cycle: "Humanités", amount: 450000, currency: "CDF", frequency: "Trimestre", due: "30 septembre 2026", active: true },
         { id: "demo-3", name: "Inscription", cycle: "Tous les cycles", amount: 50000, currency: "CDF", frequency: "Une fois", due: "À l’inscription", active: true },
         { id: "demo-4", name: "Transport scolaire", cycle: "Service facultatif", amount: 100000, currency: "USD", frequency: "Mois", due: "Chaque 5 du mois", active: true },
-        { id: "demo-5", name: "Frais de cantine", cycle: "Service facultatif", amount: 75000, currency: "CDF", frequency: "Mois", due: "Chaque 5 du mois", active: true }
+        { id: "demo-5", name: "Frais de cantine", cycle: "Service facultatif", amount: 75000, currency: "CDF", frequency: "Mois", due: "Chaque 5 du mois", active: true },
+        { id: "demo-6", name: "Rattrapage pédagogique", cycle: "Accompagnement ciblé", amount: 120000, currency: "CDF", frequency: "Programme", due: "Selon décision", active: true }
       ],
       feeAssignment: { feeStructureId: "", targetingMode: "cycle", classIds: [], studentIds: [], prepared: false },
       campaignDraft: { feeStructureId: "", label: "", startsAt: "", endsAt: "", description: "", prepared: false, preparedSummary: null },
@@ -243,6 +244,7 @@
   var FEE_EXEMPTION_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-exemption-drafts";
   var PAYMENT_CANCELLATION_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-payment-cancellation-drafts";
   var CANTEEN_LINK_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-canteen-link-drafts";
+  var REMEDIATION_FINANCE_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-remediation-link-drafts";
 
   function readLocalDrafts(key) {
     try {
@@ -266,6 +268,8 @@
   financeState.exemptionDrafts = readLocalDrafts(FEE_EXEMPTION_DRAFT_STORAGE_KEY);
   financeState.cancellationDrafts = readLocalDrafts(PAYMENT_CANCELLATION_DRAFT_STORAGE_KEY);
   financeState.canteenLinkDrafts = readLocalDrafts(CANTEEN_LINK_DRAFT_STORAGE_KEY);
+  financeState.remediationFinanceDrafts = readLocalDrafts(REMEDIATION_FINANCE_DRAFT_STORAGE_KEY);
+  financeState.remediationFinanceError = "";
 
   // ---------------------------------------------------------------------------
   // Mapping données backend
@@ -545,6 +549,10 @@
     return canAccessFeeCatalog("canteen.manage");
   }
 
+  function canPrepareRemediationFinance() {
+    return canManageFeeCatalog();
+  }
+
   function exemptionDraftState() {
     if (!financeState.exemptionDraft) {
       financeState.exemptionDraft = { studentId: "", studentFeeId: "", type: "total", prepared: false, preparedSummary: null };
@@ -811,6 +819,7 @@
   // ---------------------------------------------------------------------------
   function financeTabForAction(actionName) {
     if (/liaison financière|frais de cantine|finance cantine/i.test(actionName)) return "canteen";
+    if (/rattrapage|remédiation/i.test(actionName)) return "remediation-finance";
     if (/campagne/i.test(actionName)) return "campaigns";
     if (/exemption|exonération/i.test(actionName)) return "exemptions";
     if (/affectation des frais|affecter un frais/i.test(actionName)) return "assignments";
@@ -844,6 +853,7 @@
     if (canPrepareExemption()) tabs.push("exemptions");
     if (canReadFinanceReports()) tabs.push("reports");
     if (canManageCanteenFinanceLink()) tabs.push("canteen");
+    if (canPrepareRemediationFinance()) tabs.push("remediation-finance");
     // La gestion de campagnes legacy reste disponible uniquement pour un
     // utilisateur déjà autorisé dans Finance générale ; control.* seul ne crée
     // donc jamais une entrée Finance générale.
@@ -1040,6 +1050,43 @@
       window.ssField({ label: "Population de liaison", labelFor: "financeCanteenTargeting", required: true, inputHtml: window.ssSelect({ id: "financeCanteenTargeting", name: "targeting_mode", required: true, value: "active_students", options: [{ value: "active_students", label: "Élèves actifs éligibles" }] }) }) +
       '</div>' + window.ssButton({ label: "Préparer la liaison", icon: "link-2", type: "submit" }) + '</form>' : window.ssState({ type: "empty", title: "Type de frais Cantine indisponible", message: "Finance doit d’abord définir un type de frais générique ; canteen.manage ne peut pas le créer." });
     return '<section class="finance-canteen-link" data-finance-canteen><header><div><span>F6-FE · Cantine financière uniquement</span><h3>Liaison du service Cantine</h3><p>canteen.manage prépare la liaison avec un type de frais existant, sans gérer le catalogue ni encaisser.</p></div>' + window.ssBadge({ variant: "info", label: "CONFIGURATION FRONTEND" }) + '</header><div class="finance-workflow-steps"><span>TYPE DE FRAIS</span><i data-lucide="arrow-right"></i><span>AFFECTATION</span><i data-lucide="arrow-right"></i><span>STUDENT_FEE</span></div><aside class="finance-audit-note"><i data-lucide="shield-check"></i><p>Seuls ' + activeStudents.length + ' élèves actifs sont comptés. Toute affectation et tout student_fee officiel restent BACKEND_LATER.</p></aside><div class="finance-two-column"><section class="finance-panel"><header><div><span>Configuration de liaison</span><h3>Préparation locale</h3></div></header>' + form + '</section><aside class="finance-panel"><header><div><span>Périmètre opérationnel</span><h3>FEATURE_LATER</h3></div></header><p>Repas, menus, stocks et présences ne font pas partie de la Phase F. Aucune action opérationnelle n’est exposée ici.</p><p>Le paiement reste sous finance.payment.record ; le type de frais reste sous finance.fee.manage.</p></aside></div><section class="finance-canteen-drafts"><header><span>Préparations distinctes</span><h3>Liaisons locales</h3></header>' + (drafts || window.ssState({ type: "empty", title: "Aucune liaison préparée", message: "La configuration n’entraîne aucune obligation financière." })) + '</section></section>';
+  }
+
+  function remediationFinanceProjection() {
+    var pedagogy = root.SchoolSafeTeacherPedagogy;
+    if (!pedagogy || typeof pedagogy.readRemediationDrafts !== "function") return [];
+    var students = Array.isArray(pedagogy.STUDENTS) ? pedagogy.STUDENTS : [];
+    var classes = Array.isArray(pedagogy.CLASSES) ? pedagogy.CLASSES : [];
+    var subjects = Array.isArray(pedagogy.SUBJECTS) ? pedagogy.SUBJECTS : [];
+    return pedagogy.readRemediationDrafts().map(function (draft) {
+      var student = students.find(function (item) { return item.id === draft.studentId && item.lifecycleStatus === "active"; });
+      var classItem = classes.find(function (item) { return item.id === draft.classId; });
+      var subject = subjects.find(function (item) { return item.id === draft.subjectId; });
+      if (!student || !classItem || !subject) return null;
+      return { id: draft.id, studentId: student.id, studentName: student.name, classId: classItem.id, className: classItem.name, subjectId: subject.id, subjectName: subject.name, status: draft.status || "À ÉVALUER", local: draft.local === true };
+    }).filter(Boolean);
+  }
+
+  function renderRemediationFinanceLink() {
+    if (!canPrepareRemediationFinance()) {
+      return window.ssState({ type: "denied", title: "Liaison financière Rattrapage non autorisée", message: "finance.fee.manage avec portée school est requis. Aucun droit n’est déduit de la Pédagogie." });
+    }
+    var remediationDrafts = remediationFinanceProjection();
+    var feeTypes = feeCatalog().filter(function (fee) { return fee.active && /rattrapage|remédiation/i.test(fee.name || ""); });
+    var remediationOptions = remediationDrafts.map(function (draft) { return { value: draft.id, label: draft.studentName + " · " + draft.className + " · " + draft.subjectName + " · " + draft.status }; });
+    var feeOptions = feeTypes.map(function (fee) { return { value: fee.id, label: fee.name + " · " + formatFinancialAmount(fee.amount, fee.currency) }; });
+    var form = remediationDrafts.length && feeTypes.length ? '<form id="financeRemediationLinkForm" class="finance-remediation-link-form"><div class="ss-form-grid">' +
+      window.ssField({ label: "Brouillon D6 actif", labelFor: "financeRemediationDraft", required: true, inputHtml: window.ssSelect({ id: "financeRemediationDraft", name: "remediation_id", required: true, value: remediationDrafts[0].id, options: remediationOptions }) }) +
+      window.ssField({ label: "Type de frais existant", labelFor: "financeRemediationFee", required: true, inputHtml: window.ssSelect({ id: "financeRemediationFee", name: "fee_structure_id", required: true, value: feeTypes[0].id, options: feeOptions }) }) +
+      window.ssField({ label: "Part école (%)", labelFor: "financeRemediationSchoolShare", required: true, inputHtml: window.ssInput({ id: "financeRemediationSchoolShare", name: "school_share", type: "number", min: 0, max: 100, step: 0.01, required: true, placeholder: "À définir" }) }) +
+      window.ssField({ label: "Autre part (%)", labelFor: "financeRemediationOtherShare", required: true, inputHtml: window.ssInput({ id: "financeRemediationOtherShare", name: "other_share", type: "number", min: 0, max: 100, step: 0.01, required: true, placeholder: "À définir" }) }) +
+      window.ssField({ label: "Autre destination déclarée", labelFor: "financeRemediationOtherDestination", help: "Obligatoire si l’autre part est supérieure à zéro. Aucun bénéficiaire n’est inventé.", className: "wide", inputHtml: window.ssInput({ id: "financeRemediationOtherDestination", name: "other_destination", maxlength: 160, placeholder: "Nommer explicitement la destination" }) }) +
+      '</div>' + window.ssButton({ label: "Préparer la liaison financière", icon: "split", type: "submit" }) + '</form>' : window.ssState({ type: "empty", title: "Rattrapage ou type de frais indisponible", message: "Un brouillon D6 actif et un type de frais Rattrapage existant sont nécessaires." });
+    var error = financeState.remediationFinanceError ? '<aside class="finance-form-error" data-remediation-finance-error>' + escapeMarkup(financeState.remediationFinanceError) + '</aside>' : "";
+    var prepared = (financeState.remediationFinanceDrafts || []).map(function (draft) {
+      return '<article class="finance-remediation-draft" data-remediation-finance-draft><header><div><span>FRONTEND CONFIG</span><h4>' + escapeMarkup(draft.studentName + " · " + draft.className) + '</h4></div>' + window.ssBadge({ variant: "warning", label: "BACKEND_LATER" }) + '</header><p>' + escapeMarkup(draft.feeLabel + " · " + draft.subjectName + " · " + draft.remediationStatus) + '</p><dl class="student-finance-facts"><div><dt>Répartition école</dt><dd>Part école · ' + escapeMarkup(draft.schoolShare) + ' %</dd></div><div><dt>Destination déclarée</dt><dd>' + escapeMarkup(draft.otherDestination || "Autre destination non utilisée") + ' · ' + escapeMarkup(draft.otherShare) + ' %</dd></div><div><dt>Contrôle du total</dt><dd>Total · ' + escapeMarkup(draft.totalShare) + ' %</dd></div></dl><small>BROUILLON LOCAL · student_fee non créé · configuration sans écriture pédagogique</small></article>';
+    }).join("");
+    return '<section class="finance-remediation-link" data-remediation-finance><header><div><span>F7-FE · lecture D6</span><h3>Liaison financière du rattrapage</h3><p>La projection lit les brouillons pédagogiques actifs sans modifier leur contenu ni leur statut.</p></div>' + window.ssBadge({ variant: "info", label: "FRONTEND CONFIG" }) + '</header><aside class="finance-audit-note"><i data-lucide="shield-check"></i><p>La répartition est libre mais son total doit être exactement 100 %. Aucune part 40/60 ni aucun bénéficiaire ne sont imposés.</p></aside><div class="finance-two-column"><section class="finance-panel"><header><div><span>Configuration</span><h3>Préparer une affectation financière</h3></div></header>' + error + form + '</section><aside class="finance-panel"><header><div><span>Frontière D6</span><h3>Pédagogie intacte</h3></div></header><p>Seuls l’élève actif, la classe, la matière et le statut du brouillon sont projetés. Difficultés, objectifs et résultats restent dans D6.</p><p>BACKEND_LATER · aucune obligation et aucun paiement créés.</p></aside></div><section class="finance-remediation-drafts"><header><span>Préparations locales</span><h3>Affectations distinctes</h3></header>' + (prepared || window.ssState({ type: "empty", title: "Aucune liaison préparée", message: "Définissez explicitement une répartition totalisant 100 %." })) + '</section></section>';
   }
 
   function renderCash() {
@@ -1505,7 +1552,7 @@
     }
     if (allowedTabs.indexOf(financeState.activeTab) === -1 && !deniedReports) financeState.activeTab = allowedTabs[0];
 
-    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", exemptions: "Exemptions", campaigns: "Campagnes de contrôle", cash: "Encaissements", receipts: "Reçus", "cash-register": "Caisse", balances: "Soldes et régularité", reports: "Rapports financiers", family: "Situation familiale", canteen: "Liaison financière Cantine" };
+    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", exemptions: "Exemptions", campaigns: "Campagnes de contrôle", cash: "Encaissements", receipts: "Reçus", "cash-register": "Caisse", balances: "Soldes et régularité", reports: "Rapports financiers", family: "Situation familiale", canteen: "Liaison financière Cantine", "remediation-finance": "Rattrapage financier" };
     if (titleEl) titleEl.textContent = titles[financeState.activeTab];
     if (workspaceTitle) workspaceTitle.textContent = titles[financeState.activeTab];
 
@@ -1532,6 +1579,7 @@
       fees: renderFeeStructure,
       assignments: renderFeeAssignment,
       canteen: renderCanteenFinanceLink,
+      "remediation-finance": renderRemediationFinanceLink,
       exemptions: renderExemptions,
       campaigns: renderControlCampaignManagement,
       cash: renderCash,
@@ -1772,6 +1820,36 @@
       financeState.canteenLinkDrafts.unshift({ id: "local-canteen-link-" + Date.now(), serviceLabel: serviceLabel, feeStructureId: fee.id, feeLabel: fee.name, targetingMode: targetingMode, populationLabel: activeStudents.length + " élèves actifs éligibles", local: true, backendLater: true });
       persistLocalDrafts(CANTEEN_LINK_DRAFT_STORAGE_KEY, financeState.canteenLinkDrafts);
       d.notify("Liaison Cantine préparée en BROUILLON LOCAL · BACKEND_LATER.");
+      renderFinanceModule();
+    });
+
+    var remediationLinkForm = document.getElementById("financeRemediationLinkForm");
+    if (remediationLinkForm) remediationLinkForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      financeState.remediationFinanceError = "";
+      if (!canPrepareRemediationFinance()) { d.notify("Action non autorisée.", "error"); return; }
+      var data = new FormData(remediationLinkForm);
+      var remediationId = String(data.get("remediation_id") || "");
+      var feeStructureId = String(data.get("fee_structure_id") || "");
+      var schoolShare = Number(data.get("school_share"));
+      var otherShare = Number(data.get("other_share"));
+      var otherDestination = String(data.get("other_destination") || "").trim();
+      var remediation = remediationFinanceProjection().find(function (item) { return item.id === remediationId; });
+      var fee = feeCatalog().find(function (item) { return item.id === feeStructureId && item.active && /rattrapage|remédiation/i.test(item.name || ""); });
+      var total = schoolShare + otherShare;
+      if (!remediation || !fee || !Number.isFinite(schoolShare) || !Number.isFinite(otherShare) || schoolShare < 0 || otherShare < 0 || schoolShare > 100 || otherShare > 100 || Math.abs(total - 100) > 0.000001) {
+        financeState.remediationFinanceError = "La part école et l’autre part doivent totaliser exactement 100 %.";
+        renderFinanceModule();
+        return;
+      }
+      if (otherShare > 0 && !otherDestination) {
+        financeState.remediationFinanceError = "Nommez explicitement l’autre destination avant de préparer la répartition à 100 %.";
+        renderFinanceModule();
+        return;
+      }
+      financeState.remediationFinanceDrafts.unshift({ id: "local-remediation-finance-" + Date.now(), remediationId: remediation.id, studentId: remediation.studentId, studentName: remediation.studentName, classId: remediation.classId, className: remediation.className, subjectId: remediation.subjectId, subjectName: remediation.subjectName, remediationStatus: remediation.status, feeStructureId: fee.id, feeLabel: fee.name, schoolShare: schoolShare, otherShare: otherShare, otherDestination: otherShare > 0 ? otherDestination : "", totalShare: total, local: true, backendLater: true });
+      persistLocalDrafts(REMEDIATION_FINANCE_DRAFT_STORAGE_KEY, financeState.remediationFinanceDrafts);
+      d.notify("Liaison financière du rattrapage préparée · FRONTEND CONFIG · BACKEND_LATER.");
       renderFinanceModule();
     });
 
