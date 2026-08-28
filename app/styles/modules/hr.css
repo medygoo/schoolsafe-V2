@@ -187,6 +187,13 @@
 .hr-biometric dl div { min-width: 0; padding: var(--ss-space-3); border-radius: var(--ss-radius); background: var(--ss-bg-secondary); }
 .hr-biometric dt { color: var(--ss-text-secondary); font-size: var(--ss-text-xs); }
 .hr-biometric dd { margin: var(--ss-space-1) 0 0; overflow-wrap: anywhere; font-weight: var(--ss-font-bold); }
+.hr-payroll { display: grid; gap: var(--ss-space-4); }
+.hr-payroll > header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ss-space-3); padding: var(--ss-space-5); border: 1px solid var(--ss-border-default); border-radius: var(--ss-radius-lg); background: var(--ss-surface-raised); }
+.hr-payroll > header p { color: var(--ss-text-secondary); }
+.hr-payroll-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ss-space-3); }
+.hr-payroll-grid article { min-width: 0; display: grid; gap: var(--ss-space-2); padding: var(--ss-space-4); border: 1px solid var(--ss-border-default); border-radius: var(--ss-radius-md); background: var(--ss-bg-secondary); }
+.hr-payroll-grid small { color: var(--ss-text-secondary); }
+.hr-payroll-grid b { overflow-wrap: anywhere; }
 @media (max-width: 1100px) { .hr-biometric dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .hr-dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) {
@@ -205,6 +212,7 @@
   .hr-draft-list > header,
   .hr-preparation-form > header { flex-direction: column; }
   .hr-biometric > header { flex-direction: column; }
+  .hr-payroll > header { flex-direction: column; }
   .hr-staff-filters,
   .hr-staff-form,
   .hr-staff-dossier dl,
@@ -212,6 +220,7 @@
   .hr-preparation-form { grid-template-columns: 1fr; }
   .hr-absence-summary { grid-template-columns: 1fr; }
   .hr-biometric dl { grid-template-columns: 1fr; }
+  .hr-payroll-grid { grid-template-columns: 1fr; }
   .hr-staff-form > header,
   .hr-form-wide { grid-column: auto; }
   .hr-preparation-form > header,

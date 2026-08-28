@@ -267,6 +267,16 @@
     return '<section class="hr-biometric" data-hr-biometric><header><div><span>Frontière biométrie</span><h3>Contrat frontend futur</h3><p>Aucun enrôlement ni capture n’est disponible dans cette phase.</p></div><span class="hr-boundary-chip">FEATURE_LATER · BACKEND_LATER</span></header><aside class="hr-biometric-warning"><i data-lucide="shield-alert"></i><div><b>AUCUNE DONNÉE BIOMÉTRIQUE STOCKÉE.</b><p>Pas d’empreinte, visage, template, webcam, identifiant biométrique ou localStorage.</p></div></aside><dl><div><dt>Salarié</dt><dd>Référence future non créée</dd></div><div><dt>Méthode future</dt><dd>À définir côté backend autorisé</dd></div><div><dt>Appareil</dt><dd>Aucun appareil connecté</dd></div><div><dt>Statut d’enrôlement futur</dt><dd>FEATURE_LATER</dd></div><div><dt>Dernière synchronisation future</dt><dd>BACKEND_LATER</dd></div></dl></section>';
   }
 
+  function renderPayrollDenied() {
+    return root.ssState({ type: "error", title: "Paie non autorisée", message: "reports.hr.read avec portée school permet uniquement de comprendre le contrat futur.", details: "staff.manage et finance.payment.record ne sont jamais des permissions Paie · DENY explicite prioritaire." });
+  }
+
+  function renderPayroll() {
+    if (!canReadReports()) return '<section>' + renderPayrollDenied() + '</section>';
+    var fields = ["Salaire de base", "Primes", "Avances", "Retenues", "Net à payer", "Période", "Statut", "Historique", "Bulletin de paie"];
+    return '<section class="hr-payroll" data-hr-payroll><header><div><span>PAIE — CONTRAT FRONTEND FUTUR</span><h3>Structure de rémunération à autoriser ultérieurement</h3><p>Aucune source officielle, donnée individuelle ou valeur monétaire n’est disponible.</p></div><span class="hr-boundary-chip">FEATURE_LATER · BACKEND_LATER</span></header><aside class="hr-biometric-warning"><i data-lucide="shield-alert"></i><div><b>PERMISSION PAIE DÉDIÉE REQUISE</b><p>staff.manage et finance.payment.record ne permettent ni salaire, prime, avance, retenue, bulletin ou paiement.</p></div></aside><div class="hr-payroll-grid">' + fields.map(function (label) { return '<article><small>' + escapeMarkup(label) + '</small><b data-hr-payroll-value>Non disponible · FEATURE_LATER</b></article>'; }).join("") + '</div><aside class="hr-boundary"><i data-lucide="lock-keyhole"></i><p>Aucun calcul officiel, bulletin, paiement, modification de salaire, prime, avance ou retenue.</p></aside></section>';
+  }
+
   function bindStaff() {
     var search = document.querySelector('[data-hr-staff-filter="search"]');
     var status = document.querySelector('[data-hr-staff-filter="status"]');
@@ -366,7 +376,8 @@
       button.hidden = !tabAllowed(tab);
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = !canAccessHr() ? renderDenied() : !tabAllowed(activeTab) ? (activeTab === "attendance" || activeTab === "biometric" ? renderAttendanceDenied() : renderDenied()) : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : activeTab === "absence" ? renderAbsence() : activeTab === "attendance" ? renderAttendance() : activeTab === "biometric" ? renderBiometric() : renderFuture();
+    var blocked = !canAccessHr() || !tabAllowed(activeTab);
+    content.innerHTML = blocked ? (activeTab === "attendance" || activeTab === "biometric" ? renderAttendanceDenied() : activeTab === "payroll" ? renderPayrollDenied() : renderDenied()) : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : activeTab === "absence" ? renderAbsence() : activeTab === "attendance" ? renderAttendance() : activeTab === "biometric" ? renderBiometric() : activeTab === "payroll" ? renderPayroll() : renderFuture();
     bindNavigation();
     if (activeTab === "staff") bindStaff();
     if (activeTab === "contracts") bindContracts();
