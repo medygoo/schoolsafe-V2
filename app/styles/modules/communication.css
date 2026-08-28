@@ -412,6 +412,56 @@
   text-align: right;
 }
 
+.communication-channel-grid,
+.communication-event-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .8rem;
+  margin-top: 1rem;
+}
+
+.communication-channel-grid article,
+.communication-event-grid article {
+  display: grid;
+  gap: .5rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--ss-border, #d9e1ec);
+  border-radius: 14px;
+  background: var(--ss-surface, #fff);
+}
+
+.communication-channel-grid svg {
+  color: var(--communication-accent);
+}
+
+.communication-channel-grid span,
+.communication-event-grid p {
+  margin: 0;
+  color: var(--ss-text-muted, #64748b);
+  font-size: .8rem;
+}
+
+.communication-compact-denied {
+  min-height: 180px;
+  margin-top: 1rem;
+}
+
+.communication-events > button {
+  min-height: 44px;
+  margin-top: 1rem;
+}
+
+.communication-event-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.communication-event-grid article > span {
+  color: var(--communication-accent);
+  font-size: .75rem;
+  font-weight: 800;
+}
+
 .communication-future > svg {
   width: 48px;
   height: 48px;
@@ -459,6 +509,11 @@
 
   .communication-category-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .communication-channel-grid,
+  .communication-event-grid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -8,6 +8,7 @@
   var announcementDrafts = [];
   var convocationDrafts = [];
   var notificationPreference = { subscription: "opt-in", channels: ["in-app"], prepared: false };
+  var emailDrafts = [];
 
   var SECTIONS = [
     { key: "messages", label: "Messages", icon: "messages-square", note: "Composition bornée par permission et portée." },
@@ -68,6 +69,15 @@
   }
 
   function canSendNotification() {
+    return false;
+  }
+
+  function canPrepareEmail(subject) {
+    var scope = permissionScope(subject || user(), "email.send");
+    return !!(scope && ["own", "own_children", "assigned_classes", "assigned_subjects", "school"].indexOf(scope.type) >= 0);
+  }
+
+  function canPublishWebSync() {
     return false;
   }
 
@@ -358,6 +368,55 @@
     });
   }
 
+  function emailAudiences(subject) {
+    var scope = permissionScope(subject, "email.send");
+    if (!scope) return [];
+    if (scope.type === "school") return ["Direction", "Personnel autorisé", "Communauté scolaire"];
+    if (scope.type === "assigned_classes") return (subject.assignedClassIds || []).map(function (id) { return "Classe affectée · " + labelForClass(id); });
+    if (scope.type === "assigned_subjects") return (subject.assignedSubjectIds || []).map(function (id) { return "Matière affectée · " + labelForSubject(id); });
+    if (scope.type === "own_children") return ["Direction · enfants rattachés uniquement"];
+    if (scope.type === "own") return ["Direction · demande personnelle"];
+    return [];
+  }
+
+  function renderEmailDraft(draft) {
+    return '<article class="communication-draft" data-email-draft><header><div><span>ENVOI EMAIL — BACKEND_LATER</span><b>' + escapeMarkup(draft.subject) + '</b></div><span>BROUILLON DE SESSION</span></header><p>' + escapeMarkup(draft.content) + '</p><footer><span>' + escapeMarkup(draft.audience) + '</span><span>Aucun destinataire externe contacté</span></footer></article>';
+  }
+
+  function renderChannels() {
+    var subject = user();
+    var live = !isDemoMode(subject);
+    var emailScope = permissionScope(subject, "email.send");
+    var audiences = canPrepareEmail(subject) ? emailAudiences(subject) : [];
+    var emailForm = audiences.length ? '<form class="communication-form" data-email-form><p class="communication-form-wide">Garde exacte : <b>email.send + ' + escapeMarkup(emailScope.type) + '</b></p><label>Audience<select name="audience">' + audiences.map(function (audience) { return '<option>' + escapeMarkup(audience) + '</option>'; }).join("") + '</select></label><label>Objet<input name="subject" maxlength="120" required></label><label class="communication-form-wide">Contenu<textarea name="content" rows="5" maxlength="1400" required></textarea></label><button class="ss-button ss-button--primary" type="submit">Préparer l’e-mail</button><span class="communication-submit-boundary">ENVOI EMAIL — BACKEND_LATER</span></form>' : '<aside class="communication-denied communication-compact-denied" data-email-denied><i data-lucide="mail-x"></i><span>EMAIL INDISPONIBLE</span><p>email.send et une portée effective sont requis. DENY prioritaire.</p></aside>';
+    return '<section class="communication-channels"><header class="communication-view-header"><div><span>CANAUX SÉPARÉS</span><h3>Canaux et publication</h3><p>Chaque canal conserve sa propre frontière d’autorisation et d’exécution.</p></div><span class="communication-boundary-chip">' + (live ? "SESSION LIVE" : "DÉMONSTRATION") + '</span></header><div class="communication-channel-grid" data-channel-grid>' +
+      '<article><i data-lucide="app-window"></i><b>In-app</b><span>Interface locale uniquement</span></article><article><i data-lucide="bell-ring"></i><b>Push</b><span>BACKEND_LATER</span></article><article><i data-lucide="mail"></i><b>Email</b><span>Préparation avec email.send</span></article><article><i data-lucide="globe-2"></i><b>Site public / WebSync</b><span>Permission future requise</span></article></div>' + emailForm + '<div class="communication-draft-list">' + emailDrafts.map(renderEmailDraft).join("") + '</div><aside class="communication-boundary" data-websync-boundary><i data-lucide="unlink"></i><div><b>PUBLICATION SITE / WEBSYNC — PERMISSION FUTURE REQUISE</b><p>sync.submit ne vaut jamais permission de publication. Aucune synchronisation ni publication : BACKEND_LATER.</p></div></aside></section>';
+  }
+
+  function bindChannelEvents() {
+    var form = document.querySelector("[data-email-form]");
+    if (!form || form.__communicationBound) return;
+    form.__communicationBound = true;
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var subject = user();
+      if (!canPrepareEmail(subject)) { renderContent(); return; }
+      var allowed = emailAudiences(subject);
+      var data = new FormData(form);
+      var audience = String(data.get("audience") || "");
+      if (allowed.indexOf(audience) < 0) { renderContent(); return; }
+      emailDrafts = emailDrafts.concat([{ audience: audience, subject: String(data.get("subject") || "").trim(), content: String(data.get("content") || "").trim() }]);
+      renderContent();
+    });
+  }
+
+  function renderEvents() {
+    if (!isDemoMode(user())) {
+      return '<section class="communication-denied" data-events-live-boundary><i data-lucide="calendar-x"></i><span>PERMISSION FUTURE REQUISE</span><h3>Événements publics indisponibles</h3><p>Aucun événement réel n’est lu ou publié. PUBLICATION SITE — BACKEND_LATER.</p></section>';
+    }
+    return '<section class="communication-events" data-events-demo><header class="communication-view-header"><div><span>APERÇU DÉMO</span><h3>Événements publics fictifs</h3><p>Prévisualisation frontend sans données ni publication réelles.</p></div><span class="communication-boundary-chip">DÉMONSTRATION</span></header><div class="communication-event-grid"><article><span>15 SEPT.</span><b>Réunion de rentrée — exemple</b><p>Cour principale · 09 h 00</p></article><article><span>30 SEPT.</span><b>Journée culturelle — exemple</b><p>APERÇU NON PUBLIÉ</p></article></div><button class="ss-button" type="button" data-events-publish disabled>Publier sur le site — BACKEND_LATER</button></section>';
+  }
+
   function renderFuture() {
     var selected = SECTIONS.filter(function (item) { return item.key === activeTab; })[0];
     return '<section class="communication-future"><i data-lucide="construction"></i><span>DÉMONSTRATION · BACKEND_LATER</span><h3>' +
@@ -373,7 +432,7 @@
   function renderContent() {
     var content = document.getElementById("communicationContent");
     if (!content) return;
-    content.innerHTML = activeTab === "dashboard" ? renderDashboard() : activeTab === "messages" ? renderMessages() : activeTab === "announcements" ? renderAnnouncements() : activeTab === "convocations" ? renderConvocations() : activeTab === "notifications" ? renderNotifications() : renderFuture();
+    content.innerHTML = activeTab === "dashboard" ? renderDashboard() : activeTab === "messages" ? renderMessages() : activeTab === "announcements" ? renderAnnouncements() : activeTab === "convocations" ? renderConvocations() : activeTab === "notifications" ? renderNotifications() : activeTab === "channels" ? renderChannels() : activeTab === "events" ? renderEvents() : renderFuture();
     refreshTabs();
     content.querySelectorAll("[data-communication-open]").forEach(function (button) {
       button.addEventListener("click", function () { open(button.getAttribute("data-communication-open")); });
@@ -382,6 +441,7 @@
     if (activeTab === "announcements") bindAnnouncementEvents();
     if (activeTab === "convocations") bindConvocationEvents();
     if (activeTab === "notifications") bindNotificationEvents();
+    if (activeTab === "channels") bindChannelEvents();
     if (root.lucide && typeof root.lucide.createIcons === "function") root.lucide.createIcons();
   }
 
@@ -421,6 +481,7 @@
     announcementDrafts = [];
     convocationDrafts = [];
     notificationPreference = { subscription: "opt-in", channels: ["in-app"], prepared: false };
+    emailDrafts = [];
   }
 
   root.SchoolSafeCommunication = {
@@ -438,6 +499,9 @@
     getConvocationDrafts: function () { return convocationDrafts.map(function (draft) { return Object.assign({}, draft); }); },
     canManageOwnNotifications: canManageOwnNotifications,
     canSendNotification: canSendNotification,
-    getNotificationPreference: function () { return Object.assign({}, notificationPreference, { channels: notificationPreference.channels.slice() }); }
+    getNotificationPreference: function () { return Object.assign({}, notificationPreference, { channels: notificationPreference.channels.slice() }); },
+    canPrepareEmail: canPrepareEmail,
+    canPublishWebSync: canPublishWebSync,
+    getEmailDrafts: function () { return emailDrafts.map(function (draft) { return Object.assign({}, draft); }); }
   };
 })(window);
