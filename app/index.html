@@ -37,6 +37,7 @@
   <link rel="stylesheet" href="./styles/modules/security.css">
   <link rel="stylesheet" href="./styles/modules/pilotage.css">
   <link rel="stylesheet" href="./styles/modules/finance.css">
+  <link rel="stylesheet" href="./styles/modules/accounting-treasury.css">
   <link rel="stylesheet" href="./styles/screens/setup.css">
   <link rel="stylesheet" href="./styles/screens/auth.css">
   <script>
@@ -59,6 +60,7 @@
   <script type="module" src="./modules/cards/cards-module.js"></script>
   <script src="./modules/finance/finance-api.js" defer></script>
   <script src="./modules/finance/finance-module.js" defer></script>
+  <script src="./modules/accounting/accounting-treasury-demo.js" defer></script>
   <script src="./modules/finance/fee-control-module.js" defer></script>
   <script src="./modules/security/security-api.js" defer></script>
   <script src="./modules/school/student-pickup-demo.js" defer></script>
@@ -564,6 +566,23 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <button type="button" data-finance-tab="family"><i data-lucide="contact-round"></i><span>Ma famille</span></button>
             </nav>
             <div class="pedagogy-content finance-content" id="financeContent"></div>
+          </section>
+          <section class="pedagogy-module accounting-module" id="accountingModule" hidden>
+            <header class="pedagogy-module-header accounting-module-header">
+              <button class="ss-button ss-button--secondary" id="closeAccountingModule" type="button"><i data-lucide="arrow-left"></i> Tableau de bord</button>
+              <div><span>Comptabilité / Trésorerie</span><h2 id="accountingModuleTitle">Synthèse de trésorerie</h2><p>Lecture frontend des opérations Finance visibles, sans comptabilité légale inventée.</p></div>
+              <span class="local-draft"><i data-lucide="database-zap"></i> BACKEND_LATER</span>
+            </header>
+            <nav class="pedagogy-tabs accounting-tabs" id="accountingTabs" aria-label="Fonctions Comptabilité et Trésorerie">
+              <button class="active" type="button" data-accounting-tab="dashboard"><i data-lucide="layout-dashboard"></i><span>Vue d’ensemble</span></button>
+              <button type="button" data-accounting-tab="journal"><i data-lucide="notebook-tabs"></i><span>Journal</span></button>
+              <button type="button" data-accounting-tab="expenses"><i data-lucide="receipt"></i><span>Dépenses</span></button>
+              <button type="button" data-accounting-tab="treasury"><i data-lucide="landmark"></i><span>Trésorerie</span></button>
+              <button type="button" data-accounting-tab="closing"><i data-lucide="lock-keyhole"></i><span>Clôture</span></button>
+              <button type="button" data-accounting-tab="reconciliation"><i data-lucide="list-checks"></i><span>Rapprochement</span></button>
+              <button type="button" data-accounting-tab="reports"><i data-lucide="file-chart-column"></i><span>Rapports</span></button>
+            </nav>
+            <div class="pedagogy-content accounting-content" id="accountingContent"></div>
           </section>
           <section class="pedagogy-module security-module" id="securityModule" hidden>
             <header class="pedagogy-module-header security-module-header">

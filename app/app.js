@@ -223,13 +223,15 @@
    * Elle ne crée aucun droit backend et permet aux modules de passer par Access_Law sans bypass de rôle.
    */
   var DEMO_PERMISSIONS_BY_ROLE = {
-    admin: ["school.manage", "staff.read", "staff.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "canteen.manage", "communication.message.send"],
+    admin: ["school.manage", "staff.read", "staff.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "finance.report.read", "reports.financial.read", "finance.cash_register.close", "safe.assistant.use", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
     teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage", "safe.assistant.use"],
     pedagogy: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.lesson-plan.read", "pedagogy.report.read", "pedagogy.report.manage", "palmarques.read", "safe.assistant.use"],
     guard: ["security.scan", "security.pickup.manage", "safe.assistant.use"],
+    school_head: ["finance.report.read", "reports.financial.read", "safe.assistant.use"],
     finance: ["finance.fee.read", "finance.fee.manage", "finance.receipt.read", "finance.report.read", "finance.cash_register.close", "finance.control.read", "finance.control.manage", "finance.status.read", "safe.assistant.use"],
+    accountant: ["reports.financial.read", "finance.report.read", "finance.receipt.read", "safe.assistant.use"],
     cashier: ["finance.payment.record", "finance.receipt.read", "finance.status.read", "safe.assistant.use"]
   };
 
@@ -305,6 +307,21 @@
         { permission: "finance.control.read", type: "school" },
         { permission: "finance.control.manage", type: "school" },
         { permission: "finance.status.read", type: "school" },
+        { permission: "safe.assistant.use", type: "own" }
+      ]
+    },
+    school_head: {
+      scopes: [
+        { permission: "finance.report.read", type: "school" },
+        { permission: "reports.financial.read", type: "school" },
+        { permission: "safe.assistant.use", type: "own" }
+      ]
+    },
+    accountant: {
+      scopes: [
+        { permission: "reports.financial.read", type: "school" },
+        { permission: "finance.report.read", type: "school" },
+        { permission: "finance.receipt.read", type: "school" },
         { permission: "safe.assistant.use", type: "own" }
       ]
     },
@@ -384,7 +401,7 @@
    */
   function showDashboard() {
     setWorkspaceDashboardVisible(true);
-    var modules = ["pedagogyModule", "financeModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
+    var modules = ["pedagogyModule", "financeModule", "accountingModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
     modules.forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.hidden = true;
@@ -1247,6 +1264,7 @@
   }
 
   function openFinanceModule(actionName) {
+    document.getElementById("accountingModule").hidden = true;
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("securityModule").hidden = true;
     document.getElementById("pilotageModule").hidden = true;
@@ -2367,11 +2385,36 @@
       '</button>';
   }
 
+  function openAccountingModule() {
+    ["pedagogyModule", "financeModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+      var module = document.getElementById(id);
+      if (module) module.hidden = true;
+    });
+    setWorkspaceDashboardVisible(false);
+    document.getElementById("cardsProtected").hidden = true;
+    if (window.SchoolSafeAccountingTreasury && typeof window.SchoolSafeAccountingTreasury.render === "function") {
+      window.SchoolSafeAccountingTreasury.render("accountingModule");
+    }
+    document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeAccountingModule() {
+    if (window.SchoolSafeAccountingTreasury && typeof window.SchoolSafeAccountingTreasury.close === "function") {
+      window.SchoolSafeAccountingTreasury.close();
+    } else {
+      document.getElementById("accountingModule").hidden = true;
+      setWorkspaceDashboardVisible(true);
+    }
+    document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
+    document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    setBreadcrumb(null);
+  }
+
   function openPhaseDPedagogy(view) {
     if (!window.SchoolSafeTeacherPedagogy || (currentDemoRole !== "teacher" && currentDemoRole !== "pedagogy")) return false;
     if (currentDemoRole === "pedagogy" && view !== "direction") return false;
     setWorkspaceDashboardVisible(false);
-    ["pedagogyModule", "palmaresModule", "financeModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2396,7 +2439,7 @@
     if (branchKey === "school") { openSchoolModule("school"); return; }
     if (branchKey === "pilotage") { openPilotageModule("Tableau de bord"); return; }
     if (branchKey === "people") { notify("Personnel — ouverture dans une prochaine étape."); return; }
-    if (branchKey === "accounting") { notify("Comptabilité — ouverture dans une prochaine étape."); return; }
+    if (branchKey === "accounting") { openAccountingModule(); return; }
     if (branchKey === "communication") { notify("Communication — ouverture dans une prochaine étape."); return; }
     if (branchKey === "reports") { notify("Contrôle et rapports — ouverture dans une prochaine étape."); return; }
     notify(definition.label + " — ouverture dans une prochaine étape.");
@@ -2425,6 +2468,7 @@
     if (branchKey === "care" && /liaison financière/i.test(actionName)) { openFinanceModule(actionName); return; }
     if (branchKey === "finance" && feeControlTabForAction(actionName)) { openFeeControlModule(actionName); return; }
     if (branchKey === "finance") { openFinanceModule(actionName); return; }
+    if (branchKey === "accounting") { openAccountingModule(); return; }
     if (branchKey === "feeControl") { openFeeControlModule(actionName); return; }
     if (branchKey === "security") { openSecurityModule(actionName); return; }
     if (branchKey === "school") { openSchoolModule(schoolTabForAction(actionName) || "school"); return; }
@@ -2739,6 +2783,7 @@
     });
   });
   bindIfExists("closeFinanceModule", "click", closeFinanceModule);
+  bindIfExists("closeAccountingModule", "click", closeAccountingModule);
   bindIfExists("closeSecurityModule", "click", closeSecurityModule);
   bindIfExists("closePilotageModule", "click", closePilotageModule);
   bindIfExists("closeFeeControlModule", "click", closeFeeControlModule);

@@ -1,0 +1,141 @@
+.accounting-module,
+.accounting-content {
+  color: var(--ss-text-primary);
+  background: var(--ss-bg-primary);
+}
+
+.accounting-module-header {
+  background: var(--ss-gradient-module);
+}
+
+.accounting-dashboard,
+.accounting-shortcuts,
+.accounting-future {
+  display: grid;
+  gap: var(--ss-space-4);
+}
+
+.accounting-dashboard > header,
+.accounting-shortcuts,
+.accounting-future {
+  padding: var(--ss-space-5);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-surface-raised);
+}
+
+.accounting-dashboard > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ss-space-4);
+}
+
+.accounting-dashboard h3,
+.accounting-shortcuts h3,
+.accounting-future h3 {
+  margin: var(--ss-space-1) 0;
+  color: var(--ss-text-primary);
+}
+
+.accounting-dashboard p,
+.accounting-future p,
+.accounting-dashboard small,
+.accounting-shortcuts > header span {
+  color: var(--ss-text-secondary);
+}
+
+.accounting-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ss-space-3);
+}
+
+.accounting-dashboard-metric {
+  min-width: 0;
+  min-height: 104px;
+  display: flex;
+  align-items: center;
+  gap: var(--ss-space-3);
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-border-subtle);
+  border-radius: var(--ss-radius-md);
+  background: var(--ss-bg-secondary);
+}
+
+.accounting-dashboard-metric > span {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--ss-radius-md);
+  color: var(--ss-domain-comptabilite);
+  background: var(--ss-domain-comptabilite-bg);
+}
+
+.accounting-dashboard-metric small,
+.accounting-dashboard-metric b {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.accounting-boundary {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ss-space-3);
+  padding: var(--ss-space-4);
+  color: var(--ss-info-text);
+  border: 1px solid var(--ss-info-border);
+  border-radius: var(--ss-radius-md);
+  background: var(--ss-info-bg);
+}
+
+.accounting-boundary p {
+  margin: 0;
+  color: inherit;
+}
+
+.accounting-boundary-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: var(--ss-space-2) var(--ss-space-3);
+  border: 1px solid var(--ss-warning-border);
+  border-radius: var(--ss-radius-full);
+  color: var(--ss-warning-text);
+  background: var(--ss-warning-bg);
+  font-size: var(--ss-text-xs);
+  font-weight: var(--ss-font-bold);
+}
+
+.accounting-shortcuts > div {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--ss-space-3);
+}
+
+.accounting-dashboard-action {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ss-space-2);
+  padding: var(--ss-space-3);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-md);
+  color: var(--ss-text-primary);
+  background: var(--ss-bg-primary);
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .accounting-dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accounting-shortcuts > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 520px) {
+  .accounting-dashboard > header { flex-direction: column; }
+  .accounting-dashboard-grid,
+  .accounting-shortcuts > div { grid-template-columns: 1fr; }
+}

@@ -2353,11 +2353,21 @@
     financeSessionOverride = session || null;
   }
 
+  function accountingSnapshot() {
+    return {
+      dayStatus: financeState.dayStatus || "Indisponible",
+      transactions: (financeState.transactions || []).map(function (item) { return Object.assign({}, item); }),
+      expenses: (financeState.expenses || []).map(function (item) { return Object.assign({}, item); }),
+      studentFees: (financeState.studentFees || []).map(function (item) { return Object.assign({}, item); })
+    };
+  }
+
   root.SchoolSafeFinanceModule = {
     render: render,
     close: close,
     setRole: setRole,
     setSession: setSession,
+    getAccountingSnapshot: accountingSnapshot,
     answerJaspe: answerJaspe,
     _state: financeState,
     isDemoMode: isDemoMode
