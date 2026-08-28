@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { enterDemoWorkspace, expectBranches, expectNoBranch, openAction, domClick } from "./helpers";
+import { enterDemoWorkspace, expectBranches, expectNoBranch, openAction } from "./helpers";
 
-test.describe("Profil agent de caisse", () => {
-  test("affiche uniquement la branche finance", async ({ page }) => {
+test.describe("F4-FE — caisse, paiements constatés et reçus", () => {
+  test("conserve le profil Caisse dans sa seule branche métier", async ({ page }) => {
     await enterDemoWorkspace(page, "cashier");
     await expectBranches(page, "cashier");
     await expectNoBranch(page, "pedagogy");
@@ -10,47 +10,88 @@ test.describe("Profil agent de caisse", () => {
     await expectNoBranch(page, "pilotage");
   });
 
-  test("peut enregistrer un paiement et obtenir un numéro de reçu", async ({ page }) => {
+  test("prépare puis confirme localement un paiement sur un student_fee exact", async ({ page }) => {
+    const writes: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() !== "GET" && request.url().includes("/finance/")) writes.push(`${request.method()} ${request.url()}`);
+    });
     await enterDemoWorkspace(page, "cashier");
     await openAction(page, "Enregistrer un paiement");
-    await expect(page.locator("#financeModule")).toBeVisible();
-    await expect(page.locator('#financeTabs [data-finance-tab="cash"].active')).toBeVisible();
-    await expect(page.locator("#paymentForm")).toBeVisible();
 
-    await page.locator("#financeStudentSelect").selectOption("0");
-    await page.locator('#paymentForm select[name="fee"]').selectOption({ index: 0 });
-    await page.locator('#paymentForm input[name="amount"]').fill("50000");
-    await page.locator('#paymentForm input[name="reference"]').fill("Troisième tranche de démonstration");
-    await page.locator('#paymentForm button[type="submit"]').click();
+    const before = await page.evaluate(() => {
+      const fee = (window as any).SchoolSafeFinanceModule._state.studentFees.find((item: any) => item.id === "demo-sf-lucas-school");
+      return { ...fee };
+    });
+    const form = page.locator("#paymentForm");
+    await expect(form).toBeVisible();
+    await expect(page.locator("#financeCashStudent")).not.toContainText("Amina Mbuyi");
+    await page.locator("#financeCashStudent").selectOption("demo-s1");
+    await page.locator("#financeCashStudentFee").selectOption("demo-sf-lucas-school");
+    await form.locator('[name="amount"]').fill("50000");
+    await form.locator('[name="mode"]').selectOption("cash");
+    await form.locator('[name="reference"]').fill("Troisième tranche constatée");
+    await form.locator('button[type="submit"]').click();
 
-    // The demo local-sync adapter confirms the operation and generates a receipt number.
-    await page.getByText("REC-2026-0588", { exact: true }).waitFor({ timeout: 15000 });
-    await expect(page.getByText("REC-2026-0588", { exact: true })).toBeVisible();
+    const prepared = page.locator("[data-payment-confirmation]");
+    await expect(prepared).toContainText("demo-sf-lucas-school");
+    await expect(prepared).toContainText("50 000 CDF");
+    await expect(prepared).toContainText("PAIEMENT CONSTATÉ");
+    const afterPrepare = await page.evaluate(() => {
+      const fee = (window as any).SchoolSafeFinanceModule._state.studentFees.find((item: any) => item.id === "demo-sf-lucas-school");
+      return { ...fee };
+    });
+    expect(afterPrepare).toEqual(before);
+
+    await prepared.locator("[data-confirm-demo-payment]").click();
+    const afterConfirm = await page.evaluate(() => {
+      const fee = (window as any).SchoolSafeFinanceModule._state.studentFees.find((item: any) => item.id === "demo-sf-lucas-school");
+      return { ...fee };
+    });
+    expect(afterConfirm.amount_paid).toBe(before.amount_paid + 50000);
+    expect(afterConfirm.amount_remaining).toBe(before.amount_remaining - 50000);
+    await expect(page.locator("[data-receipt-preview]")).toContainText("APERÇU DE REÇU");
+    await expect(page.locator("[data-receipt-preview]")).toContainText("DÉMONSTRATION · NON OFFICIEL");
+    await expect(page.locator("[data-receipt-preview]")).toContainText("demo-sf-lucas-school");
+    expect(writes).toEqual([]);
   });
 
-  test("n’a pas accès au paramétrage des frais", async ({ page }) => {
+  test("ne propose ni paiement en ligne ni moteur PDF Phase F", async ({ page }) => {
     await enterDemoWorkspace(page, "cashier");
-    await openAction(page, "Rapport de caisse");
-    await expect(page.locator("#financeModule")).toBeVisible();
+    await openAction(page, "Enregistrer un paiement");
+    const module = page.locator("#financeModule");
+    await expect(module.getByText(/PAYER EN LIGNE/i)).toHaveCount(0);
+    await expect(module.getByRole("button", { name: /PDF|télécharger|imprimer/i })).toHaveCount(0);
+    await expect(module).toContainText("Paiement constaté");
+  });
+
+  test("masque le paramétrage et toute annulation sans permission dédiée", async ({ page }) => {
+    await enterDemoWorkspace(page, "cashier");
+    await openAction(page, "Produire un reçu PDF");
     await expect(page.locator('#financeTabs [data-finance-tab="fees"]')).toBeHidden();
-    await expect(page.locator("#closeCashRegister")).toBeVisible();
+    await expect(page.locator("[data-cancel-payment-id]")).toHaveCount(0);
+    await expect(page.locator("#financeContent")).toContainText("Aperçus de reçus");
   });
 
-  test("accède à l’interface d’émission des reçus", async ({ page }) => {
+  test("autorise uniquement la préparation d’annulation avec finance.payment.cancel", async ({ page }) => {
     await enterDemoWorkspace(page, "cashier");
-    await openAction(page, "Produire un reçu PDF");
-    await expect(page.locator("#financeModule")).toBeVisible();
-    await expect(page.locator('#financeTabs [data-finance-tab="receipts"].active')).toBeVisible();
-    await expect(page.locator("[data-export-receipt-id]").first()).toBeVisible();
-  });
-
-  test("documente la présence du bouton d’annulation pour le caissier en mode démo", async ({ page }) => {
-    await enterDemoWorkspace(page, "cashier");
-    await openAction(page, "Produire un reçu PDF");
-    // Note métier : l’application actuelle affiche le bouton d’annulation pour le
-    // profil caissier. Ce test documente l’état actuel ; la décision de retirer
-    // cette action au caissier relève d’un ajustement produit à part.
-    const cancelButtons = page.locator("[data-cancel-payment-id]");
-    await expect(cancelButtons).toHaveCount(6);
+    await page.evaluate(() => {
+      const finance = (window as any).SchoolSafeFinanceModule;
+      finance.setSession({
+        permissions: ["finance.receipt.read", "finance.payment.cancel"],
+        scopes: [
+          { permission: "finance.receipt.read", type: "school" },
+          { permission: "finance.payment.cancel", type: "school" },
+        ],
+      });
+      finance.render("financeModule", { tab: "receipts" });
+    });
+    const cancel = page.locator("[data-cancel-payment-id]").first();
+    await expect(cancel).toBeVisible();
+    await cancel.click();
+    const form = page.locator("#cancelPaymentForm");
+    await form.locator('[name="reason"]').fill("Erreur de référence constatée.");
+    await form.locator('button[type="submit"]').click();
+    await expect(page.locator("[data-cancellation-draft]").first()).toContainText("ANNULATION PRÉPARÉE");
+    await expect(page.locator("[data-cancellation-draft]").first()).toContainText("BACKEND_LATER");
   });
 });

@@ -175,7 +175,9 @@
       exemptionDraft: { studentId: "demo-s1", studentFeeId: "demo-sf-lucas-transport", type: "total", prepared: false, preparedSummary: null },
       selectedCashStudentId: "demo-s1",
       selectedCashStudentFeeId: "demo-sf-lucas-school",
+      paymentDraft: null,
       lastConfirmedPayment: null,
+      cancellationDrafts: [],
       financialSearch: "",
       financialFeeFilter: "",
       financialStatusFilter: "",
@@ -220,7 +222,9 @@
       exemptionDraft: { studentId: "", studentFeeId: "", type: "total", prepared: false, preparedSummary: null },
       selectedCashStudentId: "",
       selectedCashStudentFeeId: "",
+      paymentDraft: null,
       lastConfirmedPayment: null,
+      cancellationDrafts: [],
       financialSearch: "",
       financialFeeFilter: "",
       financialStatusFilter: "",
@@ -236,6 +240,7 @@
   var FEE_TYPE_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-fee-type-drafts";
   var FEE_ASSIGNMENT_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-assignment-drafts";
   var FEE_EXEMPTION_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-exemption-drafts";
+  var PAYMENT_CANCELLATION_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-payment-cancellation-drafts";
 
   function readLocalDrafts(key) {
     try {
@@ -257,6 +262,7 @@
   financeState.feeTypeDrafts = readLocalDrafts(FEE_TYPE_DRAFT_STORAGE_KEY);
   financeState.assignmentDrafts = readLocalDrafts(FEE_ASSIGNMENT_DRAFT_STORAGE_KEY);
   financeState.exemptionDrafts = readLocalDrafts(FEE_EXEMPTION_DRAFT_STORAGE_KEY);
+  financeState.cancellationDrafts = readLocalDrafts(PAYMENT_CANCELLATION_DRAFT_STORAGE_KEY);
 
   // ---------------------------------------------------------------------------
   // Mapping données backend
@@ -515,6 +521,10 @@
     return canAccessFeeCatalog("finance.receipt.read");
   }
 
+  function canCancelPayment() {
+    return canAccessFeeCatalog("finance.payment.cancel");
+  }
+
   // FE-FIN-06 : garde transitoire. La permission dédiée finance.exemption.manage
   // reste BACKEND_LATER ; aucune décision finale ne repose sur un rôle.
   function canPrepareExemption() {
@@ -642,8 +652,12 @@
       return studentFee.id === updated.id ? updated : studentFee;
     });
     rebuildStudentFinancialProfiles();
-    financeState.transactions.unshift({ id: "demo-payment-" + Date.now(), receipt: "Démonstration — non officiel", date: formatIsoDateTimeFr(new Date().toISOString()), day: formatIsoDateFr(new Date().toISOString()), student: profile.student.name, className: profile.student.className, fee: fee.label, amount: amount, mode: modeLabel(mode), cashier: "—", reference: reference, status: "Démonstration", currency: fee.currency, studentId: profile.student.id, studentFeeId: fee.student_fee_id, feeStructureId: fee.fee_structure_id });
-    d.notify("Paiement simulé en démonstration. Aucun reçu officiel n’a été créé.");
+    var now = Date.now();
+    var transaction = { id: "demo-payment-" + now, receipt: "DÉMO-REC-" + now, date: formatIsoDateTimeFr(new Date(now).toISOString()), day: formatIsoDateFr(new Date(now).toISOString()), student: profile.student.name, className: profile.student.className, fee: fee.label, amount: amount, mode: modeLabel(mode), cashier: "—", reference: reference, status: "Démonstration", currency: fee.currency, studentId: profile.student.id, studentFeeId: fee.student_fee_id, feeStructureId: fee.fee_structure_id, local: true, nonOfficial: true };
+    financeState.transactions.unshift(transaction);
+    financeState.lastConfirmedPayment = transaction;
+    financeState.paymentDraft = null;
+    d.notify("Paiement constaté dans la démonstration. Aucun reçu officiel n’a été créé.");
     renderFinanceModule();
   }
 
@@ -1054,14 +1068,18 @@
       '</section>';
     var feeSummary = fee ? '<section class="finance-panel"><header><div><span>Obligation sélectionnée</span><h3>' + escapeMarkup(fee.label) + '</h3></div>' + window.ssBadge({ variant: financialStatusDefinition(fee.status).variant, label: financialStatusDefinition(fee.status).label }) + '</header>' +
       window.ssTable({ headers: ["Type de frais", "Attendu", "Déjà payé", "Restant", "Devise"], rows: '<tr data-student-id="' + escapeMarkup(fee.student_id) + '" data-student-fee-id="' + escapeMarkup(fee.student_fee_id) + '" data-fee-structure-id="' + escapeMarkup(fee.fee_structure_id) + '"><td><b>' + escapeMarkup(fee.label) + '</b></td><td>' + formatFinancialAmount(fee.expected, fee.currency) + '</td><td>' + formatFinancialAmount(fee.paid, fee.currency) + '</td><td><b>' + formatFinancialAmount(fee.remaining, fee.currency) + '</b></td><td>' + escapeMarkup(fee.currency || "Indisponible") + '</td></tr>', responsive: true, compact: true }) + '</section>' : window.ssState({ type: "unavailable", title: "Obligation indisponible", message: "La sélection du student_fee doit être rétablie avant tout paiement." });
-    var paymentForm = fee && availability.allowed && financeState.dayStatus === "Ouverte" ? '<form class="payment-form" id="paymentForm" data-student-id="' + escapeMarkup(student.id) + '" data-student-fee-id="' + escapeMarkup(fee.student_fee_id) + '" data-fee-structure-id="' + escapeMarkup(fee.fee_structure_id) + '" data-currency="' + escapeMarkup(fee.currency) + '"><header><span><i data-lucide="hand-coins"></i></span><div><h3>Enregistrer un paiement</h3><p>Le paiement sera rattaché uniquement à l’obligation sélectionnée.</p></div></header><div>' +
+    var paymentForm = fee && availability.allowed && financeState.dayStatus === "Ouverte" ? '<form class="payment-form" id="paymentForm" data-student-id="' + escapeMarkup(student.id) + '" data-student-fee-id="' + escapeMarkup(fee.student_fee_id) + '" data-fee-structure-id="' + escapeMarkup(fee.fee_structure_id) + '" data-currency="' + escapeMarkup(fee.currency) + '"><header><span><i data-lucide="hand-coins"></i></span><div><h3>Paiement constaté</h3><p>La préparation sera rattachée uniquement à l’obligation sélectionnée. Aucun paiement en ligne n’est traité.</p></div></header><div>' +
       window.ssField({ label: "Montant reçu", labelFor: "financePaymentAmount", required: true, help: "Maximum : " + formatFinancialAmount(fee.remaining, fee.currency), inputHtml: window.ssInput({ type: "number", name: "amount", id: "financePaymentAmount", required: true, min: paymentStepForCurrency(fee.currency), max: fee.remaining, step: paymentStepForCurrency(fee.currency), inputmode: "decimal", placeholder: "Montant en " + fee.currency }) }) +
       window.ssField({ label: "Devise", labelFor: "financePaymentCurrency", inputHtml: window.ssInput({ type: "text", id: "financePaymentCurrency", value: fee.currency, readonly: true }) }) +
-      window.ssField({ label: "Mode constaté", labelFor: "financePaymentMode", required: true, inputHtml: window.ssSelect({ name: "mode", id: "financePaymentMode", value: "cash", options: [{ value: "cash", label: "Espèces" }, { value: "card", label: "Carte bancaire" }, { value: "check", label: "Chèque" }, { value: "bank_transfer", label: "Virement constaté" }, { value: "mobile_money", label: "Mobile money" }, { value: "other", label: "Autre moyen constaté" }] }) }) +
+      window.ssField({ label: "Mode constaté", labelFor: "financePaymentMode", required: true, inputHtml: window.ssSelect({ name: "mode", id: "financePaymentMode", value: "cash", options: [{ value: "cash", label: "Espèces constatées" }, { value: "card", label: "Carte constatée" }, { value: "check", label: "Chèque constaté" }, { value: "bank_transfer", label: "Virement constaté" }, { value: "mobile_money", label: "Mobile money constaté" }, { value: "other", label: "Autre moyen constaté" }] }) }) +
       window.ssField({ label: "Référence ou observation", labelFor: "financePaymentReference", required: true, inputHtml: window.ssInput({ type: "text", name: "reference", id: "financePaymentReference", required: true, maxlength: 200, placeholder: "Ex. Deuxième tranche" }) }) +
-      '</div>' + window.ssButton({ label: isDemoMode() ? "Simuler le paiement (démo)" : "Enregistrer et préparer le reçu", icon: "badge-check", type: "submit" }) + '</form>' : window.ssState({ type: availability.allowed ? "unavailable" : "denied", title: availability.allowed ? "Encaissement indisponible" : "Paiement normal indisponible", message: financeState.dayStatus !== "Ouverte" ? "La journée de caisse ne permet plus de nouvel encaissement." : availability.message });
+      '</div>' + window.ssButton({ label: "Préparer la confirmation", icon: "badge-check", type: "submit" }) + '</form>' : window.ssState({ type: availability.allowed ? "unavailable" : "denied", title: availability.allowed ? "Encaissement indisponible" : "Paiement normal indisponible", message: financeState.dayStatus !== "Ouverte" ? "La journée de caisse ne permet plus de nouvel encaissement." : availability.message });
+    var paymentDraft = financeState.paymentDraft;
+    var paymentConfirmation = paymentDraft ? '<section class="finance-payment-confirmation" data-payment-confirmation><header><div><span>PAIEMENT CONSTATÉ</span><h3>Vérification avant confirmation</h3></div>' + window.ssBadge({ variant: "warning", label: isDemoMode() ? "DÉMONSTRATION" : "BACKEND_LATER" }) + '</header><dl class="student-finance-facts"><div><dt>Élève</dt><dd>' + escapeMarkup(paymentDraft.studentName) + '</dd></div><div><dt>student_fee exact</dt><dd>' + escapeMarkup(paymentDraft.studentFeeId) + '</dd></div><div><dt>Montant</dt><dd>' + formatFinancialAmount(paymentDraft.amount, paymentDraft.currency) + '</dd></div><div><dt>Mode</dt><dd>' + escapeMarkup(modeLabel(paymentDraft.mode)) + '</dd></div><div><dt>Référence</dt><dd>' + escapeMarkup(paymentDraft.reference) + '</dd></div></dl><p>Aucune obligation n’est modifiée avant cette confirmation locale.</p>' + (isDemoMode() ? window.ssButton({ label: "Confirmer le paiement constaté", icon: "circle-check", attrs: { "data-confirm-demo-payment": "true" } }) : window.ssState({ type: "unavailable", title: "Confirmation officielle — BACKEND_LATER", message: "Phase F ne déclenche aucune écriture serveur." })) + '</section>' : "";
+    var receipt = financeState.lastConfirmedPayment;
+    var receiptPreview = receipt ? '<section class="finance-receipt-preview" data-receipt-preview><header><div><span>APERÇU DE REÇU</span><h3>' + escapeMarkup(receipt.receipt) + '</h3></div>' + window.ssBadge({ variant: "info", label: "DÉMONSTRATION · NON OFFICIEL" }) + '</header><dl class="student-finance-facts"><div><dt>Élève</dt><dd>' + escapeMarkup(receipt.student) + '</dd></div><div><dt>student_fee exact</dt><dd>' + escapeMarkup(receipt.studentFeeId) + '</dd></div><div><dt>Frais</dt><dd>' + escapeMarkup(receipt.fee) + '</dd></div><div><dt>Montant constaté</dt><dd>' + formatFinancialAmount(receipt.amount, receipt.currency) + '</dd></div><div><dt>Mode</dt><dd>' + escapeMarkup(receipt.mode) + '</dd></div><div><dt>Référence</dt><dd>' + escapeMarkup(receipt.reference) + '</dd></div></dl><p>Cet aperçu local ne constitue ni un reçu officiel, ni un PDF, ni une preuve de paiement en ligne.</p></section>' : "";
     var demoActivity = isDemoMode() ? '<section class="finance-panel"><header><div><span>Encaissements · données fictives</span><h3>Activité de démonstration</h3></div><b>' + formatTransactionTotal(financeTotals().today) + '</b></header><aside class="finance-audit-note"><i data-lucide="flask-conical"></i><p>Cette activité est fictive et non officielle. Elle ne constitue ni un journal de caisse ni un registre de reçus.</p></aside>' + window.ssTable({ headers: ["Référence", "Élève", "Mode", "Montant", "Statut"], rows: financeTotals().today.map(function (transaction) { return '<tr><td><b>' + escapeMarkup(transaction.receipt) + '</b></td><td>' + escapeMarkup(transaction.student) + '</td><td>' + escapeMarkup(transaction.mode) + '</td><td><b>' + formatTransactionAmount(transaction) + '</b></td><td>' + window.ssBadge({ variant: d.certificationStatusClass(transaction.status), label: transaction.status }) + '</td></tr>'; }).join(""), empty: "Aucune opération fictive.", emptyTitle: "Encaissements de démonstration", responsive: true }) + '</section>' : "";
-    return '<div class="cash-workspace"><section class="cashier-layout">' + studentPanel + paymentForm + '</section>' + demoActivity + feeSummary + '</div>';
+    return '<div class="cash-workspace"><section class="cashier-layout">' + studentPanel + paymentForm + '</section>' + paymentConfirmation + receiptPreview + demoActivity + feeSummary + '</div>';
   }
 
   function renderCashRegister() {
@@ -1114,17 +1132,17 @@
       '</section>';
     }
 
-    var demoReceipts = [
-      { reference: "DÉMO-REC-001", date: "14 août 2026 · 10:20", student: "Emma Martin", matricule: "DEMO-002", fee: "Scolarité", amount: 300000, currency: "CDF", mode: "Espèces", status: "Valide", kind: "Paiement complet", transaction: "DÉMO-TX-001" },
-      { reference: "DÉMO-REC-002", date: "14 août 2026 · 09:15", student: "Lucas Martin", matricule: "DEMO-001", fee: "Transport scolaire", amount: 100000, currency: "USD", mode: "Virement constaté", status: "Valide", kind: "Paiement partiel", transaction: "DÉMO-TX-002" },
-      { reference: "DÉMO-REC-003", date: "13 août 2026 · 14:40", student: "Ethan Leroy", matricule: "DEMO-003", fee: "Scolarité", amount: 150000, currency: "CDF", mode: "Espèces", status: "Annulé", kind: "Paiement annulé", transaction: "DÉMO-TX-003" }
-    ];
-    var rows = demoReceipts.map(function (receipt) {
-      var statusVariant = receipt.status === "Annulé" ? "danger" : "success";
-      return '<tr><td><b>' + escapeMarkup(receipt.reference) + '</b><small>' + escapeMarkup(receipt.date) + '</small></td><td><b>' + escapeMarkup(receipt.student) + '</b><small>Matricule : ' + escapeMarkup(receipt.matricule) + '</small></td><td>' + escapeMarkup(receipt.fee) + '<small>' + escapeMarkup(receipt.kind) + '</small></td><td>' + escapeMarkup(receipt.mode) + '<small>Réf. transaction : ' + escapeMarkup(receipt.transaction) + '</small></td><td><b>' + formatFinancialAmount(receipt.amount, receipt.currency) + '</b></td><td>' + window.ssBadge({ variant: statusVariant, label: receipt.status }) + '</td></tr>';
+    var rows = (financeState.transactions || []).map(function (receipt) {
+      var statusVariant = receipt.status === "Annulé" ? "danger" : receipt.status === "Démonstration" ? "info" : "success";
+      var cancellationAction = canCancelPayment() && receipt.status !== "Annulé" ? window.ssButton({ label: "Préparer l’annulation", variant: "secondary", icon: "circle-x", attrs: { "data-cancel-payment-id": receipt.id } }) : "";
+      return '<tr><td><b>' + escapeMarkup(receipt.receipt) + '</b><small>' + escapeMarkup(receipt.date) + '</small></td><td><b>' + escapeMarkup(receipt.student) + '</b><small>' + escapeMarkup(receipt.className || "Classe indisponible") + '</small></td><td>' + escapeMarkup(receipt.fee) + '<small>student_fee : ' + escapeMarkup(receipt.studentFeeId || "DÉMO non lié") + '</small></td><td>' + escapeMarkup(receipt.mode) + '<small>' + escapeMarkup(receipt.reference || "Sans référence") + '</small></td><td><b>' + formatFinancialAmount(receipt.amount, receipt.currency) + '</b></td><td>' + window.ssBadge({ variant: statusVariant, label: receipt.status }) + cancellationAction + '</td></tr>';
     }).join("");
-    return '<section class="finance-panel receipt-register"><header><div><span>Reçus</span><h3>Projection de registre</h3><p>Ces reçus sont fictifs et servent uniquement à visualiser la future surface autorisée.</p></div>' + window.ssBadge({ variant: "info", icon: "flask-conical", label: "DÉMO" }) + '</header><aside class="finance-audit-note"><i data-lucide="info"></i><p>Un reçu annulé reste visible pour l’audit, mais aucune correction, aucun remboursement, aucun avoir et aucune génération officielle ne sont disponibles ici.</p></aside>' +
+    var cancellationDrafts = (financeState.cancellationDrafts || []).map(function (draft) {
+      return '<article class="finance-cancellation-draft" data-cancellation-draft><header><div><span>ANNULATION PRÉPARÉE</span><h4>' + escapeMarkup(draft.receipt) + '</h4></div>' + window.ssBadge({ variant: "warning", label: "BACKEND_LATER" }) + '</header><p>' + escapeMarkup(draft.reason) + '</p><small>Transaction ' + escapeMarkup(draft.paymentId) + ' · statut officiel inchangé</small></article>';
+    }).join("");
+    return '<section class="finance-panel receipt-register"><header><div><span>Reçus · démonstration</span><h3>Aperçus de reçus</h3><p>Ces aperçus sont fictifs, non officiels et ne déclenchent aucune génération PDF.</p></div>' + window.ssBadge({ variant: "info", icon: "flask-conical", label: "DÉMONSTRATION · NON OFFICIEL" }) + '</header><aside class="finance-audit-note"><i data-lucide="info"></i><p>Une annulation peut seulement être préparée localement avec finance.payment.cancel. Le paiement et son statut officiel restent intacts.</p></aside>' +
       window.ssTable({ headers: ['Référence', 'Élève', 'Frais', 'Paiement', 'Montant', 'Statut'], rows: rows, empty: 'Aucun reçu démo.', emptyTitle: 'Reçus', responsive: true }) +
+      (cancellationDrafts ? '<section class="finance-cancellation-drafts"><header><span>Préparations locales</span><h3>Annulations distinctes</h3></header>' + cancellationDrafts + '</section>' : "") +
       '</section>';
   }
 
@@ -1731,10 +1749,6 @@
     if (paymentForm) paymentForm.addEventListener("submit", function (event) {
       event.preventDefault();
       if (!canRecordPayment()) { d.notify("Action non autorisée.", "error"); return; }
-      if (!isDemoMode() && typeof navigator !== "undefined" && navigator.onLine === false) {
-        d.notify("Connexion requise pour enregistrer cet encaissement.", "error");
-        return;
-      }
       var profile = selectedCashProfile();
       var fee = selectedCashStudentFee(profile);
       var availability = paymentAvailability(fee);
@@ -1753,53 +1767,53 @@
         d.notify("La sélection du paiement a changé. Vérifiez l’obligation financière avant de confirmer.", "error");
         return;
       }
-      var api = d.api;
-      var input = {
-        student_fee_id: fee.student_fee_id,
+      financeState.paymentDraft = {
+        studentId: profile.student.id,
+        studentName: profile.student.name,
+        studentFeeId: fee.student_fee_id,
+        feeStructureId: fee.fee_structure_id,
+        feeLabel: fee.label,
         amount: amount,
         currency: fee.currency,
         mode: mode,
-        reference: reference,
-        metadata: { mode: mode, reference: reference }
+        reference: reference
       };
-      if (isDemoMode()) {
-        recordDemoPayment(profile, fee, amount, mode, reference, d);
-        return;
-      }
-      if (!api || typeof api.createPayment !== "function") {
-        d.notify("Connexion requise pour enregistrer cet encaissement.", "error");
-        return;
-      }
-      api.createPayment(input).then(function (res) {
-        financeState.lastConfirmedPayment = res || null;
-        d.notify("Paiement enregistré sur le serveur.");
-        financeState.loaded = false;
-        return loadFinanceData();
-      }).then(function () {
-        financeState.activeTab = "receipts";
-        renderFinanceModule();
-      }).catch(function (err) {
-        console.warn("[Finance] paiement backend échoué", err);
-        d.notify("Impossible d’enregistrer le paiement : " + (err.message || "erreur"), "error");
-      });
+      d.notify(isDemoMode() ? "Paiement constaté prêt à confirmer dans la démonstration." : "Préparation locale conservée. Confirmation officielle : BACKEND_LATER.");
+      renderFinanceModule();
     });
 
-    document.querySelectorAll("[data-export-receipt-id]").forEach(function (button) {
-      button.addEventListener("click", function () { exportReceiptPdf(button.getAttribute("data-export-receipt-id")); });
+    var confirmDemoPayment = document.querySelector("[data-confirm-demo-payment]");
+    if (confirmDemoPayment) confirmDemoPayment.addEventListener("click", function () {
+      if (!canRecordPayment() || !isDemoMode()) { d.notify("Action non autorisée.", "error"); return; }
+      var draft = financeState.paymentDraft;
+      if (!draft) { d.notify("Aucun paiement constaté à confirmer.", "error"); return; }
+      var profile = (financeState.studentFinancialProfiles || []).find(function (item) { return item.student.id === draft.studentId; });
+      var fee = profile && (profile.fees || []).find(function (item) { return item.student_fee_id === draft.studentFeeId; });
+      var availability = paymentAvailability(fee);
+      if (!profile || !fee || fee.student_id !== profile.student.id || !availability.allowed || Number(draft.amount) > Number(fee.remaining) || fee.currency !== draft.currency) {
+        d.notify("L’obligation a changé. Préparez de nouveau le paiement constaté.", "error");
+        financeState.paymentDraft = null;
+        renderFinanceModule();
+        return;
+      }
+      recordDemoPayment(profile, fee, Number(draft.amount), draft.mode, draft.reference, d);
     });
 
     document.querySelectorAll("[data-cancel-payment-id]").forEach(function (button) {
       button.addEventListener("click", function () {
+        if (!canCancelPayment()) { d.notify("Action non autorisée.", "error"); return; }
         var paymentId = button.getAttribute("data-cancel-payment-id");
+        var transaction = (financeState.transactions || []).find(function (item) { return item.id === paymentId; });
+        if (!transaction) { d.notify("Paiement introuvable.", "error"); return; }
         var trigger = button;
         var modal = window.ssModal({
-          title: "Annuler le paiement",
-          content: '<form id="cancelPaymentForm"><label>Motif de l’annulation<textarea name="reason" rows="3" required placeholder="Précisez pourquoi ce paiement est annulé…"></textarea></label></form>',
+          title: "Préparer l’annulation",
+          subtitle: "Le statut officiel du paiement restera inchangé.",
+          content: '<form id="cancelPaymentForm"><label>Motif de l’annulation<textarea name="reason" rows="3" required placeholder="Précisez pourquoi cette annulation doit être préparée…"></textarea></label>' + window.ssButton({ label: "Préparer l’annulation", variant: "danger", type: "submit", icon: "circle-x" }) + '<p>BACKEND_LATER · aucune annulation serveur en Phase F</p></form>',
           size: "md",
           focusReturn: trigger,
           actions: [
-            { label: "Annuler", variant: "secondary", onClick: function () { modal.close(); } },
-            { label: "Confirmer l’annulation", variant: "danger", type: "submit", attrs: { form: "cancelPaymentForm" } }
+            { label: "Fermer", variant: "secondary", onClick: function () { modal.close(); } }
           ]
         });
 
@@ -1811,31 +1825,12 @@
             modal.setError("Le motif est obligatoire.");
             return;
           }
-          modal.setLoading(true);
-          var api = d.api;
-          (api ? api.cancelPayment(paymentId, reason) : Promise.reject(new Error("API indisponible"))).then(function () {
-            d.notify("Annulation enregistrée sur le serveur.");
-            financeState.loaded = false;
-            return loadFinanceData();
-          }).then(function () {
-            modal.close();
-            renderFinanceModule();
-          }).catch(function (err) {
-            console.warn("[Finance] annulation backend échouée", err);
-            if (!isDemoMode()) {
-              modal.setError("Impossible d’annuler le paiement : " + (err.message || "erreur"));
-              modal.setLoading(false);
-              return;
-            }
-            var transaction = financeState.transactions.find(function (t) { return t.id === paymentId; });
-            if (transaction && transaction.status === "Validé") {
-              transaction.status = "Annulation demandée";
-              d.queueOfflineOperation("finance", "Demande d’annulation " + transaction.receipt, { kind: "cancellation-request", receipt: transaction.receipt, reason: reason, paymentId: paymentId });
-            }
-            modal.close();
-            d.notify("Demande d’annulation conservée localement.");
-            renderFinanceModule();
-          });
+          if (!canCancelPayment()) { modal.setError("Action non autorisée."); return; }
+          financeState.cancellationDrafts.unshift({ id: "local-cancellation-" + Date.now(), paymentId: paymentId, receipt: transaction.receipt, reason: reason, status: "prepared", local: true, backendLater: true });
+          persistLocalDrafts(PAYMENT_CANCELLATION_DRAFT_STORAGE_KEY, financeState.cancellationDrafts);
+          modal.close();
+          d.notify("Annulation préparée localement. Le paiement officiel reste inchangé.");
+          renderFinanceModule();
         });
       });
     });
