@@ -38,8 +38,12 @@
   }
 
   function allows(permission, scope) {
+    return allowsFor(user(), permission, scope);
+  }
+
+  function allowsFor(subject, permission, scope) {
     var access = root.SchoolSafeAccess;
-    return !!(access && typeof access.allowsScope === "function" && access.allowsScope(user(), permission, scope));
+    return !!(access && typeof access.allowsScope === "function" && access.allowsScope(subject, permission, scope));
   }
 
   function canReadAccounting() {
@@ -398,12 +402,14 @@
     var content = document.getElementById("accountingContent");
     if (!content) return;
     var closeAllowed = canPrepareClosing();
+    var readAllowed = canReadAccounting();
     document.querySelectorAll("#accountingTabs [data-accounting-tab]").forEach(function (button) {
       var tab = button.getAttribute("data-accounting-tab");
-      button.hidden = tab === "closing" && !closeAllowed;
+      button.hidden = tab === "closing" ? !closeAllowed : !readAllowed;
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : activeTab === "closing" ? renderClosing() : activeTab === "reconciliation" ? renderReconciliation() : activeTab === "reports" ? renderReports() : renderFutureSurface()) : renderDenied();
+    var surfaceAllowed = readAllowed || (activeTab === "closing" && closeAllowed);
+    content.innerHTML = surfaceAllowed ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : activeTab === "closing" ? renderClosing() : activeTab === "reconciliation" ? renderReconciliation() : activeTab === "reports" ? renderReports() : renderFutureSurface()) : renderDenied();
     bindNavigation();
     if (activeTab === "journal") bindJournalFilters();
     if (activeTab === "closing") bindClosing();
@@ -415,7 +421,12 @@
     var module = document.getElementById(containerId || "accountingModule");
     if (!module) return;
     module.hidden = false;
-    activeTab = "dashboard";
+    activeTab = canReadAccounting() ? "dashboard" : canPrepareClosing() ? "closing" : "dashboard";
+    renderContent();
+  }
+
+  function open(tab) {
+    activeTab = tab || (canReadAccounting() ? "dashboard" : canPrepareClosing() ? "closing" : "dashboard");
     renderContent();
   }
 
@@ -429,10 +440,80 @@
     sessionOverride = session || null;
   }
 
+  function normalizeText(value) {
+    var text = String(value || "").toLowerCase();
+    return typeof text.normalize === "function" ? text.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : text;
+  }
+
+  function jaspeRefusal(message) {
+    return { allowed: false, refusal: true, message: "REFUS — " + message };
+  }
+
+  function jaspeCanRead(subject) {
+    return allowsFor(subject, "reports.financial.read", "school") || allowsFor(subject, "finance.report.read", "school");
+  }
+
+  function jaspeCanClose(subject) {
+    return allowsFor(subject, "finance.cash_register.close", "school");
+  }
+
+  function answerJaspe(query, context) {
+    var subject = context && context.user ? context.user : user();
+    var role = context && context.activeRole ? context.activeRole : subject && subject.role;
+    var text = normalizeText(query);
+    var unsafeFinanceIntent = /(cree|creer|enregistre|ajoute).*(depense|ecriture)|(depense|ecriture).*(cree|creer|enregistre|ajoute)|(modifi|change|supprim).*(paiement|transaction|montant|devise)|(paiement|transaction|montant|devise).*(modifi|change|supprim)|(fabriqu|cree|genere).*(recu)|(recu).*(fabriqu|cree|genere)/.test(text);
+    var accountingIntent = /comptab|tresorer|journal|rapproch|anomal|mouvement|devise|ecart|clotur|depense|ecriture|debit|credit|solde d.ouverture|bilan|compte de resultat|grand livre|taux fx|conversion/.test(text) || (role === "accountant" && /rapport/.test(text)) || unsafeFinanceIntent;
+    if (!accountingIntent) return null;
+    if (!allowsFor(subject, "safe.assistant.use", "own")) return jaspeRefusal("safe.assistant.use avec portée own est obligatoire et tout DENY explicite reste prioritaire.");
+    if (role === "parent") return jaspeRefusal("le Parent ne peut jamais consulter le journal global, la trésorerie globale ou la caisse.");
+    if (role === "guard") return jaspeRefusal("le Gardien ne reçoit aucun détail de journal, montant, devise ou caisse.");
+
+    if (/(cree|creer|enregistre|ajoute).*(depense|ecriture)|(depense|ecriture).*(cree|creer|enregistre|ajoute)/.test(text)) {
+      return jaspeRefusal("aucune dépense ni écriture comptable ne peut être créée ; PERMISSION D’ÉCRITURE REQUISE · BACKEND_LATER.");
+    }
+    if (/(modifi|change|supprim).*(paiement|transaction|montant|devise)|(paiement|transaction|montant|devise).*(modifi|change|supprim)/.test(text)) {
+      return jaspeRefusal("Jaspe ne modifie ni ne supprime paiement, transaction, montant ou devise.");
+    }
+    if (/(fabriqu|cree|genere).*(recu)|(recu).*(fabriqu|cree|genere)/.test(text)) {
+      return jaspeRefusal("Jaspe ne fabrique jamais de reçu et ne peut expliquer qu’une référence existante visible.");
+    }
+    if (/taux fx|conversion|converti/.test(text)) return jaspeRefusal("aucun taux FX ni conversion de devise n’est appliqué.");
+    if (/(clotur|ferme).*(officiel)|(officiel).*(clotur|ferme)/.test(text)) return jaspeRefusal("Jaspe ne clôture jamais officiellement une caisse ; CLÔTURE OFFICIELLE — BACKEND_LATER.");
+    if (/(invente|cree|fixe).*(solde d.ouverture)/.test(text)) return jaspeRefusal("aucun solde d’ouverture ne peut être inventé ; BACKEND_LATER.");
+    if (/bilan|compte de resultat|grand livre|debit|credit|syscohada|fiscal/.test(text)) return jaspeRefusal("aucun état légal, débit/crédit, référentiel fiscal ou comptabilité officielle n’est produit.");
+
+    if (/clotur|observation.*caisse|caisse.*observation/.test(text)) {
+      if (!jaspeCanClose(subject)) return jaspeRefusal("finance.cash_register.close avec portée school est requis pour préparer une observation de clôture.");
+      return { allowed: true, refusal: false, action: "closing", message: "Jaspe ouvre la préparation d’observation en BROUILLON LOCAL · BACKEND_LATER. Aucune caisse n’est officiellement clôturée." };
+    }
+    if (!jaspeCanRead(subject)) return jaspeRefusal("reports.financial.read ou finance.report.read avec portée school est requis ; aucun détail global n’est révélé.");
+
+    if (/anomal|rapproch/.test(text)) {
+      return { allowed: true, refusal: false, action: "reconciliation", message: reconciliationAnomalies().length + " signaux visibles à expliquer · AUCUNE CORRECTION AUTOMATIQUE." };
+    }
+    if (/rapport/.test(text)) {
+      return { allowed: true, refusal: false, action: "reports", message: "RAPPORT FINANCIER FRONTEND · SYNTHÈSE DE TRÉSORERIE visible, sans état légal ni document final." };
+    }
+    if (/tresorer|devise|ecart|caisse/.test(text)) {
+      return { allowed: true, refusal: false, action: "treasury", message: "Trésorerie visible par devise · AUCUNE CONVERSION · solde d’ouverture non inventé · BACKEND_LATER." };
+    }
+    if (/depense/.test(text)) {
+      return { allowed: true, refusal: false, action: "expenses", message: "Registre des dépenses existantes en LECTURE SEULE · toute création exige une permission d’écriture future." };
+    }
+    var rows = journalRows();
+    var mentioned = rows.find(function (row) { return text.indexOf(normalizeText(row.reference)) >= 0; });
+    if (/journal|mouvement/.test(text) || mentioned) {
+      return { allowed: true, refusal: false, action: "journal", message: mentioned ? "Mouvement visible " + mentioned.reference + " · " + amountLabel(mentioned.amount, mentioned.currency) + " · " + mentioned.status + " · LECTURE SEULE." : "Journal de trésorerie visible en LECTURE SEULE, par devise et sans conversion." };
+    }
+    return { allowed: true, refusal: false, action: "dashboard", message: "Jaspe explique uniquement les surfaces Comptabilité / Trésorerie visibles sans mutation." };
+  }
+
   root.SchoolSafeAccountingTreasury = {
     render: render,
+    open: open,
     close: close,
     setSession: setSession,
+    answerJaspe: answerJaspe,
     canReadAccounting: canReadAccounting,
     canPrepareClosing: canPrepareClosing,
     getReconciliationAnomalies: reconciliationAnomalies,

@@ -356,6 +356,12 @@
       return { activeRole: currentDemoRole, user: getCurrentUser() };
     },
     getCurrentUser: getCurrentUser,
+    openAccounting: function (tab) {
+      openAccountingModule();
+      if (tab && window.SchoolSafeAccountingTreasury && typeof window.SchoolSafeAccountingTreasury.open === "function") {
+        window.SchoolSafeAccountingTreasury.open(tab);
+      }
+    },
     showDashboard: function () {
       showDashboard();
     }

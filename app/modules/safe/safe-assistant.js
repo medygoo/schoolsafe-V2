@@ -296,6 +296,25 @@
       }
     }
 
+    if (global.SchoolSafeAccountingTreasury && typeof global.SchoolSafeAccountingTreasury.answerJaspe === "function") {
+      var accountingContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
+        ? global.SchoolSafeAppContext.getAssistantContext()
+        : null;
+      var accountingAnswer = accountingContext
+        ? global.SchoolSafeAccountingTreasury.answerJaspe(raw, accountingContext)
+        : null;
+      if (accountingAnswer) {
+        state.currentMessage = accountingAnswer.message;
+        state.pose = accountingAnswer.refusal ? "reflechie" : "sourire";
+        state.suggestions = [];
+        if (accountingAnswer.action && global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.openAccounting === "function") {
+          global.SchoolSafeAppContext.openAccounting(accountingAnswer.action);
+        }
+        render();
+        return;
+      }
+    }
+
     if (global.SchoolSafeFinanceModule && typeof global.SchoolSafeFinanceModule.answerJaspe === "function") {
       var financeContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
