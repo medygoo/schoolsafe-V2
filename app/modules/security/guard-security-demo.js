@@ -113,6 +113,10 @@
           open("scan");
           return;
         }
+        if (target === "pickup") {
+          open("pickup");
+          return;
+        }
         var feature = container.querySelector("[data-guard-feature]");
         if (!feature) return;
         feature.hidden = false;
@@ -149,6 +153,14 @@
     if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
   }
 
+  function renderPickupWorkspace(container, projection) {
+    container.innerHTML = '<div class="guard-security-shell guard-pickup-view"><header class="guard-security-workspace-header"><button type="button" data-guard-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="guard-security-eyebrow">E4 · Contrôle frontend</p><h1>Contrôler une récupération</h1><p>security.pickup.manage · assigned_portal</p></div><span>' + escapeMarkup(projection.portal.name) + ' · BACKEND_LATER</span></header><section class="guard-security-panel"><div id="guardPickupHost" class="guard-pickup-host"></div></section></div>';
+    root.SchoolSafeStudentPickup.resetControl();
+    root.SchoolSafeStudentPickup.renderControl("guardPickupHost", activeUser);
+    var back = container.querySelector("[data-guard-back]");
+    if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
+  }
+
   function open(view) {
     var container = root.document.getElementById(activeContainerId || "guardSecurityPortal");
     if (!container || !activeUser) return false;
@@ -171,6 +183,17 @@
         return false;
       }
       renderScannerWorkspace(container, portalProjection);
+      if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+      return true;
+    }
+    if (view === "pickup") {
+      var pickupProjection = getPortalProjection(activeUser);
+      if (!pickupProjection.allowed || !root.SchoolSafeStudentPickup || !root.SchoolSafeStudentPickup.canControlPickup(activeUser)) {
+        renderDenied(container, activeUser);
+        if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+        return false;
+      }
+      renderPickupWorkspace(container, pickupProjection);
       if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
       return true;
     }

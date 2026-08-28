@@ -88,6 +88,15 @@
     });
   }
 
+  function canControlPickup(user) {
+    var assignedPortalIds = Array.isArray(user && user.assignedPortalIds) ? user.assignedPortalIds : [];
+    var access = root.SchoolSafeAccess;
+    var scoped = access && typeof access.allowsScope === "function"
+      ? access.allowsScope(user || {}, "security.pickup.manage", "assigned_portal")
+      : permissionAllowed(user, "security.pickup.manage") && hasScope(user, "security.pickup.manage", "assigned_portal");
+    return !!scoped && assignedPortalIds.length > 0;
+  }
+
   function profileId(user) {
     return user && ((user.profile && user.profile.id) || user.profile_id || user.id);
   }
@@ -262,10 +271,9 @@
 
   function renderControlMarkup() {
     var student = controlStudent || demoActiveStudent;
-    var canRead = permissionAllowed(controlUser, "security.pickup.read") && hasScope(controlUser, "security.pickup.read", "school");
-    if (!canRead) {
+    if (!canControlPickup(controlUser)) {
       return '<div class="pickup-control" data-pickup-control><header class="pickup-control__header"><div><h2>Contrôle Gardien</h2><p>Consultation limitée par la permission et la portée accordées.</p></div>' + root.ssBadge({ label: "ACCÈS LIMITÉ", variant: "warning", icon: "lock-keyhole" }) + '</header>' +
-        '<div class="pickup-access-denied"><i data-lucide="lock-keyhole"></i><p><b>Accès non accordé.</b> security.pickup.read avec portée school est requis.</p></div></div>';
+        '<div class="pickup-access-denied"><i data-lucide="lock-keyhole"></i><p><b>Accès non accordé.</b> security.pickup.manage avec portée assigned_portal et un portail affecté est requis. Un DENY explicite reste prioritaire.</p></div></div>';
     }
     if (!isStudentActive(student)) {
       return '<div class="pickup-control" data-pickup-control data-pickup-student-blocked="true">' +
@@ -276,7 +284,7 @@
     var people = peopleFor(student, familyState);
     var selected = selectedPerson(people);
     var decision = decisionFor(selected);
-    var canControl = permissionAllowed(controlUser, "security.pickup.manage") && hasScope(controlUser, "security.pickup.manage", "school");
+    var canControl = canControlPickup(controlUser);
     var result = selected ? '<section class="pickup-decision pickup-decision--' + decision.code + '" data-pickup-decision>' +
       '<div class="pickup-decision__visual">' + photoFrame(selected, true) + '</div><div class="pickup-decision__content"><span>' + escapeMarkup(decision.label) + '</span><h3>' + escapeMarkup(fullName(selected)) + '</h3><p>' + escapeMarkup(relationLabel(selected.relation)) + ' · ' + escapeMarkup(selected.phone || "Téléphone non renseigné") + '</p><p>' + escapeMarkup(selected.idType || "Pièce non renseignée") + ' · ' + escapeMarkup(selected.idNumber || "—") + '</p>' +
       (decision.allowed && canControl ? root.ssButton({ label: "Valider la remise locale", icon: "check-check", attrs: { "data-validate-pickup": "true" } }) : '<small>Aucune validation disponible pour ce résultat.</small>') + '</div></section>' +
@@ -336,7 +344,7 @@
       var state = familyStateFor(controlStudent);
       var person = selectedPerson(peopleFor(controlStudent, state));
       var decision = decisionFor(person);
-      if (!decision.allowed || !permissionAllowed(controlUser, "security.pickup.manage") || !hasScope(controlUser, "security.pickup.manage", "school")) return;
+      if (!decision.allowed || !canControlPickup(controlUser)) return;
       var now = new Date();
       controlState.record = {
         student: controlStudent.first_name + " " + controlStudent.last_name,
@@ -365,6 +373,7 @@
 
   root.SchoolSafeStudentPickup = {
     bindDossier: bindDossier,
+    canControlPickup: canControlPickup,
     canManageGuardians: canManageGuardians,
     renderControl: renderControl,
     renderDossierSection: renderDossierSection,

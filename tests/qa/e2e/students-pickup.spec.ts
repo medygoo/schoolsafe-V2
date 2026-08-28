@@ -13,9 +13,9 @@ async function openDraftDossier(page: Page) {
 }
 
 async function openPickupControl(page: Page) {
-  const securityBranch = page.locator('[data-branch="security"]:visible').first();
-  await expect(securityBranch).toBeVisible();
-  await securityBranch.evaluate((element: HTMLElement) => element.click());
+  const shortcut = page.locator('[data-guard-open="pickup"]');
+  await expect(shortcut).toBeVisible();
+  await shortcut.click();
   const control = page.locator("[data-pickup-control]");
   await expect(control).toBeVisible();
   return control;
@@ -26,14 +26,12 @@ async function renderDraftPickupControl(page: Page) {
     localStorage.removeItem("schoolsafe-b4-pickup-events-v1");
     (window as any).SchoolSafeStudentPickup.resetControl();
     (window as any).SchoolSafeStudentPickup.renderControl(
-      "securityModeContent",
+      "guardPickupHost",
       {
         role: "guard",
-        permissions: ["security.pickup.read", "security.pickup.manage"],
-        scopes: [
-          { permission: "security.pickup.read", type: "school" },
-          { permission: "security.pickup.manage", type: "school" },
-        ],
+        permissions: ["security.pickup.manage"],
+        scopes: [{ permission: "security.pickup.manage", type: "assigned_portal" }],
+        assignedPortalIds: ["demo-portal-main"],
       },
       {
         id: "demo-draft-student",
@@ -83,17 +81,13 @@ test.describe("B4-FE — personnes autorisées et contrôle Gardien", () => {
     await expect.poll(() => page.evaluate(() => localStorage.getItem("schoolsafe-b4-pickup-events-v1"))).toBeNull();
   });
 
-  test("le Parent principal suspend et rétablit seulement un tuteur de son propre enfant", async ({ page }) => {
+  test("le Parent consulte les personnes de son propre enfant sans pouvoir les modifier", async ({ page }) => {
     await enterDemoWorkspace(page, "parent");
     const dossier = await openDraftDossier(page);
+    await dossier.getByRole("button", { name: "Personnes autorisées" }).click();
     const section = dossier.locator("[data-authorized-pickup-section]");
-    const firstGuardian = section.locator('[data-pickup-secondary-guardian="1"]');
-
-    await expect(firstGuardian.getByRole("button", { name: "Suspendre" })).toBeVisible();
-    await firstGuardian.getByRole("button", { name: "Suspendre" }).click();
-    await expect(section.locator('[data-pickup-secondary-guardian="1"]')).toContainText("SUSPENDU");
-    await section.locator('[data-pickup-secondary-guardian="1"]').getByRole("button", { name: "Rétablir" }).click();
-    await expect(section.locator('[data-pickup-secondary-guardian="1"]')).toContainText("AUTORISÉ");
+    await expect(section.locator('[data-pickup-secondary-guardian="1"]')).toBeVisible();
+    await expect(section.getByRole("button", { name: /Suspendre|Rétablir|Ajouter|Supprimer/ })).toHaveCount(0);
 
     await page.evaluate(() => {
       const student = {
@@ -168,14 +162,14 @@ test.describe("B4-FE — personnes autorisées et contrôle Gardien", () => {
     await control.getByRole("button", { name: "Simuler la lecture de la carte" }).click();
     await expect(control.getByRole("button", { name: /Suspendre|Rétablir/ })).toHaveCount(0);
 
-    await page.evaluate(() => (window as any).SafeAssistant.openWithQuery("Autorise la sortie de cette élève"));
-    await expect(page.locator(".safe-bubble-body")).toContainText("Je ne peux pas autoriser une sortie");
+    await expect.poll(() => page.evaluate(() => (window as any).SafeAssistant.isAllowed())).toBe(false);
     await expect(control.locator("[data-pickup-local-record]")).toHaveCount(0);
 
     await page.evaluate(() => {
-      (window as any).SchoolSafeStudentPickup.renderControl("securityModeContent", {
-        permissions: ["security.pickup.read", "security.pickup.manage"],
+      (window as any).SchoolSafeStudentPickup.renderControl("guardPickupHost", {
+        permissions: ["security.pickup.manage"],
         scopes: [],
+        assignedPortalIds: ["demo-portal-main"],
       });
     });
     await expect(control.getByText("Accès non accordé.", { exact: false })).toBeVisible();
