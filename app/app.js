@@ -378,6 +378,12 @@
         window.SchoolSafeHrDemo.open(tab);
       }
     },
+    openInventory: function (tab) {
+      openInventoryModule();
+      if (tab && window.SchoolSafeInventoryDemo && typeof window.SchoolSafeInventoryDemo.open === "function") {
+        window.SchoolSafeInventoryDemo.open(tab);
+      }
+    },
     showDashboard: function () {
       showDashboard();
     }
@@ -423,7 +429,7 @@
    */
   function showDashboard() {
     setWorkspaceDashboardVisible(true);
-    var modules = ["pedagogyModule", "financeModule", "accountingModule", "hrModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
+    var modules = ["pedagogyModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
     modules.forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.hidden = true;
@@ -536,6 +542,7 @@
     feeControl: { label: "Contrôle des frais", icon: "badge-check", color: "#0f766e", background: "#f0fdfa" },
     accounting: { label: "Comptabilité", icon: "landmark", color: "#475569", background: "#f1f5f9" },
     people: { label: "Personnel", icon: "contact-round", color: "#64748b", background: "#f1f5f9" },
+    inventory: { label: "Stock / Inventaire", icon: "package-search", color: "#0f766e", background: "#f0fdfa" },
     communication: { label: "Communication", icon: "messages-square", color: "#3b82f6", background: "#eff6ff" },
     care: { label: "Vie et bien-être", icon: "heart-pulse", color: "#1d4ed8", background: "#dbeafe" },
     administration: { label: "Administration", icon: "folder-cog", color: "#475569", background: "#f1f5f9" },
@@ -558,6 +565,7 @@
         branch("security","Superviser les accès et les sorties",[group("Action et contrôle",[["Scanner un QR","scan-line"],["Entrées","log-in"],["Sorties","log-out"],["Préparer une sortie","clock-3"]]),group("Autorisation et suivi",[["Personnes autorisées","contact-round"],["Confirmer ou refuser une sortie","badge-check"],["Alertes et anomalies","siren"],["Historique des passages","history"]])]),
         branch("finance","Contrôler la situation financière",[group("Frais et caisse",[["Structure des frais","settings"],["Encaissements","wallet"],["Reçus PDF","receipt-text"],["Impayés et soldes","badge-alert"]]),group("Trésorerie",[["Recettes et dépenses","arrow-left-right"],["Rapports de caisse","file-chart-column"],["Clôtures","lock-keyhole"],["Exports financiers","file-down"]])]),
         branch("accounting","Tenir et contrôler la comptabilité",[group("Écritures",[["Plan comptable","list-tree"],["Journal comptable","notebook-tabs"],["Grand livre","book-copy"],["Écritures comptables","file-pen-line"]]),group("États",[["Balance","scale"],["Rapprochements","list-checks"],["États financiers","file-chart-column"],["Rapports SYSCOHADA","landmark"]])]),
+        branch("inventory","Gérer le stock et les achats internes",[group("Stock",[["Stock / Inventaire","package-search"],["Catalogue articles","boxes"],["Emplacements et seuils","warehouse"],["Mouvements","arrow-left-right"]]),group("Achats internes",[["Demandes d’achat","clipboard-list"],["Commandes","shopping-cart"],["Réceptions","package-check"],["Rapports Stock","file-chart-column"]])]),
         branch("communication","Informer la communauté scolaire",[group("Échanges",[["Messages","messages-square"],["Notifications","bell"],["Annonces","megaphone"],["Convocations","mail-plus"]]),group("Publication",[["Site public et WebSync","globe-2"],["Événements","calendar-days"]])]),
         branch("administration","Gouverner et conserver les preuves",[group("Configuration",[["École & Personnel","school","execute"]]),group("Administration",[["Documents R2","files"],["Archives","archive"],["Paramètres","settings"],["Comptes et droits","shield-ellipsis"]]),group("Plateforme",[["Français et anglais","languages"],["Mode hors ligne","cloud-off"],["Séparation public et privé","shield-check"]])]),
         branch("reports","Contrôler l’activité",[group("Traçabilité",[["Historiques","history"],["Audit des actions","list-checks"],["Rapports administratifs","file-chart-column"],["Exports PDF et Excel","file-down"]])])
@@ -1287,6 +1295,7 @@
 
   function openFinanceModule(actionName) {
     document.getElementById("accountingModule").hidden = true;
+    document.getElementById("inventoryModule").hidden = true;
     document.getElementById("pedagogyModule").hidden = true;
     document.getElementById("securityModule").hidden = true;
     document.getElementById("pilotageModule").hidden = true;
@@ -2408,7 +2417,7 @@
   }
 
   function openAccountingModule() {
-    ["pedagogyModule", "financeModule", "hrModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "financeModule", "hrModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2445,7 +2454,7 @@
   }
 
   function openHrModule(actionName) {
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2469,11 +2478,46 @@
     setBreadcrumb(null);
   }
 
+  function inventoryTabForAction(actionName) {
+    if (/catalogue|articles/i.test(actionName)) return "catalog";
+    if (/emplacements|seuils|niveaux|ruptures/i.test(actionName)) return "levels";
+    if (/mouvements/i.test(actionName)) return "movements";
+    if (/demandes d’achat|commandes|fournisseurs/i.test(actionName)) return "procurement";
+    if (/réceptions|anomalies/i.test(actionName)) return "receipts";
+    if (/rapports/i.test(actionName)) return "reports";
+    return "dashboard";
+  }
+
+  function openInventoryModule(actionName) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+      var module = document.getElementById(id);
+      if (module) module.hidden = true;
+    });
+    setWorkspaceDashboardVisible(false);
+    document.getElementById("cardsProtected").hidden = true;
+    if (window.SchoolSafeInventoryDemo && typeof window.SchoolSafeInventoryDemo.render === "function") {
+      window.SchoolSafeInventoryDemo.render("inventoryModule");
+      window.SchoolSafeInventoryDemo.open(inventoryTabForAction(actionName || ""));
+    }
+    document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeInventoryModule() {
+    if (window.SchoolSafeInventoryDemo && typeof window.SchoolSafeInventoryDemo.close === "function") window.SchoolSafeInventoryDemo.close();
+    else {
+      document.getElementById("inventoryModule").hidden = true;
+      setWorkspaceDashboardVisible(true);
+    }
+    document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
+    document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    setBreadcrumb(null);
+  }
+
   function openPhaseDPedagogy(view) {
     if (!window.SchoolSafeTeacherPedagogy || (currentDemoRole !== "teacher" && currentDemoRole !== "pedagogy")) return false;
     if (currentDemoRole === "pedagogy" && view !== "direction") return false;
     setWorkspaceDashboardVisible(false);
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2499,6 +2543,7 @@
     if (branchKey === "pilotage") { openPilotageModule("Tableau de bord"); return; }
     if (branchKey === "people") { openHrModule(); return; }
     if (branchKey === "accounting") { openAccountingModule(); return; }
+    if (branchKey === "inventory") { openInventoryModule(); return; }
     if (branchKey === "communication") { notify("Communication — ouverture dans une prochaine étape."); return; }
     if (branchKey === "reports") { notify("Contrôle et rapports — ouverture dans une prochaine étape."); return; }
     notify(definition.label + " — ouverture dans une prochaine étape.");
@@ -2529,6 +2574,7 @@
     if (branchKey === "finance") { openFinanceModule(actionName); return; }
     if (branchKey === "accounting") { openAccountingModule(); return; }
     if (branchKey === "people") { openHrModule(actionName); return; }
+    if (branchKey === "inventory") { openInventoryModule(actionName); return; }
     if (branchKey === "feeControl") { openFeeControlModule(actionName); return; }
     if (branchKey === "security") { openSecurityModule(actionName); return; }
     if (branchKey === "school") { openSchoolModule(schoolTabForAction(actionName) || "school"); return; }
@@ -2845,6 +2891,7 @@
   bindIfExists("closeFinanceModule", "click", closeFinanceModule);
   bindIfExists("closeAccountingModule", "click", closeAccountingModule);
   bindIfExists("closeHrModule", "click", closeHrModule);
+  bindIfExists("closeInventoryModule", "click", closeInventoryModule);
   bindIfExists("closeSecurityModule", "click", closeSecurityModule);
   bindIfExists("closePilotageModule", "click", closePilotageModule);
   bindIfExists("closeFeeControlModule", "click", closeFeeControlModule);

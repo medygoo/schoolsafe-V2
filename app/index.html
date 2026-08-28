@@ -39,6 +39,7 @@
   <link rel="stylesheet" href="./styles/modules/finance.css">
   <link rel="stylesheet" href="./styles/modules/accounting-treasury.css">
   <link rel="stylesheet" href="./styles/modules/hr.css">
+  <link rel="stylesheet" href="./styles/modules/inventory.css">
   <link rel="stylesheet" href="./styles/screens/setup.css">
   <link rel="stylesheet" href="./styles/screens/auth.css">
   <script>
@@ -63,6 +64,7 @@
   <script src="./modules/finance/finance-module.js" defer></script>
   <script src="./modules/accounting/accounting-treasury-demo.js" defer></script>
   <script src="./modules/hr/hr-demo.js" defer></script>
+  <script src="./modules/inventory/inventory-demo.js" defer></script>
   <script src="./modules/finance/fee-control-module.js" defer></script>
   <script src="./modules/security/security-api.js" defer></script>
   <script src="./modules/school/student-pickup-demo.js" defer></script>
@@ -604,6 +606,23 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <button type="button" data-hr-tab="reports"><i data-lucide="file-chart-column"></i><span>Rapports RH</span></button>
             </nav>
             <div class="pedagogy-content hr-content" id="hrContent"></div>
+          </section>
+          <section class="pedagogy-module inventory-module" id="inventoryModule" hidden>
+            <header class="pedagogy-module-header inventory-module-header">
+              <button class="ss-button ss-button--secondary" id="closeInventoryModule" type="button"><i data-lucide="arrow-left"></i> Tableau de bord</button>
+              <div><span>Stock / Inventaire</span><h2 id="inventoryModuleTitle">Stock et achats internes</h2><p>Moteur frontend générique pour les articles, mouvements et approvisionnements.</p></div>
+              <span class="local-draft"><i data-lucide="database-zap"></i> DÉMONSTRATION · BACKEND_LATER</span>
+            </header>
+            <nav class="pedagogy-tabs inventory-tabs" id="inventoryTabs" aria-label="Fonctions Stock, Inventaire et Achats internes">
+              <button class="active" type="button" data-inventory-tab="dashboard"><i data-lucide="layout-dashboard"></i><span>Vue d’ensemble</span></button>
+              <button type="button" data-inventory-tab="catalog"><i data-lucide="boxes"></i><span>Catalogue</span></button>
+              <button type="button" data-inventory-tab="levels"><i data-lucide="warehouse"></i><span>Niveaux</span></button>
+              <button type="button" data-inventory-tab="movements"><i data-lucide="arrow-left-right"></i><span>Mouvements</span></button>
+              <button type="button" data-inventory-tab="procurement"><i data-lucide="shopping-cart"></i><span>Achats internes</span></button>
+              <button type="button" data-inventory-tab="receipts"><i data-lucide="package-check"></i><span>Réceptions</span></button>
+              <button type="button" data-inventory-tab="reports"><i data-lucide="file-chart-column"></i><span>Rapports</span></button>
+            </nav>
+            <div class="pedagogy-content inventory-content" id="inventoryContent"></div>
           </section>
           <section class="pedagogy-module security-module" id="securityModule" hidden>
             <header class="pedagogy-module-header security-module-header">
