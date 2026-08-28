@@ -30,6 +30,14 @@
     { id: "absence-demo-2", staffId: "hr-demo-5", type: "Congé préparatoire", reason: "Organisation personnelle", startDate: "2026-09-03", endDate: "2026-09-05", duration: "3 jours indicatifs", observation: "Calendrier à contrôler", status: "EN REVUE", history: ["Demande préparée", "Passage en revue · simulation"] },
     { id: "absence-demo-3", staffId: "hr-demo-4", type: "Absence démo", reason: "Démarche administrative", startDate: "2026-09-12", endDate: "2026-09-12", duration: "1 jour indicatif", observation: "Prêt pour examen humain", status: "PRÊT POUR DÉCISION", history: ["Demande préparée", "Observation ajoutée", "Prêt pour décision · simulation"] }
   ];
+  var ATTENDANCE = [
+    { id: "attendance-demo-1", staffId: "hr-demo-1", status: "PRÉSENT", entry: "07:31", exit: "16:08", firstEntry: "07:31", lastExit: "16:08", hours: "8 h 37 visibles", history: "Entrée puis sortie", anomaly: "Aucune" },
+    { id: "attendance-demo-2", staffId: "hr-demo-2", status: "RETARD", entry: "08:14", exit: "16:22", firstEntry: "08:14", lastExit: "16:22", hours: "8 h 08 visibles", history: "Entrée tardive démo", anomaly: "Retard à expliquer" },
+    { id: "attendance-demo-3", staffId: "hr-demo-3", status: "PRÉSENT", entry: "07:42", exit: "16:01", firstEntry: "07:42", lastExit: "16:01", hours: "8 h 19 visibles", history: "Entrée puis sortie", anomaly: "Aucune" },
+    { id: "attendance-demo-4", staffId: "hr-demo-4", status: "PRÉSENT", entry: "06:55", exit: "15:10", firstEntry: "06:55", lastExit: "15:10", hours: "8 h 15 visibles", history: "Poste portail", anomaly: "Aucune" },
+    { id: "attendance-demo-5", staffId: "hr-demo-5", status: "ABSENT", entry: "—", exit: "—", firstEntry: "—", lastExit: "—", hours: "0 h visible", history: "Aucun passage démo", anomaly: "Absence à rapprocher" },
+    { id: "attendance-demo-6", staffId: "hr-demo-6", status: "INACTIF", entry: "—", exit: "—", firstEntry: "—", lastExit: "—", hours: "Sans objet", history: "Profil inactif", anomaly: "Exclu du présentiel" }
+  ];
   var CONTRACT_DRAFTS_STORAGE_KEY = "schoolsafe-v2-hr-contract-drafts";
   var ASSIGNMENT_DRAFTS_STORAGE_KEY = "schoolsafe-v2-hr-assignment-drafts";
   var ABSENCE_DRAFTS_STORAGE_KEY = "schoolsafe-v2-hr-absence-drafts";
@@ -242,6 +250,23 @@
     return '<section class="hr-records" data-hr-absence><header><div><span>Absences / congés</span><h3>Suivi préparatoire</h3><p>' + (summaryOnly ? "Synthèse uniquement avec reports.hr.read." : "Données fictives non sensibles visibles avec staff.read.") + '</p></div><span class="hr-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header>' + renderAbsenceSummary() + table + (summaryOnly ? '<aside class="hr-boundary"><i data-lucide="lock-keyhole"></i><p>Synthèse uniquement · aucune fiche individuelle, préparation ou décision.</p></aside>' : renderAbsenceDrafts() + renderAbsenceForm()) + '<aside class="hr-boundary"><i data-lucide="shield-alert"></i><p>DÉCISION OFFICIELLE — BACKEND_LATER · aucune approbation automatique ou juridique.</p></aside></section>';
   }
 
+  function renderAttendanceDenied() {
+    return root.ssState({ type: "error", title: "Présence personnel non autorisées", message: "staff.attendance.read avec portée school est obligatoire.", details: "DENY explicite prioritaire · aucune donnée de présence n’est révélée." });
+  }
+
+  function renderAttendance() {
+    if (!canReadAttendance()) return '<section>' + renderAttendanceDenied() + '</section>';
+    var present = ATTENDANCE.filter(function (item) { return item.status === "PRÉSENT"; }).length;
+    var absent = ATTENDANCE.filter(function (item) { return item.status === "ABSENT"; }).length;
+    var late = ATTENDANCE.filter(function (item) { return item.status === "RETARD"; }).length;
+    return '<section class="hr-records" data-hr-attendance><header><div><span>Présence personnel</span><h3>Registre visible du jour</h3><p>Projection frontend strictement en LECTURE SEULE.</p></div><span class="hr-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><section class="hr-absence-summary"><article><small>Présents</small><b>' + present + '</b></article><article><small>Absents</small><b>' + absent + '</b></article><article><small>Retards</small><b>' + late + '</b></article></section><div class="hr-table-wrap"><table class="hr-table"><thead><tr><th>Personnel</th><th>État</th><th>Entrée</th><th>Sortie</th><th>Première entrée</th><th>Dernière sortie</th><th>Heures visibles</th><th>Historique</th><th>Anomalies</th></tr></thead><tbody>' + ATTENDANCE.map(function (attendance) { var member = staffById(attendance.staffId); return '<tr data-hr-attendance-row="' + attendance.id + '"><td>' + escapeMarkup(member.firstName + " " + member.lastName) + '</td><td><span class="hr-status">' + escapeMarkup(attendance.status) + '</span></td><td>' + escapeMarkup(attendance.entry) + '</td><td>' + escapeMarkup(attendance.exit) + '</td><td>' + escapeMarkup(attendance.firstEntry) + '</td><td>' + escapeMarkup(attendance.lastExit) + '</td><td>' + escapeMarkup(attendance.hours) + '</td><td>' + escapeMarkup(attendance.history) + '</td><td>' + escapeMarkup(attendance.anomaly) + '</td></tr>'; }).join("") + '</tbody></table></div><aside class="hr-boundary"><i data-lucide="lock-keyhole"></i><p>LECTURE SEULE · aucune correction ou écriture officielle du registre.</p></aside></section>';
+  }
+
+  function renderBiometric() {
+    if (!canReadAttendance()) return '<section>' + renderAttendanceDenied() + '</section>';
+    return '<section class="hr-biometric" data-hr-biometric><header><div><span>Frontière biométrie</span><h3>Contrat frontend futur</h3><p>Aucun enrôlement ni capture n’est disponible dans cette phase.</p></div><span class="hr-boundary-chip">FEATURE_LATER · BACKEND_LATER</span></header><aside class="hr-biometric-warning"><i data-lucide="shield-alert"></i><div><b>AUCUNE DONNÉE BIOMÉTRIQUE STOCKÉE.</b><p>Pas d’empreinte, visage, template, webcam, identifiant biométrique ou localStorage.</p></div></aside><dl><div><dt>Salarié</dt><dd>Référence future non créée</dd></div><div><dt>Méthode future</dt><dd>À définir côté backend autorisé</dd></div><div><dt>Appareil</dt><dd>Aucun appareil connecté</dd></div><div><dt>Statut d’enrôlement futur</dt><dd>FEATURE_LATER</dd></div><div><dt>Dernière synchronisation future</dt><dd>BACKEND_LATER</dd></div></dl></section>';
+  }
+
   function bindStaff() {
     var search = document.querySelector('[data-hr-staff-filter="search"]');
     var status = document.querySelector('[data-hr-staff-filter="status"]');
@@ -341,7 +366,7 @@
       button.hidden = !tabAllowed(tab);
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = !canAccessHr() ? renderDenied() : !tabAllowed(activeTab) ? renderDenied() : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : activeTab === "absence" ? renderAbsence() : renderFuture();
+    content.innerHTML = !canAccessHr() ? renderDenied() : !tabAllowed(activeTab) ? (activeTab === "attendance" || activeTab === "biometric" ? renderAttendanceDenied() : renderDenied()) : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : activeTab === "absence" ? renderAbsence() : activeTab === "attendance" ? renderAttendance() : activeTab === "biometric" ? renderBiometric() : renderFuture();
     bindNavigation();
     if (activeTab === "staff") bindStaff();
     if (activeTab === "contracts") bindContracts();
