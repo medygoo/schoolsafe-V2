@@ -5,6 +5,7 @@
   var activeTab = "dashboard";
   var sessionOverride = null;
   var ITEM_DRAFTS_STORAGE_KEY = "schoolsafe-v2-inventory-item-drafts";
+  var MOVEMENT_DRAFTS_STORAGE_KEY = "schoolsafe-v2-inventory-movement-drafts";
   var ITEMS = [
     { code: "ART-001", name: "Papier A4", category: "Fournitures administratives", unit: "rame", type: "CONSOMMABLE", status: "ACTIF", service: "Administration" },
     { code: "ART-002", name: "Craie blanche", category: "Fournitures pédagogiques", unit: "boîte", type: "CONSOMMABLE", status: "ACTIF", service: "Pédagogie" },
@@ -21,6 +22,12 @@
     { item: "ART-004", name: "Détergent multiusage", location: "Local entretien", quantity: 6, unit: "litre", minimum: 6 },
     { item: "ART-005", name: "Ordinateur portable démo", location: "Bureau informatique", quantity: 3, unit: "pièce", minimum: 1, control: true },
     { item: "ART-006", name: "Farine de maïs", location: "Réserve Cantine", quantity: 9, unit: "sac", minimum: 4 }
+  ];
+  var MOVEMENTS = [
+    { reference: "MVT-DEM-001", type: "ENTRÉE", item: "ART-001 · Papier A4", quantity: 20, unit: "rame", source: "Fournisseur démo", destination: "Magasin central", service: "Administration", date: "2026-08-20", reason: "Réception fictive", status: "DÉMO" },
+    { reference: "MVT-DEM-002", type: "SORTIE", item: "ART-006 · Farine de maïs", quantity: 2, unit: "sac", source: "Réserve Cantine", destination: "Service Cantine", service: "Cantine", date: "2026-08-21", reason: "Consommation Cantine fictive", status: "DÉMO" },
+    { reference: "MVT-DEM-003", type: "TRANSFERT", item: "ART-001 · Papier A4", quantity: 4, unit: "rame", source: "Magasin central", destination: "Secrétariat", service: "Administration", date: "2026-08-22", reason: "Réassort fictif", status: "DÉMO" },
+    { reference: "MVT-DEM-004", type: "AJUSTEMENT", item: "ART-004 · Détergent multiusage", quantity: 1, unit: "litre", source: "Local entretien", destination: "Local entretien · contrôle", service: "Entretien", date: "2026-08-23", reason: "Écart constaté, aucune correction officielle", status: "À CONTRÔLER" }
   ];
   var METRICS = [
     ["Articles", "12 références démo", "boxes"],
@@ -66,6 +73,7 @@
   }
 
   var itemDrafts = readDraftList(ITEM_DRAFTS_STORAGE_KEY);
+  var movementDrafts = readDraftList(MOVEMENT_DRAFTS_STORAGE_KEY);
 
   function metric(item, live) {
     return '<article class="inventory-dashboard-metric"><span><i data-lucide="' + item[2] + '"></i></span><div><small>' + escapeMarkup(item[0]) + '</small><b>' + escapeMarkup(live ? "Agrégat disponible" : item[1]) + "</b></div></article>";
@@ -113,6 +121,47 @@
     return '<section class="inventory-levels" data-inventory-levels><header><div><span>Inventaire théorique de démonstration</span><h3>Emplacements et seuils</h3><p>Un article peut exister dans plusieurs emplacements. Le navigateur n’est pas la source officielle du stock.</p></div><span class="inventory-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><aside class="inventory-boundary"><i data-lucide="shield-alert"></i><p>Quantités bornées à zéro · aucune correction silencieuse ni stock négatif automatique.</p></aside><div class="inventory-level-legend"><span>NORMAL</span><span>BAS</span><span>RUPTURE</span><span>À CONTRÔLER</span></div><div class="inventory-table-wrap"><table><thead><tr><th>Article</th><th>Emplacement</th><th>Quantité théorique</th><th>Unité</th><th>Seuil minimum</th><th>État</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
   }
 
+  function itemByCode(code) { return ITEMS.find(function (item) { return item.code === code; }); }
+
+  function renderMovementRow(movement, draft) {
+    return '<tr data-inventory-movement' + (draft ? '-draft' : '') + '><td><b>' + escapeMarkup(movement.reference) + '</b>' + (draft ? '<small>BROUILLON LOCAL · APPEND-ONLY</small>' : '<small>DONNÉE DÉMO</small>') + '</td><td><span class="inventory-movement-type">' + escapeMarkup(movement.type) + '</span></td><td>' + escapeMarkup(movement.item) + '</td><td>' + escapeMarkup(movement.quantity) + ' ' + escapeMarkup(movement.unit) + '</td><td>' + escapeMarkup(movement.source) + '</td><td>' + escapeMarkup(movement.destination) + '</td><td>' + escapeMarkup(movement.service) + '</td><td>' + escapeMarkup(movement.date) + '</td><td>' + escapeMarkup(movement.reason) + '</td><td>' + escapeMarkup(movement.status) + '</td></tr>';
+  }
+
+  function renderMovements() {
+    var rows = MOVEMENTS.map(function (movement) { return renderMovementRow(movement, false); }).concat(movementDrafts.map(function (movement) { return renderMovementRow(movement, true); })).join("");
+    var options = ITEMS.map(function (item) { return '<option value="' + escapeMarkup(item.code) + '">' + escapeMarkup(item.code + " · " + item.name) + '</option>'; }).join("");
+    return '<section class="inventory-movements" data-inventory-movements><header><div><span>Journal démo append-only</span><h3>Mouvements de stock préparés</h3><p>Aucune mutation officielle, correction silencieuse ou réutilisation du scanner Sécurité.</p></div><span class="inventory-boundary-chip">BROUILLONS LOCAUX · BACKEND_LATER</span></header><div class="inventory-movement-legend"><span>ENTRÉE</span><span>SORTIE</span><span>TRANSFERT</span><span>AJUSTEMENT</span></div><div class="inventory-table-wrap"><table><thead><tr><th>Référence</th><th>Type</th><th>Article</th><th>Quantité</th><th>Source</th><th>Destination</th><th>Service</th><th>Date</th><th>Motif</th><th>Statut</th></tr></thead><tbody>' + rows + '</tbody></table></div><form class="inventory-form" data-inventory-movement-form><header><div><span>Préparation locale</span><h4>Ajouter au journal sans modifier l’existant</h4></div><span class="inventory-boundary-chip">BROUILLON LOCAL</span></header><label>Type<select name="type"><option>ENTRÉE</option><option>SORTIE</option><option>TRANSFERT</option><option>AJUSTEMENT</option></select></label><label>Article<select name="item">' + options + '</select></label><label>Quantité<input name="quantity" type="number" min="0.01" step="0.01" required></label><label>Source<input name="source" required></label><label>Destination<input name="destination" required></label><label>Service<input name="service" required></label><label class="inventory-form-wide">Motif<input name="reason" required></label><p class="inventory-form-error inventory-form-wide" data-movement-error hidden></p><button class="ss-button ss-button--primary" type="submit">Préparer le mouvement</button><p class="inventory-form-wide">Aucun niveau officiel n’est recalculé · BACKEND_LATER.</p></form></section>';
+  }
+
+  function bindMovementEvents() {
+    var form = document.querySelector("[data-inventory-movement-form]");
+    if (!form || form.__inventoryBound) return;
+    form.__inventoryBound = true;
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var data = new FormData(form);
+      var type = String(data.get("type") || "");
+      var source = String(data.get("source") || "").trim();
+      var destination = String(data.get("destination") || "").trim();
+      var error = form.querySelector("[data-movement-error]");
+      if (type === "TRANSFERT" && source.toLowerCase() === destination.toLowerCase()) {
+        error.hidden = false;
+        error.textContent = "Les emplacements source et destination d’un transfert doivent être différents.";
+        return;
+      }
+      var code = String(data.get("item") || "");
+      var item = itemByCode(code) || ITEMS[0];
+      movementDrafts = movementDrafts.concat([{
+        reference: "MVT-BR-" + String(movementDrafts.length + 1).padStart(3, "0"), type: type,
+        item: item.code + " · " + item.name, quantity: Math.max(0, Number(data.get("quantity")) || 0), unit: item.unit,
+        source: source, destination: destination, service: String(data.get("service") || "").trim(),
+        date: new Date().toISOString().slice(0, 10), reason: String(data.get("reason") || "").trim(), status: "BROUILLON LOCAL · BACKEND_LATER"
+      }]);
+      persistDraftList(MOVEMENT_DRAFTS_STORAGE_KEY, movementDrafts);
+      renderContent();
+    });
+  }
+
   function bindCatalogEvents() {
     var form = document.querySelector("[data-inventory-item-form]");
     if (!form || form.__inventoryBound) return;
@@ -143,10 +192,12 @@
     var subject = user();
     if (activeTab === "catalog") content.innerHTML = isDemoMode(subject) ? renderCatalog() : renderDenied();
     else if (activeTab === "levels") content.innerHTML = isDemoMode(subject) ? renderLevels() : renderDenied();
+    else if (activeTab === "movements") content.innerHTML = isDemoMode(subject) ? renderMovements() : renderDenied();
     else if (activeTab !== "dashboard") content.innerHTML = isDemoMode(subject) ? renderFuture(activeTab) : (canReadAggregates(subject) && activeTab === "reports" ? renderLiveAggregates() : renderDenied());
     else content.innerHTML = isDemoMode(subject) ? renderDemoDashboard() : (canReadAggregates(subject) ? renderLiveAggregates() : renderDenied());
     refreshTabs();
     if (activeTab === "catalog" && isDemoMode(subject)) bindCatalogEvents();
+    if (activeTab === "movements" && isDemoMode(subject)) bindMovementEvents();
     if (root.lucide && typeof root.lucide.createIcons === "function") root.lucide.createIcons();
   }
 
