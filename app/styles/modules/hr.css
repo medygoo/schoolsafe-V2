@@ -3,7 +3,9 @@
 .hr-module-header { background: var(--ss-gradient-module); }
 .hr-dashboard,
 .hr-shortcuts,
-.hr-future { display: grid; gap: var(--ss-space-4); }
+.hr-future,
+.hr-staff,
+.hr-staff-detail { display: grid; gap: var(--ss-space-4); }
 .hr-dashboard > header,
 .hr-shortcuts,
 .hr-future {
@@ -80,10 +82,84 @@
   background: var(--ss-bg-primary);
   cursor: pointer;
 }
+.hr-staff > header,
+.hr-staff-dossier,
+.hr-staff-draft,
+.hr-staff-form {
+  padding: var(--ss-space-5);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-surface-raised);
+}
+.hr-staff > header,
+.hr-staff-dossier > header,
+.hr-staff-draft > header,
+.hr-staff-form > header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ss-space-3); }
+.hr-staff > header p { color: var(--ss-text-secondary); }
+.hr-staff-filters { display: grid; grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr); gap: var(--ss-space-3); }
+.hr-staff-filters label,
+.hr-staff-form label { display: grid; gap: var(--ss-space-2); color: var(--ss-text-secondary); font-size: var(--ss-text-sm); font-weight: var(--ss-font-semibold); }
+.hr-staff-filters :is(input, select),
+.hr-staff-form :is(input, select, textarea) {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--ss-space-2) var(--ss-space-3);
+  border: 1px solid var(--ss-border-strong);
+  border-radius: var(--ss-radius);
+  color: var(--ss-text-primary);
+  background: var(--ss-bg-secondary);
+}
+.hr-staff-layout { display: grid; grid-template-columns: minmax(250px, .8fr) minmax(0, 2fr); gap: var(--ss-space-4); align-items: start; }
+.hr-staff-list { display: grid; gap: var(--ss-space-2); }
+.hr-staff-list button {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ss-space-3);
+  padding: var(--ss-space-3);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-md);
+  color: var(--ss-text-primary);
+  background: var(--ss-bg-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.hr-staff-list button.active { border-color: var(--ss-brand-primary); background: var(--ss-info-bg); }
+.hr-staff-list button small { display: block; margin-top: var(--ss-space-1); color: var(--ss-text-secondary); }
+.hr-status { display: inline-flex; width: fit-content; padding: var(--ss-space-1) var(--ss-space-2); border-radius: var(--ss-radius-full); color: var(--ss-success-text); background: var(--ss-success-bg); font-size: var(--ss-text-xs); font-weight: var(--ss-font-bold); }
+.hr-staff-dossier dl,
+.hr-staff-draft dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ss-space-3); }
+.hr-staff-dossier dl div,
+.hr-staff-draft dl div { min-width: 0; padding: var(--ss-space-3); border-radius: var(--ss-radius); background: var(--ss-bg-secondary); }
+.hr-staff-dossier dt,
+.hr-staff-draft dt { color: var(--ss-text-secondary); font-size: var(--ss-text-xs); }
+.hr-staff-dossier dd,
+.hr-staff-draft dd { margin: var(--ss-space-1) 0 0; overflow-wrap: anywhere; font-weight: var(--ss-font-bold); }
+.hr-staff-draft { border-color: var(--ss-warning-border); background: var(--ss-warning-bg); }
+.hr-staff-draft p { color: var(--ss-warning-text); }
+.hr-staff-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ss-space-3); }
+.hr-staff-form > header,
+.hr-form-wide { grid-column: 1 / -1; }
+.hr-staff-form button { min-height: 44px; }
+.hr-empty { padding: var(--ss-space-5); color: var(--ss-text-secondary); text-align: center; }
 @media (max-width: 1100px) { .hr-dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 900px) { .hr-shortcuts > div { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) {
+  .hr-shortcuts > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hr-staff-layout { grid-template-columns: 1fr; }
+}
 @media (max-width: 520px) {
   .hr-dashboard > header { flex-direction: column; }
   .hr-dashboard-grid,
   .hr-shortcuts > div { grid-template-columns: 1fr; }
+  .hr-staff > header,
+  .hr-staff-dossier > header,
+  .hr-staff-draft > header,
+  .hr-staff-form > header { flex-direction: column; }
+  .hr-staff-filters,
+  .hr-staff-form,
+  .hr-staff-dossier dl,
+  .hr-staff-draft dl { grid-template-columns: 1fr; }
+  .hr-staff-form > header,
+  .hr-form-wide { grid-column: auto; }
 }

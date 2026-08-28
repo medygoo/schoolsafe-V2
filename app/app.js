@@ -2493,7 +2493,6 @@
     if (branchKey === "pilotage") { openPilotageModule("Tableau de bord"); return; }
     if (branchKey === "people") { openHrModule(); return; }
     if (branchKey === "accounting") { openAccountingModule(); return; }
-    if (branchKey === "people") { openHrModule(actionName); return; }
     if (branchKey === "communication") { notify("Communication — ouverture dans une prochaine étape."); return; }
     if (branchKey === "reports") { notify("Contrôle et rapports — ouverture dans une prochaine étape."); return; }
     notify(definition.label + " — ouverture dans une prochaine étape.");
@@ -2523,6 +2522,7 @@
     if (branchKey === "finance" && feeControlTabForAction(actionName)) { openFeeControlModule(actionName); return; }
     if (branchKey === "finance") { openFinanceModule(actionName); return; }
     if (branchKey === "accounting") { openAccountingModule(); return; }
+    if (branchKey === "people") { openHrModule(actionName); return; }
     if (branchKey === "feeControl") { openFeeControlModule(actionName); return; }
     if (branchKey === "security") { openSecurityModule(actionName); return; }
     if (branchKey === "school") { openSchoolModule(schoolTabForAction(actionName) || "school"); return; }
