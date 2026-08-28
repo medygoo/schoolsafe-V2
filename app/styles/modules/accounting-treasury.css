@@ -11,13 +11,17 @@
 .accounting-dashboard,
 .accounting-shortcuts,
 .accounting-future,
-.accounting-journal {
+.accounting-journal,
+.accounting-expenses,
+.accounting-expense-boundary {
   display: grid;
   gap: var(--ss-space-4);
 }
 
 .accounting-dashboard > header,
 .accounting-journal > header,
+.accounting-expenses > header,
+.accounting-expense-boundary > header,
 .accounting-shortcuts,
 .accounting-future {
   padding: var(--ss-space-5);
@@ -34,6 +38,14 @@
 }
 
 .accounting-journal > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ss-space-4);
+}
+
+.accounting-expenses > header,
+.accounting-expense-boundary > header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -180,6 +192,45 @@
   background: var(--ss-bg-primary);
 }
 
+.accounting-expense-table { min-width: 820px; }
+
+.accounting-expense-boundary {
+  padding: var(--ss-space-5);
+  border: 1px solid var(--ss-warning-border);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-warning-bg);
+}
+
+.accounting-expense-boundary form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ss-space-3);
+}
+
+.accounting-expense-boundary label {
+  display: grid;
+  gap: var(--ss-space-2);
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-semibold);
+}
+
+.accounting-expense-boundary :is(input, select, button) {
+  width: 100%;
+  min-height: 44px;
+}
+
+.accounting-expense-boundary :is(input, select) {
+  padding: var(--ss-space-2) var(--ss-space-3);
+  border: 1px solid var(--ss-border-strong);
+  border-radius: var(--ss-radius);
+  color: var(--ss-text-primary);
+  background: var(--ss-bg-primary);
+}
+
+.accounting-expense-boundary button:disabled { cursor: not-allowed; opacity: .62; }
+.accounting-boundary--warning { color: var(--ss-warning-text); border-color: var(--ss-warning-border); background: var(--ss-bg-primary); }
+
 .accounting-table :is(th, td) {
   padding: var(--ss-space-3);
   border-bottom: 1px solid var(--ss-border-subtle);
@@ -222,12 +273,16 @@
   .accounting-dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .accounting-shortcuts > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .accounting-journal-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accounting-expense-boundary form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 520px) {
   .accounting-dashboard > header { flex-direction: column; }
   .accounting-journal > header { flex-direction: column; }
+  .accounting-expenses > header,
+  .accounting-expense-boundary > header { flex-direction: column; }
   .accounting-dashboard-grid,
   .accounting-shortcuts > div { grid-template-columns: 1fr; }
   .accounting-journal-filters { grid-template-columns: 1fr; }
+  .accounting-expense-boundary form { grid-template-columns: 1fr; }
 }

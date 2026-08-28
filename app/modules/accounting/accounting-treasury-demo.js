@@ -189,6 +189,14 @@
     });
   }
 
+  function renderExpenses() {
+    var rows = snapshot().expenses.map(function (expense) {
+      return '<tr><td><b>' + escapeMarkup(expense.reference || "RÉFÉRENCE MANQUANTE") + '</b></td><td>' + escapeMarkup(expense.date || "Date indisponible") + '</td><td>' + escapeMarkup(expense.label || "Libellé indisponible") + '</td><td><b>' + escapeMarkup(amountLabel(expense.amount, expense.currency || "")) + '</b></td><td>' + escapeMarkup(expense.status || "Statut indisponible") + '</td><td>' + escapeMarkup(expense.justification || "Justification non disponible") + "</td></tr>";
+    }).join("");
+    if (!rows) rows = '<tr><td colspan="6"><div class="accounting-empty">Aucune dépense Finance visible.</div></td></tr>';
+    return '<section class="accounting-expenses" data-accounting-expenses><header><div><span>Registre des dépenses</span><h3>Dépenses Finance existantes</h3><p>Consultation uniquement des sorties déjà disponibles dans la source Finance.</p></div><span class="accounting-boundary-chip">LECTURE SEULE</span></header><div class="accounting-table-wrap" tabindex="0"><table class="accounting-table accounting-expense-table"><thead><tr><th>Référence</th><th>Date</th><th>Libellé</th><th>Montant / devise</th><th>Statut</th><th>Justification</th></tr></thead><tbody>' + rows + '</tbody></table></div><section class="accounting-expense-boundary"><header><div><span>Contrat futur visible</span><h3>Enregistrement officiel indisponible</h3><p>Ce formulaire documente les champs attendus sans créer de dépense locale ou officielle.</p></div><span class="accounting-boundary-chip">BACKEND_LATER</span></header><form id="expenseFutureForm"><label>Date<input id="expenseFutureDate" type="date"></label><label>Libellé<input id="expenseFutureLabel" type="text" maxlength="200" placeholder="Libellé futur"></label><label>Montant<input id="expenseFutureAmount" type="number" min="0" step="0.01"></label><label>Devise<select id="expenseFutureCurrency"><option value="CDF">CDF</option><option value="USD">USD</option></select></label><label>Catégorie future<input id="expenseFutureCategory" type="text" placeholder="FEATURE_LATER"></label><label>Référence<input id="expenseFutureReference" type="text"></label><label>Pièce future<input id="expenseFutureReceipt" type="text" placeholder="Référence de pièce"></label><button class="ss-button" id="expenseFutureSubmit" type="submit" disabled>Enregistrer la dépense</button></form><aside class="accounting-boundary accounting-boundary--warning"><i data-lucide="lock-keyhole"></i><p>PERMISSION D’ÉCRITURE REQUISE · BACKEND_LATER · aucune permission de lecture n’autorise une création.</p></aside></section></section>';
+  }
+
   function renderFutureSurface() {
     var labels = {
       journal: "Journal de trésorerie",
@@ -225,7 +233,7 @@
       button.hidden = tab === "closing" && !closeAllowed;
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : renderFutureSurface()) : renderDenied();
+    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : renderFutureSurface()) : renderDenied();
     bindNavigation();
     if (activeTab === "journal") bindJournalFilters();
     if (typeof root.lucide !== "undefined" && root.lucide.createIcons) root.lucide.createIcons();
