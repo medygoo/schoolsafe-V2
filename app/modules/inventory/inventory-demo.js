@@ -248,6 +248,24 @@
     });
   }
 
+  function reportCard(label, value, note, icon) {
+    return '<article class="inventory-report-card"><span><i data-lucide="' + icon + '"></i></span><div><small>' + escapeMarkup(label) + '</small><b>' + escapeMarkup(value) + '</b><p>' + escapeMarkup(note) + '</p></div></article>';
+  }
+
+  function renderReports(live) {
+    var cards = [
+      ["État du stock", live ? "Agrégat autorisé" : "7 positions démo", "Quantités théoriques consolidées", "warehouse"],
+      ["Seuils", live ? "Agrégat autorisé" : "3 alertes", "Seuils minimum consolidés", "gauge"],
+      ["Ruptures", live ? "Agrégat autorisé" : "1 simulation", "Aucune ligne article exposée", "package-x"],
+      ["Mouvements", live ? "Agrégat autorisé" : "4 types", "ENTRÉE / SORTIE / TRANSFERT / AJUSTEMENT agrégés", "arrow-left-right"],
+      ["Consommation par service", live ? "Agrégat autorisé" : "Administration · Pédagogie · Cantine · Entretien", "Cantine réutilise le moteur générique", "building-2"],
+      ["Commandes", live ? "Agrégat autorisé" : "2 simulations", "Aucun fournisseur ni devis détaillé", "shopping-cart"],
+      ["Réceptions", live ? "Agrégat autorisé" : "6 contrôles", "Rapprochements consolidés", "package-check"],
+      ["Anomalies", live ? "Agrégat autorisé" : "5 signaux", "Partiel, surplus, dommage et contrôle", "triangle-alert"]
+    ].map(function (item) { return reportCard(item[0], item[1], item[2], item[3]); }).join("");
+    return '<section class="inventory-reports" data-inventory-reports' + (live ? ' data-live-aggregates' : '') + '><header><div><span>' + (live ? "AGRÉGATS AUTORISÉS" : "RAPPORTS DÉMO") + '</span><h3>Rapports opérationnels Stock</h3><p>' + (live ? "LECTURE SEULE · reports.operational.read + school" : "Synthèses frontend de démonstration") + '</p></div><span class="inventory-boundary-chip">' + (live ? "LIVE AGRÉGÉ" : "DÉMONSTRATION") + '</span></header><aside class="inventory-boundary"><i data-lucide="shield-check"></i><p>Aucun détail fournisseur, commercial ou devis · aucun article ou mouvement individuel en session live.</p></aside><div class="inventory-report-grid">' + cards + '</div><section class="inventory-currency-summary"><article><span>CDF</span><b>' + (live ? "Agrégat séparé" : "180 000 CDF indicatifs") + '</b></article><article><span>USD</span><b>' + (live ? "Agrégat séparé" : "240 USD indicatifs") + '</b></article><p>Aucune conversion automatique entre CDF et USD.</p></section><footer>Pas de PDF final : export documentaire prévu en Phase J.</footer></section>';
+  }
+
   function bindCatalogEvents() {
     var form = document.querySelector("[data-inventory-item-form]");
     if (!form || form.__inventoryBound) return;
@@ -281,6 +299,7 @@
     else if (activeTab === "movements") content.innerHTML = isDemoMode(subject) ? renderMovements() : renderDenied();
     else if (activeTab === "procurement") content.innerHTML = isDemoMode(subject) ? renderProcurement() : renderDenied();
     else if (activeTab === "receipts") content.innerHTML = isDemoMode(subject) ? renderReceipts() : renderDenied();
+    else if (activeTab === "reports") content.innerHTML = isDemoMode(subject) ? renderReports(false) : (canReadAggregates(subject) ? renderReports(true) : renderDenied());
     else if (activeTab !== "dashboard") content.innerHTML = isDemoMode(subject) ? renderFuture(activeTab) : (canReadAggregates(subject) && activeTab === "reports" ? renderLiveAggregates() : renderDenied());
     else content.innerHTML = isDemoMode(subject) ? renderDemoDashboard() : (canReadAggregates(subject) ? renderLiveAggregates() : renderDenied());
     refreshTabs();

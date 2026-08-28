@@ -23,6 +23,10 @@
 .inventory-movements > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .inventory-procurement > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .inventory-receipts > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.inventory-reports > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.inventory-reports > header span:first-child { color: var(--inventory-accent); font-size: .76rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.inventory-reports > header h3 { margin: .2rem 0; }
+.inventory-reports > header p { margin: 0; color: var(--text-muted); }
 .inventory-receipts > header span:first-child { color: var(--inventory-accent); font-size: .76rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .inventory-receipts > header h3 { margin: .2rem 0; }
 .inventory-receipts > header p { margin: 0; color: var(--text-muted); }
@@ -57,6 +61,17 @@
 .inventory-workflow svg { flex: 0 0 1rem; color: var(--text-muted); }
 .inventory-finance-link { display: grid; gap: .35rem; margin-top: 1rem; border: 1px dashed var(--border-color); border-radius: .9rem; padding: 1rem; background: var(--surface-card); color: var(--text-primary); }
 .inventory-finance-link small { color: var(--text-muted); }
+.inventory-report-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; margin-top: 1rem; }
+.inventory-report-card { display: flex; gap: .7rem; border: 1px solid var(--border-color); border-radius: 1rem; padding: .9rem; background: var(--surface-card); }
+.inventory-report-card > span { display: grid; flex: 0 0 2.3rem; width: 2.3rem; height: 2.3rem; place-items: center; border-radius: .75rem; background: var(--inventory-soft); color: var(--inventory-accent); }
+.inventory-report-card small, .inventory-report-card b { display: block; color: var(--text-primary); }
+.inventory-report-card p { margin: .3rem 0 0; color: var(--text-muted); font-size: .75rem; }
+.inventory-currency-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: 1rem; }
+.inventory-currency-summary article { border: 1px solid var(--border-color); border-radius: .8rem; padding: .8rem; background: var(--surface-card); color: var(--text-primary); }
+.inventory-currency-summary article span, .inventory-currency-summary article b { display: block; }
+.inventory-currency-summary article span { color: var(--inventory-accent); font-weight: 800; }
+.inventory-currency-summary p { grid-column: 1 / -1; margin: 0; color: var(--text-muted); }
+.inventory-reports footer { margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem; color: var(--text-muted); }
 .inventory-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; margin-top: 1rem; border: 1px solid var(--border-color); border-radius: 1rem; padding: 1rem; background: var(--surface-card); }
 .inventory-form > header, .inventory-form-wide { grid-column: 1 / -1; }
 .inventory-form label { display: grid; gap: .35rem; color: var(--text-primary); font-size: .82rem; font-weight: 700; }
@@ -65,6 +80,7 @@
 .inventory-denied { max-width: 48rem; margin: 3rem auto; }
 [data-theme="dark"] .inventory-module { --inventory-accent: #5eead4; --inventory-soft: #123445; }
 [data-theme="dark"] .inventory-module-header { background: linear-gradient(135deg, #12304b, #1e3a5f); }
+@media (max-width: 1100px) { .inventory-report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .inventory-dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) {
   .inventory-dashboard > header { flex-direction: column; }
@@ -76,5 +92,7 @@
   .inventory-movements > header { flex-direction: column; }
   .inventory-procurement > header { flex-direction: column; }
   .inventory-receipts > header { flex-direction: column; }
+  .inventory-reports > header { flex-direction: column; }
+  .inventory-report-grid, .inventory-currency-summary { grid-template-columns: 1fr; }
   .inventory-form { grid-template-columns: 1fr; }
 }
