@@ -40,6 +40,7 @@
   <link rel="stylesheet" href="./styles/modules/accounting-treasury.css">
   <link rel="stylesheet" href="./styles/modules/hr.css">
   <link rel="stylesheet" href="./styles/modules/inventory.css">
+  <link rel="stylesheet" href="./styles/modules/document-center.css">
   <link rel="stylesheet" href="./styles/screens/setup.css">
   <link rel="stylesheet" href="./styles/screens/auth.css">
   <script>
@@ -88,6 +89,7 @@
   <script src="./modules/security/guard-security-demo.js" defer></script>
   <script src="./modules/safe/safe-assistant.js" defer></script>
   <script src="./modules/core/access.js" defer></script>
+  <script src="./modules/document-center/document-center.js" defer></script>
   <script src="./modules/core/ui-helpers.js" defer></script>
   <script src="./app.js" defer></script>
 </head>
@@ -623,6 +625,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <button type="button" data-inventory-tab="reports"><i data-lucide="file-chart-column"></i><span>Rapports</span></button>
             </nav>
             <div class="pedagogy-content inventory-content" id="inventoryContent"></div>
+          </section>
+          <section class="pedagogy-module document-center-module" id="documentCenterModule" hidden>
+            <header class="pedagogy-module-header document-center-module-header">
+              <button class="ss-button ss-button--secondary" id="closeDocumentCenter" type="button"><i data-lucide="arrow-left"></i> Tableau de bord</button>
+              <div><span>Centre transversal</span><h2>Centre de documents</h2><p>Retrouvez uniquement les aperçus et sorties autorisés dans votre périmètre.</p></div>
+              <span class="local-draft"><i data-lucide="shield-check"></i> APERÇU · FRONTEND</span>
+            </header>
+            <div class="pedagogy-content document-center-content" id="documentCenterContent"></div>
           </section>
           <section class="pedagogy-module security-module" id="securityModule" hidden>
             <header class="pedagogy-module-header security-module-header">

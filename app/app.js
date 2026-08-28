@@ -350,6 +350,8 @@
     var role = currentDemoRole || "admin";
     var context = DEMO_ACCESS_CONTEXT_BY_ROLE[role] || {};
     return {
+      userId: context.profile && context.profile.id ? context.profile.id : "demo-" + role + "-1",
+      schoolId: "demo-school-1",
       role: role,
       permissions: (DEMO_PERMISSIONS_BY_ROLE[role] || []).slice(),
       profile: context.profile || null,
@@ -383,6 +385,9 @@
       if (tab && window.SchoolSafeInventoryDemo && typeof window.SchoolSafeInventoryDemo.open === "function") {
         window.SchoolSafeInventoryDemo.open(tab);
       }
+    },
+    openDocuments: function () {
+      openDocumentCenter();
     },
     showDashboard: function () {
       showDashboard();
@@ -429,7 +434,7 @@
    */
   function showDashboard() {
     setWorkspaceDashboardVisible(true);
-    var modules = ["pedagogyModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
+    var modules = ["pedagogyModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "documentCenterModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
     modules.forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.hidden = true;
@@ -2122,6 +2127,7 @@
           return '<button type="button" data-branch="' + item.key + '"><i data-lucide="' + definition.icon + '"></i><span>' + definition.label + '</span></button>';
         }).join("") +
         '<div class="nav-section"><span>Système</span></div>' +
+        '<button type="button" id="documentsNav"><i data-lucide="files"></i><span>Centre de documents</span></button>' +
         '<button type="button" data-action="Paramètres"><i data-lucide="settings"></i><span>Paramètres</span></button>' +
         '<button type="button" id="permissionsNav"' + (currentDemoRole !== "admin" ? " hidden" : "") + '><i data-lucide="shield-ellipsis"></i><span>Rôles et accès</span></button>' +
         '<button type="button" data-action="Audit et journaux"><i data-lucide="scroll-text"></i><span>Audit et journaux</span></button>' +
@@ -2212,6 +2218,16 @@
     if (permissionsNav) {
       permissionsNav.addEventListener("click", function () {
         openAccessConsole();
+      });
+    }
+
+    var documentsNav = document.getElementById("documentsNav");
+    if (documentsNav) {
+      documentsNav.addEventListener("click", function () {
+        document.querySelectorAll("#workspaceNav button").forEach(function (button) { button.classList.remove("active"); });
+        documentsNav.classList.add("active");
+        closeWorkspaceMenu();
+        openDocumentCenter();
       });
     }
 
@@ -2426,6 +2442,7 @@
     if (window.SchoolSafeAccountingTreasury && typeof window.SchoolSafeAccountingTreasury.render === "function") {
       window.SchoolSafeAccountingTreasury.render("accountingModule");
     }
+
     document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -2513,6 +2530,30 @@
     setBreadcrumb(null);
   }
 
+  function openDocumentCenter() {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule", "cardsStudio"].forEach(function (id) {
+      var module = document.getElementById(id);
+      if (module) module.hidden = true;
+    });
+    setWorkspaceDashboardVisible(false);
+    var module = document.getElementById("documentCenterModule");
+    if (!module) return;
+    module.hidden = false;
+    document.getElementById("cardsProtected").hidden = true;
+    setBreadcrumb("Centre de documents");
+    if (window.SchoolSafeDocumentCenter && typeof window.SchoolSafeDocumentCenter.render === "function") {
+      window.SchoolSafeDocumentCenter.render("documentCenterContent", getCurrentUser());
+    }
+    var workspaceContent = document.querySelector(".workspace-content");
+    if (workspaceContent) workspaceContent.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeDocumentCenter() {
+    var module = document.getElementById("documentCenterModule");
+    if (module) module.hidden = true;
+    showDashboard();
+  }
+
   function openPhaseDPedagogy(view) {
     if (!window.SchoolSafeTeacherPedagogy || (currentDemoRole !== "teacher" && currentDemoRole !== "pedagogy")) return false;
     if (currentDemoRole === "pedagogy" && view !== "direction") return false;
@@ -2530,6 +2571,8 @@
   }
 
   function openModuleByBranch(branchKey) {
+    var documentCenter = document.getElementById("documentCenterModule");
+    if (documentCenter) documentCenter.hidden = true;
     var definition = branchDefinitions[branchKey];
     if (!definition) return;
     setBreadcrumb(definition.label);
@@ -2550,6 +2593,8 @@
   }
 
   function openActionByBranch(branchKey, actionName) {
+    var documentCenter = document.getElementById("documentCenterModule");
+    if (documentCenter) documentCenter.hidden = true;
     var definition = branchDefinitions[branchKey];
     if (!definition) return;
     setBreadcrumb(definition.label);
@@ -2659,6 +2704,7 @@
       return;
     }
     document.getElementById("pedagogyModule").hidden = true;
+    document.getElementById("documentCenterModule").hidden = true;
     document.getElementById("financeModule").hidden = true;
     document.getElementById("accessConsole").hidden = false;
     setWorkspaceDashboardVisible(false);
@@ -2892,6 +2938,7 @@
   bindIfExists("closeAccountingModule", "click", closeAccountingModule);
   bindIfExists("closeHrModule", "click", closeHrModule);
   bindIfExists("closeInventoryModule", "click", closeInventoryModule);
+  bindIfExists("closeDocumentCenter", "click", closeDocumentCenter);
   bindIfExists("closeSecurityModule", "click", closeSecurityModule);
   bindIfExists("closePilotageModule", "click", closePilotageModule);
   bindIfExists("closeFeeControlModule", "click", closeFeeControlModule);
