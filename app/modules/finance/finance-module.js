@@ -2156,6 +2156,147 @@
   }
 
   // ---------------------------------------------------------------------------
+  // F8-FE — Jaspe Finance borné par les permissions exactes de l'utilisateur
+  // ---------------------------------------------------------------------------
+  function normalizeFinanceText(value) {
+    var text = String(value || "").toLowerCase();
+    return typeof text.normalize === "function" ? text.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : text;
+  }
+
+  function financeJaspeRefusal(message) {
+    return { allowed: false, refusal: true, message: "REFUS — " + message };
+  }
+
+  function financeJaspeAllows(user, permission, expectedScopes) {
+    var access = root.SchoolSafeAccess;
+    if (!access || typeof access.canAccess !== "function" || typeof access.scopeFor !== "function" || !access.canAccess(user, permission)) return false;
+    var scope = access.scopeFor(user, permission);
+    if (!scope) return false;
+    return !Array.isArray(expectedScopes) || expectedScopes.indexOf(scope.type) >= 0;
+  }
+
+  function financeJaspeCanUse(user) {
+    var access = root.SchoolSafeAccess;
+    return !!(access && typeof access.allowsScope === "function" && access.allowsScope(user, "safe.assistant.use", "own"));
+  }
+
+  function financeJaspeHasAny(user, permissions) {
+    return permissions.some(function (permission) { return financeJaspeAllows(user, permission); });
+  }
+
+  function financeJaspeStudentMention(text) {
+    return (financeState.students || []).find(function (student) {
+      var name = normalizeFinanceText(student.name || [student.first_name, student.last_name].filter(Boolean).join(" "));
+      return name && text.indexOf(name) >= 0;
+    }) || null;
+  }
+
+  function financeJaspeObligationMention(text) {
+    var byId = (financeState.studentFees || []).find(function (fee) { return text.indexOf(normalizeFinanceText(fee.id)) >= 0; });
+    if (byId) return byId;
+    var student = financeJaspeStudentMention(text);
+    if (!student) return null;
+    return (financeState.studentFees || []).find(function (fee) { return fee.student_id === student.id; }) || null;
+  }
+
+  function financeJaspeObligationMessage(fee) {
+    var profile = (financeState.studentFinancialProfiles || []).find(function (item) { return item.student.id === fee.student_id; });
+    var student = profile ? profile.student : mapFinancialStudent((financeState.students || []).find(function (item) { return item.id === fee.student_id; }) || {});
+    var mapped = mapStudentFeeForFinancialProfile(fee);
+    var status = financialStatusDefinition(mapped.status);
+    return "Obligation " + mapped.student_fee_id + " · " + student.name + " · " + mapped.label + " · " + status.label + " · attendu " + formatFinancialAmount(mapped.expected, mapped.currency) + " · payé " + formatFinancialAmount(mapped.paid, mapped.currency) + " · restant " + formatFinancialAmount(mapped.remaining, mapped.currency) + ". Consultation uniquement.";
+  }
+
+  function answerJaspe(query, context) {
+    var user = context && context.user ? context.user : financeAccessUser();
+    var activeRole = context && context.activeRole ? context.activeRole : (user && user.role);
+    if (!user || activeRole === "parent") return null;
+    if (!financeJaspeCanUse(user)) return financeJaspeRefusal("safe.assistant.use avec portée own est obligatoire et tout DENY explicite reste prioritaire.");
+    if (activeRole === "guard") return financeJaspeRefusal("aucun détail financier n’est accordé au Gardien par Jaspe.");
+
+    var text = normalizeFinanceText(query);
+    if (!text) return { allowed: true, refusal: false, action: null, message: "Posez une question sur une situation financière visible ou demandez la préparation d’un brouillon autorisé." };
+
+    var mentionedStudent = financeJaspeStudentMention(text);
+    var asksFinancialOperation = /paiement|recu|frais|obligation|student_fee|exemption|caisse|finance/.test(text);
+    if (mentionedStudent && (mentionedStudent.lifecycleStatus || mentionedStudent.lifecycle_status) === "draft" && asksFinancialOperation) {
+      return financeJaspeRefusal("DOSSIER NON ACTIF — un élève draft ne reçoit aucune obligation, aucun paiement ni aucun reçu officiel.");
+    }
+
+    if (/(fabriqu|cree|gener).*(recu)|(recu).*(fabriqu|cree|gener)/.test(text)) {
+      return financeJaspeRefusal("Jaspe ne fabrique jamais de reçu. Il explique uniquement un reçu existant visible.");
+    }
+    if (/(marque|passe|declare).*(paid|paye|en regle)|(modifi|change).*(montant|student_fee|obligation)|(supprim).*(transaction|paiement)/.test(text)) {
+      return financeJaspeRefusal("Jaspe ne modifie aucun montant, student_fee, statut paid ou transaction.");
+    }
+
+    if (/annul/.test(text) && /paiement|transaction|recu/.test(text)) {
+      if (!financeJaspeAllows(user, "finance.payment.cancel", ["school"])) return financeJaspeRefusal("finance.payment.cancel avec portée school est requis ; aucune annulation n’est disponible.");
+      return { allowed: true, refusal: false, action: "receipts", message: "La demande d’annulation peut seulement être préparée en BROUILLON LOCAL · BACKEND_LATER. Jaspe ne supprime ni n’annule la transaction." };
+    }
+
+    if (/(prepare|demande|applique).*(exempt|exoner)|(exempt|exoner).*(prepare|demande|applique)/.test(text)) {
+      if (!financeJaspeAllows(user, "finance.fee.manage", ["school"])) return financeJaspeRefusal("finance.fee.manage avec portée school est requis pour préparer une exemption frontend.");
+      return { allowed: true, refusal: false, action: "exemptions", message: "Formulaire ouvert pour préparer une exemption en BROUILLON LOCAL · BACKEND_LATER. Aucun student_fee n’est modifié." };
+    }
+
+    if (/(prepare|saisi|enregistr|confirme|ajout|cree).*(paiement|encaissement)|(paiement|encaissement).*(prepare|saisi|enregistr|confirme|ajout|cree)/.test(text)) {
+      if (!financeJaspeAllows(user, "finance.payment.record", ["school"])) return financeJaspeRefusal("finance.payment.record avec portée school est requis ; Jaspe ne peut préparer aucune saisie de paiement.");
+      var paymentFee = financeJaspeObligationMention(text);
+      return { allowed: true, refusal: false, action: "cash", message: "Formulaire ouvert pour préparer une saisie liée à " + (paymentFee ? "l’obligation " + paymentFee.id : "un student_fee exact à sélectionner") + " · BROUILLON LOCAL · finance.payment.record · aucune création silencieuse." };
+    }
+
+    if (/ouvre|accede|voir|montre/.test(text) && /caisse/.test(text)) {
+      if (!financeJaspeAllows(user, "finance.cash_register.close", ["school"])) return financeJaspeRefusal("finance.cash_register.close avec portée school est requis ; un contrôleur ne peut jamais ouvrir la Caisse.");
+      return { allowed: true, refusal: false, action: "cash-register", message: "Caisse visible selon finance.cash_register.close · consultation frontend bornée." };
+    }
+
+    if (/(prepare|affect).*(frais|obligation)|(frais|obligation).*(prepare|affect)/.test(text)) {
+      if (!financeJaspeAllows(user, "finance.fee.manage", ["school"])) return financeJaspeRefusal("finance.fee.manage avec portée school est requis pour préparer une affectation.");
+      return { allowed: true, refusal: false, action: "assignments", message: "Formulaire ouvert pour préparer une affectation en BROUILLON LOCAL · BACKEND_LATER. Aucun student_fee officiel n’est créé." };
+    }
+
+    if (/rapport/.test(text)) {
+      if (!financeJaspeAllows(user, "finance.report.read", ["school"])) return financeJaspeRefusal("finance.report.read avec portée school est requis ; aucun rapport financier n’est visible.");
+      return { allowed: true, refusal: false, action: "reports", message: "Jaspe peut aider à préparer le rapport visible sous finance.report.read, sans publier ni inventer de données." };
+    }
+
+    if (/recu/.test(text)) {
+      if (!financeJaspeAllows(user, "finance.receipt.read", ["school"])) return financeJaspeRefusal("finance.receipt.read avec portée school est requis ; aucun reçu n’est visible.");
+      var receipt = (financeState.transactions || []).find(function (transaction) { return text.indexOf(normalizeFinanceText(transaction.receipt || transaction.id)) >= 0; });
+      return { allowed: true, refusal: false, action: "receipts", message: receipt ? "Reçu existant " + receipt.receipt + " · " + receipt.student + " · " + formatFinancialAmount(receipt.amount, receipt.currency) + " · aperçu visible, non fabriqué." : "Registre des reçus existants visible sous finance.receipt.read. Jaspe ne fabrique aucun reçu." };
+    }
+
+    if (/controle|campagne|scan/.test(text)) {
+      var canExplainControl = financeJaspeAllows(user, "finance.control.read", ["school"]) || financeJaspeAllows(user, "finance.control.manage", ["school"]) || financeJaspeAllows(user, "finance.control.scan", ["assigned_classes"]);
+      if (!canExplainControl) return financeJaspeRefusal("une permission finance.control.read/manage avec portée school ou finance.control.scan avec assigned_classes est requise.");
+      return { allowed: true, refusal: false, action: "fee-control", message: "Contrôle des frais expliqué dans son domaine séparé : identité minimale, classe, résultat, consigne et statut uniquement. Aucune Caisse, transaction détaillée, reçu ni rapport." };
+    }
+
+    var mentionedFee = financeJaspeObligationMention(text);
+    if (mentionedFee || /obligation|student_fee/.test(text)) {
+      if (!financeJaspeAllows(user, "finance.fee.read", ["school"])) return financeJaspeRefusal("la projection school de finance.fee.read est requise pour retrouver cette obligation précise ; un scope plus étroit non projeté ne révèle aucune donnée.");
+      if (!mentionedFee) return financeJaspeRefusal("aucun student_fee visible ne correspond à la demande.");
+      return { allowed: true, refusal: false, action: "balances", message: financeJaspeObligationMessage(mentionedFee) };
+    }
+
+    var explainedStatus = ["partial", "pending", "exempted", "anomaly", "paid"].find(function (status) { return new RegExp("(^|[^a-z])" + status + "([^a-z]|$)").test(text); });
+    if (explainedStatus || /statut|situation|solde/.test(text)) {
+      if (!financeJaspeHasAny(user, ["finance.status.read", "finance.fee.read"])) return financeJaspeRefusal("finance.status.read ou finance.fee.read est requis pour expliquer une situation financière.");
+      if (explainedStatus) {
+        var definition = financialStatusDefinition(explainedStatus);
+        return { allowed: true, refusal: false, action: "balances", message: explainedStatus + " signifie « " + definition.label + " ». Jaspe explique le statut visible sans le modifier." };
+      }
+      return { allowed: true, refusal: false, action: "balances", message: "Jaspe peut expliquer uniquement les situations visibles : paid, partial, pending, exempted et anomaly, sans changer leur état." };
+    }
+
+    if (!financeJaspeHasAny(user, ["finance.fee.read", "finance.fee.manage", "finance.payment.record", "finance.payment.cancel", "finance.receipt.read", "finance.report.read", "finance.cash_register.close", "finance.control.read", "finance.control.manage", "finance.control.scan", "finance.status.read"])) {
+      return financeJaspeRefusal("aucune permission Finance ou Contrôle des frais n’est accordée à cette session.");
+    }
+    return { allowed: true, refusal: false, action: null, message: "Jaspe Finance explique les données visibles et prépare uniquement les brouillons permis. Aucun paiement, reçu, montant, exemption ou student_fee n’est modifié silencieusement." };
+  }
+
+  // ---------------------------------------------------------------------------
   // API publique
   // ---------------------------------------------------------------------------
   function render(containerId, options) {
@@ -2217,6 +2358,7 @@
     close: close,
     setRole: setRole,
     setSession: setSession,
+    answerJaspe: answerJaspe,
     _state: financeState,
     isDemoMode: isDemoMode
   };

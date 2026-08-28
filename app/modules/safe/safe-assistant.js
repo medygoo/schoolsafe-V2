@@ -296,6 +296,26 @@
       }
     }
 
+    if (global.SchoolSafeFinanceModule && typeof global.SchoolSafeFinanceModule.answerJaspe === "function") {
+      var financeContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
+        ? global.SchoolSafeAppContext.getAssistantContext()
+        : null;
+      var reservedRole = financeContext && ["parent", "teacher", "pedagogy", "guard"].indexOf(financeContext.activeRole) >= 0;
+      var financeAnswer = financeContext && !reservedRole
+        ? global.SchoolSafeFinanceModule.answerJaspe(raw, financeContext)
+        : null;
+      if (financeAnswer) {
+        state.currentMessage = financeAnswer.message;
+        state.pose = financeAnswer.refusal ? "reflechie" : "sourire";
+        state.suggestions = [];
+        if (financeAnswer.action && financeAnswer.action !== "fee-control" && typeof global.SchoolSafeFinanceModule.render === "function") {
+          global.SchoolSafeFinanceModule.render("financeModule", { tab: financeAnswer.action });
+        }
+        render();
+        return;
+      }
+    }
+
     if (/autorise|autoriser|valide|valider/.test(text) && /sortie|remise|récup|recup/.test(text)) {
       state.currentMessage = "Je ne peux pas autoriser une sortie, valider une remise, suspendre ou rétablir une personne. Ces actions exigent les droits utilisateur correspondants et restent sous contrôle humain.";
       state.pose = "reflechie";

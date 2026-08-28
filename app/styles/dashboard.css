@@ -1472,7 +1472,9 @@ body.screen-workspace {
   display: none;
 }
 
-.screen-workspace[data-active-role="guard"] .safe-assistant {
+.screen-workspace[data-active-role="guard"] .safe-assistant,
+.screen-workspace[data-active-role="finance"] .safe-assistant,
+.screen-workspace[data-active-role="cashier"] .safe-assistant {
   display: block;
 }
 

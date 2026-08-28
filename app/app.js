@@ -228,7 +228,9 @@
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
     teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage", "safe.assistant.use"],
     pedagogy: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.lesson-plan.read", "pedagogy.report.read", "pedagogy.report.manage", "palmarques.read", "safe.assistant.use"],
-    guard: ["security.scan", "security.pickup.manage", "safe.assistant.use"]
+    guard: ["security.scan", "security.pickup.manage", "safe.assistant.use"],
+    finance: ["finance.fee.read", "finance.fee.manage", "finance.receipt.read", "finance.report.read", "finance.cash_register.close", "finance.control.read", "finance.control.manage", "finance.status.read", "safe.assistant.use"],
+    cashier: ["finance.payment.record", "finance.receipt.read", "finance.status.read", "safe.assistant.use"]
   };
 
   var DEMO_ACCESS_CONTEXT_BY_ROLE = {
@@ -290,6 +292,27 @@
       scopes: [
         { permission: "security.scan", type: "assigned_portal", portalIds: ["demo-portal-main"] },
         { permission: "security.pickup.manage", type: "assigned_portal", portalIds: ["demo-portal-main"] },
+        { permission: "safe.assistant.use", type: "own" }
+      ]
+    },
+    finance: {
+      scopes: [
+        { permission: "finance.fee.read", type: "school" },
+        { permission: "finance.fee.manage", type: "school" },
+        { permission: "finance.receipt.read", type: "school" },
+        { permission: "finance.report.read", type: "school" },
+        { permission: "finance.cash_register.close", type: "school" },
+        { permission: "finance.control.read", type: "school" },
+        { permission: "finance.control.manage", type: "school" },
+        { permission: "finance.status.read", type: "school" },
+        { permission: "safe.assistant.use", type: "own" }
+      ]
+    },
+    cashier: {
+      scopes: [
+        { permission: "finance.payment.record", type: "school" },
+        { permission: "finance.receipt.read", type: "school" },
+        { permission: "finance.status.read", type: "school" },
         { permission: "safe.assistant.use", type: "own" }
       ]
     }

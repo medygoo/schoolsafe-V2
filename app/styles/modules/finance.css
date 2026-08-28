@@ -1,3 +1,146 @@
+.finance-module .finance-content {
+  color: var(--ss-text-primary);
+  background: var(--ss-bg-primary);
+}
+
+.finance-module .finance-content :is(h2, h3, h4, b, strong, dd) {
+  color: var(--ss-text-primary);
+}
+
+.finance-module :is(
+  .finance-overview > header,
+  .family-finance > header,
+  .finance-report-head,
+  .finance-panel,
+  .finance-fee-form,
+  .payment-form,
+  .family-receipts,
+  .receipt-register
+) {
+  color: var(--ss-text-primary);
+  border-color: var(--ss-border-default);
+  background: var(--ss-bg-primary);
+  box-shadow: var(--ss-shadow-sm);
+}
+
+.finance-module :is(
+  .finance-panel > header,
+  .finance-fee-form > header,
+  .payment-form > header,
+  .family-receipts > header
+) {
+  color: var(--ss-text-primary);
+  border-color: var(--ss-border-subtle);
+  background: var(--ss-bg-secondary);
+}
+
+.finance-module :is(
+  .finance-overview > header p,
+  .finance-panel > header p,
+  .finance-report-head p,
+  .family-finance > header p,
+  .finance-fee-form p,
+  .payment-form p,
+  .student-finance-card small,
+  .student-finance-card p,
+  .finance-empty
+) {
+  color: var(--ss-text-secondary);
+}
+
+.finance-module :is(
+  .finance-overview > header span:first-child,
+  .finance-panel > header span,
+  .finance-report-head > div > span,
+  .family-finance > header > div > span,
+  .finance-panel > header > b
+) {
+  color: var(--ss-info-text);
+}
+
+.finance-module :is(.finance-fee-form label, .payment-form label, .finance-student-picker, .family-student-picker) {
+  color: var(--ss-text-secondary);
+}
+
+.finance-module :is(
+  .finance-fee-form input,
+  .finance-fee-form select,
+  .finance-fee-form textarea,
+  .payment-form input,
+  .payment-form select,
+  .payment-form textarea,
+  .finance-student-picker select,
+  .family-student-picker select
+) {
+  min-height: 44px;
+  color: var(--ss-text-primary);
+  border-color: var(--ss-border-strong);
+  background: var(--ss-bg-secondary);
+}
+
+.finance-module .student-finance-card {
+  border-color: var(--ss-border-subtle);
+  background: var(--ss-bg-secondary);
+}
+
+.finance-module .student-finance-facts div {
+  color: var(--ss-text-primary);
+  border-color: var(--ss-border-default);
+  background: var(--ss-bg-secondary);
+}
+
+.finance-module .student-finance-facts dt {
+  color: var(--ss-text-secondary);
+}
+
+.finance-module .student-finance-facts dd {
+  color: var(--ss-text-primary);
+}
+
+.finance-module :is(.finance-audit-note, .finance-readonly) {
+  color: var(--ss-text-primary);
+  border-color: var(--ss-info-border);
+  background: var(--ss-info-bg);
+}
+
+.finance-module .finance-status-boundary {
+  color: var(--ss-text-primary);
+  border-color: var(--ss-success-border);
+  background: var(--ss-success-bg);
+}
+
+.finance-module .finance-table th {
+  color: var(--ss-text-secondary);
+  background: var(--ss-bg-secondary);
+}
+
+.finance-module .finance-table td {
+  color: var(--ss-text-primary);
+  border-color: var(--ss-border-subtle);
+}
+
+.finance-module .balance-summary article,
+.finance-module .family-finance-summary > div,
+.finance-module .family-finance-summary > article {
+  color: var(--ss-text-primary);
+  border-color: var(--ss-border-default);
+  background: var(--ss-bg-secondary);
+}
+
+.finance-module :is(.balance-summary small, .family-finance-summary small) {
+  color: var(--ss-text-secondary);
+}
+
+.finance-module .recording-only {
+  color: var(--ss-success-text);
+  background: var(--ss-success-bg);
+}
+
+.finance-module :is(.closure-chip, .receipt-waiting) {
+  color: var(--ss-warning-text);
+  background: var(--ss-warning-bg);
+}
+
 .finance-overview,
 .finance-dashboard-shortcuts {
   display: grid;
