@@ -59,6 +59,7 @@
       currencyPolicy: value.currencyPolicy ? String(value.currencyPolicy) : "not-applicable",
       officialBoundary: value.officialBoundary ? String(value.officialBoundary) : "Aperçu frontend uniquement",
       templateKind: value.templateKind ? String(value.templateKind) : "report",
+      dataBoundary: value.dataBoundary ? String(value.dataBoundary) : "authorized-context-only",
     };
   }
 
@@ -231,6 +232,7 @@
       sensitivity: descriptor.sensitivity, formats: descriptor.formats.slice(), permission: descriptor.permission,
       scope: descriptor.scope, actions: descriptor.actions.slice(), authority: descriptor.authority,
       currencyPolicy: descriptor.currencyPolicy, officialBoundary: descriptor.officialBoundary, templateKind: descriptor.templateKind,
+      dataBoundary: descriptor.dataBoundary,
     };
   }
 
