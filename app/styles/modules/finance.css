@@ -1,0 +1,114 @@
+.finance-overview,
+.finance-dashboard-shortcuts {
+  display: grid;
+  gap: var(--ss-space-4);
+}
+
+.finance-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--ss-space-3);
+}
+
+.finance-dashboard-metric {
+  min-width: 0;
+  min-height: 112px;
+  display: flex;
+  align-items: center;
+  gap: var(--ss-space-3);
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-border-subtle);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-surface-raised);
+  color: var(--ss-text-primary);
+}
+
+.finance-dashboard-metric > span {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--ss-radius-md);
+  color: var(--ss-text-link);
+  background: var(--ss-info-bg);
+}
+
+.finance-dashboard-metric small,
+.finance-dashboard-metric b {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.finance-dashboard-metric small {
+  color: var(--ss-text-secondary);
+  line-height: 1.35;
+}
+
+.finance-dashboard-metric b {
+  margin-top: var(--ss-space-1);
+  font-size: var(--ss-text-base);
+}
+
+.finance-dashboard-shortcuts {
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-border-subtle);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-surface-raised);
+}
+
+.finance-dashboard-shortcuts > header h3,
+.finance-dashboard-shortcuts > header span {
+  margin: 0;
+}
+
+.finance-dashboard-shortcuts > header span {
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.finance-dashboard-shortcuts > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ss-space-2);
+}
+
+.finance-dashboard-action {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ss-space-2);
+  padding: var(--ss-space-2) var(--ss-space-4);
+  border: 1px solid var(--ss-border-strong);
+  border-radius: var(--ss-radius-md);
+  background: var(--ss-bg-primary);
+  color: var(--ss-text-primary);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.finance-dashboard-action:hover,
+.finance-dashboard-action:focus-visible {
+  border-color: var(--ss-text-link);
+  outline: none;
+}
+
+@media (max-width: 1180px) {
+  .finance-dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .finance-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-dashboard-action {
+    width: 100%;
+  }
+}

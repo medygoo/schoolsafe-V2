@@ -26,8 +26,11 @@
     };
   }
 
-  function currentRole() { return deps().currentDemoRole; }
-  function currentSession() { return root.currentSession || null; }
+  var financeRoleOverride = "";
+  var financeSessionOverride = null;
+
+  function currentRole() { return financeRoleOverride || deps().currentDemoRole; }
+  function currentSession() { return financeSessionOverride || root.currentSession || null; }
 
   // ---------------------------------------------------------------------------
   // Helpers généraux
@@ -393,18 +396,58 @@
   /**
    * FE-FIN-02 : accès catalogue via ACCESS_LAW; aucun rôle ne décide seul.
    */
+  function demoFinanceAccessUser(role) {
+    var templates = {
+      finance: [
+        "finance.fee.read",
+        "finance.fee.manage",
+        "finance.receipt.read",
+        "finance.report.read",
+        "finance.cash_register.close",
+        "finance.control.read",
+        "finance.control.manage",
+        "finance.status.read",
+        "safe.assistant.use"
+      ],
+      cashier: [
+        "finance.payment.record",
+        "finance.receipt.read",
+        "finance.status.read",
+        "safe.assistant.use"
+      ],
+      school_head: ["finance.status.read", "finance.report.read", "safe.assistant.use"]
+    };
+    var permissions = templates[role] || [];
+    return {
+      role: role,
+      permissions: permissions.slice(),
+      scopes: permissions.map(function (permission) {
+        return { permission: permission, type: permission === "safe.assistant.use" ? "own" : "school" };
+      })
+    };
+  }
+
   function financeAccessUser() {
     var session = currentSession();
     if (session) return session;
-    // Démo uniquement : le rôle fournit son modèle initial de permissions.
-    var demoPermissions = { cashier: ["finance.payment.record"] };
-    return { role: currentRole(), permissions: isDemoMode() ? (demoPermissions[currentRole()] || []) : [] };
+    var appUser = root.SchoolSafeAppContext && typeof root.SchoolSafeAppContext.getCurrentUser === "function"
+      ? root.SchoolSafeAppContext.getCurrentUser()
+      : null;
+    if (appUser && Array.isArray(appUser.permissions) && appUser.permissions.length) return appUser;
+    // Les profils Finance et Caisse de démonstration reçoivent ici un modèle
+    // explicite permission + portée. Les rôles ne sont jamais consultés par les
+    // gardes ci-dessous : SchoolSafeAccess reste l’unique décisionnaire.
+    return isDemoMode() ? demoFinanceAccessUser(currentRole()) : (appUser || { permissions: [], scopes: [] });
   }
 
   function canAccessFeeCatalog(permission) {
     var access = root.SchoolSafeAccess;
     var user = financeAccessUser();
     return !!(access && typeof access.canAccess === "function" && access.canAccess(user, permission));
+  }
+  function canAccessAnyFinance(permissionCodes) {
+    var access = root.SchoolSafeAccess;
+    return !!(access && typeof access.canAccessAny === "function" && access.canAccessAny(financeAccessUser(), permissionCodes));
   }
   function canReadFeeCatalog() { return canAccessFeeCatalog("finance.fee.read"); }
   function canManageFeeCatalog() { return canAccessFeeCatalog("finance.fee.manage"); }
@@ -781,11 +824,36 @@
     if (!isDemoMode()) {
       return '<section class="finance-overview"><header><div><span>Pilotage financier</span><h3>Vue d’ensemble</h3><p>Les agrégats officiels exigent une projection serveur par devise, période et portée.</p></div>' + window.ssBadge({ variant: "warning", icon: "plug-zap", label: "BACKEND_LATER" }) + '</header>' + window.ssState({ type: "unavailable", title: "Vue d’ensemble non connectée", message: "Les montants attendus, payés, restants, taux de recouvrement et encaissements du jour ne sont pas affichés sans agrégats serveur sûrs.", details: "Aucun total local, aucune transaction navigateur et aucune addition CDF + USD ne sont utilisés." }) + '</section>';
     }
-    var demoRows = [
-      ["CDF", "Illustration séparée par devise", "Aucun total officiel"],
-      ["USD", "Illustration séparée par devise", "Aucun total officiel"]
-    ].map(function (row) { return "<tr><td><b>" + row[0] + "</b></td><td>" + row[1] + "</td><td>" + row[2] + "</td></tr>"; }).join("");
-    return '<section class="finance-overview"><header><div><span>Pilotage financier · démonstration</span><h3>Vue d’ensemble illustrative</h3><p>Cette surface ne représente aucune donnée serveur ni aucun indicateur officiel.</p></div>' + window.ssBadge({ variant: "info", icon: "flask-conical", label: "DÉMO · Non officiel" }) + '</header><aside class="finance-audit-note"><i data-lucide="shield-check"></i><p>Les devises sont séparées. Aucun total CDF + USD, aucun taux de recouvrement et aucun encaissement réel ne sont calculés.</p></aside>' + window.ssTable({ headers: ["Devise", "Projection", "Statut"], rows: demoRows, empty: "Aucune donnée de démonstration.", emptyTitle: "Démonstration", responsive: true }) + '</section>';
+    var activeFees = financeState.feeTypes.filter(function (fee) { return fee.active; }).length;
+    var anomalies = financeState.studentFees.filter(function (fee) {
+      return ["pending", "partial", "paid", "exempted"].indexOf(fee.status) === -1;
+    }).length;
+    var metrics = [
+      { label: "Situation financière", value: canReadFinancialStatus() || canReadFeeCatalog() ? "Synthèse démo" : "Non autorisée", icon: "chart-pie" },
+      { label: "Types de frais actifs", value: canReadFeeCatalog() ? String(activeFees) : "Non autorisés", icon: "settings" },
+      { label: "Obligations élèves", value: canReadFeeCatalog() ? String(financeState.studentFees.length) : "Statut uniquement", icon: "list-checks" },
+      { label: "Paiements enregistrés", value: canReadFinanceReceipts() || canRecordPayment() ? String(financeState.transactions.length) : "Non autorisés", icon: "hand-coins" },
+      { label: "Opérations récentes", value: canReadFinanceReceipts() ? "Projection démo" : "Non autorisées", icon: "history" },
+      { label: "Exemptions", value: canPrepareExemption() ? String(financeState.studentFees.filter(function (fee) { return fee.status === "exempted"; }).length) : "Non autorisées", icon: "shield-check" },
+      { label: "Caisse", value: canAccessCashRegister() ? "BACKEND_LATER" : "Non autorisée", icon: "landmark" },
+      { label: "Contrôles de frais", value: canAccessAnyFinance(["finance.control.read", "finance.control.manage", "finance.control.scan"]) ? "Domaine séparé" : "Non autorisés", icon: "scan-line" },
+      { label: "Rapports", value: canReadFinanceReports() ? "Projection démo" : "Non autorisés", icon: "file-chart-column" },
+      { label: "Alertes et anomalies", value: canReadFeeCatalog() || canReadFinancialStatus() ? String(anomalies) : "Non autorisées", icon: "triangle-alert" }
+    ];
+    var metricMarkup = metrics.map(function (metric) {
+      return '<article class="finance-dashboard-metric"><span><i data-lucide="' + metric.icon + '"></i></span><div><small>' + escapeMarkup(metric.label) + '</small><b>' + escapeMarkup(metric.value) + '</b></div></article>';
+    }).join("");
+    var shortcuts = [];
+    if (canReadFeeCatalog() || canManageFeeCatalog()) shortcuts.push({ tab: "fees", label: "Types de frais", icon: "settings" });
+    if (canManageFeeCatalog()) shortcuts.push({ tab: "assignments", label: "Affectations", icon: "users-round" });
+    if (canRecordPayment()) shortcuts.push({ tab: "cash", label: "Enregistrer un paiement", icon: "hand-coins" });
+    if (canReadFinanceReceipts()) shortcuts.push({ tab: "receipts", label: "Reçus", icon: "receipt-text" });
+    if (canAccessCashRegister()) shortcuts.push({ tab: "cash-register", label: "Caisse", icon: "landmark" });
+    if (canReadFinanceReports()) shortcuts.push({ tab: "reports", label: "Rapports", icon: "file-chart-column" });
+    var shortcutMarkup = shortcuts.map(function (shortcut) {
+      return '<button type="button" class="finance-dashboard-action" data-finance-open="' + shortcut.tab + '"><i data-lucide="' + shortcut.icon + '"></i><span>' + escapeMarkup(shortcut.label) + '</span></button>';
+    }).join("");
+    return '<section class="finance-overview" data-finance-dashboard><header><div><span>Pilotage financier · démonstration</span><h3>Vue d’ensemble Finance</h3><p>Une synthèse locale illustrative, séparée du Contrôle des frais et bornée par permission.</p></div>' + window.ssBadge({ variant: "info", icon: "flask-conical", label: "DÉMONSTRATION" }) + '</header><aside class="finance-audit-note"><i data-lucide="shield-check"></i><p>Aucun total CDF + USD, aucune donnée officielle et aucun paiement en ligne. Les valeurs restent une projection DÉMONSTRATION.</p></aside><div class="finance-dashboard-grid">' + metricMarkup + '</div><section class="finance-dashboard-shortcuts"><header><span>Raccourcis autorisés</span><h3>Actions visibles selon Access_Law</h3></header><div>' + shortcutMarkup + '</div></section></section>';
   }
 
   function renderFeeStructure() {
@@ -1973,11 +2041,11 @@
   }
 
   function setRole(role) {
-    root.currentDemoRole = role;
+    financeRoleOverride = role || "";
   }
 
   function setSession(session) {
-    root.currentSession = session;
+    financeSessionOverride = session || null;
   }
 
   root.SchoolSafeFinanceModule = {
