@@ -17,7 +17,9 @@
 .accounting-treasury,
 .accounting-closing,
 .accounting-closing-summary,
-.accounting-reconciliation {
+.accounting-reconciliation,
+.accounting-reports,
+.accounting-report-currencies {
   display: grid;
   gap: var(--ss-space-4);
 }
@@ -29,6 +31,7 @@
 .accounting-treasury > header,
 .accounting-closing > header,
 .accounting-reconciliation > header,
+.accounting-reports > header,
 .accounting-shortcuts,
 .accounting-future {
   padding: var(--ss-space-5);
@@ -55,7 +58,8 @@
 .accounting-expense-boundary > header,
 .accounting-treasury > header,
 .accounting-closing > header,
-.accounting-reconciliation > header {
+.accounting-reconciliation > header,
+.accounting-reports > header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -391,6 +395,72 @@
 .accounting-reconciliation-table { min-width: 850px; }
 .accounting-review-only { display: inline-flex; padding: var(--ss-space-1) var(--ss-space-2); border-radius: var(--ss-radius-full); color: var(--ss-info-text); background: var(--ss-info-bg); font-size: var(--ss-text-xs); font-weight: var(--ss-font-bold); }
 
+.accounting-report-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 260px));
+  gap: var(--ss-space-3);
+}
+
+.accounting-report-filters label {
+  display: grid;
+  gap: var(--ss-space-2);
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-semibold);
+}
+
+.accounting-report-filters input {
+  min-height: 44px;
+  padding: var(--ss-space-2) var(--ss-space-3);
+  border: 1px solid var(--ss-border-strong);
+  border-radius: var(--ss-radius);
+  color: var(--ss-text-primary);
+  background: var(--ss-bg-secondary);
+}
+
+.accounting-report-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ss-space-3);
+}
+
+.accounting-report-overview article,
+.accounting-report-currencies article {
+  min-width: 0;
+  display: grid;
+  gap: var(--ss-space-2);
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-md);
+  background: var(--ss-surface-raised);
+}
+
+.accounting-report-overview small,
+.accounting-report-overview span,
+.accounting-report-currencies span,
+.accounting-report-currencies dt { color: var(--ss-text-secondary); }
+.accounting-report-overview b { overflow-wrap: anywhere; }
+
+.accounting-report-currencies > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--ss-space-3);
+}
+
+.accounting-report-currencies article header { display: flex; justify-content: space-between; gap: var(--ss-space-2); }
+.accounting-report-currencies article dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ss-space-2); margin: 0; }
+.accounting-report-currencies article dl div { min-width: 0; padding: var(--ss-space-2); border-radius: var(--ss-radius); background: var(--ss-bg-primary); }
+.accounting-report-currencies dd { margin: var(--ss-space-1) 0 0; overflow-wrap: anywhere; font-weight: var(--ss-font-bold); }
+
+.accounting-report-legal-boundary {
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-warning-border);
+  border-radius: var(--ss-radius-md);
+  color: var(--ss-warning-text);
+  background: var(--ss-warning-bg);
+}
+.accounting-report-legal-boundary p { margin-bottom: 0; color: inherit; }
+
 .accounting-table :is(th, td) {
   padding: var(--ss-space-3);
   border-bottom: 1px solid var(--ss-border-subtle);
@@ -436,6 +506,7 @@
   .accounting-expense-boundary form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .accounting-closing form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .accounting-closing-summary dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accounting-report-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 520px) {
@@ -446,6 +517,7 @@
   .accounting-treasury > header { flex-direction: column; }
   .accounting-closing > header { flex-direction: column; }
   .accounting-reconciliation > header { flex-direction: column; }
+  .accounting-reports > header { flex-direction: column; }
   .accounting-dashboard-grid,
   .accounting-shortcuts > div { grid-template-columns: 1fr; }
   .accounting-journal-filters { grid-template-columns: 1fr; }
@@ -453,4 +525,7 @@
   .accounting-treasury-card dl { grid-template-columns: 1fr; }
   .accounting-closing form,
   .accounting-closing-summary dl { grid-template-columns: 1fr; }
+  .accounting-report-filters,
+  .accounting-report-overview,
+  .accounting-report-currencies article dl { grid-template-columns: 1fr; }
 }

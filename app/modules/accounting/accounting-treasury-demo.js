@@ -5,6 +5,7 @@
   var activeTab = "dashboard";
   var sessionOverride = null;
   var journalFilters = { from: "", to: "", direction: "", currency: "", search: "" };
+  var reportFilters = { from: "", to: "" };
   var CLOSING_DRAFT_STORAGE_KEY = "schoolsafe-v2-accounting-closing-draft";
 
   function readClosingDraft() {
@@ -324,6 +325,48 @@
     return '<section class="accounting-reconciliation" data-accounting-reconciliation><header><div><span>Rapprochement frontend</span><h3>Chaîne de contrôle visible</h3><p>Paiement → student_fee → reçu / référence → journal → caisse → écart / anomalie</p></div><span class="accounting-boundary-chip">LECTURE SEULE · BACKEND_LATER</span></header><div class="accounting-reconciliation-chain"><span>Paiement</span><i data-lucide="arrow-right"></i><span>student_fee</span><i data-lucide="arrow-right"></i><span>Reçu / référence</span><i data-lucide="arrow-right"></i><span>Journal</span><i data-lucide="arrow-right"></i><span>Caisse</span><i data-lucide="arrow-right"></i><span>Anomalie</span></div><aside class="accounting-boundary accounting-boundary--warning"><i data-lucide="shield-alert"></i><p>AUCUNE CORRECTION AUTOMATIQUE · aucune mutation de paiement, reçu, montant, devise, student_fee ou dépense.</p></aside><div class="accounting-reconciliation-summary"><b>' + anomalies.length + '</b><span>signaux démontrables à examiner</span></div><div class="accounting-table-wrap" tabindex="0"><table class="accounting-table accounting-reconciliation-table"><thead><tr><th>Anomalie</th><th>Référence</th><th>Explication</th><th>Action permise</th></tr></thead><tbody>' + rows + "</tbody></table></div></section>";
   }
 
+  function reportRows() {
+    return journalRows().filter(function (row) {
+      if (reportFilters.from && (!row.isoDate || row.isoDate < reportFilters.from)) return false;
+      if (reportFilters.to && (!row.isoDate || row.isoDate > reportFilters.to)) return false;
+      return true;
+    });
+  }
+
+  function renderReportCurrencies(rows) {
+    var currencies = [];
+    rows.forEach(function (row) { if (row.currency && currencies.indexOf(row.currency) < 0) currencies.push(row.currency); });
+    return currencies.sort().map(function (currency) {
+      var incoming = rows.filter(function (row) { return row.currency === currency && row.direction === "in"; }).reduce(function (sum, row) { return sum + row.amount; }, 0);
+      var outgoing = rows.filter(function (row) { return row.currency === currency && row.direction === "out"; }).reduce(function (sum, row) { return sum + row.amount; }, 0);
+      return '<article data-report-currency="' + escapeMarkup(currency) + '"><header><b>' + escapeMarkup(currency) + '</b><span>SYNTHÈSE DE TRÉSORERIE</span></header><dl><div><dt>Entrées</dt><dd>' + escapeMarkup(amountLabel(incoming, currency)) + '</dd></div><div><dt>Sorties</dt><dd>' + escapeMarkup(amountLabel(outgoing, currency)) + '</dd></div><div><dt>Mouvements nets</dt><dd>' + escapeMarkup(amountLabel(incoming - outgoing, currency)) + "</dd></div></dl></article>";
+    }).join("");
+  }
+
+  function renderReports() {
+    var rows = reportRows();
+    var data = snapshot();
+    var anomalies = reconciliationAnomalies();
+    var incomingCount = rows.filter(function (row) { return row.direction === "in"; }).length;
+    var outgoingCount = rows.filter(function (row) { return row.direction === "out"; }).length;
+    var currencies = renderReportCurrencies(rows);
+    if (!currencies) currencies = '<div class="accounting-empty">Aucun mouvement avec devise dans cette période.</div>';
+    var closureState = closingDraft ? closingDraft.state : "OUVERTE · aucune préparation locale";
+    var closureVariance = closingDraft ? amountLabel(closingDraft.variance, closingDraft.currency) : "Non calculé";
+    return '<section class="accounting-reports" data-accounting-reports><header><div><span>RAPPORT FINANCIER FRONTEND</span><h3>SYNTHÈSE DE TRÉSORERIE</h3><p>Lecture de contrôle des mouvements Finance visibles, sans valeur légale.</p></div><span class="accounting-boundary-chip">BACKEND_LATER</span></header><aside class="accounting-boundary"><i data-lucide="split"></i><p>AUCUNE CONVERSION · chaque devise reste autonome · aucun total général multidevise.</p></aside><div class="accounting-report-filters"><label>Du<input id="reportFrom" type="date" value="' + escapeMarkup(reportFilters.from) + '"></label><label>Au<input id="reportTo" type="date" value="' + escapeMarkup(reportFilters.to) + '"></label></div><div class="accounting-report-overview"><article><small>Journal du jour</small><b>' + rows.length + ' mouvements visibles</b><span>Période frontend sélectionnée</span></article><article><small>Recettes / dépenses</small><b>' + incomingCount + ' recettes · ' + outgoingCount + ' dépenses</b><span>' + data.transactions.length + ' transactions · ' + data.expenses.length + ' sorties Finance</span></article><article><small>Trésorerie par période</small><b>' + (reportFilters.from || "Début visible") + ' → ' + (reportFilters.to || "Fin visible") + '</b><span>BACKEND_LATER pour une période officielle</span></article><article><small>Anomalies visibles</small><b>' + anomalies.length + ' signaux</b><span>Explications sans correction</span></article><article><small>Écarts de caisse</small><b>' + escapeMarkup(closureVariance) + '</b><span>Brouillon local uniquement</span></article><article><small>Statut de clôture</small><b>' + escapeMarkup(closureState) + '</b><span>Clôture officielle indisponible</span></article></div><section class="accounting-report-currencies"><header><span>Mouvements par devise</span><h3>Positions indépendantes</h3></header><div>' + currencies + '</div></section><aside class="accounting-report-legal-boundary"><b>FEATURE_LATER</b><p>Les états comptables officiels, obligations fiscales et exports de documents finaux ne font pas partie de cette surface.</p></aside></section>';
+  }
+
+  function bindReportFilters() {
+    [["reportFrom", "from"], ["reportTo", "to"]].forEach(function (binding) {
+      var input = document.getElementById(binding[0]);
+      if (!input) return;
+      input.addEventListener("change", function () {
+        reportFilters[binding[1]] = input.value;
+        renderContent();
+      });
+    });
+  }
+
   function renderFutureSurface() {
     var labels = {
       journal: "Journal de trésorerie",
@@ -360,10 +403,11 @@
       button.hidden = tab === "closing" && !closeAllowed;
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : activeTab === "closing" ? renderClosing() : activeTab === "reconciliation" ? renderReconciliation() : renderFutureSurface()) : renderDenied();
+    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : activeTab === "closing" ? renderClosing() : activeTab === "reconciliation" ? renderReconciliation() : activeTab === "reports" ? renderReports() : renderFutureSurface()) : renderDenied();
     bindNavigation();
     if (activeTab === "journal") bindJournalFilters();
     if (activeTab === "closing") bindClosing();
+    if (activeTab === "reports") bindReportFilters();
     if (typeof root.lucide !== "undefined" && root.lucide.createIcons) root.lucide.createIcons();
   }
 
