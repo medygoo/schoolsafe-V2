@@ -308,6 +308,11 @@
     return true;
   }
 
+  function readPickupRecords() {
+    var records = readJson(PICKUP_STORAGE_KEY, []);
+    return Array.isArray(records) ? records : [];
+  }
+
   function renderControl(containerId, user, student) {
     controlContainerId = containerId;
     controlUser = user || { permissions: [] };
@@ -390,6 +395,7 @@
     bindDossier: bindDossier,
     canControlPickup: canControlPickup,
     canManageGuardians: canManageGuardians,
+    readPickupRecords: readPickupRecords,
     renderControl: renderControl,
     renderDossierSection: renderDossierSection,
     resetControl: resetControl

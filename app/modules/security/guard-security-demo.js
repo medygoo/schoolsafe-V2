@@ -5,6 +5,8 @@
   var activeUser = null;
   var activePickupStudent = null;
   var DISMISSAL_STORAGE_KEY = "schoolsafe-v2-security-dismissal-v1";
+  var INCIDENT_STORAGE_KEY = "schoolsafe-v2-security-incidents-v1";
+  var LOCKDOWN_STORAGE_KEY = "schoolsafe-v2-security-lockdown-v1";
 
   var PORTALS = [
     { id: "demo-portal-main", name: "Portail principal", station: "Poste A", status: "POSTE ACTIF" },
@@ -143,6 +145,105 @@
     };
   }
 
+  function readIncidents() {
+    try {
+      var incidents = JSON.parse(root.localStorage.getItem(INCIDENT_STORAGE_KEY) || "[]");
+      return Array.isArray(incidents) ? incidents : [];
+    } catch (error) { return []; }
+  }
+
+  function saveIncident(incident) {
+    var incidents = readIncidents();
+    incidents.unshift(incident);
+    try { root.localStorage.setItem(INCIDENT_STORAGE_KEY, JSON.stringify(incidents.slice(0, 40))); }
+    catch (error) {}
+  }
+
+  function canPrepareIncident(user) {
+    var assignedIds = Array.isArray(user && user.assignedPortalIds) ? user.assignedPortalIds : [];
+    return assignedIds.length > 0 && (
+      allowsScope(user, "security.scan", "assigned_portal") ||
+      allowsScope(user, "security.pickup.manage", "assigned_portal")
+    );
+  }
+
+  function canManageLockdown(user) {
+    return allowsScope(user, "security.lockdown.manage", "school");
+  }
+
+  function canReadGlobalSecurityReport(user) {
+    return allowsScope(user, "reports.security.read", "school");
+  }
+
+  function readLockdownState() {
+    try {
+      var state = JSON.parse(root.localStorage.getItem(LOCKDOWN_STORAGE_KEY) || "null");
+      return state && state.status ? state : { status: "INACTIF", updatedAt: null };
+    } catch (error) { return { status: "INACTIF", updatedAt: null }; }
+  }
+
+  function writeLockdownState(status) {
+    try { root.localStorage.setItem(LOCKDOWN_STORAGE_KEY, JSON.stringify({ status: status, updatedAt: new Date().toISOString() })); }
+    catch (error) {}
+  }
+
+  function eventStudent(event) {
+    return STUDENTS.find(function (student) { return student.id === event.studentId; }) || null;
+  }
+
+  function historyAccess(user, event) {
+    if (canReadGlobalSecurityReport(user)) return true;
+    if (canPrepareIncident(user)) {
+      var portals = Array.isArray(user && user.assignedPortalIds) ? user.assignedPortalIds : [];
+      return !event.portalId || portals.indexOf(event.portalId) >= 0;
+    }
+    if (allowsScope(user, "security.events.read", "assigned_classes") && allowsScope(user, "school.student.read", "assigned_classes")) {
+      var student = eventStudent(event);
+      var classes = Array.isArray(user && user.assignedClassIds) ? user.assignedClassIds : [];
+      return !!student && classes.indexOf(student.classId) >= 0;
+    }
+    return false;
+  }
+
+  function getSecurityHistory(user) {
+    var events = [];
+    var scanEvents = root.SchoolSafeSecurityModule && root.SchoolSafeSecurityModule.readLocalEvents ? root.SchoolSafeSecurityModule.readLocalEvents() : [];
+    scanEvents.forEach(function (event) {
+      events.push({ id: event.id, kind: event.type === "exit" ? "SORTIE" : event.type === "incident" ? "INCIDENT" : "ENTRÉE", studentId: event.studentId, student: event.studentName || "Identité non confirmée", detail: event.decision || "", portalId: event.portalId, time: event.occurredAt || "" });
+    });
+    var pickups = root.SchoolSafeStudentPickup && root.SchoolSafeStudentPickup.readPickupRecords ? root.SchoolSafeStudentPickup.readPickupRecords() : [];
+    pickups.forEach(function (record, index) {
+      events.push({ id: "pickup-history-" + index, kind: "RÉCUPÉRATION", studentId: record.studentId, student: record.student, detail: record.result + " · " + record.picker, portalId: "demo-portal-main", time: record.date + " " + record.time });
+    });
+    var dismissalTimeline = readDismissalStore().timeline;
+    (Array.isArray(dismissalTimeline) ? dismissalTimeline : []).forEach(function (event) {
+      events.push({ id: event.id, kind: event.eventType, studentId: event.studentId, student: event.student, detail: event.detail, portalId: event.portalId, time: event.time });
+    });
+    readIncidents().forEach(function (incident) {
+      events.push({ id: incident.id, kind: "INCIDENT", studentId: incident.studentId, student: incident.studentName || "Sans élève", detail: incident.typeLabel + " · " + incident.status, portalId: incident.portalId, time: incident.occurredAt });
+    });
+    return events.filter(function (event) { return historyAccess(user, event); });
+  }
+
+  function getSecurityOperationsProjection(user) {
+    var incidentAllowed = canPrepareIncident(user);
+    var lockdownAllowed = canManageLockdown(user);
+    var globalReportAllowed = canReadGlobalSecurityReport(user);
+    var history = getSecurityHistory(user);
+    var assignedIds = Array.isArray(user && user.assignedPortalIds) ? user.assignedPortalIds : [];
+    var portal = PORTALS.find(function (item) { return assignedIds.indexOf(item.id) >= 0; }) || null;
+    return {
+      allowed: incidentAllowed || lockdownAllowed || globalReportAllowed || history.length > 0,
+      canPrepareIncident: incidentAllowed,
+      canManageLockdown: lockdownAllowed,
+      canReadGlobalReport: globalReportAllowed,
+      portal: portal,
+      incidents: readIncidents().filter(function (incident) { return historyAccess(user, incident); }),
+      lockdown: readLockdownState(),
+      history: history
+    };
+  }
+
   function dashboardCard(label, value, detail, iconName) {
     return '<article class="guard-security-metric"><span>' + icon(iconName) + '</span><div><small>' + escapeMarkup(label) + '</small><strong>' + escapeMarkup(value) + '</strong><p>' + escapeMarkup(detail) + '</p></div></article>';
   }
@@ -175,6 +276,7 @@
         shortcut("Préparer une sortie", "dismissal", "clock-3") +
       '</section>' +
       '<button class="guard-security-inline-action" type="button" data-guard-attendance>' + icon("clipboard-check") + '<span><strong>Consulter la présence</strong><small>Statut du jour · démonstration</small></span></button>' +
+      '<button class="guard-security-inline-action" type="button" data-guard-security-operations>' + icon("shield-alert") + '<span><strong>Incidents et historique</strong><small>Poste affecté · données locales</small></span></button>' +
       '<div class="guard-security-columns"><section class="guard-security-panel"><header><div><p class="guard-security-eyebrow">Opérations admissibles</p><h2>Élèves actifs du portail</h2></div><span>DRAFTS EXCLUS</span></header><ul class="guard-security-student-list">' + studentRows + '</ul></section>' +
       '<section class="guard-security-panel"><header><div><p class="guard-security-eyebrow">Session locale</p><h2>Événements récents</h2></div><span>DÉMONSTRATION</span></header><ol class="guard-security-event-list"><li><b>08:04</b><span>Entrée autorisée · Lucas Martin</span></li><li><b>12:15</b><span>Contrôle préparé · Chloé Bernard</span></li><li><b>14:02</b><span>Vérification d’identité requise</span></li></ol></section></div>' +
       '<aside class="guard-security-honesty">' + icon("cloud-off") + '<div><strong>FRONTEND UNIQUEMENT · BACKEND_LATER</strong><p>Les compteurs et événements sont des données de démonstration locales. Aucune action serveur réelle.</p></div></aside>' +
@@ -204,6 +306,8 @@
     });
     var attendance = container.querySelector("[data-guard-attendance]");
     if (attendance) attendance.addEventListener("click", function () { open("attendance"); });
+    var operations = container.querySelector("[data-guard-security-operations]");
+    if (operations) operations.addEventListener("click", function () { open("security"); });
   }
 
   function attendanceMetric(label, value, iconName) {
@@ -265,6 +369,96 @@
     });
     var back = container.querySelector("[data-guard-back]");
     if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
+  }
+
+  function incidentCard(incident) {
+    return '<article class="guard-incident-card" data-security-incident><header><div><p class="guard-security-eyebrow">' + escapeMarkup(incident.typeLabel) + '</p><h3>' + escapeMarkup(incident.studentName || "Sans élève") + '</h3></div><span>' + escapeMarkup(incident.attention) + '</span></header><p>' + escapeMarkup(incident.description) + '</p><dl><div><dt>Portail</dt><dd>' + escapeMarkup(incident.portalName) + '</dd></div><div><dt>Statut</dt><dd>' + escapeMarkup(incident.status) + '</dd></div><div><dt>Action locale</dt><dd>' + escapeMarkup(incident.action) + '</dd></div></dl><small>' + escapeMarkup(new Date(incident.occurredAt).toLocaleString("fr-FR")) + ' · BACKEND_LATER</small></article>';
+  }
+
+  function lockdownActions(state) {
+    if (state.status === "INACTIF") return '<button type="button" data-lockdown-next="PRÉPARATION">Préparer le lockdown</button>';
+    if (state.status === "PRÉPARATION") return '<button type="button" data-lockdown-next="ACTIF — simulation uniquement">Simuler l’activation</button>';
+    if (state.status === "ACTIF — simulation uniquement") return '<button type="button" data-lockdown-next="LEVÉ — simulation uniquement">Simuler la levée</button>';
+    return '<button type="button" data-lockdown-next="INACTIF">Revenir à INACTIF</button>';
+  }
+
+  function renderSecurityOperationsMarkup(container, projection) {
+    var studentOptions = STUDENTS.filter(function (student) { return student.lifecycleStatus === "active"; }).map(function (student) {
+      return '<option value="' + escapeMarkup(student.id) + '">' + escapeMarkup(student.name + " · " + student.className) + '</option>';
+    }).join("");
+    var incidentForm = projection.canPrepareIncident
+      ? '<form class="guard-incident-form" data-incident-form><label>Type<select name="incident_type"><option value="identity">Identité / récupération</option><option value="scan">Scan / QR</option><option value="safety">Sécurité du portail</option><option value="other">Autre</option></select></label><label>Élève<select name="incident_student"><option value="">Sans élève</option>' + studentOptions + '</select></label><label>Niveau d’attention<select name="incident_attention"><option value="normal">Normal</option><option value="high">Élevé</option><option value="critical">Critique</option></select></label><label>Description<textarea name="incident_description" required></textarea></label><label>Action locale<textarea name="incident_action" required></textarea></label><button type="submit">' + icon("file-plus-2") + ' Enregistrer l’incident local</button><small>Enregistrement frontend · aucune suppression · BACKEND_LATER</small></form>'
+      : '<div class="guard-security-unavailable"><strong>Préparation d’incident non accordée</strong><p>Un poste `assigned_portal` autorisé est obligatoire.</p></div>';
+    var incidents = projection.incidents.map(incidentCard).join("");
+    var lockdown = projection.canManageLockdown
+      ? '<div class="guard-lockdown-authorized"><span>SIMULATION UNIQUEMENT · BACKEND_LATER</span><strong data-lockdown-state>' + escapeMarkup(projection.lockdown.status) + '</strong><p>Aucune alerte réelle n’est déclenchée par cette interface.</p>' + lockdownActions(projection.lockdown) + '</div>'
+      : '<div class="guard-security-unavailable"><strong>Gestion lockdown non accordée</strong><p>security.lockdown.manage + school est obligatoire. Aucun bouton de déclenchement n’est affiché.</p></div>';
+    var history = projection.history.map(function (event) {
+      return '<li><span>' + escapeMarkup(event.kind) + '</span><div><strong>' + escapeMarkup(event.student || "Sans élève") + '</strong><small>' + escapeMarkup(event.detail || "Événement local") + '</small></div><time>' + escapeMarkup(event.time || "—") + '</time></li>';
+    }).join("");
+    var globalReport = projection.canReadGlobalReport
+      ? '<aside class="guard-global-report" data-global-security-report><strong>Rapport sécurité école disponible</strong><p>reports.security.read + school · synthèse frontend des événements locaux uniquement.</p><span>BACKEND_LATER</span></aside>'
+      : '';
+    container.innerHTML = '<div class="guard-security-shell guard-security-operations" data-security-operations><header class="guard-security-workspace-header"><button type="button" data-guard-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="guard-security-eyebrow">E6 · Sécurité frontend</p><h1>Incidents, lockdown et historique</h1><p>' + escapeMarkup(projection.portal ? projection.portal.name : "Portée école") + '</p></div><span>LOCAL · BACKEND_LATER</span></header><div class="guard-security-columns"><section class="guard-security-panel"><header><div><p class="guard-security-eyebrow">Incident</p><h2>Préparer un enregistrement local</h2></div><span>AUCUNE SUPPRESSION</span></header>' + incidentForm + '<div class="guard-incident-list">' + (incidents || '<p>Aucun incident visible.</p>') + '</div></section><section class="guard-security-panel"><header><div><p class="guard-security-eyebrow">Lockdown</p><h2>Gestion bornée par Access_Law</h2></div><span>SIMULATION</span></header>' + lockdown + globalReport + '</section></div><section class="guard-security-panel"><header><div><p class="guard-security-eyebrow">Historique local</p><h2>Événements visibles</h2></div><span>LECTURE SEULE</span></header><ol class="guard-security-history" data-security-history>' + (history || '<li class="guard-dismissal-empty">Aucun événement visible dans cette portée.</li>') + '</ol></section></div>';
+  }
+
+  function bindSecurityOperations(container, projection) {
+    var form = container.querySelector("[data-incident-form]");
+    if (form) form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!canPrepareIncident(activeUser)) return;
+      var data = new root.FormData(form);
+      var studentId = String(data.get("incident_student") || "");
+      var student = STUDENTS.find(function (item) { return item.id === studentId && item.lifecycleStatus === "active"; });
+      var type = String(data.get("incident_type") || "other");
+      var typeLabels = { identity: "Identité / récupération", scan: "Scan / QR", safety: "Sécurité du portail", other: "Autre" };
+      var attentionLabels = { normal: "NORMAL", high: "ÉLEVÉ", critical: "CRITIQUE" };
+      saveIncident({
+        id: "incident-" + Date.now(),
+        type: type,
+        typeLabel: typeLabels[type] || typeLabels.other,
+        studentId: student ? student.id : null,
+        studentName: student ? student.name : null,
+        portalId: projection.portal.id,
+        portalName: projection.portal.name,
+        description: String(data.get("incident_description") || ""),
+        attention: attentionLabels[String(data.get("incident_attention") || "normal")] || "NORMAL",
+        action: String(data.get("incident_action") || ""),
+        status: "OUVERT",
+        occurredAt: new Date().toISOString()
+      });
+      renderSecurityOperationsMarkup(container, getSecurityOperationsProjection(activeUser));
+      bindSecurityOperations(container, getSecurityOperationsProjection(activeUser));
+      if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+    });
+    container.querySelectorAll("[data-lockdown-next]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        if (!canManageLockdown(activeUser)) return;
+        writeLockdownState(button.getAttribute("data-lockdown-next") || "INACTIF");
+        var nextProjection = getSecurityOperationsProjection(activeUser);
+        renderSecurityOperationsMarkup(container, nextProjection);
+        bindSecurityOperations(container, nextProjection);
+        if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+      });
+    });
+    var back = container.querySelector("[data-guard-back]");
+    if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
+  }
+
+  function renderSecurityOperations(containerId, user) {
+    var container = root.document.getElementById(containerId);
+    if (!container) return false;
+    activeContainerId = containerId;
+    activeUser = user || {};
+    var projection = getSecurityOperationsProjection(activeUser);
+    if (!projection.allowed) {
+      renderDenied(container, activeUser);
+      return false;
+    }
+    renderSecurityOperationsMarkup(container, projection);
+    bindSecurityOperations(container, projection);
+    if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+    return true;
   }
 
   function renderScannerWorkspace(container, projection) {
@@ -329,6 +523,7 @@
       if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
       return true;
     }
+    if (view === "security") return renderSecurityOperations(activeContainerId || "guardSecurityPortal", activeUser);
     return false;
   }
 
@@ -371,8 +566,11 @@
     getPortalProjection: getPortalProjection,
     getAttendanceProjection: getAttendanceProjection,
     getDismissalProjection: getDismissalProjection,
+    getSecurityHistory: getSecurityHistory,
+    getSecurityOperationsProjection: getSecurityOperationsProjection,
     open: open,
     clear: clear,
-    render: render
+    render: render,
+    renderSecurityOperations: renderSecurityOperations
   };
 }(window));
