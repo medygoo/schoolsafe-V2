@@ -78,7 +78,12 @@ export function createUniversalDocumentActions(options = {}) {
         reason: "Frontend preview requested from the SchoolSafe Document Center",
       });
 
-      const result = await engine.generate(request);
+      let result;
+      try {
+        result = await engine.generate(request);
+      } catch (error) {
+        return fail(error && error.message ? error.message : "Document generation failed");
+      }
       if (!result.ok) return { ok: false, error: result.error || "Document generation failed", descriptor, request, result };
       const output = result.outputs && result.outputs[DOCUMENT_FORMATS.PDF];
       if (!output || output.ok === false || !output.blob) {

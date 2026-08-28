@@ -10,8 +10,19 @@ test.describe("J4 — Documents Finance et Comptabilité", () => {
     const result = await page.evaluate(async () => {
       const center = (window as any).SchoolSafeDocumentCenter;
       const connector = (window as any).SchoolSafeFinanceAccountingDocuments;
+      const user = {
+        userId: "finance-real-1", schoolId: "school-real-1", childIds: ["child-real-1"], assignedClassIds: ["class-real-1"],
+        permissions: ["finance.receipt.read", "finance.report.read", "finance.status.read", "reports.financial.read"],
+        scopes: [
+          { permission: "finance.receipt.read", type: "own_children" },
+          { permission: "finance.report.read", type: "school" },
+          { permission: "finance.status.read", type: "assigned_classes" },
+          { permission: "reports.financial.read", type: "school" },
+        ],
+      };
+      await (window as any).SchoolSafeDocumentRuntime.bindContext({ user, mode: "live" });
       const documents = center.listRegistered().filter((item: any) => ["finance", "accounting"].includes(item.sourceModule));
-      const receiptTemplate = await connector.getTemplate("finance-receipt-school");
+      const receiptTemplate = await connector.getTemplate("finance-receipt-family");
       return { documents, receiptInfo: receiptTemplate.info };
     });
 
@@ -35,34 +46,37 @@ test.describe("J4 — Documents Finance et Comptabilité", () => {
     expect(joined).not.toMatch(/bilan légal|compte de résultat légal|grand livre officiel|syscohada|pièce comptable officielle/);
   });
 
-  test("borne les vues school et own_children avec DENY prioritaire", async ({ page }) => {
-    const result = await page.evaluate(() => {
+  test("borne les vues school, assigned_classes et own_children avec DENY prioritaire", async ({ page }) => {
+    const result = await page.evaluate(async () => {
       const center = (window as any).SchoolSafeDocumentCenter;
       const financeUser = {
-        userId: "finance-1", schoolId: "demo-school-1",
+        userId: "finance-1", schoolId: "school-real-1", childIds: ["child-real-1"], assignedClassIds: ["class-real-1"],
         permissions: ["finance.receipt.read", "finance.report.read", "finance.status.read"],
         scopes: [
-          { permission: "finance.receipt.read", type: "school" },
+          { permission: "finance.receipt.read", type: "own_children" },
           { permission: "finance.report.read", type: "school" },
-          { permission: "finance.status.read", type: "school" },
+          { permission: "finance.status.read", type: "assigned_classes" },
         ],
       };
       const parent = {
-        userId: "parent-1", schoolId: "demo-school-1", childIds: ["demo-parent-child-lucas"],
-        permissions: ["finance.receipt.read", "finance.status.read"],
-        scopes: [
-          { permission: "finance.receipt.read", type: "own_children" },
-          { permission: "finance.status.read", type: "own_children" },
-        ],
+        userId: "parent-1", schoolId: "school-real-1", childIds: ["child-real-1"],
+        permissions: ["finance.receipt.read"],
+        scopes: [{ permission: "finance.receipt.read", type: "own_children" }],
       };
-      const otherParent = { ...parent, childIds: ["other-child"] };
       const denied = { ...financeUser, deniedPermissions: ["finance.report.read"] };
-      const ids = (user: any) => center.visibleDocuments(user).map((item: any) => item.id);
-      return { finance: ids(financeUser), parent: ids(parent), otherParent: ids(otherParent), denied: ids(denied) };
+      const bindIds = async (user: any) => {
+        await (window as any).SchoolSafeDocumentRuntime.bindContext({ user, mode: "live" });
+        return center.visibleDocuments(user).map((item: any) => item.id);
+      };
+      const finance = await bindIds(financeUser);
+      const parentIds = await bindIds(parent);
+      const otherParentIds = center.visibleDocuments({ ...parent, childIds: ["child-real-2"] }).map((item: any) => item.id);
+      const deniedIds = await bindIds(denied);
+      return { finance, parent: parentIds, otherParent: otherParentIds, denied: deniedIds };
     });
 
-    expect(result.finance).toEqual(expect.arrayContaining(["finance-receipt-school", "finance-cash-report", "finance-situation-school"]));
-    expect(result.parent).toEqual(expect.arrayContaining(["finance-receipt-family", "finance-situation-family"]));
+    expect(result.finance).toEqual(expect.arrayContaining(["finance-receipt-family", "finance-cash-report", "finance-situation-class"]));
+    expect(result.parent).toContain("finance-receipt-family");
     expect(result.otherParent).not.toContain("finance-receipt-family");
     expect(result.denied).not.toContain("finance-cash-report");
   });
@@ -70,8 +84,8 @@ test.describe("J4 — Documents Finance et Comptabilité", () => {
   test("affiche dans le Centre uniquement les sorties Finance du profil", async ({ page }) => {
     await openDocumentsCenter(page);
     await expect(page.locator("[data-document-id='finance-cash-report']")).toBeVisible();
-    await expect(page.locator("[data-document-id='finance-receipt-school']")).toBeVisible();
     await expect(page.locator("[data-document-id='finance-receipt-family']")).toHaveCount(0);
+    await expect(page.locator("[data-document-id='finance-situation-class']")).toHaveCount(0);
     await expect(page.locator("#documentCenterModule")).toContainText("Aucun PDF confidentiel n’est archivé");
   });
 });

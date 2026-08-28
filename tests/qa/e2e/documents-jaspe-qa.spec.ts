@@ -147,6 +147,7 @@ test.describe("J8 — Jaspe Documents et QA finale", () => {
   });
 
   test("explique honnêtement pourquoi un PDF visible est indisponible", async ({ page }) => {
+    await enterDemoWorkspace(page, "admin");
     const answer = await page.evaluate(() => {
       const user = {
         userId: "admin-1", schoolId: "demo-school-1", role: "admin",

@@ -182,6 +182,8 @@
       childIds: bootstrap.childIds || bootstrap.child_ids || bootstrap.linked_child_ids,
       assignedClassIds: bootstrap.assignedClassIds || bootstrap.assigned_class_ids,
       assignedSubjectIds: bootstrap.assignedSubjectIds || bootstrap.assigned_subject_ids,
+      assignedPortalIds: bootstrap.assignedPortalIds || bootstrap.assigned_portal_ids,
+      schoolId: bootstrap.schoolId || bootstrap.school_id || (bootstrap.school && bootstrap.school.id) || null,
       school: bootstrap.school || null,
       offline_policy: bootstrap.offline_policy || { max_offline_hours: 24 }
     };
@@ -357,7 +359,12 @@
   };
 
   function getCurrentUser() {
-    if (currentSession && currentSession.token) return Object.assign({}, currentSession, { role: currentDemoRole });
+    if (currentSession && currentSession.token) {
+      return Object.assign({}, currentSession, {
+        role: currentDemoRole,
+        schoolId: currentSession.schoolId || (currentSession.school && currentSession.school.id) || null
+      });
+    }
     var role = currentDemoRole || "admin";
     var context = DEMO_ACCESS_CONTEXT_BY_ROLE[role] || {};
     return {
@@ -374,11 +381,25 @@
     };
   }
 
+  function bindDocumentRuntimeContext(selectedContext) {
+    if (!window.SchoolSafeDocumentRuntime || typeof window.SchoolSafeDocumentRuntime.bindContext !== "function") {
+      return Promise.reject(new Error("Contexte documentaire indisponible"));
+    }
+    var binding = window.SchoolSafeDocumentRuntime.bindContext({
+      user: getCurrentUser(),
+      mode: currentSession && currentSession.token ? "live" : "demo",
+      selectedContext: selectedContext || {}
+    });
+    window.SchoolSafeDocumentContextReady = binding;
+    return binding;
+  }
+
   window.SchoolSafeAppContext = {
     getAssistantContext: function () {
       return { activeRole: currentDemoRole, user: getCurrentUser() };
     },
     getCurrentUser: getCurrentUser,
+    refreshDocuments: bindDocumentRuntimeContext,
     openDocuments: openDocumentCenter,
     openAccounting: function (tab) {
       openAccountingModule();
@@ -2419,6 +2440,11 @@
       themeToggle.checked = document.documentElement.getAttribute("data-theme") === "dark";
     }
 
+    bindDocumentRuntimeContext().catch(function (error) {
+      if (window.console && typeof window.console.warn === "function") {
+        window.console.warn("[SchoolSafe][Documents] Contexte indisponible:", error && error.message ? error.message : error);
+      }
+    });
     icons();
     if (window.SchoolSafeCards) window.SchoolSafeCards.init();
   }
@@ -2553,9 +2579,20 @@
     module.hidden = false;
     document.getElementById("cardsProtected").hidden = true;
     setBreadcrumb("Centre de documents");
-    if (window.SchoolSafeDocumentCenter && typeof window.SchoolSafeDocumentCenter.render === "function") {
-      window.SchoolSafeDocumentCenter.render("documentCenterContent", getCurrentUser());
-    }
+    var documentContent = document.getElementById("documentCenterContent");
+    if (documentContent) documentContent.innerHTML = '<div class="document-center__empty"><strong>Chargement du contexte documentaire…</strong><span>Permissions, portée et identité sont vérifiées avant affichage.</span></div>';
+    bindDocumentRuntimeContext().then(function () {
+      if (window.SchoolSafeDocumentCenter && typeof window.SchoolSafeDocumentCenter.render === "function") {
+        window.SchoolSafeDocumentCenter.render("documentCenterContent", getCurrentUser());
+      }
+    }).catch(function () {
+      if (window.SchoolSafeDocumentCenter && typeof window.SchoolSafeDocumentCenter.render === "function") {
+        window.SchoolSafeDocumentCenter.render("documentCenterContent", getCurrentUser());
+      }
+      var content = document.getElementById("documentCenterContent");
+      if (content) content.insertAdjacentHTML("afterbegin", '<section class="document-center__notice"><i data-lucide="shield-alert"></i><div><strong>DONNÉES DOCUMENTAIRES INDISPONIBLES</strong><span>Le catalogue Access_Law ou l’identité école n’est pas disponible. Accès fermé · BACKEND_LATER.</span></div></section>');
+      icons();
+    });
     var workspaceContent = document.querySelector(".workspace-content");
     if (workspaceContent) workspaceContent.scrollTo({ top: 0, behavior: "smooth" });
   }

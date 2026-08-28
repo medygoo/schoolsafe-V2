@@ -10,6 +10,16 @@ test.describe("J6 — Documents opérationnels", () => {
     const result = await page.evaluate(async () => {
       const center = (window as any).SchoolSafeDocumentCenter;
       const connector = (window as any).SchoolSafeOperationalDocuments;
+      const user = {
+        userId: "operations-real-1", schoolId: "school-real-1",
+        permissions: ["reports.security.read", "reports.hr.read", "reports.operational.read"],
+        scopes: [
+          { permission: "reports.security.read", type: "school" },
+          { permission: "reports.hr.read", type: "school" },
+          { permission: "reports.operational.read", type: "school" },
+        ],
+      };
+      await (window as any).SchoolSafeDocumentRuntime.bindContext({ user, mode: "live" });
       const documents = center.listRegistered().filter((item: any) => ["security", "hr", "inventory"].includes(item.sourceModule));
       const template = await connector.getTemplate("inventory-operational-summary");
       return { documents, template: template.info, boundaries: connector.boundaries };
@@ -31,18 +41,21 @@ test.describe("J6 — Documents opérationnels", () => {
   });
 
   test("sépare strictement les trois permissions et applique DENY", async ({ page }) => {
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const center = (window as any).SchoolSafeDocumentCenter;
       const makeUser = (permission: string, deniedPermissions: string[] = []) => ({
         userId: permission, schoolId: "demo-school-1", permissions: [permission], deniedPermissions,
         scopes: [{ permission, type: "school" }],
       });
-      const ids = (user: any) => center.visibleDocuments(user).map((item: any) => item.id);
+      const ids = async (user: any) => {
+        await (window as any).SchoolSafeDocumentRuntime.bindContext({ user, mode: "live" });
+        return center.visibleDocuments(user).map((item: any) => item.id);
+      };
       return {
-        security: ids(makeUser("reports.security.read")),
-        hr: ids(makeUser("reports.hr.read")),
-        inventory: ids(makeUser("reports.operational.read")),
-        denied: ids(makeUser("reports.operational.read", ["reports.operational.read"])),
+        security: await ids(makeUser("reports.security.read")),
+        hr: await ids(makeUser("reports.hr.read")),
+        inventory: await ids(makeUser("reports.operational.read")),
+        denied: await ids(makeUser("reports.operational.read", ["reports.operational.read"])),
       };
     });
     expect(result.security.every((id: string) => id.startsWith("security-"))).toBe(true);

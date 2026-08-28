@@ -1,4 +1,8 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+const canonicalPermissions = JSON.parse(readFileSync(path.resolve(process.cwd(), "shared/permissions.json"), "utf8"));
 
 test.describe("J7 — Actions documentaires universelles", () => {
   test.beforeEach(async ({ page }) => {
@@ -159,13 +163,15 @@ test.describe("J7 — Actions documentaires universelles", () => {
   });
 
   test("connecte réellement un adaptateur métier au moteur PDF", async ({ page }) => {
-    const result = await page.evaluate(async () => {
+    const result = await page.evaluate(async (catalog) => {
       const actions = await (window as any).SchoolSafeDocumentActionsReady;
       const user = {
         userId: "demo-parent-1", schoolId: "demo-school-1", role: "parent", name: "Parent Démo",
         permissions: ["finance.receipt.read"], childIds: ["demo-parent-child-lucas"],
         scopes: [{ permission: "finance.receipt.read", type: "own_children" }],
       };
+      (window as any).SchoolSafeAccess.loadPermissions = async () => catalog;
+      await (window as any).SchoolSafeDocumentRuntime.bindContext({ user, mode: "demo" });
       const response = await actions.executeById({
         descriptorId: "finance-receipt-family", action: "preview", user, applyEffect: false,
       });
@@ -182,7 +188,7 @@ test.describe("J7 — Actions documentaires universelles", () => {
           size: response.output.size,
         },
       };
-    });
+    }, canonicalPermissions);
 
     expect(result).toMatchObject({
       ok: true,

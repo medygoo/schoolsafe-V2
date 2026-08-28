@@ -3,6 +3,10 @@
 // data-action attributes and ARIA labels already present in app/index.html.
 
 import { expect, Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+const CANONICAL_PERMISSIONS = readFileSync(path.resolve(process.cwd(), "shared/permissions.json"), "utf8");
 
 export const ROLE_LABELS: Record<string, string> = {
   admin: "Administrateur principal",
@@ -133,6 +137,9 @@ const DEMO_STUDENTS = [
 async function setupRoutes(page: Page) {
   await page.route("**/*", (route) => {
     const url = route.request().url();
+    if (url.includes("/shared/permissions.json")) {
+      return route.fulfill({ status: 200, contentType: "application/json", body: CANONICAL_PERMISSIONS });
+    }
     if (url.includes("cdnjs.cloudflare.com")) {
       return route.abort("aborted");
     }
@@ -225,6 +232,8 @@ export async function enterDemoWorkspace(page: Page, role: string) {
   await domClick(page, "#previewWorkspace");
   await expect(page.locator("#workspace.active")).toBeVisible();
   await expect(page.locator("#workspaceRole")).toHaveText(ROLE_LABELS[role]);
+  await page.waitForFunction(() => Boolean((window as any).SchoolSafeDocumentContextReady));
+  await page.evaluate(() => (window as any).SchoolSafeDocumentContextReady);
 }
 
 export async function expectBranches(page: Page, role: string) {
@@ -274,4 +283,5 @@ export async function openDocumentsCenter(page: Page) {
   }
   await domClick(page, "#documentsNav");
   await expect(page.locator("#documentCenterModule")).toBeVisible();
+  await page.evaluate(() => (window as any).SchoolSafeDocumentContextReady);
 }

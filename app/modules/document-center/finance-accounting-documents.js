@@ -1,9 +1,7 @@
-/* Phase J4 — Adaptateurs frontend Finance / Comptabilité vers le Centre de documents. */
+/* Phase J4 — Adaptateurs Finance / Comptabilité liés au contexte autorisé courant. */
 (function (root) {
   "use strict";
 
-  var SCHOOL_ID = "demo-school-1";
-  var CHILD_ID = "demo-parent-child-lucas";
   var today = new Date().toISOString().slice(0, 10);
   var common = {
     date: today,
@@ -13,59 +11,46 @@
     formats: ["pdf"],
     officialBoundary: "APERÇU / BROUILLON frontend · aucune pièce comptable officielle",
   };
+  var descriptors = [];
 
-  function descriptor(value) {
-    return Object.assign({}, common, value);
-  }
+  function descriptor(value) { return Object.assign({}, common, value); }
 
-  var descriptors = [
+  var blueprints = [
     descriptor({
       id: "finance-receipt-family", type: "receipt", label: "Reçu familial — aperçu",
       description: "Reçu existant lié à l’enfant autorisé, généré avec le template A5 SchoolSafe.",
-      sourceModule: "finance", nature: "DOCUMENT", permission: "finance.receipt.read", scope: "own_children",
-      context: { childId: CHILD_ID, studentId: CHILD_ID }, templateKind: "receipt",
-    }),
-    descriptor({
-      id: "finance-receipt-school", type: "receipt", label: "Registre des reçus — aperçu",
-      description: "Reçus de démonstration visibles au niveau école, sans valeur probante frontend.",
-      sourceModule: "finance", nature: "DOCUMENT", permission: "finance.receipt.read", scope: "school",
-      context: { schoolId: SCHOOL_ID }, templateKind: "receipt",
+      sourceModule: "finance", nature: "DOCUMENT", permission: "finance.receipt.read", templateKind: "receipt",
+      contextKind: "child",
     }),
     descriptor({
       id: "finance-cash-report", type: "cash-report", label: "Rapport de caisse par devise",
       description: "Projection de caisse CDF et USD séparée, sans clôture ni total inter-devise.",
-      sourceModule: "finance", nature: "REGISTRE/LISTE IMPRIMABLE", permission: "finance.report.read", scope: "school",
-      context: { schoolId: SCHOOL_ID }, templateKind: "table",
+      sourceModule: "finance", nature: "REGISTRE/LISTE IMPRIMABLE", permission: "finance.report.read", templateKind: "table",
+      contextKind: "school",
     }),
     descriptor({
-      id: "finance-situation-family", type: "financial-situation", label: "Situation financière familiale",
-      description: "Récapitulatif strictement limité à l’enfant lié au parent ou tuteur.",
-      sourceModule: "finance", nature: "FICHE", permission: "finance.status.read", scope: "own_children",
-      context: { childId: CHILD_ID, studentId: CHILD_ID }, templateKind: "sheet",
-    }),
-    descriptor({
-      id: "finance-situation-school", type: "financial-situation", label: "Situation financière — école",
-      description: "Synthèse frontend des statuts financiers visibles, séparée par devise.",
-      sourceModule: "finance", nature: "DOCUMENT", permission: "finance.status.read", scope: "school",
-      context: { schoolId: SCHOOL_ID }, templateKind: "report",
+      id: "finance-situation-class", type: "financial-situation", label: "Situation financière — classe affectée",
+      description: "Récapitulatif financier limité à la classe réellement affectée.",
+      sourceModule: "finance", nature: "FICHE", permission: "finance.status.read", templateKind: "sheet",
+      contextKind: "class",
     }),
     descriptor({
       id: "finance-register", type: "financial-register", label: "Liste financière autorisée",
-      description: "Liste de démonstration issue de la surface Finance visible, jamais un registre légal.",
-      sourceModule: "finance", nature: "REGISTRE/LISTE IMPRIMABLE", permission: "finance.report.read", scope: "school",
-      context: { schoolId: SCHOOL_ID }, templateKind: "register",
+      description: "Liste issue de la surface Finance visible, jamais un registre légal.",
+      sourceModule: "finance", nature: "REGISTRE/LISTE IMPRIMABLE", permission: "finance.report.read", templateKind: "register",
+      contextKind: "school",
     }),
     descriptor({
       id: "accounting-summary", type: "accounting-summary", label: "Synthèse comptable frontend",
-      description: "Agrégats de démonstration déjà visibles, sans écriture, débit/crédit ni valeur légale.",
-      sourceModule: "accounting", nature: "DOCUMENT", permission: "reports.financial.read", scope: "school",
-      context: { schoolId: SCHOOL_ID }, templateKind: "report",
+      description: "Agrégats déjà visibles, sans écriture, débit/crédit ni valeur légale.",
+      sourceModule: "accounting", nature: "DOCUMENT", permission: "reports.financial.read", templateKind: "report",
+      contextKind: "school",
     }),
     descriptor({
       id: "accounting-treasury-report", type: "treasury-report", label: "Trésorerie par devise — aperçu",
       description: "Entrées et sorties visibles regroupées séparément en CDF et USD, sans conversion.",
-      sourceModule: "accounting", nature: "REGISTRE/LISTE IMPRIMABLE", permission: "reports.financial.read", scope: "school",
-      context: { schoolId: SCHOOL_ID }, templateKind: "table",
+      sourceModule: "accounting", nature: "REGISTRE/LISTE IMPRIMABLE", permission: "reports.financial.read", templateKind: "table",
+      contextKind: "school",
     }),
   ];
 
@@ -94,8 +79,12 @@
     });
   }
 
-  function register() {
-    if (!root.SchoolSafeDocumentCenter) return [];
+  function register(options) {
+    if (!root.SchoolSafeDocumentCenter || !options || typeof options.buildDescriptors !== "function") {
+      descriptors = [];
+      return [];
+    }
+    descriptors = options.buildDescriptors(blueprints);
     return root.SchoolSafeDocumentCenter.registerMany(descriptors);
   }
 
@@ -104,6 +93,4 @@
     list: function () { return descriptors.map(function (item) { return Object.assign({}, item); }); },
     getTemplate: getTemplate,
   };
-
-  register();
 }(window));
