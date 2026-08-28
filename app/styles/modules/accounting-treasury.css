@@ -14,7 +14,9 @@
 .accounting-journal,
 .accounting-expenses,
 .accounting-expense-boundary,
-.accounting-treasury {
+.accounting-treasury,
+.accounting-closing,
+.accounting-closing-summary {
   display: grid;
   gap: var(--ss-space-4);
 }
@@ -24,6 +26,7 @@
 .accounting-expenses > header,
 .accounting-expense-boundary > header,
 .accounting-treasury > header,
+.accounting-closing > header,
 .accounting-shortcuts,
 .accounting-future {
   padding: var(--ss-space-5);
@@ -48,7 +51,8 @@
 
 .accounting-expenses > header,
 .accounting-expense-boundary > header,
-.accounting-treasury > header {
+.accounting-treasury > header,
+.accounting-closing > header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -296,6 +300,61 @@
 .accounting-treasury-card dd { margin: var(--ss-space-1) 0 0; overflow-wrap: anywhere; font-weight: var(--ss-font-bold); }
 .accounting-missing-currency { display: flex; flex-wrap: wrap; gap: var(--ss-space-2); }
 
+.accounting-closing-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ss-space-2);
+}
+
+.accounting-closing-steps span,
+.accounting-closing-state {
+  padding: var(--ss-space-2) var(--ss-space-3);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-full);
+  color: var(--ss-text-secondary);
+  background: var(--ss-bg-secondary);
+  font-size: var(--ss-text-xs);
+  font-weight: var(--ss-font-bold);
+}
+
+.accounting-closing form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--ss-space-3);
+  padding: var(--ss-space-5);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-surface-raised);
+}
+
+.accounting-closing form label {
+  display: grid;
+  gap: var(--ss-space-2);
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-semibold);
+}
+
+.accounting-closing form :is(input, select, textarea) {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--ss-space-2) var(--ss-space-3);
+  border: 1px solid var(--ss-border-strong);
+  border-radius: var(--ss-radius);
+  color: var(--ss-text-primary);
+  background: var(--ss-bg-primary);
+}
+
+.accounting-closing-observation { grid-column: 1 / -1; }
+.accounting-closing form button { min-height: 44px; align-self: end; }
+.accounting-closing-summary { padding: var(--ss-space-5); border: 1px solid var(--ss-warning-border); border-radius: var(--ss-radius-lg); background: var(--ss-warning-bg); }
+.accounting-closing-summary > header { display: flex; justify-content: space-between; gap: var(--ss-space-3); }
+.accounting-closing-summary dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ss-space-3); }
+.accounting-closing-summary dl div { padding: var(--ss-space-3); border-radius: var(--ss-radius); background: var(--ss-bg-primary); }
+.accounting-closing-summary dt { color: var(--ss-text-secondary); font-size: var(--ss-text-xs); }
+.accounting-closing-summary dd { margin: var(--ss-space-1) 0 0; font-weight: var(--ss-font-bold); overflow-wrap: anywhere; }
+.accounting-closing-state { display: flex; gap: var(--ss-space-2); width: fit-content; }
+
 .accounting-table :is(th, td) {
   padding: var(--ss-space-3);
   border-bottom: 1px solid var(--ss-border-subtle);
@@ -339,6 +398,8 @@
   .accounting-shortcuts > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .accounting-journal-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .accounting-expense-boundary form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accounting-closing form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accounting-closing-summary dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 520px) {
@@ -347,9 +408,12 @@
   .accounting-expenses > header,
   .accounting-expense-boundary > header,
   .accounting-treasury > header { flex-direction: column; }
+  .accounting-closing > header { flex-direction: column; }
   .accounting-dashboard-grid,
   .accounting-shortcuts > div { grid-template-columns: 1fr; }
   .accounting-journal-filters { grid-template-columns: 1fr; }
   .accounting-expense-boundary form { grid-template-columns: 1fr; }
   .accounting-treasury-card dl { grid-template-columns: 1fr; }
+  .accounting-closing form,
+  .accounting-closing-summary dl { grid-template-columns: 1fr; }
 }

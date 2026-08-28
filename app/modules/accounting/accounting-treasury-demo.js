@@ -5,6 +5,22 @@
   var activeTab = "dashboard";
   var sessionOverride = null;
   var journalFilters = { from: "", to: "", direction: "", currency: "", search: "" };
+  var CLOSING_DRAFT_STORAGE_KEY = "schoolsafe-v2-accounting-closing-draft";
+
+  function readClosingDraft() {
+    try {
+      var parsed = JSON.parse(root.localStorage.getItem(CLOSING_DRAFT_STORAGE_KEY) || "null");
+      return parsed && parsed.prepared ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function persistClosingDraft(draft) {
+    try { root.localStorage.setItem(CLOSING_DRAFT_STORAGE_KEY, JSON.stringify(draft)); } catch (error) {}
+  }
+
+  var closingDraft = readClosingDraft();
 
   function escapeMarkup(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
@@ -206,11 +222,58 @@
       var incoming = currencyRows.filter(function (row) { return row.direction === "in"; }).reduce(function (sum, row) { return sum + row.amount; }, 0);
       var outgoing = currencyRows.filter(function (row) { return row.direction === "out"; }).reduce(function (sum, row) { return sum + row.amount; }, 0);
       var net = incoming - outgoing;
-      return '<article class="accounting-treasury-card" data-treasury-currency="' + escapeMarkup(currency) + '"><header><span>' + escapeMarkup(currency) + '</span><b>MOUVEMENTS UNIQUEMENT</b></header><div class="accounting-opening-missing">SOLDE D’OUVERTURE NON DISPONIBLE · BACKEND_LATER</div><dl><div><dt>Entrées</dt><dd>Entrées ' + escapeMarkup(amountLabel(incoming, currency)) + '</dd></div><div><dt>Sorties</dt><dd>Sorties ' + escapeMarkup(amountLabel(outgoing, currency)) + '</dd></div><div><dt>Position théorique</dt><dd>Mouvements nets ' + escapeMarkup(amountLabel(net, currency)) + '</dd></div><div><dt>Comptage local</dt><dd>Non préparé</dd></div><div><dt>Écart</dt><dd>Non calculable</dd></div><div><dt>Statut</dt><dd>À contrôler</dd></div></dl></article>';
+      var localClosing = closingDraft && closingDraft.currency === currency ? closingDraft : null;
+      return '<article class="accounting-treasury-card" data-treasury-currency="' + escapeMarkup(currency) + '"><header><span>' + escapeMarkup(currency) + '</span><b>MOUVEMENTS UNIQUEMENT</b></header><div class="accounting-opening-missing">SOLDE D’OUVERTURE NON DISPONIBLE · BACKEND_LATER</div><dl><div><dt>Entrées</dt><dd>Entrées ' + escapeMarkup(amountLabel(incoming, currency)) + '</dd></div><div><dt>Sorties</dt><dd>Sorties ' + escapeMarkup(amountLabel(outgoing, currency)) + '</dd></div><div><dt>Position théorique</dt><dd>Mouvements nets ' + escapeMarkup(amountLabel(net, currency)) + '</dd></div><div><dt>Comptage local</dt><dd>' + (localClosing ? escapeMarkup(amountLabel(localClosing.counted, currency)) : "Non préparé") + '</dd></div><div><dt>Écart</dt><dd>' + (localClosing ? escapeMarkup(amountLabel(localClosing.variance, currency)) : "Non calculable") + '</dd></div><div><dt>Statut</dt><dd>' + (localClosing ? escapeMarkup(localClosing.state) : "À contrôler") + "</dd></div></dl></article>";
     }).join("");
     if (!cards) cards = '<div class="accounting-empty">Aucune devise exploitable dans les mouvements visibles.</div>';
     var missingCurrency = rows.filter(function (row) { return !row.currency; }).length;
     return '<section class="accounting-treasury" data-accounting-treasury><header><div><span>Position de trésorerie</span><h3>Mouvements distincts par devise</h3><p>Les positions sont calculées sans somme ni conversion entre devises.</p></div><span class="accounting-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><aside class="accounting-boundary"><i data-lucide="split"></i><p>AUCUNE CONVERSION · aucun taux de change · aucun total général multidevise.</p></aside><div class="accounting-treasury-grid">' + cards + '</div>' + (missingCurrency ? '<aside class="accounting-missing-currency"><b>MOUVEMENTS SANS DEVISE EXCLUS</b><span>' + missingCurrency + ' mouvements à qualifier avant tout calcul.</span></aside>' : "") + "</section>";
+  }
+
+  function closingCurrencies() {
+    var currencies = [];
+    journalRows().forEach(function (row) { if (row.currency && currencies.indexOf(row.currency) < 0) currencies.push(row.currency); });
+    if (!currencies.length) currencies.push("CDF");
+    return currencies.sort();
+  }
+
+  function renderClosingSummary() {
+    if (!closingDraft) return '<aside class="accounting-closing-state"><b>OUVERTE</b><span>Aucune préparation locale enregistrée.</span></aside>';
+    return '<section class="accounting-closing-summary"><header><span>BROUILLON LOCAL</span><b>' + escapeMarkup(closingDraft.state) + '</b></header><dl><div><dt>Date</dt><dd>' + escapeMarkup(closingDraft.date) + '</dd></div><div><dt>Caisse / poste</dt><dd>' + escapeMarkup(closingDraft.till) + '</dd></div><div><dt>Devise</dt><dd>' + escapeMarkup(closingDraft.currency) + '</dd></div><div><dt>Attendu local</dt><dd>' + escapeMarkup(amountLabel(closingDraft.expected, closingDraft.currency)) + '</dd></div><div><dt>Compté</dt><dd>' + escapeMarkup(amountLabel(closingDraft.counted, closingDraft.currency)) + '</dd></div><div><dt>Écart</dt><dd>' + escapeMarkup(amountLabel(closingDraft.variance, closingDraft.currency)) + '</dd></div></dl><p>' + escapeMarkup(closingDraft.observation || "Aucune observation") + '</p><aside class="accounting-boundary accounting-boundary--warning"><i data-lucide="cloud-off"></i><p>CLÔTURE OFFICIELLE — BACKEND_LATER · ce brouillon ne ferme aucune caisse.</p></aside></section>';
+  }
+
+  function renderClosing() {
+    if (!canPrepareClosing()) {
+      return '<section class="accounting-denied">' + root.ssState({ type: "error", title: "Clôture non autorisée", message: "finance.cash_register.close avec portée school est obligatoire.", details: "DENY explicite prioritaire · aucune préparation locale disponible." }) + "</section>";
+    }
+    var selectedCurrency = closingDraft ? closingDraft.currency : closingCurrencies()[0];
+    var currencyOptions = closingCurrencies().map(function (currency) { return '<option value="' + escapeMarkup(currency) + '"' + (currency === selectedCurrency ? " selected" : "") + ">" + escapeMarkup(currency) + "</option>"; }).join("");
+    return '<section class="accounting-closing" data-accounting-closing><header><div><span>Préparation locale de clôture</span><h3>Comptage de caisse</h3><p>Préparez un constat frontend sans fermer officiellement la caisse.</p></div><span class="accounting-boundary-chip">BROUILLON LOCAL · BACKEND_LATER</span></header><div class="accounting-closing-steps"><span>OUVERTE</span><span>PRÉPARATION</span><span>ÉCART À CONTRÔLER</span><span>PRÊTE POUR CLÔTURE</span><span>CLÔTURE OFFICIELLE — BACKEND_LATER</span></div><form id="accountingClosingForm"><label>Date<input id="closingDate" type="date" required value="' + escapeMarkup(closingDraft ? closingDraft.date : "") + '"></label><label>Caisse / poste<input id="closingTill" type="text" required maxlength="120" value="' + escapeMarkup(closingDraft ? closingDraft.till : "") + '" placeholder="Caisse ou poste"></label><label>Devise<select id="closingCurrency" required>' + currencyOptions + '</select></label><label>Attendu local<input id="closingExpected" type="number" required step="0.01" value="' + escapeMarkup(closingDraft ? closingDraft.expected : "") + '"></label><label>Montant compté<input id="closingCounted" type="number" required step="0.01" value="' + escapeMarkup(closingDraft ? closingDraft.counted : "") + '"></label><label class="accounting-closing-observation">Observation<textarea id="closingObservation" rows="3" maxlength="500">' + escapeMarkup(closingDraft ? closingDraft.observation : "") + '</textarea></label><button class="ss-button" id="closingPrepare" type="submit">Préparer le constat local</button></form>' + renderClosingSummary() + "</section>";
+  }
+
+  function bindClosing() {
+    var form = document.getElementById("accountingClosingForm");
+    if (!form) return;
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!canPrepareClosing()) return;
+      var expected = Number(document.getElementById("closingExpected").value || 0);
+      var counted = Number(document.getElementById("closingCounted").value || 0);
+      var variance = counted - expected;
+      closingDraft = {
+        prepared: true,
+        date: document.getElementById("closingDate").value,
+        till: document.getElementById("closingTill").value.trim(),
+        currency: document.getElementById("closingCurrency").value,
+        expected: expected,
+        counted: counted,
+        variance: variance,
+        observation: document.getElementById("closingObservation").value.trim(),
+        state: variance === 0 ? "PRÊTE POUR CLÔTURE" : "ÉCART À CONTRÔLER"
+      };
+      persistClosingDraft(closingDraft);
+      renderContent();
+    });
   }
 
   function renderFutureSurface() {
@@ -249,9 +312,10 @@
       button.hidden = tab === "closing" && !closeAllowed;
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : renderFutureSurface()) : renderDenied();
+    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : activeTab === "closing" ? renderClosing() : renderFutureSurface()) : renderDenied();
     bindNavigation();
     if (activeTab === "journal") bindJournalFilters();
+    if (activeTab === "closing") bindClosing();
     if (typeof root.lucide !== "undefined" && root.lucide.createIcons) root.lucide.createIcons();
   }
 
