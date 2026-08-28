@@ -232,7 +232,7 @@
     pedagogy: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.lesson-plan.read", "pedagogy.report.read", "pedagogy.report.manage", "palmarques.read", "safe.assistant.use"],
     guard: ["security.scan", "security.pickup.manage", "safe.assistant.use"],
     school_head: ["finance.report.read", "reports.financial.read", "safe.assistant.use"],
-    finance: ["finance.fee.read", "finance.fee.manage", "finance.receipt.read", "finance.report.read", "finance.cash_register.close", "finance.control.read", "finance.control.manage", "finance.status.read", "safe.assistant.use"],
+    finance: ["finance.fee.read", "finance.fee.manage", "finance.receipt.read", "finance.report.read", "finance.cash_register.close", "finance.control.read", "finance.control.manage", "finance.status.read", "reports.operational.read", "safe.assistant.use"],
     accountant: ["reports.financial.read", "finance.report.read", "finance.receipt.read", "safe.assistant.use"],
     hr: ["staff.read", "staff.manage", "staff.attendance.read", "reports.hr.read", "safe.assistant.use"],
     cashier: ["finance.payment.record", "finance.receipt.read", "finance.status.read", "safe.assistant.use"],
@@ -326,6 +326,7 @@
         { permission: "finance.control.read", type: "school" },
         { permission: "finance.control.manage", type: "school" },
         { permission: "finance.status.read", type: "school" },
+        { permission: "reports.operational.read", type: "school" },
         { permission: "safe.assistant.use", type: "own" }
       ]
     },

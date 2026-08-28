@@ -248,7 +248,30 @@
     var text = String(raw || "").toLowerCase();
     if (!text) return;
 
-    if (global.SchoolSafeDocumentAssistant && typeof global.SchoolSafeDocumentAssistant.answer === "function") {
+    var routingContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
+      ? global.SchoolSafeAppContext.getAssistantContext()
+      : { user: assistantUser() };
+    if (!global.SchoolSafeJaspeCapabilityRouter || typeof global.SchoolSafeJaspeCapabilityRouter.route !== "function") {
+      state.currentMessage = "Jaspe refuse cette demande : le routeur central de capacités est indisponible.";
+      state.pose = "reflechie";
+      state.suggestions = [];
+      render();
+      return;
+    }
+    var routingDecision = global.SchoolSafeJaspeCapabilityRouter.route(raw, routingContext);
+    if (routingDecision && routingDecision.matched && !routingDecision.allowed) {
+      state.currentMessage = routingDecision.message;
+      state.pose = "reflechie";
+      state.suggestions = [];
+      render();
+      return;
+    }
+    var routedTarget = routingDecision && routingDecision.matched ? routingDecision.target : null;
+    function routeAllows(target) {
+      return !routedTarget || routedTarget === "legacy" || routedTarget === target;
+    }
+
+    if (routeAllows("documents") && global.SchoolSafeDocumentAssistant && typeof global.SchoolSafeDocumentAssistant.answer === "function") {
       var documentContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
         : null;
@@ -265,7 +288,7 @@
       }
     }
 
-    if (global.SchoolSafeCommunication && typeof global.SchoolSafeCommunication.answerJaspe === "function") {
+    if (routeAllows("communication") && global.SchoolSafeCommunication && typeof global.SchoolSafeCommunication.answerJaspe === "function") {
       var communicationContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
         : null;
@@ -284,7 +307,7 @@
       }
     }
 
-    if (global.SchoolSafeParentPortal && typeof global.SchoolSafeParentPortal.answerJaspe === "function") {
+    if (routeAllows("parent") && global.SchoolSafeParentPortal && typeof global.SchoolSafeParentPortal.answerJaspe === "function") {
       var assistantContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
         : null;
@@ -300,7 +323,7 @@
       }
     }
 
-    if (global.SchoolSafeTeacherPedagogy && typeof global.SchoolSafeTeacherPedagogy.answerJaspe === "function") {
+    if (routeAllows("teacher") && global.SchoolSafeTeacherPedagogy && typeof global.SchoolSafeTeacherPedagogy.answerJaspe === "function") {
       var pedagogyContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
         : null;
@@ -316,7 +339,7 @@
       }
     }
 
-    if (global.SchoolSafeGuardSecurity && typeof global.SchoolSafeGuardSecurity.answerJaspe === "function") {
+    if (routeAllows("security") && global.SchoolSafeGuardSecurity && typeof global.SchoolSafeGuardSecurity.answerJaspe === "function") {
       var securityContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
         : null;
@@ -332,7 +355,7 @@
       }
     }
 
-    if (global.SchoolSafeHrDemo && typeof global.SchoolSafeHrDemo.answerJaspe === "function") {
+    if (routeAllows("staff") && global.SchoolSafeHrDemo && typeof global.SchoolSafeHrDemo.answerJaspe === "function") {
       var hrContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
         : null;
@@ -351,7 +374,7 @@
       }
     }
 
-    if (global.SchoolSafeInventoryDemo && typeof global.SchoolSafeInventoryDemo.answerJaspe === "function") {
+    if (routeAllows("inventory") && global.SchoolSafeInventoryDemo && typeof global.SchoolSafeInventoryDemo.answerJaspe === "function") {
       var inventoryContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
         : null;
@@ -370,7 +393,7 @@
       }
     }
 
-    if (global.SchoolSafeAccountingTreasury && typeof global.SchoolSafeAccountingTreasury.answerJaspe === "function") {
+    if (routeAllows("accounting") && global.SchoolSafeAccountingTreasury && typeof global.SchoolSafeAccountingTreasury.answerJaspe === "function") {
       var accountingContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
         : null;
@@ -389,7 +412,7 @@
       }
     }
 
-    if (global.SchoolSafeFinanceModule && typeof global.SchoolSafeFinanceModule.answerJaspe === "function") {
+    if (routeAllows("finance") && global.SchoolSafeFinanceModule && typeof global.SchoolSafeFinanceModule.answerJaspe === "function") {
       var financeContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
         : null;
