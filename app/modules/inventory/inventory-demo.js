@@ -71,9 +71,13 @@
 
   function isDemoMode(subject) { return !(subject && subject.token); }
 
-  function canReadAggregates(subject) {
+  function allowsFor(subject, permission, scope) {
     var access = root.SchoolSafeAccess;
-    return !!(access && typeof access.allowsScope === "function" && access.allowsScope(subject || user(), "reports.operational.read", "school"));
+    return !!(access && typeof access.allowsScope === "function" && access.allowsScope(subject, permission, scope));
+  }
+
+  function canReadAggregates(subject) {
+    return allowsFor(subject || user(), "reports.operational.read", "school");
   }
 
   function readDraftList(key) {
@@ -340,12 +344,66 @@
 
   function setSession(session) { sessionOverride = session || null; }
 
+  function normalizeJaspeText(value) {
+    return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  function jaspeRefusal(message) {
+    return { allowed: false, refusal: true, action: null, message: "REFUS — " + message };
+  }
+
+  function answerJaspe(query, context) {
+    var text = normalizeJaspeText(query);
+    var subject = context && context.user ? context.user : user();
+    var inventoryIntent = /stock|inventair|article|quantite|seuil|rupture|mouvement|approvision|achat|fournisseur|devis|commande|reception|marchandise|anomalie/.test(text);
+    if (!inventoryIntent) return null;
+    if (!allowsFor(subject, "safe.assistant.use", "own")) return jaspeRefusal("safe.assistant.use avec portée own est obligatoire.");
+
+    var forbidden = /(cree|creer|modifie|modifier|corrige|corriger).*(stock|quantite|mouvement|commande|depense)|(commande reel)|(choisis|choisir|valide|valider).*(fournisseur|devis|achat)|(receptionne|receptionner).*(officiel|commande)|(cree|creer).*(depense|ecriture)|(paie|payer).*(fournisseur)|(invente|inventer).*(mouvement)|(supprime|supprimer).*(historique)/.test(text);
+    if (forbidden) return jaspeRefusal("Jaspe ne crée, modifie, commande, réceptionne, paie, invente ou supprime aucune donnée Stock officielle.");
+
+    if (!isDemoMode(subject) && !canReadAggregates(subject)) return jaspeRefusal("reports.operational.read avec portée school est requis en live ; aucun détail Stock n’est disponible.");
+
+    var action = /rapport|agregat/.test(text) ? "reports"
+      : /reception|marchandise|anomalie|endommag/.test(text) ? "receipts"
+      : /achat|fournisseur|devis|commande|approvision/.test(text) ? "procurement"
+      : /mouvement|entree|sortie|transfert|ajustement/.test(text) ? "movements"
+      : /seuil|rupture|emplacement|niveau|quantite/.test(text) ? "levels"
+      : /article|catalog|categorie/.test(text) ? "catalog" : "dashboard";
+
+    if (!isDemoMode(subject)) {
+      return { allowed: true, refusal: false, action: "reports", message: "AGRÉGATS AUTORISÉS Stock · LECTURE SEULE · reports.operational.read + school. Aucun article, fournisseur, devis, mouvement ou achat détaillé n’est révélé." };
+    }
+    var explanations = {
+      catalog: "Catalogue Stock démo : articles et catégories génériques, dont les ingrédients Cantine · DÉMONSTRATION · BACKEND_LATER.",
+      levels: "Stock démo : seuils, états NORMAL/BAS/RUPTURE/À CONTRÔLER et quantités théoriques, jamais officielles.",
+      movements: "Mouvements fictifs : ENTRÉE, SORTIE, TRANSFERT et AJUSTEMENT dans un journal append-only, sans mutation officielle.",
+      procurement: "Workflow achat démo : besoin ≠ demande ≠ devis/fournisseur ≠ commande ≠ paiement. Aucun achat officiel.",
+      receipts: "Réception démo : rapprochement commande/réception, écarts et anomalies, sans entrée Stock ni dépense automatique.",
+      reports: "Rapports Stock démo : agrégats d’état, seuils, mouvements, consommation, commandes, réceptions et anomalies.",
+      dashboard: "Stock / Inventaire / Achats internes : moteur frontend générique de démonstration · BACKEND_LATER."
+    };
+    return { allowed: true, refusal: false, action: action, message: explanations[action] || explanations.dashboard };
+  }
+
+  function getSnapshot() {
+    return {
+      items: ITEMS.concat(itemDrafts).map(function (item) { return Object.assign({}, item); }),
+      levels: LEVELS.map(function (level) { return Object.assign({}, level); }),
+      movements: MOVEMENTS.concat(movementDrafts).map(function (movement) { return Object.assign({}, movement); }),
+      purchaseRequests: PURCHASE_REQUESTS.concat(purchaseDrafts).map(function (request) { return Object.assign({}, request); }),
+      receipts: RECEIPTS.concat(receiptDrafts).map(function (receipt) { return Object.assign({}, receipt); })
+    };
+  }
+
   root.SchoolSafeInventoryDemo = {
     render: render,
     open: open,
     close: close,
     setSession: setSession,
     isDemoMode: isDemoMode,
-    canReadAggregates: canReadAggregates
+    canReadAggregates: canReadAggregates,
+    answerJaspe: answerJaspe,
+    getSnapshot: getSnapshot
   };
 })(window);

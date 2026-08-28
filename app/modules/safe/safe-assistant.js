@@ -315,6 +315,25 @@
       }
     }
 
+    if (global.SchoolSafeInventoryDemo && typeof global.SchoolSafeInventoryDemo.answerJaspe === "function") {
+      var inventoryContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
+        ? global.SchoolSafeAppContext.getAssistantContext()
+        : null;
+      var inventoryAnswer = inventoryContext
+        ? global.SchoolSafeInventoryDemo.answerJaspe(raw, inventoryContext)
+        : null;
+      if (inventoryAnswer) {
+        state.currentMessage = inventoryAnswer.message;
+        state.pose = inventoryAnswer.refusal ? "reflechie" : "sourire";
+        state.suggestions = [];
+        if (!inventoryAnswer.refusal && inventoryAnswer.action && global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.openInventory === "function") {
+          global.SchoolSafeAppContext.openInventory(inventoryAnswer.action);
+        }
+        render();
+        return;
+      }
+    }
+
     if (global.SchoolSafeAccountingTreasury && typeof global.SchoolSafeAccountingTreasury.answerJaspe === "function") {
       var accountingContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()
