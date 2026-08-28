@@ -277,6 +277,36 @@
     return '<section class="hr-payroll" data-hr-payroll><header><div><span>PAIE — CONTRAT FRONTEND FUTUR</span><h3>Structure de rémunération à autoriser ultérieurement</h3><p>Aucune source officielle, donnée individuelle ou valeur monétaire n’est disponible.</p></div><span class="hr-boundary-chip">FEATURE_LATER · BACKEND_LATER</span></header><aside class="hr-biometric-warning"><i data-lucide="shield-alert"></i><div><b>PERMISSION PAIE DÉDIÉE REQUISE</b><p>staff.manage et finance.payment.record ne permettent ni salaire, prime, avance, retenue, bulletin ou paiement.</p></div></aside><div class="hr-payroll-grid">' + fields.map(function (label) { return '<article><small>' + escapeMarkup(label) + '</small><b data-hr-payroll-value>Non disponible · FEATURE_LATER</b></article>'; }).join("") + '</div><aside class="hr-boundary"><i data-lucide="lock-keyhole"></i><p>Aucun calcul officiel, bulletin, paiement, modification de salaire, prime, avance ou retenue.</p></aside></section>';
   }
 
+  function renderReportsDenied() {
+    return root.ssState({ type: "error", title: "Rapports RH non autorisés", message: "reports.hr.read avec portée school est obligatoire.", details: "DENY explicite prioritaire · aucun rapport global ni dossier individuel n’est révélé." });
+  }
+
+  function reportCard(key, label, value, detail) {
+    return '<article data-hr-report="' + key + '"><small>' + escapeMarkup(label) + '</small><b>' + escapeMarkup(value) + '</b><span>' + escapeMarkup(detail) + '</span></article>';
+  }
+
+  function renderReports() {
+    if (!canReadReports()) return '<section>' + renderReportsDenied() + '</section>';
+    var active = STAFF.filter(function (member) { return member.status === "ACTIF"; }).length;
+    var inactive = STAFF.filter(function (member) { return member.status !== "ACTIF"; }).length;
+    var arrived = ATTENDANCE.filter(function (item) { return item.status === "PRÉSENT" || item.status === "RETARD"; }).length;
+    var late = ATTENDANCE.filter(function (item) { return item.status === "RETARD"; }).length;
+    var expiring = CONTRACTS.filter(function (contract) { return contract.status === "À RENOUVELER"; }).length;
+    var anomalies = ATTENDANCE.filter(function (item) { return item.anomaly !== "Aucune"; }).length;
+    var cards = [
+      reportCard("workforce", "Effectif", String(STAFF.length), "profils fictifs visibles"),
+      reportCard("lifecycle", "Actifs / inactifs", active + " actifs · " + inactive + " inactif", "cycle de vie frontend"),
+      reportCard("movements", "Mouvements du personnel", inactive + " mouvement visible", "projection de statut"),
+      reportCard("attendance", "Présence", arrived + " arrivés", "présents et retard inclus"),
+      reportCard("absence", "Absences", ABSENCES.length + " demandes", "statuts préparatoires"),
+      reportCard("late", "Retards", late + " retard", "signal frontend"),
+      reportCard("contracts", "Contrats à échéance", expiring + " échéance", "à renouveler"),
+      reportCard("assignments", "Affectations", ASSIGNMENTS.length + " affectations", "projections visibles"),
+      reportCard("anomalies", "Anomalies RH", anomalies + " signaux", "aucune correction automatique")
+    ].join("");
+    return '<section class="hr-reports" data-hr-reports><header><div><span>RAPPORT RH FRONTEND</span><h3>Synthèses Ressources humaines</h3><p>Calculées uniquement à partir des données fictives visibles dans ce module.</p></div><span class="hr-boundary-chip">BACKEND_LATER</span></header><div class="hr-reports-grid">' + cards + '</div><aside class="hr-biometric-warning"><i data-lucide="file-warning"></i><div><b>AUCUN PDF FINAL</b><p>Le moteur documentaire et le PDF final appartiennent à la Phase J.</p></div></aside><aside class="hr-boundary"><i data-lucide="shield-check"></i><p>Aucun bilan social légal, déclaration sociale ou fiscale, fichier bancaire, bulletin de paie légal ou rapport officiel de biométrie.</p></aside></section>';
+  }
+
   function bindStaff() {
     var search = document.querySelector('[data-hr-staff-filter="search"]');
     var status = document.querySelector('[data-hr-staff-filter="status"]');
@@ -377,7 +407,7 @@
       button.classList.toggle("active", tab === activeTab);
     });
     var blocked = !canAccessHr() || !tabAllowed(activeTab);
-    content.innerHTML = blocked ? (activeTab === "attendance" || activeTab === "biometric" ? renderAttendanceDenied() : activeTab === "payroll" ? renderPayrollDenied() : renderDenied()) : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : activeTab === "absence" ? renderAbsence() : activeTab === "attendance" ? renderAttendance() : activeTab === "biometric" ? renderBiometric() : activeTab === "payroll" ? renderPayroll() : renderFuture();
+    content.innerHTML = blocked ? (activeTab === "attendance" || activeTab === "biometric" ? renderAttendanceDenied() : activeTab === "payroll" ? renderPayrollDenied() : activeTab === "reports" ? renderReportsDenied() : renderDenied()) : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : activeTab === "absence" ? renderAbsence() : activeTab === "attendance" ? renderAttendance() : activeTab === "biometric" ? renderBiometric() : activeTab === "payroll" ? renderPayroll() : activeTab === "reports" ? renderReports() : renderFuture();
     bindNavigation();
     if (activeTab === "staff") bindStaff();
     if (activeTab === "contracts") bindContracts();
