@@ -232,6 +232,7 @@
     school_head: ["finance.report.read", "reports.financial.read", "safe.assistant.use"],
     finance: ["finance.fee.read", "finance.fee.manage", "finance.receipt.read", "finance.report.read", "finance.cash_register.close", "finance.control.read", "finance.control.manage", "finance.status.read", "safe.assistant.use"],
     accountant: ["reports.financial.read", "finance.report.read", "finance.receipt.read", "safe.assistant.use"],
+    hr: ["staff.read", "staff.manage", "staff.attendance.read", "reports.hr.read", "safe.assistant.use"],
     cashier: ["finance.payment.record", "finance.receipt.read", "finance.status.read", "safe.assistant.use"]
   };
 
@@ -325,6 +326,15 @@
         { permission: "safe.assistant.use", type: "own" }
       ]
     },
+    hr: {
+      scopes: [
+        { permission: "staff.read", type: "school" },
+        { permission: "staff.manage", type: "school" },
+        { permission: "staff.attendance.read", type: "school" },
+        { permission: "reports.hr.read", type: "school" },
+        { permission: "safe.assistant.use", type: "own" }
+      ]
+    },
     cashier: {
       scopes: [
         { permission: "finance.payment.record", type: "school" },
@@ -407,7 +417,7 @@
    */
   function showDashboard() {
     setWorkspaceDashboardVisible(true);
-    var modules = ["pedagogyModule", "financeModule", "accountingModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
+    var modules = ["pedagogyModule", "financeModule", "accountingModule", "hrModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
     modules.forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.hidden = true;
@@ -2392,7 +2402,7 @@
   }
 
   function openAccountingModule() {
-    ["pedagogyModule", "financeModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "financeModule", "hrModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2416,11 +2426,48 @@
     setBreadcrumb(null);
   }
 
+  function hrTabForAction(actionName) {
+    if (/contrat/i.test(actionName)) return "contracts";
+    if (/affectation/i.test(actionName)) return "assignments";
+    if (/absence|congé/i.test(actionName)) return "absence";
+    if (/présence/i.test(actionName)) return "attendance";
+    if (/biométr/i.test(actionName)) return "biometric";
+    if (/salaire|paie|prime|avance|retenue/i.test(actionName)) return "payroll";
+    if (/rapport/i.test(actionName)) return "reports";
+    if (/personnel|enseignant/i.test(actionName)) return "staff";
+    return "dashboard";
+  }
+
+  function openHrModule(actionName) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+      var module = document.getElementById(id);
+      if (module) module.hidden = true;
+    });
+    setWorkspaceDashboardVisible(false);
+    document.getElementById("cardsProtected").hidden = true;
+    if (window.SchoolSafeHrDemo && typeof window.SchoolSafeHrDemo.render === "function") {
+      window.SchoolSafeHrDemo.render("hrModule");
+      window.SchoolSafeHrDemo.open(hrTabForAction(actionName || ""));
+    }
+    document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeHrModule() {
+    if (window.SchoolSafeHrDemo && typeof window.SchoolSafeHrDemo.close === "function") window.SchoolSafeHrDemo.close();
+    else {
+      document.getElementById("hrModule").hidden = true;
+      setWorkspaceDashboardVisible(true);
+    }
+    document.getElementById("cardsProtected").hidden = currentDemoRole !== "admin" && currentDemoRole !== "admissions";
+    document.getElementById("workspaceTitle").textContent = "Tableau de bord";
+    setBreadcrumb(null);
+  }
+
   function openPhaseDPedagogy(view) {
     if (!window.SchoolSafeTeacherPedagogy || (currentDemoRole !== "teacher" && currentDemoRole !== "pedagogy")) return false;
     if (currentDemoRole === "pedagogy" && view !== "direction") return false;
     setWorkspaceDashboardVisible(false);
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2444,8 +2491,9 @@
     if (branchKey === "care" && currentDemoRole === "canteen") { openFinanceModule("Liaison financière"); return; }
     if (branchKey === "school") { openSchoolModule("school"); return; }
     if (branchKey === "pilotage") { openPilotageModule("Tableau de bord"); return; }
-    if (branchKey === "people") { notify("Personnel — ouverture dans une prochaine étape."); return; }
+    if (branchKey === "people") { openHrModule(); return; }
     if (branchKey === "accounting") { openAccountingModule(); return; }
+    if (branchKey === "people") { openHrModule(actionName); return; }
     if (branchKey === "communication") { notify("Communication — ouverture dans une prochaine étape."); return; }
     if (branchKey === "reports") { notify("Contrôle et rapports — ouverture dans une prochaine étape."); return; }
     notify(definition.label + " — ouverture dans une prochaine étape.");
@@ -2790,6 +2838,7 @@
   });
   bindIfExists("closeFinanceModule", "click", closeFinanceModule);
   bindIfExists("closeAccountingModule", "click", closeAccountingModule);
+  bindIfExists("closeHrModule", "click", closeHrModule);
   bindIfExists("closeSecurityModule", "click", closeSecurityModule);
   bindIfExists("closePilotageModule", "click", closePilotageModule);
   bindIfExists("closeFeeControlModule", "click", closeFeeControlModule);

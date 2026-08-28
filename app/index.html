@@ -38,6 +38,7 @@
   <link rel="stylesheet" href="./styles/modules/pilotage.css">
   <link rel="stylesheet" href="./styles/modules/finance.css">
   <link rel="stylesheet" href="./styles/modules/accounting-treasury.css">
+  <link rel="stylesheet" href="./styles/modules/hr.css">
   <link rel="stylesheet" href="./styles/screens/setup.css">
   <link rel="stylesheet" href="./styles/screens/auth.css">
   <script>
@@ -61,6 +62,7 @@
   <script src="./modules/finance/finance-api.js" defer></script>
   <script src="./modules/finance/finance-module.js" defer></script>
   <script src="./modules/accounting/accounting-treasury-demo.js" defer></script>
+  <script src="./modules/hr/hr-demo.js" defer></script>
   <script src="./modules/finance/fee-control-module.js" defer></script>
   <script src="./modules/security/security-api.js" defer></script>
   <script src="./modules/school/student-pickup-demo.js" defer></script>
@@ -583,6 +585,25 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <button type="button" data-accounting-tab="reports"><i data-lucide="file-chart-column"></i><span>Rapports</span></button>
             </nav>
             <div class="pedagogy-content accounting-content" id="accountingContent"></div>
+          </section>
+          <section class="pedagogy-module hr-module" id="hrModule" hidden>
+            <header class="pedagogy-module-header hr-module-header">
+              <button class="ss-button ss-button--secondary" id="closeHrModule" type="button"><i data-lucide="arrow-left"></i> Tableau de bord</button>
+              <div><span>Personnel / Ressources humaines</span><h2 id="hrModuleTitle">Tableau de bord RH</h2><p>Données fictives non sensibles pour préparer les futures fonctions RH.</p></div>
+              <span class="local-draft"><i data-lucide="database-zap"></i> DÉMONSTRATION · BACKEND_LATER</span>
+            </header>
+            <nav class="pedagogy-tabs hr-tabs" id="hrTabs" aria-label="Fonctions Ressources humaines">
+              <button class="active" type="button" data-hr-tab="dashboard"><i data-lucide="layout-dashboard"></i><span>Vue d’ensemble</span></button>
+              <button type="button" data-hr-tab="staff"><i data-lucide="contact-round"></i><span>Personnel</span></button>
+              <button type="button" data-hr-tab="contracts"><i data-lucide="files"></i><span>Contrats</span></button>
+              <button type="button" data-hr-tab="assignments"><i data-lucide="user-cog"></i><span>Affectations</span></button>
+              <button type="button" data-hr-tab="absence"><i data-lucide="calendar-x"></i><span>Absences</span></button>
+              <button type="button" data-hr-tab="attendance"><i data-lucide="clipboard-check"></i><span>Présence</span></button>
+              <button type="button" data-hr-tab="biometric"><i data-lucide="scan-face"></i><span>Biométrie</span></button>
+              <button type="button" data-hr-tab="payroll"><i data-lucide="banknote"></i><span>Paie</span></button>
+              <button type="button" data-hr-tab="reports"><i data-lucide="file-chart-column"></i><span>Rapports RH</span></button>
+            </nav>
+            <div class="pedagogy-content hr-content" id="hrContent"></div>
           </section>
           <section class="pedagogy-module security-module" id="securityModule" hidden>
             <header class="pedagogy-module-header security-module-header">
