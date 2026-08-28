@@ -5,6 +5,7 @@
   var activeTab = "dashboard";
   var sessionOverride = null;
   var messageDrafts = [];
+  var announcementDrafts = [];
 
   var SECTIONS = [
     { key: "messages", label: "Messages", icon: "messages-square", note: "Composition bornée par permission et portée." },
@@ -46,6 +47,11 @@
 
   function canPrepareMessage(subject) {
     var scope = permissionScope(subject || user(), "communication.message.send");
+    return !!(scope && ["own", "own_children", "assigned_classes", "assigned_subjects", "school"].indexOf(scope.type) >= 0);
+  }
+
+  function canPrepareAnnouncement(subject) {
+    var scope = permissionScope(subject || user(), "communication.announcement.manage");
     return !!(scope && ["own", "own_children", "assigned_classes", "assigned_subjects", "school"].indexOf(scope.type) >= 0);
   }
 
@@ -187,6 +193,78 @@
     });
   }
 
+  function announcementAudiences(subject) {
+    var scope = permissionScope(subject, "communication.announcement.manage");
+    if (!scope) return [];
+    if (scope.type === "school") return ["Communauté scolaire", "Personnel autorisé", "Parents et tuteurs"];
+    if (scope.type === "assigned_classes") return (subject.assignedClassIds || []).map(function (id) { return "Classe affectée · " + labelForClass(id); });
+    if (scope.type === "assigned_subjects") return (subject.assignedSubjectIds || []).map(function (id) { return "Matière affectée · " + labelForSubject(id); });
+    if (scope.type === "own_children") return ["Direction · enfants rattachés uniquement"];
+    if (scope.type === "own") return ["Direction · périmètre personnel"];
+    return [];
+  }
+
+  function renderAnnouncementDraft(draft, index) {
+    var canAdvance = draft.status !== "PRÊT À PUBLIER";
+    return '<article class="communication-draft communication-announcement-draft" data-announcement-draft><header><div><span>' + escapeMarkup(draft.status) + '</span><b>' + escapeMarkup(draft.title) + '</b></div><span>' + escapeMarkup(draft.priority) + '</span></header><p>' + escapeMarkup(draft.content) + '</p><footer><span>' + escapeMarkup(draft.audience) + '</span><span>' + escapeMarkup(draft.startsOn) + ' → ' + escapeMarkup(draft.endsOn) + '</span></footer>' +
+      (canAdvance ? '<button class="ss-button ss-button--secondary" type="button" data-announcement-advance="' + index + '">Faire avancer</button>' : '<span class="communication-ready-boundary">PRÊT À PUBLIER ≠ PUBLIÉE</span>') + '</article>';
+  }
+
+  function renderAnnouncements() {
+    var subject = user();
+    var scope = permissionScope(subject, "communication.announcement.manage");
+    if (!canPrepareAnnouncement(subject)) {
+      return '<section class="communication-denied" data-announcement-denied><i data-lucide="shield-x"></i><span>ACCÈS REFUSÉ</span><h3>Gestion des annonces indisponible</h3><p>communication.announcement.manage et une portée effective sont obligatoires. Le DENY explicite est prioritaire.</p></section>';
+    }
+    var live = !isDemoMode(subject);
+    var audiences = announcementAudiences(subject);
+    var preview = announcementDrafts.length ? announcementDrafts[announcementDrafts.length - 1] : null;
+    return '<section class="communication-announcements" data-communication-announcements><header class="communication-view-header"><div><span>ANNONCES BORNÉES</span><h3>Préparer une annonce</h3><p>communication.announcement.manage · portée <b>' + escapeMarkup(scope.type) + '</b></p></div><span class="communication-boundary-chip">' + (live ? "SESSION LIVE" : "DÉMONSTRATION") + '</span></header>' +
+      '<div class="communication-workflow" aria-label="Workflow des annonces"><span>BROUILLON</span><i data-lucide="arrow-right"></i><span>À RELIRE</span><i data-lucide="arrow-right"></i><span>PRÊT À PUBLIER</span></div>' +
+      '<form class="communication-form" data-announcement-form><label>Titre<input name="title" maxlength="120" required></label><label>Audience<select name="audience">' + audiences.map(function (audience) { return '<option>' + escapeMarkup(audience) + '</option>'; }).join("") + '</select></label>' +
+      '<label class="communication-form-wide">Contenu<textarea name="content" rows="5" maxlength="1600" required></textarea></label><label>Début<input name="startsOn" type="date" required></label><label>Fin<input name="endsOn" type="date" required></label><label>Priorité<select name="priority"><option>NORMALE</option><option>HAUTE</option><option>URGENTE</option></select></label><button class="ss-button ss-button--primary" type="submit">Créer le brouillon</button></form>' +
+      '<aside class="communication-preview" data-announcement-preview><span>APERÇU FRONTEND</span><h4>' + escapeMarkup(preview ? preview.title : "Aucune annonce préparée") + '</h4><p>' + escapeMarkup(preview ? preview.content : "La dernière annonce de la session sera prévisualisée ici.") + '</p></aside>' +
+      '<div class="communication-draft-list">' + announcementDrafts.map(renderAnnouncementDraft).join("") + '</div>' +
+      '<footer class="communication-final-boundary" data-announcement-boundary><b>PUBLICATION RÉELLE — BACKEND_LATER</b><span>Aucun e-mail ni notification n’est déclenché par ce workflow.</span><button class="ss-button" type="button" data-announcement-publish disabled>Publier réellement</button></footer></section>';
+  }
+
+  function bindAnnouncementEvents() {
+    var form = document.querySelector("[data-announcement-form]");
+    if (form && !form.__communicationBound) {
+      form.__communicationBound = true;
+      var today = new Date().toISOString().slice(0, 10);
+      var starts = form.querySelector('[name="startsOn"]');
+      var ends = form.querySelector('[name="endsOn"]');
+      if (starts) starts.value = today;
+      if (ends) ends.value = today;
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var subject = user();
+        if (!canPrepareAnnouncement(subject)) { renderContent(); return; }
+        var allowedAudiences = announcementAudiences(subject);
+        var data = new FormData(form);
+        var audience = String(data.get("audience") || "");
+        if (allowedAudiences.indexOf(audience) < 0) { renderContent(); return; }
+        announcementDrafts = announcementDrafts.concat([{
+          title: String(data.get("title") || "").trim(), content: String(data.get("content") || "").trim(),
+          audience: audience, startsOn: String(data.get("startsOn") || ""), endsOn: String(data.get("endsOn") || ""),
+          priority: String(data.get("priority") || "NORMALE"), status: "BROUILLON"
+        }]);
+        renderContent();
+      });
+    }
+    document.querySelectorAll("[data-announcement-advance]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var index = Number(button.getAttribute("data-announcement-advance"));
+        var draft = announcementDrafts[index];
+        if (!draft || !canPrepareAnnouncement(user())) return;
+        if (draft.status === "BROUILLON") draft.status = "À RELIRE";
+        else if (draft.status === "À RELIRE") draft.status = "PRÊT À PUBLIER";
+        renderContent();
+      });
+    });
+  }
+
   function renderFuture() {
     var selected = SECTIONS.filter(function (item) { return item.key === activeTab; })[0];
     return '<section class="communication-future"><i data-lucide="construction"></i><span>DÉMONSTRATION · BACKEND_LATER</span><h3>' +
@@ -202,12 +280,13 @@
   function renderContent() {
     var content = document.getElementById("communicationContent");
     if (!content) return;
-    content.innerHTML = activeTab === "dashboard" ? renderDashboard() : activeTab === "messages" ? renderMessages() : renderFuture();
+    content.innerHTML = activeTab === "dashboard" ? renderDashboard() : activeTab === "messages" ? renderMessages() : activeTab === "announcements" ? renderAnnouncements() : renderFuture();
     refreshTabs();
     content.querySelectorAll("[data-communication-open]").forEach(function (button) {
       button.addEventListener("click", function () { open(button.getAttribute("data-communication-open")); });
     });
     if (activeTab === "messages") bindMessageEvents();
+    if (activeTab === "announcements") bindAnnouncementEvents();
     if (root.lucide && typeof root.lucide.createIcons === "function") root.lucide.createIcons();
   }
 
@@ -244,6 +323,7 @@
   function setSession(session) {
     sessionOverride = session || null;
     messageDrafts = [];
+    announcementDrafts = [];
   }
 
   root.SchoolSafeCommunication = {
@@ -254,6 +334,8 @@
     isDemoMode: isDemoMode,
     canPrepareMessage: canPrepareMessage,
     messageRecipients: messageRecipients,
-    getMessageDrafts: function () { return messageDrafts.map(function (draft) { return Object.assign({}, draft); }); }
+    getMessageDrafts: function () { return messageDrafts.map(function (draft) { return Object.assign({}, draft); }); },
+    canPrepareAnnouncement: canPrepareAnnouncement,
+    getAnnouncementDrafts: function () { return announcementDrafts.map(function (draft) { return Object.assign({}, draft); }); }
   };
 })(window);
