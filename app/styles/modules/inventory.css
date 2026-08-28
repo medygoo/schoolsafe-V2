@@ -21,6 +21,10 @@
 .inventory-catalog > header, .inventory-form > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .inventory-levels > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .inventory-movements > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.inventory-procurement > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.inventory-procurement > header span:first-child { color: var(--inventory-accent); font-size: .76rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.inventory-procurement > header h3 { margin: .2rem 0; }
+.inventory-procurement > header p { margin: 0; color: var(--text-muted); }
 .inventory-movements > header span:first-child { color: var(--inventory-accent); font-size: .76rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .inventory-movements > header h3 { margin: .2rem 0; }
 .inventory-movements > header p { margin: 0; color: var(--text-muted); }
@@ -44,6 +48,9 @@
 .inventory-movement-legend { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .65rem; }
 .inventory-movement-legend span, .inventory-movement-type { border-radius: 999px; padding: .3rem .55rem; background: var(--inventory-soft); color: var(--inventory-accent); font-size: .7rem; font-weight: 800; }
 .inventory-form-error { margin: 0; border: 1px solid #fecaca; border-radius: .7rem; padding: .7rem; background: #fef2f2; color: #b91c1c; font-weight: 700; }
+.inventory-workflow { display: flex; align-items: center; gap: .55rem; max-width: 100%; margin-bottom: 1rem; overflow-x: auto; padding: .75rem; border: 1px solid var(--border-color); border-radius: .9rem; background: var(--surface-card); }
+.inventory-workflow span { flex: 0 0 auto; border-radius: 999px; padding: .45rem .7rem; background: var(--inventory-soft); color: var(--inventory-accent); font-size: .72rem; font-weight: 800; }
+.inventory-workflow svg { flex: 0 0 1rem; color: var(--text-muted); }
 .inventory-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; margin-top: 1rem; border: 1px solid var(--border-color); border-radius: 1rem; padding: 1rem; background: var(--surface-card); }
 .inventory-form > header, .inventory-form-wide { grid-column: 1 / -1; }
 .inventory-form label { display: grid; gap: .35rem; color: var(--text-primary); font-size: .82rem; font-weight: 700; }
@@ -61,5 +68,6 @@
   .inventory-catalog > header, .inventory-form > header { flex-direction: column; }
   .inventory-levels > header { flex-direction: column; }
   .inventory-movements > header { flex-direction: column; }
+  .inventory-procurement > header { flex-direction: column; }
   .inventory-form { grid-template-columns: 1fr; }
 }

@@ -6,6 +6,7 @@
   var sessionOverride = null;
   var ITEM_DRAFTS_STORAGE_KEY = "schoolsafe-v2-inventory-item-drafts";
   var MOVEMENT_DRAFTS_STORAGE_KEY = "schoolsafe-v2-inventory-movement-drafts";
+  var PURCHASE_DRAFTS_STORAGE_KEY = "schoolsafe-v2-inventory-purchase-drafts";
   var ITEMS = [
     { code: "ART-001", name: "Papier A4", category: "Fournitures administratives", unit: "rame", type: "CONSOMMABLE", status: "ACTIF", service: "Administration" },
     { code: "ART-002", name: "Craie blanche", category: "Fournitures pédagogiques", unit: "boîte", type: "CONSOMMABLE", status: "ACTIF", service: "Pédagogie" },
@@ -28,6 +29,11 @@
     { reference: "MVT-DEM-002", type: "SORTIE", item: "ART-006 · Farine de maïs", quantity: 2, unit: "sac", source: "Réserve Cantine", destination: "Service Cantine", service: "Cantine", date: "2026-08-21", reason: "Consommation Cantine fictive", status: "DÉMO" },
     { reference: "MVT-DEM-003", type: "TRANSFERT", item: "ART-001 · Papier A4", quantity: 4, unit: "rame", source: "Magasin central", destination: "Secrétariat", service: "Administration", date: "2026-08-22", reason: "Réassort fictif", status: "DÉMO" },
     { reference: "MVT-DEM-004", type: "AJUSTEMENT", item: "ART-004 · Détergent multiusage", quantity: 1, unit: "litre", source: "Local entretien", destination: "Local entretien · contrôle", service: "Entretien", date: "2026-08-23", reason: "Écart constaté, aucune correction officielle", status: "À CONTRÔLER" }
+  ];
+  var PURCHASE_REQUESTS = [
+    { reference: "DA-DEM-001", service: "Pédagogie", item: "Craie blanche", quantity: 24, priority: "NORMALE", supplier: "Papeterie Démo", quote: "DEV-DEM-101", amount: "180 000", currency: "CDF", status: "DEMANDE EN REVUE — simulation" },
+    { reference: "DA-DEM-002", service: "Cantine", item: "Farine de maïs", quantity: 10, priority: "HAUTE", supplier: "Marché Démo", quote: "DEV-DEM-102", amount: "240", currency: "USD", status: "COMMANDE SIMULÉE CMD-DEM-02" },
+    { reference: "DA-DEM-003", service: "Entretien", item: "Détergent multiusage", quantity: 18, priority: "NORMALE", supplier: "Hygiène Démo", quote: "À rapprocher", amount: "—", currency: "CDF", status: "BESOIN IDENTIFIÉ" }
   ];
   var METRICS = [
     ["Articles", "12 références démo", "boxes"],
@@ -74,6 +80,7 @@
 
   var itemDrafts = readDraftList(ITEM_DRAFTS_STORAGE_KEY);
   var movementDrafts = readDraftList(MOVEMENT_DRAFTS_STORAGE_KEY);
+  var purchaseDrafts = readDraftList(PURCHASE_DRAFTS_STORAGE_KEY);
 
   function metric(item, live) {
     return '<article class="inventory-dashboard-metric"><span><i data-lucide="' + item[2] + '"></i></span><div><small>' + escapeMarkup(item[0]) + '</small><b>' + escapeMarkup(live ? "Agrégat disponible" : item[1]) + "</b></div></article>";
@@ -162,6 +169,35 @@
     });
   }
 
+  function renderPurchaseRow(request, draft) {
+    return '<tr' + (draft ? ' data-purchase-request-draft' : '') + '><td><b>' + escapeMarkup(request.reference) + '</b>' + (draft ? '<small>BROUILLON LOCAL · BACKEND_LATER</small>' : '<small>DONNÉE DÉMO</small>') + '</td><td>' + escapeMarkup(request.service) + '</td><td>' + escapeMarkup(request.item) + '</td><td>' + escapeMarkup(request.quantity) + '</td><td>' + escapeMarkup(request.priority) + '</td><td>' + escapeMarkup(request.supplier || "À déterminer") + '</td><td>' + escapeMarkup(request.quote || "Non fourni") + '</td><td>' + escapeMarkup(request.amount || "—") + '</td><td>' + escapeMarkup(request.currency) + '</td><td>' + escapeMarkup(request.status) + '</td></tr>';
+  }
+
+  function renderProcurement() {
+    var rows = PURCHASE_REQUESTS.map(function (request) { return renderPurchaseRow(request, false); }).concat(purchaseDrafts.map(function (request) { return renderPurchaseRow(request, true); })).join("");
+    return '<section class="inventory-procurement" data-inventory-procurement><header><div><span>Achats internes de l’école</span><h3>Demandes, devis et commandes préparatoires</h3><p>Règle : besoin ≠ demande ≠ commande ≠ paiement.</p></div><span class="inventory-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><div class="inventory-workflow" aria-label="Workflow achats internes"><span>BESOIN</span><i data-lucide="arrow-right"></i><span>DEMANDE D’ACHAT</span><i data-lucide="arrow-right"></i><span>FOURNISSEUR / DEVIS</span><i data-lucide="arrow-right"></i><span>COMMANDE</span><i data-lucide="arrow-right"></i><span>RÉCEPTION</span></div><aside class="inventory-boundary"><i data-lucide="ban"></i><p>Aucun paiement fournisseur, aucune dépense comptable et aucune commande officielle depuis Stock. Une future approbation n’autoriserait pas l’achat.</p></aside><div class="inventory-table-wrap"><table><thead><tr><th>Référence</th><th>Service demandeur</th><th>Articles</th><th>Quantité</th><th>Priorité</th><th>Fournisseur démo</th><th>Référence devis</th><th>Montant indicatif</th><th>Devise</th><th>Statut</th></tr></thead><tbody>' + rows + '</tbody></table></div><form class="inventory-form" data-purchase-request-form><header><div><span>Préparation locale</span><h4>Préparer une demande d’achat</h4></div><span class="inventory-boundary-chip">DEMANDE UNIQUEMENT</span></header><label>Service demandeur<input name="service" required></label><label>Article / besoin<input name="item" required></label><label>Quantité<input name="quantity" type="number" min="0.01" step="0.01" required></label><label>Priorité<select name="priority"><option>NORMALE</option><option>HAUTE</option><option>URGENTE — à justifier</option></select></label><label>Fournisseur démo éventuel<input name="supplier"></label><label>Référence devis éventuelle<input name="quote"></label><label>Montant indicatif<input name="amount" type="number" min="0" step="0.01"></label><label>Devise<select name="currency"><option>CDF</option><option>USD</option></select></label><button class="ss-button ss-button--primary" type="submit">Préparer la demande</button><p class="inventory-form-wide">BROUILLON LOCAL · aucune commande, validation, dépense ou conversion automatique.</p></form></section>';
+  }
+
+  function bindProcurementEvents() {
+    var form = document.querySelector("[data-purchase-request-form]");
+    if (!form || form.__inventoryBound) return;
+    form.__inventoryBound = true;
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var data = new FormData(form);
+      purchaseDrafts = purchaseDrafts.concat([{
+        reference: "DA-BR-" + String(purchaseDrafts.length + 1).padStart(3, "0"),
+        service: String(data.get("service") || "").trim(), item: String(data.get("item") || "").trim(),
+        quantity: Math.max(0, Number(data.get("quantity")) || 0), priority: String(data.get("priority") || "NORMALE"),
+        supplier: String(data.get("supplier") || "").trim(), quote: String(data.get("quote") || "").trim(),
+        amount: String(data.get("amount") || "—"), currency: String(data.get("currency") || "CDF"),
+        status: "BROUILLON LOCAL · DEMANDE UNIQUEMENT"
+      }]);
+      persistDraftList(PURCHASE_DRAFTS_STORAGE_KEY, purchaseDrafts);
+      renderContent();
+    });
+  }
+
   function bindCatalogEvents() {
     var form = document.querySelector("[data-inventory-item-form]");
     if (!form || form.__inventoryBound) return;
@@ -193,11 +229,13 @@
     if (activeTab === "catalog") content.innerHTML = isDemoMode(subject) ? renderCatalog() : renderDenied();
     else if (activeTab === "levels") content.innerHTML = isDemoMode(subject) ? renderLevels() : renderDenied();
     else if (activeTab === "movements") content.innerHTML = isDemoMode(subject) ? renderMovements() : renderDenied();
+    else if (activeTab === "procurement") content.innerHTML = isDemoMode(subject) ? renderProcurement() : renderDenied();
     else if (activeTab !== "dashboard") content.innerHTML = isDemoMode(subject) ? renderFuture(activeTab) : (canReadAggregates(subject) && activeTab === "reports" ? renderLiveAggregates() : renderDenied());
     else content.innerHTML = isDemoMode(subject) ? renderDemoDashboard() : (canReadAggregates(subject) ? renderLiveAggregates() : renderDenied());
     refreshTabs();
     if (activeTab === "catalog" && isDemoMode(subject)) bindCatalogEvents();
     if (activeTab === "movements" && isDemoMode(subject)) bindMovementEvents();
+    if (activeTab === "procurement" && isDemoMode(subject)) bindProcurementEvents();
     if (root.lucide && typeof root.lucide.createIcons === "function") root.lucide.createIcons();
   }
 
