@@ -58,6 +58,8 @@
           ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="inspector">Inspecter un accès</button>'
         : section.key === "exceptions"
           ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="simulation">Simuler une exception</button>'
+        : section.key === "jaspe"
+          ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="jaspe">Voir la gouvernance Jaspe</button>'
         : '<span class="administration-card__boundary">FRONTEND · contrôle d’accès actif</span>';
     return '<article class="administration-card" data-admin-section="' + section.key + '">' +
       '<span class="administration-card__icon"><i data-lucide="' + section.icon + '"></i></span>' +
@@ -365,6 +367,25 @@
     });
   }
 
+  function renderJaspeGovernance() {
+    var policy = global.SchoolSafeJaspeGovernance;
+    if (!canUse(state.user, "roles.manage", "school")) return '<section class="administration-empty" data-jaspe-governance><i data-lucide="shield-off"></i><h3>Gouvernance Jaspe non autorisée</h3><p>roles.manage + school requis pour cette vue de diagnostic.</p></section>';
+    if (!policy || typeof policy.summarize !== "function") return '<section class="administration-empty" data-jaspe-governance><i data-lucide="wifi-off"></i><h3>Politique Jaspe indisponible</h3></section>';
+    var summary = policy.summarize(state.user || {});
+    return '<section class="administration-jaspe" data-jaspe-governance>' +
+      '<div class="administration-view-heading"><button class="ss-button ss-button--secondary" type="button" data-admin-home><i data-lucide="arrow-left"></i> Centre Administration</button><div><span>GOUVERNANCE LOGICIELLE</span><h3>Contrôle de Jaspe</h3><p>Visibilité d’un module ≠ permission et Jaspe n’élargit jamais l’accès utilisateur.</p></div><span class="administration-jaspe-limit">JASPE &lt;= UTILISATEUR</span></div>' +
+      '<div class="administration-jaspe-base administration-jaspe-base--' + (summary.base.allowed ? 'allowed' : 'denied') + '"><div><span>Permission de sécurité</span><strong>safe.assistant.use</strong></div><div><span>Portée obligatoire</span><strong>own</strong></div><div><span>État</span><strong>' + (summary.base.allowed ? 'AUTORISÉ' : 'REFUSÉ') + '</strong></div><small>' + escapeMarkup(summary.base.reason) + '</small></div>' +
+      '<div class="administration-jaspe-domains">' + summary.domains.map(function (domain) {
+        return '<article class="administration-jaspe-domain administration-jaspe-domain--' + (domain.allowed ? 'allowed' : 'denied') + '"><header><strong>' + escapeMarkup(domain.label) + '</strong><span>' + (domain.allowed ? 'AUTORISÉ' : 'REFUSÉ') + '</span></header><p>' + escapeMarkup(domain.permission || "Permission métier absente") + '</p><small>' + escapeMarkup(domain.scope || "Aucune portée compatible") + ' · ' + escapeMarkup(domain.reason) + '</small></article>';
+      }).join("") + '</div>' +
+      '<aside class="administration-jaspe-boundary"><i data-lucide="ban"></i><div><strong>Aucun pouvoir d’administration délégué</strong><p>Jaspe ne modifie ni rôle, ni permission, ni portée, ni exception et ne peut exécuter une action refusée.</p></div></aside></section>';
+  }
+
+  function bindJaspeGovernance(container) {
+    var home = container.querySelector("[data-admin-home]");
+    if (home) home.addEventListener("click", function () { open("dashboard"); });
+  }
+
   function loadAccounts() {
     var api = global.SchoolSafeSchoolAPI;
     if (state.accountsLoading || state.staff) return;
@@ -501,7 +522,7 @@
         '<div><span>Administration / Accès / Jaspe logiciel</span><h2>Centre Administration</h2><p>Vue de contrôle frontend : chaque surface exige sa permission et sa portée réelles.</p></div>' +
         '<span class="administration-header__badge"><i data-lucide="shield-check"></i> DENY explicite prioritaire</span>' +
       '</header>' +
-      (state.activeView === "accounts" ? renderAccounts() : state.activeView === "permissions" ? renderPermissions() : state.activeView === "inspector" ? renderInspector() : state.activeView === "simulation" ? renderSimulation() : dashboardMarkup(allowed));
+      (state.activeView === "accounts" ? renderAccounts() : state.activeView === "permissions" ? renderPermissions() : state.activeView === "inspector" ? renderInspector() : state.activeView === "simulation" ? renderSimulation() : state.activeView === "jaspe" ? renderJaspeGovernance() : dashboardMarkup(allowed));
 
     var closeButton = container.querySelector("[data-admin-close]");
     if (closeButton) closeButton.addEventListener("click", function () {
@@ -527,6 +548,7 @@
     }
     if (state.activeView === "inspector") bindInspector(container);
     if (state.activeView === "simulation") bindSimulation(container);
+    if (state.activeView === "jaspe") bindJaspeGovernance(container);
     if (global.lucide && typeof global.lucide.createIcons === "function") global.lucide.createIcons();
   }
 
@@ -536,7 +558,7 @@
   }
 
   function open(view) {
-    state.activeView = ["accounts", "permissions", "inspector", "simulation"].indexOf(view) >= 0 ? view : "dashboard";
+    state.activeView = ["accounts", "permissions", "inspector", "simulation", "jaspe"].indexOf(view) >= 0 ? view : "dashboard";
     state.notice = "";
     state.selectedStaffId = null;
     state.mutationPanel = null;

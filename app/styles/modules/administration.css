@@ -72,10 +72,29 @@
 .administration-simulation-result div { display: grid; gap: 4px; }
 .administration-simulation-result span { color: var(--ss-warning-text); font-size: .78rem; font-weight: 750; }
 .administration-simulation-result p { grid-column: 1 / -1; margin: 4px 0 0; color: var(--ss-warning-text); }
+.administration-jaspe { display: grid; gap: 16px; min-width: 0; }
+.administration-jaspe-limit { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 12px; border: 1px solid var(--ss-info-border); border-radius: 12px; color: var(--ss-info-text); background: var(--ss-info-bg); font-size: .78rem; font-weight: 900; }
+.administration-jaspe-base { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 18px; border: 1px solid; border-radius: 18px; }
+.administration-jaspe-base--allowed { border-color: var(--ss-success-border); background: var(--ss-success-bg); }
+.administration-jaspe-base--denied { border-color: var(--ss-error-border); background: var(--ss-error-bg); }
+.administration-jaspe-base div { display: grid; gap: 4px; }
+.administration-jaspe-base span, .administration-jaspe-base small { color: var(--ss-text-secondary); }
+.administration-jaspe-base small { grid-column: 1 / -1; }
+.administration-jaspe-domains { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.administration-jaspe-domain { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--ss-border); border-radius: 16px; color: var(--ss-text); background: var(--ss-surface); }
+.administration-jaspe-domain header { display: flex; justify-content: space-between; gap: 10px; }
+.administration-jaspe-domain header span { padding: 5px 8px; border-radius: 999px; font-size: .7rem; font-weight: 850; }
+.administration-jaspe-domain--allowed header span { color: var(--ss-success-text); background: var(--ss-success-bg); }
+.administration-jaspe-domain--denied header span { color: var(--ss-error-text); background: var(--ss-error-bg); }
+.administration-jaspe-domain p { margin: 0; overflow-wrap: anywhere; color: var(--ss-text-link); font-weight: 750; }
+.administration-jaspe-domain small { color: var(--ss-text-secondary); }
+.administration-jaspe-boundary { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border: 1px solid var(--ss-error-border); border-radius: 16px; color: var(--ss-error-text); background: var(--ss-error-bg); }
+.administration-jaspe-boundary svg { flex: 0 0 auto; }
+.administration-jaspe-boundary p { margin: 4px 0 0; }
 html[data-theme="dark"] .administration-header__badge { color: #fca5a5; background: rgba(127, 29, 29, .28); }
-@media (max-width: 1100px) { .administration-permission-filters, .administration-simulation-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .administration-permission-filters, .administration-simulation-form, .administration-jaspe-domains { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .administration-inspector-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 834px) { .administration-header, .administration-view-heading, .administration-mutation { grid-template-columns: 1fr; } .administration-grid { grid-template-columns: 1fr; } .administration-summary { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 560px) { .administration-role-options, .administration-form-grid { grid-template-columns: 1fr; } .administration-form-grid .administration-confirm, .administration-form-grid .administration-mutation__actions { grid-column: auto; } }
-@media (max-width: 480px) { .administration-permission-filters, .administration-inspector-form, .administration-simulation-form, .administration-simulation-result { grid-template-columns: 1fr; } .administration-inspection-result { flex-direction: column; } .administration-simulation-result p { grid-column: auto; } }
+@media (max-width: 480px) { .administration-permission-filters, .administration-inspector-form, .administration-simulation-form, .administration-simulation-result, .administration-jaspe-base, .administration-jaspe-domains { grid-template-columns: 1fr; } .administration-inspection-result { flex-direction: column; } .administration-simulation-result p, .administration-jaspe-base small { grid-column: auto; } }
 @media (max-width: 480px) { .administration-header, .administration-card { padding: 16px; border-radius: 18px; } }
