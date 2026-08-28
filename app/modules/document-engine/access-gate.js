@@ -4,12 +4,11 @@
 
 const PERMISSIONS_PATH = "../shared/permissions.json";
 
-let permissionsCache = null;
-
 export function createAccessGate(options = {}) {
   const permissionsUrl = options.permissionsUrl || PERMISSIONS_PATH;
-  const adminRole = options.adminRole || "admin";
-  const isAdmin = options.isAdmin || ((user) => user.role === adminRole);
+  const access = options.access || resolveCanonicalAccess() || createLocalAccessLaw();
+  const permissionsLoader = options.permissionsLoader || (() => loadPermissions(permissionsUrl));
+  let permissionsCache = null;
 
   return {
     /**
@@ -19,47 +18,124 @@ export function createAccessGate(options = {}) {
      * @returns {Promise<AccessResult>}
      */
     async check(request, templateInfo) {
-      const permissions = await loadPermissions(permissionsUrl);
-
-      const user = request.requestedBy;
-      if (!user) {
-        return deny("No user context");
-      }
-
-      // Admin principal = full access
-      if (isAdmin(user)) {
-        return allow(templateInfo.permissions[0] || "admin", "school");
-      }
-
-      // Default deny
       if (!templateInfo || !Array.isArray(templateInfo.permissions) || templateInfo.permissions.length === 0) {
         return deny("No permission defined for document type");
       }
 
-      // Determine required permission based on action
-      const requiredPermission = pickRequiredPermission(request.action, templateInfo.permissions);
+      const user = request && request.requestedBy;
+      if (!user) {
+        return deny("No user context");
+      }
+
+      let permissions;
+      try {
+        if (!permissionsCache) permissionsCache = await permissionsLoader();
+        permissions = permissionsCache;
+      } catch (error) {
+        return deny(`Permission catalogue unavailable: ${error.message}`);
+      }
+      if (!Array.isArray(permissions)) {
+        return deny("Permission catalogue unavailable");
+      }
+
+      // The required permission always comes from TemplateInfo, never DocumentRequest.
+      const requiredPermission = pickRequiredPermission(request && request.action, templateInfo.permissions);
       const permissionDef = permissions.find((p) => p.code === requiredPermission);
 
       if (!permissionDef) {
         return deny(`Permission ${requiredPermission} not found in catalogue`);
       }
 
-      // In frontend phase we trust the user context carries the resolved permissions.
-      // Backend will re-verify against JWT/RLS.
-      const userPermissions = Array.isArray(user.permissions) ? user.permissions : [];
-      const hasPermission = userPermissions.includes(requiredPermission);
-
-      if (!hasPermission) {
+      if (typeof access.explicitDeny === "function" && access.explicitDeny(user, requiredPermission)) {
+        return deny(`Explicit DENY for ${requiredPermission}`);
+      }
+      if (typeof access.canAccess !== "function" || !access.canAccess(user, requiredPermission)) {
         return deny(`Missing permission ${requiredPermission}`);
       }
 
-      return allow(requiredPermission, permissionDef.scope || "none");
+      const requiredScope = permissionDef.scope;
+      if (!requiredScope || typeof access.scopeFor !== "function") {
+        return deny(`Scope unresolved for ${requiredPermission}`);
+      }
+      const grantedScope = access.scopeFor(user, requiredPermission);
+      if (!grantedScope || grantedScope.type !== requiredScope) {
+        return deny(`Missing required scope ${requiredScope} for ${requiredPermission}`);
+      }
+      if (!contextMatchesScope(user, grantedScope, request.context || {})) {
+        return deny(`Scope context mismatch for ${requiredPermission}`);
+      }
+
+      return allow(requiredPermission, requiredScope);
     },
 
     reset() {
       permissionsCache = null;
     },
   };
+}
+
+function resolveCanonicalAccess() {
+  if (typeof window !== "undefined" && window.SchoolSafeAccess) return window.SchoolSafeAccess;
+  if (typeof globalThis !== "undefined" && globalThis.SchoolSafeAccess) return globalThis.SchoolSafeAccess;
+  return null;
+}
+
+function createLocalAccessLaw() {
+  function exceptions(user) {
+    return Array.isArray(user && user.permissionExceptions) ? user.permissionExceptions : [];
+  }
+  function explicitDeny(user, permission) {
+    if (Array.isArray(user && user.deniedPermissions) && user.deniedPermissions.includes(permission)) return true;
+    return exceptions(user).some((item) => item && item.permission === permission && String(item.effect || "").toLowerCase() === "deny");
+  }
+  function canAccess(user, permission) {
+    if (explicitDeny(user, permission)) return false;
+    if (Array.isArray(user && user.permissions) && user.permissions.includes(permission)) return true;
+    return exceptions(user).some((item) => item && item.permission === permission && String(item.effect || "").toLowerCase() === "allow");
+  }
+  function scopeFor(user, permission) {
+    if (explicitDeny(user, permission)) return null;
+    const exception = exceptions(user).find((item) => item && item.permission === permission && String(item.effect || "").toLowerCase() === "allow");
+    if (exception) {
+      const value = exception.scope || exception.scopeType || exception.scope_type;
+      if (typeof value === "string") return { permission, type: value };
+      if (value && value.type) return { permission, ...value };
+    }
+    const scopes = Array.isArray(user && user.scopes) ? user.scopes : [];
+    return scopes.find((scope) => scope && scope.permission === permission) || null;
+  }
+  return { explicitDeny, canAccess, scopeFor };
+}
+
+function contextMatchesScope(user, scope, context) {
+  const type = scope && scope.type;
+  if (type === "none") return true;
+  if (type === "school") {
+    const contextSchoolId = context.schoolId || context.school?.id;
+    return !!user.schoolId && (!contextSchoolId || contextSchoolId === user.schoolId);
+  }
+  if (type === "own") {
+    const ownerId = context.ownerId || context.userId || context.profileId || context.owner?.id;
+    const userId = user.userId || user.profileId || user.id || user.profile?.id;
+    return !!ownerId && !!userId && ownerId === userId;
+  }
+  if (type === "own_children") {
+    const childId = context.childId || context.studentId || context.student?.id;
+    return !!childId && Array.isArray(user.childIds) && user.childIds.includes(childId);
+  }
+  if (type === "assigned_classes") {
+    const classId = context.classId || context.class?.id;
+    return !!classId && Array.isArray(user.assignedClassIds) && user.assignedClassIds.includes(classId);
+  }
+  if (type === "assigned_subjects") {
+    const subjectId = context.subjectId || context.subject?.id;
+    return !!subjectId && Array.isArray(user.assignedSubjectIds) && user.assignedSubjectIds.includes(subjectId);
+  }
+  if (type === "assigned_portal") {
+    const portalId = context.portalId || context.portal?.id;
+    return !!portalId && Array.isArray(user.assignedPortalIds) && user.assignedPortalIds.includes(portalId);
+  }
+  return false;
 }
 
 function allow(permission, scope) {
@@ -75,18 +151,15 @@ function deny(reason) {
 }
 
 async function loadPermissions(url) {
-  if (permissionsCache) return permissionsCache;
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    permissionsCache = await res.json();
-    return permissionsCache;
+    return await res.json();
   } catch (err) {
     // Fallback for Node tests or missing file
     if (typeof require !== "undefined") {
       try {
-        permissionsCache = require("../../shared/permissions.json");
-        return permissionsCache;
+        return require("../../shared/permissions.json");
       } catch {
         // ignore
       }

@@ -128,7 +128,7 @@ global.fetch = async (url) => {
 // --- Helpers ---
 
 function makeEngine({ contextResolvers = {} } = {}) {
-  const accessGate = createAccessGate({ adminRole: "admin" });
+  const accessGate = createAccessGate();
   const schoolIdentityProvider = {
     async load() {
       return {
@@ -159,8 +159,21 @@ function makeEngine({ contextResolvers = {} } = {}) {
   return createDocumentEngine({ accessGate, dataResolver, templateRegistry, layoutEngine, renderer });
 }
 
+function assignmentUser(overrides = {}) {
+  return {
+    userId: "u1",
+    role: "admin",
+    schoolId: "s1",
+    permissions: ["pedagogy.assignment.read"],
+    scopes: [{ permission: "pedagogy.assignment.read", type: "assigned_classes" }],
+    assignedClassIds: ["class-1a"],
+    ...overrides,
+  };
+}
+
 function makeAssignmentContext(overrides = {}) {
   return {
+    classId: "class-1a",
     title: "Devoir de mathématiques",
     subjectName: "Mathématiques",
     className: "1re A",
@@ -195,7 +208,7 @@ async function runTests() {
     }
   }
 
-  await test("Assignment PDF is generated for admin", async () => {
+  await test("Assignment PDF is generated for admin with explicit grant", async () => {
     const engine = makeEngine();
     const request = createDocumentRequest({
       documentType: "assignment",
@@ -203,7 +216,7 @@ async function runTests() {
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
       origin: DOCUMENT_ORIGINS.GENERATED,
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: assignmentUser(),
       context: makeAssignmentContext(),
       locale: "fr-FR",
     });
@@ -223,7 +236,7 @@ async function runTests() {
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
       origin: DOCUMENT_ORIGINS.GENERATED,
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: assignmentUser(),
       context: makeAssignmentContext({
         studentFirstName: "Lucas",
         studentLastName: "Martin",
@@ -248,6 +261,8 @@ async function runTests() {
         role: "teacher",
         schoolId: "s1",
         permissions: ["pedagogy.assignment.read"],
+        scopes: [{ permission: "pedagogy.assignment.read", type: "assigned_classes" }],
+        assignedClassIds: ["class-1a"],
       },
       context: makeAssignmentContext(),
       locale: "fr-FR",
@@ -285,7 +300,7 @@ async function runTests() {
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
       origin: DOCUMENT_ORIGINS.GENERATED,
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: assignmentUser(),
       context: makeAssignmentContext(),
       locale: "fr-FR",
     });
@@ -303,7 +318,7 @@ async function runTests() {
       sourceModule: "pedagogy",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: assignmentUser(),
       context: makeAssignmentContext(),
       locale: "fr-FR",
     });
@@ -324,7 +339,7 @@ async function runTests() {
       formats: [DOCUMENT_FORMATS.PDF],
       origin: DOCUMENT_ORIGINS.COMPOSED,
       sourceArtifacts: ["upload-pdf-abc", "text-input-def"],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: assignmentUser(),
       context: makeAssignmentContext(),
       locale: "fr-FR",
     });
@@ -345,7 +360,7 @@ async function runTests() {
       sourceModule: "pedagogy",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: assignmentUser(),
       context: makeAssignmentContext({ questions }),
       locale: "fr-FR",
     });

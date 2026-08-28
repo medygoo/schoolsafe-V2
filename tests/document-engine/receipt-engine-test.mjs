@@ -128,7 +128,7 @@ global.fetch = async (url) => {
 // --- Helpers ---
 
 function makeEngine() {
-  const accessGate = createAccessGate({ adminRole: "admin" });
+  const accessGate = createAccessGate();
   const schoolIdentityProvider = {
     async load() {
       return {
@@ -161,6 +161,18 @@ function makeEngine() {
   return createDocumentEngine({ accessGate, dataResolver, templateRegistry, layoutEngine, renderer });
 }
 
+function receiptUser(overrides = {}) {
+  return {
+    userId: "u1",
+    role: "admin",
+    schoolId: "s1",
+    permissions: ["finance.receipt.read"],
+    scopes: [{ permission: "finance.receipt.read", type: "own_children" }],
+    childIds: ["student-1"],
+    ...overrides,
+  };
+}
+
 // --- Tests ---
 
 async function runTests() {
@@ -188,14 +200,14 @@ async function runTests() {
     assert.ok(info.supportedFormats.includes("pdf"));
   });
 
-  await test("Admin can generate receipt", async () => {
+  await test("Admin with explicit permission and scope can generate receipt", async () => {
     const engine = makeEngine();
     const request = createDocumentRequest({
       documentType: "receipt",
       sourceModule: "finance",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: receiptUser(),
       context: makeReceiptContext(),
     });
     const result = await engine.generate(request);
@@ -224,7 +236,7 @@ async function runTests() {
       sourceModule: "finance",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u3", role: "parent", schoolId: "s1", permissions: ["finance.receipt.read"] },
+      requestedBy: receiptUser({ userId: "u3", role: "parent" }),
       context: makeReceiptContext(),
     });
     const result = await engine.generate(request);
@@ -238,7 +250,7 @@ async function runTests() {
       sourceModule: "finance",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: receiptUser(),
       context: makeReceiptContext(),
     });
     const result = await engine.generate(request);
@@ -255,7 +267,7 @@ async function runTests() {
       sourceModule: "finance",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: receiptUser(),
       context: makeReceiptContext(),
     });
     const result = await engine.generate(request);
@@ -274,7 +286,8 @@ async function runTests() {
 
 function makeReceiptContext() {
   return {
-    student: { firstName: "Jean", lastName: "Muluba", matricule: "MAT-001", className: "3ème A" },
+    childId: "student-1",
+    student: { id: "student-1", firstName: "Jean", lastName: "Muluba", matricule: "MAT-001", className: "3ème A" },
     feeLabel: "Frais scolaires",
     period: "Première tranche",
     amountExpected: 150000,

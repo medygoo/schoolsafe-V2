@@ -135,7 +135,7 @@ global.fetch = async (url) => {
 // --- Helpers ---
 
 function makeEngine({ contextResolvers = {} } = {}) {
-  const accessGate = createAccessGate({ adminRole: "admin" });
+  const accessGate = createAccessGate();
   const schoolIdentityProvider = {
     async load() {
       return {
@@ -168,6 +168,32 @@ function makeEngine({ contextResolvers = {} } = {}) {
   return createDocumentEngine({ accessGate, dataResolver, templateRegistry, layoutEngine, renderer });
 }
 
+function authorizedUser(permission, scope, overrides = {}) {
+  return {
+    userId: "u1",
+    role: "admin",
+    schoolId: "s1",
+    permissions: [permission],
+    scopes: [{ permission, type: scope }],
+    ...overrides,
+  };
+}
+
+function receiptContext(overrides = {}) {
+  return {
+    childId: "student-1",
+    student: { id: "student-1", firstName: "Jean", lastName: "Muluba" },
+    ...overrides,
+  };
+}
+
+function receiptUser(overrides = {}) {
+  return authorizedUser("finance.receipt.read", "own_children", {
+    childIds: ["student-1"],
+    ...overrides,
+  });
+}
+
 // --- Tests ---
 
 async function runTests() {
@@ -185,14 +211,15 @@ async function runTests() {
     }
   }
 
-  await test("AccessGate allows admin", async () => {
+  await test("AccessGate allows admin with explicit permission and scope", async () => {
     const engine = makeEngine();
     const request = createDocumentRequest({
       documentType: "dummy-receipt",
       sourceModule: "finance",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: receiptUser(),
+      context: receiptContext(),
     });
     const result = await engine.generate(request);
     assert.equal(result.ok, true, result.error);
@@ -212,14 +239,15 @@ async function runTests() {
     assert.ok(result.error.includes("Missing permission"));
   });
 
-  await test("AccessGate allows user with correct permission", async () => {
+  await test("AccessGate allows user with correct permission and scope", async () => {
     const engine = makeEngine();
     const request = createDocumentRequest({
       documentType: "dummy-receipt",
       sourceModule: "finance",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u3", role: "cashier", schoolId: "s1", permissions: ["finance.receipt.read"] },
+      requestedBy: receiptUser({ userId: "u3", role: "parent" }),
+      context: receiptContext(),
     });
     const result = await engine.generate(request);
     assert.equal(result.ok, true, result.error);
@@ -233,8 +261,8 @@ async function runTests() {
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
       origin: DOCUMENT_ORIGINS.GENERATED,
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
-      context: { payment: { amountPaid: 100, paidAt: "2026-08-21" } },
+      requestedBy: receiptUser(),
+      context: receiptContext({ payment: { amountPaid: 100, paidAt: "2026-08-21" } }),
     });
     const result = await engine.generate(request);
     assert.equal(result.ok, true);
@@ -250,7 +278,8 @@ async function runTests() {
       sourceModule: "finance",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: receiptUser(),
+      context: receiptContext(),
     });
     const result = await engine.generate(request);
     assert.ok(result.model.school.snapshotAt);
@@ -265,10 +294,11 @@ async function runTests() {
       sourceModule: "finance",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: receiptUser(),
       context: {
+        childId: "student-1",
         payment: { amountPaid: 150, paidAt: "2026-08-21", verificationCode: "VERIF-123" },
-        student: { firstName: "Jean", lastName: "Muluba" },
+        student: { id: "student-1", firstName: "Jean", lastName: "Muluba" },
       },
     });
     const result = await engine.generate(request);
@@ -285,7 +315,7 @@ async function runTests() {
       sourceModule: "security",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PNG],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: authorizedUser("security.card.create", "school"),
       context: {
         student: { firstName: "Amina", lastName: "Kabongo", matricule: "MAT-001", className: "3ème A" },
       },
@@ -312,7 +342,7 @@ async function runTests() {
       sourceModule: "finance",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.CSV],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: authorizedUser("finance.report.read", "school"),
     });
     const result = await engine.generate(request);
     assert.equal(result.ok, true);
@@ -329,7 +359,8 @@ async function runTests() {
       formats: [DOCUMENT_FORMATS.PDF],
       origin: DOCUMENT_ORIGINS.COMPOSED,
       sourceArtifacts: ["upload-photo-abc", "text-input-def"],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: receiptUser(),
+      context: receiptContext(),
     });
     const result = await engine.generate(request);
     assert.equal(result.ok, true);
@@ -344,7 +375,8 @@ async function runTests() {
       sourceModule: "finance",
       action: DOCUMENT_ACTIONS.DOWNLOAD,
       formats: [DOCUMENT_FORMATS.PDF],
-      requestedBy: { userId: "u1", role: "admin", schoolId: "s1" },
+      requestedBy: receiptUser(),
+      context: receiptContext(),
     });
     const result = await engine.generate(request);
     assert.equal(result.model.meta.sensitivity, DOCUMENT_SENSITIVITY_LEVELS.CONFIDENTIAL);
