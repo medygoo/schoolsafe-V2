@@ -372,6 +372,12 @@
         window.SchoolSafeAccountingTreasury.open(tab);
       }
     },
+    openHr: function (tab) {
+      openHrModule();
+      if (tab && window.SchoolSafeHrDemo && typeof window.SchoolSafeHrDemo.open === "function") {
+        window.SchoolSafeHrDemo.open(tab);
+      }
+    },
     showDashboard: function () {
       showDashboard();
     }

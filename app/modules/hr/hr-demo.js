@@ -384,6 +384,107 @@
     };
   }
 
+  function normalizeJaspeText(value) {
+    var text = String(value || "").toLowerCase();
+    return typeof text.normalize === "function" ? text.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : text;
+  }
+
+  function isHrJaspeIntent(text, role) {
+    var strongHrTerms = /\b(rh|personnel|employe|salarie|paie|salaire|prime|avance|retenue|conge|biometrie|biometrique|empreinte|webcam|licencie|reactive)\b|bulletin de paie|dossier rh|contrat (du |de )?personnel|affectation (du |de )?personnel|hr-dem-/;
+    var knownStaff = STAFF.some(function (member) {
+      return text.indexOf(normalizeJaspeText(member.firstName)) >= 0 || text.indexOf(normalizeJaspeText(member.lastName)) >= 0 || text.indexOf(normalizeJaspeText(member.hrId)) >= 0;
+    });
+    if (strongHrTerms.test(text) || knownStaff) return true;
+    return role === "hr" && /\b(presence|retard|absence|rapport|contrat|affectation)\b/.test(text);
+  }
+
+  function jaspeRefusal(message, action) {
+    return { allowed: false, refusal: true, action: action || null, message: "REFUS — " + message };
+  }
+
+  function jaspeMember(text) {
+    return STAFF.find(function (member) {
+      return text.indexOf(normalizeJaspeText(member.firstName)) >= 0 || text.indexOf(normalizeJaspeText(member.lastName)) >= 0 || text.indexOf(normalizeJaspeText(member.hrId)) >= 0;
+    }) || STAFF[0];
+  }
+
+  function prepareJaspeDraft(text, member) {
+    var preparedAt = new Date().toISOString();
+    if (/\bcontrat\b/.test(text)) {
+      contractDrafts.push({ id: "contract-jaspe-" + Date.now(), staffId: member.id, type: "Contrat préparatoire", job: member.job, service: member.service, startDate: "", endDate: "", status: "BROUILLON", observation: "Préparé par Jaspe · aucune valeur officielle" });
+      persistDraftList(CONTRACT_DRAFTS_STORAGE_KEY, contractDrafts);
+      return { allowed: true, refusal: false, action: "contracts", message: "Contrat préparé pour " + member.firstName + " " + member.lastName + " · BROUILLON LOCAL · BACKEND_LATER. Aucun contrat officiel n’est modifié." };
+    }
+    if (/\baffectation\b/.test(text)) {
+      assignmentDrafts.push({ id: "assignment-jaspe-" + Date.now(), staffId: member.id, service: member.service, job: member.job, className: "", subject: "", site: "À préciser", startDate: "", endDate: "" });
+      persistDraftList(ASSIGNMENT_DRAFTS_STORAGE_KEY, assignmentDrafts);
+      return { allowed: true, refusal: false, action: "assignments", message: "Affectation préparée pour " + member.firstName + " " + member.lastName + " · BROUILLON LOCAL · BACKEND_LATER. teacher_assignments reste inchangé." };
+    }
+    if (/\b(absence|conge)\b/.test(text)) {
+      absenceDrafts.push({ id: "absence-jaspe-" + Date.now(), staffId: member.id, type: "Demande préparatoire", reason: "À préciser", startDate: "", endDate: "", duration: "Durée à confirmer", observation: "Préparé par Jaspe", status: "BROUILLON", history: ["Brouillon préparé localement"] });
+      persistDraftList(ABSENCE_DRAFTS_STORAGE_KEY, absenceDrafts);
+      return { allowed: true, refusal: false, action: "absence", message: "Demande préparée pour " + member.firstName + " " + member.lastName + " · BROUILLON LOCAL · BACKEND_LATER. Aucune décision de congé n’est prise." };
+    }
+    staffDrafts[member.id] = {
+      sourceStaffId: member.id,
+      job: member.job,
+      service: member.service,
+      status: member.status,
+      assignment: member.assignment,
+      observation: "Préparé par Jaspe · BROUILLON LOCAL",
+      preparedAt: preparedAt
+    };
+    persistStaffDrafts(staffDrafts);
+    return { allowed: true, refusal: false, action: "staff", message: "Observation RH préparée pour " + member.firstName + " " + member.lastName + " · BROUILLON LOCAL · BACKEND_LATER. La fiche originale " + member.hrId + " reste intacte." };
+  }
+
+  function answerJaspe(query, context) {
+    var text = normalizeJaspeText(query);
+    var role = normalizeJaspeText(context && context.activeRole);
+    var subject = context && context.user ? context.user : user();
+    if (!isHrJaspeIntent(text, role)) return null;
+    if (!allowsFor(subject, "safe.assistant.use", "own")) return jaspeRefusal("Jaspe n’est pas autorisé pour cette session.");
+    if (["parent", "guard", "teacher"].indexOf(role) >= 0) return jaspeRefusal("les données RH générales ne sont pas accessibles à ce rôle.");
+
+    if (/\b(capture|enregistre|enrol|active)\b/.test(text) && /\b(biometrie|biometrique|empreinte|visage|webcam)\b/.test(text)) {
+      return jaspeRefusal("aucune donnée biométrique réelle ne peut être capturée ou stockée.", "biometric");
+    }
+    if (/\b(cree|creer|modifie|modifier|calcule|calculer|applique|appliquer|produis|produire|paie|payer|verse|verser)\b/.test(text) && /\b(paie|salaire|prime|avance|retenue|bulletin|salarie)\b/.test(text)) {
+      return jaspeRefusal("Jaspe ne crée ni salaire, prime, avance, retenue, bulletin ou paiement officiel.", "payroll");
+    }
+    if (/\b(licencie|licencier|reactive|reactiver|approuve|approuver|valide|valider|decide|decider)\b/.test(text)) {
+      return jaspeRefusal("toute décision RH officielle reste sous contrôle humain.");
+    }
+    if (/\b(change|changer|modifie|modifier|corrige|corriger)\b/.test(text) && (/\bofficiel/.test(text) || /\b(contrat|affectation|presence|statut|dossier)\b/.test(text))) {
+      return jaspeRefusal("aucun contrat, affectation, statut, dossier ou relevé de présence officiel n’est modifié.");
+    }
+
+    var member = jaspeMember(text);
+    if (/\b(prepare|preparer|brouillon|observation)\b/.test(text)) {
+      if (!allowsFor(subject, "staff.manage", "school")) return jaspeRefusal("staff.manage avec portée school est requis pour préparer un brouillon local.");
+      return prepareJaspeDraft(text, member);
+    }
+    if (/\b(presence|retard)\b/.test(text)) {
+      if (!allowsFor(subject, "staff.attendance.read", "school")) return jaspeRefusal("staff.attendance.read avec portée school est requis.", "attendance");
+      return { allowed: true, refusal: false, action: "attendance", message: "Présence du personnel : 4 présents, 1 absence et 1 retard dans les données de démonstration · lecture seule · BACKEND_LATER." };
+    }
+    if (/\brapport\b/.test(text)) {
+      if (!allowsFor(subject, "reports.hr.read", "school")) return jaspeRefusal("reports.hr.read avec portée school est requis.", "reports");
+      return { allowed: true, refusal: false, action: "reports", message: "Rapports RH disponibles : effectif, présence, absences, contrats et affectations · synthèses frontend sans PDF final." };
+    }
+    if (/\b(paie|salaire|bulletin|prime|avance|retenue)\b/.test(text)) {
+      if (!allowsFor(subject, "reports.hr.read", "school")) return jaspeRefusal("reports.hr.read avec portée school est requis pour voir la frontière Paie.", "payroll");
+      return { allowed: true, refusal: false, action: "payroll", message: "Paie : surface informative uniquement · Non disponible · FEATURE_LATER · BACKEND_LATER. Aucun montant officiel n’est calculé." };
+    }
+    if (/\b(biometrie|biometrique|empreinte|visage|webcam)\b/.test(text)) {
+      if (!allowsFor(subject, "staff.attendance.read", "school")) return jaspeRefusal("staff.attendance.read avec portée school est requis.", "biometric");
+      return { allowed: true, refusal: false, action: "biometric", message: "Biométrie : capacité future uniquement · aucune empreinte, image, gabarit ou donnée réelle n’est capturé ou stocké." };
+    }
+    if (!allowsFor(subject, "staff.read", "school")) return jaspeRefusal("staff.read avec portée school est requis pour consulter un dossier RH.", "staff");
+    var action = /\bcontrat\b/.test(text) ? "contracts" : /\baffectation\b/.test(text) ? "assignments" : /\b(absence|conge)\b/.test(text) ? "absence" : "staff";
+    return { allowed: true, refusal: false, action: action, message: member.firstName + " " + member.lastName + " · " + member.hrId + " · " + member.job + " · " + member.service + " · statut " + member.status + ". Données fictives non sensibles, lecture seule." };
+  }
+
   function renderFuture() {
     var labels = { staff: "Dossier personnel", contracts: "Contrats", assignments: "Affectations", absence: "Absences / congés", attendance: "Présence personnel", biometric: "Biométrie", payroll: "Paie", reports: "Rapports RH" };
     return '<section class="hr-future"><span>Phase H</span><h3>' + escapeMarkup(labels[activeTab] || "Ressources humaines") + '</h3><p>Surface frontend prévue dans le lot dédié, sans opération officielle.</p><span class="hr-boundary-chip">FEATURE_LATER · BACKEND_LATER</span></section>';
@@ -440,6 +541,7 @@
     canReadStaff: canReadStaff,
     canManageStaff: canManageStaff,
     canReadAttendance: canReadAttendance,
-    canReadReports: canReadReports
+    canReadReports: canReadReports,
+    answerJaspe: answerJaspe
   };
 })(window);
