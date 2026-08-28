@@ -280,6 +280,22 @@
       }
     }
 
+    if (global.SchoolSafeGuardSecurity && typeof global.SchoolSafeGuardSecurity.answerJaspe === "function") {
+      var securityContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
+        ? global.SchoolSafeAppContext.getAssistantContext()
+        : null;
+      var securityAnswer = securityContext && securityContext.activeRole === "guard"
+        ? global.SchoolSafeGuardSecurity.answerJaspe(raw, securityContext)
+        : null;
+      if (securityAnswer) {
+        state.currentMessage = securityAnswer.message;
+        state.pose = securityAnswer.refusal ? "reflechie" : "sourire";
+        state.suggestions = [];
+        render();
+        return;
+      }
+    }
+
     if (/autorise|autoriser|valide|valider/.test(text) && /sortie|remise|récup|recup/.test(text)) {
       state.currentMessage = "Je ne peux pas autoriser une sortie, valider une remise, suspendre ou rétablir une personne. Ces actions exigent les droits utilisateur correspondants et restent sous contrôle humain.";
       state.pose = "reflechie";

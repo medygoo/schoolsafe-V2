@@ -538,6 +538,66 @@
     if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
   }
 
+  function normalizedQuery(value) {
+    var text = String(value || "").toLowerCase();
+    if (typeof text.normalize === "function") text = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return text;
+  }
+
+  function jaspeRefusal(message) {
+    return { message: message, refusal: true };
+  }
+
+  function answerJaspe(query, context) {
+    if (!context || context.activeRole !== "guard") return null;
+    var user = context.user || {};
+    if (!allowsScope(user, "safe.assistant.use", "own")) {
+      return jaspeRefusal("Accès Jaspe non accordé : safe.assistant.use + own est requis et un DENY explicite reste prioritaire.");
+    }
+    var portalProjection = getPortalProjection(user);
+    if (!portalProjection.allowed) {
+      return jaspeRefusal("Je ne peux consulter aucune donnée de sécurité : aucun portail autorisé n’est disponible dans votre portée.");
+    }
+    var text = normalizedQuery(query);
+    if ((/autorise|autoriser|valide|valider/.test(text) && /sortie|remise|recuper/.test(text)) ||
+        (/suspend/.test(text) && /autoris/.test(text)) ||
+        ((/declenche|active|leve|lever/.test(text)) && /lockdown/.test(text)) ||
+        (/fabriqu|invente|cree/.test(text) && /scan|qr/.test(text)) ||
+        (/modifi|supprim|efface/.test(text) && /historique|evenement/.test(text))) {
+      return jaspeRefusal("Je ne peux pas exécuter cette action de sécurité. Les sorties, récupérations, autorisations familiales, scans, historiques et lockdown restent sous contrôle humain et Access_Law.");
+    }
+    if (/scan|qr/.test(text) && /explique|statut|dernier|visible/.test(text)) {
+      var scans = root.SchoolSafeSecurityModule && root.SchoolSafeSecurityModule.readLocalEvents ? root.SchoolSafeSecurityModule.readLocalEvents() : [];
+      var scan = scans.find(function (event) { return event.portalId === portalProjection.portal.id; });
+      if (!scan) return { message: "Aucun scan local visible au portail affecté. Je ne fabrique aucun événement.", refusal: false };
+      return { message: "Dernier scan visible : " + (scan.decision || "VÉRIFICATION") + " pour " + (scan.studentName || "identité non confirmée") + " au " + portalProjection.portal.name + ". Il s’agit d’un événement frontend BACKEND_LATER.", refusal: false };
+    }
+    if (/pourquoi|explique/.test(text) && /refus|recuper|remise/.test(text)) {
+      var refusal = getSecurityHistory(user).find(function (event) { return event.kind === "REFUSÉ" || /SUSPENDUE|INCONNUE|REFUS/.test(event.detail || ""); });
+      if (!refusal) return { message: "Aucun refus visible dans l’historique local de votre portail.", refusal: false };
+      return { message: "La récupération de " + refusal.student + " est refusée : " + refusal.detail + ". La procédure d’urgence doit être suivie et aucune remise ne peut être validée.", refusal: false };
+    }
+    if (/resume|synthese|evenement/.test(text)) {
+      var history = getSecurityHistory(user);
+      if (!history.length) return { message: "Aucun événement local visible dans votre portail affecté.", refusal: false };
+      return { message: history.length + " événement(s) visible(s) au portail affecté. Dernier élément : " + history[0].kind + " · " + history[0].student + ". Résumé frontend uniquement.", refusal: false };
+    }
+    if (/urgence|procedure/.test(text)) {
+      return { message: "Procédure d’urgence : ne remettez pas l’enfant ; contactez d’abord le Parent principal, puis le contact d’urgence, puis la Direction. Les appels restent BACKEND_LATER.", refusal: false };
+    }
+    if (/rapport/.test(text) && /incident/.test(text)) {
+      return { message: "Je peux aider à préparer le rapport : indiquez le type, la date et l’heure, le portail, l’élève actif concerné, la description, le niveau d’attention, l’action locale et le statut. Je ne l’enregistre pas à votre place.", refusal: false };
+    }
+    if (/retrouve|trouve|cherche/.test(text) && /eleve|lucas|chloe|ethan|amina/.test(text)) {
+      var mentioned = STUDENTS.find(function (student) { return text.indexOf(normalizedQuery(student.name)) >= 0; });
+      if (mentioned && mentioned.lifecycleStatus !== "active") return jaspeRefusal(mentioned.name + " : DOSSIER NON ACTIF. Ce brouillon est exclu de toutes les opérations de sécurité.");
+      var visible = mentioned && portalProjection.students.find(function (student) { return student.id === mentioned.id; });
+      if (!visible) return jaspeRefusal("Je ne peux pas retrouver cet élève dans le périmètre autorisé du portail.");
+      return { message: visible.name + " est visible dans votre portail affecté : " + visible.className + " · " + visible.attendanceStatus + " · " + visible.dismissalStatus + ".", refusal: false };
+    }
+    return { message: "Je peux expliquer un scan visible, un refus de récupération, résumer les événements, rappeler la procédure d’urgence, préparer un rapport d’incident ou retrouver un élève actif dans votre portail.", refusal: false };
+  }
+
   function clear() {
     activeContainerId = null;
     activeUser = null;
@@ -568,6 +628,7 @@
     getDismissalProjection: getDismissalProjection,
     getSecurityHistory: getSecurityHistory,
     getSecurityOperationsProjection: getSecurityOperationsProjection,
+    answerJaspe: answerJaspe,
     open: open,
     clear: clear,
     render: render,

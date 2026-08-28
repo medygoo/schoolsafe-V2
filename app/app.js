@@ -228,7 +228,7 @@
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
     teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage", "safe.assistant.use"],
     pedagogy: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.lesson-plan.read", "pedagogy.report.read", "pedagogy.report.manage", "palmarques.read", "safe.assistant.use"],
-    guard: ["security.scan", "security.pickup.manage"]
+    guard: ["security.scan", "security.pickup.manage", "safe.assistant.use"]
   };
 
   var DEMO_ACCESS_CONTEXT_BY_ROLE = {
@@ -289,7 +289,8 @@
       assignedPortalIds: ["demo-portal-main"],
       scopes: [
         { permission: "security.scan", type: "assigned_portal", portalIds: ["demo-portal-main"] },
-        { permission: "security.pickup.manage", type: "assigned_portal", portalIds: ["demo-portal-main"] }
+        { permission: "security.pickup.manage", type: "assigned_portal", portalIds: ["demo-portal-main"] },
+        { permission: "safe.assistant.use", type: "own" }
       ]
     }
   };
@@ -1936,6 +1937,7 @@
   function renderWorkspace(roleKey) {
     var profile = roleCatalog[roleKey] || roleCatalog.admin;
     currentDemoRole = roleCatalog[roleKey] ? roleKey : "admin";
+    document.body.setAttribute("data-active-role", currentDemoRole);
     var accessUser = getCurrentUser();
     var access = window.SchoolSafeAccess;
     // Source unique du mode démo pour les modules finance/fee-control
