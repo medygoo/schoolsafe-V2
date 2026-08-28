@@ -197,6 +197,22 @@
     return '<section class="accounting-expenses" data-accounting-expenses><header><div><span>Registre des dépenses</span><h3>Dépenses Finance existantes</h3><p>Consultation uniquement des sorties déjà disponibles dans la source Finance.</p></div><span class="accounting-boundary-chip">LECTURE SEULE</span></header><div class="accounting-table-wrap" tabindex="0"><table class="accounting-table accounting-expense-table"><thead><tr><th>Référence</th><th>Date</th><th>Libellé</th><th>Montant / devise</th><th>Statut</th><th>Justification</th></tr></thead><tbody>' + rows + '</tbody></table></div><section class="accounting-expense-boundary"><header><div><span>Contrat futur visible</span><h3>Enregistrement officiel indisponible</h3><p>Ce formulaire documente les champs attendus sans créer de dépense locale ou officielle.</p></div><span class="accounting-boundary-chip">BACKEND_LATER</span></header><form id="expenseFutureForm"><label>Date<input id="expenseFutureDate" type="date"></label><label>Libellé<input id="expenseFutureLabel" type="text" maxlength="200" placeholder="Libellé futur"></label><label>Montant<input id="expenseFutureAmount" type="number" min="0" step="0.01"></label><label>Devise<select id="expenseFutureCurrency"><option value="CDF">CDF</option><option value="USD">USD</option></select></label><label>Catégorie future<input id="expenseFutureCategory" type="text" placeholder="FEATURE_LATER"></label><label>Référence<input id="expenseFutureReference" type="text"></label><label>Pièce future<input id="expenseFutureReceipt" type="text" placeholder="Référence de pièce"></label><button class="ss-button" id="expenseFutureSubmit" type="submit" disabled>Enregistrer la dépense</button></form><aside class="accounting-boundary accounting-boundary--warning"><i data-lucide="lock-keyhole"></i><p>PERMISSION D’ÉCRITURE REQUISE · BACKEND_LATER · aucune permission de lecture n’autorise une création.</p></aside></section></section>';
   }
 
+  function renderTreasury() {
+    var rows = journalRows();
+    var currencies = [];
+    rows.forEach(function (row) { if (row.currency && currencies.indexOf(row.currency) < 0) currencies.push(row.currency); });
+    var cards = currencies.sort().map(function (currency) {
+      var currencyRows = rows.filter(function (row) { return row.currency === currency; });
+      var incoming = currencyRows.filter(function (row) { return row.direction === "in"; }).reduce(function (sum, row) { return sum + row.amount; }, 0);
+      var outgoing = currencyRows.filter(function (row) { return row.direction === "out"; }).reduce(function (sum, row) { return sum + row.amount; }, 0);
+      var net = incoming - outgoing;
+      return '<article class="accounting-treasury-card" data-treasury-currency="' + escapeMarkup(currency) + '"><header><span>' + escapeMarkup(currency) + '</span><b>MOUVEMENTS UNIQUEMENT</b></header><div class="accounting-opening-missing">SOLDE D’OUVERTURE NON DISPONIBLE · BACKEND_LATER</div><dl><div><dt>Entrées</dt><dd>Entrées ' + escapeMarkup(amountLabel(incoming, currency)) + '</dd></div><div><dt>Sorties</dt><dd>Sorties ' + escapeMarkup(amountLabel(outgoing, currency)) + '</dd></div><div><dt>Position théorique</dt><dd>Mouvements nets ' + escapeMarkup(amountLabel(net, currency)) + '</dd></div><div><dt>Comptage local</dt><dd>Non préparé</dd></div><div><dt>Écart</dt><dd>Non calculable</dd></div><div><dt>Statut</dt><dd>À contrôler</dd></div></dl></article>';
+    }).join("");
+    if (!cards) cards = '<div class="accounting-empty">Aucune devise exploitable dans les mouvements visibles.</div>';
+    var missingCurrency = rows.filter(function (row) { return !row.currency; }).length;
+    return '<section class="accounting-treasury" data-accounting-treasury><header><div><span>Position de trésorerie</span><h3>Mouvements distincts par devise</h3><p>Les positions sont calculées sans somme ni conversion entre devises.</p></div><span class="accounting-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><aside class="accounting-boundary"><i data-lucide="split"></i><p>AUCUNE CONVERSION · aucun taux de change · aucun total général multidevise.</p></aside><div class="accounting-treasury-grid">' + cards + '</div>' + (missingCurrency ? '<aside class="accounting-missing-currency"><b>MOUVEMENTS SANS DEVISE EXCLUS</b><span>' + missingCurrency + ' mouvements à qualifier avant tout calcul.</span></aside>' : "") + "</section>";
+  }
+
   function renderFutureSurface() {
     var labels = {
       journal: "Journal de trésorerie",
@@ -233,7 +249,7 @@
       button.hidden = tab === "closing" && !closeAllowed;
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : renderFutureSurface()) : renderDenied();
+    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : renderFutureSurface()) : renderDenied();
     bindNavigation();
     if (activeTab === "journal") bindJournalFilters();
     if (typeof root.lucide !== "undefined" && root.lucide.createIcons) root.lucide.createIcons();

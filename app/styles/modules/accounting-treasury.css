@@ -13,7 +13,8 @@
 .accounting-future,
 .accounting-journal,
 .accounting-expenses,
-.accounting-expense-boundary {
+.accounting-expense-boundary,
+.accounting-treasury {
   display: grid;
   gap: var(--ss-space-4);
 }
@@ -22,6 +23,7 @@
 .accounting-journal > header,
 .accounting-expenses > header,
 .accounting-expense-boundary > header,
+.accounting-treasury > header,
 .accounting-shortcuts,
 .accounting-future {
   padding: var(--ss-space-5);
@@ -45,7 +47,8 @@
 }
 
 .accounting-expenses > header,
-.accounting-expense-boundary > header {
+.accounting-expense-boundary > header,
+.accounting-treasury > header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -231,6 +234,68 @@
 .accounting-expense-boundary button:disabled { cursor: not-allowed; opacity: .62; }
 .accounting-boundary--warning { color: var(--ss-warning-text); border-color: var(--ss-warning-border); background: var(--ss-bg-primary); }
 
+.accounting-treasury-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--ss-space-4);
+}
+
+.accounting-treasury-card {
+  min-width: 0;
+  padding: var(--ss-space-5);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-surface-raised);
+}
+
+.accounting-treasury-card > header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ss-space-3);
+  margin-bottom: var(--ss-space-3);
+}
+
+.accounting-treasury-card > header span {
+  color: var(--ss-domain-comptabilite);
+  font-size: var(--ss-text-xl);
+  font-weight: var(--ss-font-extrabold);
+}
+
+.accounting-treasury-card > header b {
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-xs);
+}
+
+.accounting-opening-missing,
+.accounting-missing-currency {
+  padding: var(--ss-space-3);
+  border: 1px solid var(--ss-warning-border);
+  border-radius: var(--ss-radius-md);
+  color: var(--ss-warning-text);
+  background: var(--ss-warning-bg);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-bold);
+}
+
+.accounting-treasury-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ss-space-3);
+  margin: var(--ss-space-4) 0 0;
+}
+
+.accounting-treasury-card dl div {
+  min-width: 0;
+  padding: var(--ss-space-3);
+  border: 1px solid var(--ss-border-subtle);
+  border-radius: var(--ss-radius);
+  background: var(--ss-bg-primary);
+}
+
+.accounting-treasury-card dt { color: var(--ss-text-secondary); font-size: var(--ss-text-xs); }
+.accounting-treasury-card dd { margin: var(--ss-space-1) 0 0; overflow-wrap: anywhere; font-weight: var(--ss-font-bold); }
+.accounting-missing-currency { display: flex; flex-wrap: wrap; gap: var(--ss-space-2); }
+
 .accounting-table :is(th, td) {
   padding: var(--ss-space-3);
   border-bottom: 1px solid var(--ss-border-subtle);
@@ -280,9 +345,11 @@
   .accounting-dashboard > header { flex-direction: column; }
   .accounting-journal > header { flex-direction: column; }
   .accounting-expenses > header,
-  .accounting-expense-boundary > header { flex-direction: column; }
+  .accounting-expense-boundary > header,
+  .accounting-treasury > header { flex-direction: column; }
   .accounting-dashboard-grid,
   .accounting-shortcuts > div { grid-template-columns: 1fr; }
   .accounting-journal-filters { grid-template-columns: 1fr; }
   .accounting-expense-boundary form { grid-template-columns: 1fr; }
+  .accounting-treasury-card dl { grid-template-columns: 1fr; }
 }
