@@ -13,6 +13,15 @@
     { code: "ART-005", name: "Ordinateur portable démo", category: "Matériel informatique", unit: "pièce", type: "ÉQUIPEMENT", status: "À CONTRÔLER", service: "Administration" },
     { code: "ART-006", name: "Farine de maïs", category: "Ingrédients Cantine", unit: "sac", type: "CONSOMMABLE", status: "ACTIF", service: "Cantine" }
   ];
+  var LEVELS = [
+    { item: "ART-001", name: "Papier A4", location: "Magasin central", quantity: 28, unit: "rame", minimum: 10 },
+    { item: "ART-001", name: "Papier A4", location: "Secrétariat", quantity: 4, unit: "rame", minimum: 6 },
+    { item: "ART-002", name: "Craie blanche", location: "Dépôt pédagogique", quantity: 0, unit: "boîte", minimum: 8 },
+    { item: "ART-003", name: "Marqueurs effaçables", location: "Salle des professeurs", quantity: 12, unit: "lot", minimum: 5 },
+    { item: "ART-004", name: "Détergent multiusage", location: "Local entretien", quantity: 6, unit: "litre", minimum: 6 },
+    { item: "ART-005", name: "Ordinateur portable démo", location: "Bureau informatique", quantity: 3, unit: "pièce", minimum: 1, control: true },
+    { item: "ART-006", name: "Farine de maïs", location: "Réserve Cantine", quantity: 9, unit: "sac", minimum: 4 }
+  ];
   var METRICS = [
     ["Articles", "12 références démo", "boxes"],
     ["Catégories", "5 familles", "tags"],
@@ -89,6 +98,21 @@
     return '<section class="inventory-catalog" data-inventory-catalog><header><div><span>Catalogue générique</span><h3>Articles et catégories</h3><p>Les catégories et services restent libres : aucune enum métier fermée.</p></div><span class="inventory-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><div class="inventory-table-wrap"><table><thead><tr><th>Code article</th><th>Nom</th><th>Catégorie</th><th>Unité</th><th>Type</th><th>Statut</th><th>Service principal</th></tr></thead><tbody>' + rows + '</tbody></table></div><form class="inventory-form" data-inventory-item-form><header><div><span>Préparation locale</span><h4>Ajouter un article générique</h4></div><span class="inventory-boundary-chip">BROUILLON LOCAL</span></header><label>Code article<input name="code" required placeholder="ART-..."></label><label>Nom<input name="name" required></label><label>Catégorie libre<input name="category" required list="inventoryCategorySuggestions"></label><datalist id="inventoryCategorySuggestions"><option value="Fournitures administratives"><option value="Produits de nettoyage"><option value="Matériel informatique"><option value="Ingrédients Cantine"></datalist><label>Unité libre<input name="unit" required placeholder="pièce, kg, litre..."></label><label>Type<select name="type"><option>CONSOMMABLE</option><option>ÉQUIPEMENT</option></select></label><label>Statut<select name="status"><option>ACTIF</option><option>INACTIF</option><option>À CONTRÔLER</option></select></label><label>Service principal éventuel<input name="service" placeholder="Tous services"></label><button class="ss-button ss-button--primary" type="submit">Préparer l’article</button><p class="inventory-form-wide">Aucune création officielle · navigateur non source de vérité · BACKEND_LATER.</p></form></section>';
   }
 
+  function levelState(level) {
+    if (level.control) return "À CONTRÔLER";
+    if (level.quantity === 0) return "RUPTURE";
+    if (level.quantity <= level.minimum) return "BAS";
+    return "NORMAL";
+  }
+
+  function renderLevels() {
+    var rows = LEVELS.map(function (level) {
+      var state = levelState(level);
+      return '<tr data-level-item="' + escapeMarkup(level.item) + '"><td><b>' + escapeMarkup(level.item) + '</b><small>' + escapeMarkup(level.name) + '</small></td><td>' + escapeMarkup(level.location) + '</td><td data-level-quantity="' + Math.max(0, Number(level.quantity) || 0) + '">' + Math.max(0, Number(level.quantity) || 0) + '</td><td>' + escapeMarkup(level.unit) + '</td><td>' + Math.max(0, Number(level.minimum) || 0) + '</td><td><span class="inventory-level-state inventory-level-state--' + state.toLowerCase().replace(/[^a-z]+/g, "-") + '">' + state + '</span></td></tr>';
+    }).join("");
+    return '<section class="inventory-levels" data-inventory-levels><header><div><span>Inventaire théorique de démonstration</span><h3>Emplacements et seuils</h3><p>Un article peut exister dans plusieurs emplacements. Le navigateur n’est pas la source officielle du stock.</p></div><span class="inventory-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><aside class="inventory-boundary"><i data-lucide="shield-alert"></i><p>Quantités bornées à zéro · aucune correction silencieuse ni stock négatif automatique.</p></aside><div class="inventory-level-legend"><span>NORMAL</span><span>BAS</span><span>RUPTURE</span><span>À CONTRÔLER</span></div><div class="inventory-table-wrap"><table><thead><tr><th>Article</th><th>Emplacement</th><th>Quantité théorique</th><th>Unité</th><th>Seuil minimum</th><th>État</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+  }
+
   function bindCatalogEvents() {
     var form = document.querySelector("[data-inventory-item-form]");
     if (!form || form.__inventoryBound) return;
@@ -118,6 +142,7 @@
     if (!content) return;
     var subject = user();
     if (activeTab === "catalog") content.innerHTML = isDemoMode(subject) ? renderCatalog() : renderDenied();
+    else if (activeTab === "levels") content.innerHTML = isDemoMode(subject) ? renderLevels() : renderDenied();
     else if (activeTab !== "dashboard") content.innerHTML = isDemoMode(subject) ? renderFuture(activeTab) : (canReadAggregates(subject) && activeTab === "reports" ? renderLiveAggregates() : renderDenied());
     else content.innerHTML = isDemoMode(subject) ? renderDemoDashboard() : (canReadAggregates(subject) ? renderLiveAggregates() : renderDenied());
     refreshTabs();
