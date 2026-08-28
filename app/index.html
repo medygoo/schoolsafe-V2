@@ -41,6 +41,7 @@
   <link rel="stylesheet" href="./styles/modules/hr.css">
   <link rel="stylesheet" href="./styles/modules/inventory.css">
   <link rel="stylesheet" href="./styles/modules/document-center.css">
+  <link rel="stylesheet" href="./styles/modules/communication.css">
   <link rel="stylesheet" href="./styles/screens/setup.css">
   <link rel="stylesheet" href="./styles/screens/auth.css">
   <script>
@@ -89,6 +90,7 @@
   <script src="./modules/security/guard-security-demo.js" defer></script>
   <script src="./modules/safe/safe-assistant.js" defer></script>
   <script src="./modules/core/access.js" defer></script>
+  <script src="./modules/communication/communication-demo.js" defer></script>
   <script src="./modules/document-center/document-center.js" defer></script>
   <script src="./modules/document-center/finance-accounting-documents.js" defer></script>
   <script src="./modules/document-center/school-pedagogy-documents.js" defer></script>
@@ -630,6 +632,23 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <button type="button" data-inventory-tab="reports"><i data-lucide="file-chart-column"></i><span>Rapports</span></button>
             </nav>
             <div class="pedagogy-content inventory-content" id="inventoryContent"></div>
+          </section>
+          <section class="pedagogy-module communication-module" id="communicationModule" hidden>
+            <header class="pedagogy-module-header communication-module-header">
+              <button class="ss-button ss-button--secondary" id="closeCommunicationModule" type="button"><i data-lucide="arrow-left"></i> Tableau de bord</button>
+              <div><span>Communications / Convocations / Notifications</span><h2 id="communicationModuleTitle">Communication scolaire</h2><p>Préparation frontend bornée par Access_Law, sans envoi ni publication réelle.</p></div>
+              <span class="local-draft"><i data-lucide="radio-tower"></i> FRONTEND · BACKEND_LATER</span>
+            </header>
+            <nav class="pedagogy-tabs communication-tabs" id="communicationTabs" aria-label="Fonctions Communication">
+              <button class="active" type="button" data-communication-tab="dashboard"><i data-lucide="layout-dashboard"></i><span>Vue d’ensemble</span></button>
+              <button type="button" data-communication-tab="messages"><i data-lucide="messages-square"></i><span>Messages</span></button>
+              <button type="button" data-communication-tab="announcements"><i data-lucide="megaphone"></i><span>Annonces</span></button>
+              <button type="button" data-communication-tab="convocations"><i data-lucide="mail-plus"></i><span>Convocations</span></button>
+              <button type="button" data-communication-tab="notifications"><i data-lucide="bell"></i><span>Notifications</span></button>
+              <button type="button" data-communication-tab="channels"><i data-lucide="radio-tower"></i><span>Canaux / Site</span></button>
+              <button type="button" data-communication-tab="events"><i data-lucide="calendar-days"></i><span>Événements</span></button>
+            </nav>
+            <div class="pedagogy-content communication-content" id="communicationContent"></div>
           </section>
           <section class="pedagogy-module document-center-module" id="documentCenterModule" hidden>
             <header class="pedagogy-module-header document-center-module-header">

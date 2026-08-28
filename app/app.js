@@ -419,6 +419,9 @@
         window.SchoolSafeInventoryDemo.open(tab);
       }
     },
+    openCommunication: function (tab) {
+      openCommunicationModule(tab);
+    },
     openDocuments: function () {
       openDocumentCenter();
     },
@@ -467,7 +470,7 @@
    */
   function showDashboard() {
     setWorkspaceDashboardVisible(true);
-    var modules = ["pedagogyModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "documentCenterModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
+    var modules = ["pedagogyModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "communicationModule", "documentCenterModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
     modules.forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.hidden = true;
@@ -546,7 +549,7 @@
         if (key === "record-payment") { openModuleByBranch("finance"); return; }
         if (key === "scan-qr") { openModuleByBranch("security"); return; }
         if (key === "publish-assignment") { openModuleByBranch("pedagogy"); return; }
-        if (key === "send-message") { notify("Messages — ouverture dans une prochaine étape."); return; }
+        if (key === "send-message") { openCommunicationModule("messages"); return; }
       });
     });
     icons();
@@ -2568,6 +2571,38 @@
     setBreadcrumb(null);
   }
 
+  function communicationTabForAction(actionName) {
+    if (/message|direction|parents autorisés/i.test(actionName)) return "messages";
+    if (/annonce/i.test(actionName)) return "announcements";
+    if (/convocation|rendez-vous/i.test(actionName)) return "convocations";
+    if (/notification/i.test(actionName)) return "notifications";
+    if (/site|galerie|synchronisation|websync/i.test(actionName)) return "channels";
+    if (/événement/i.test(actionName)) return "events";
+    return "dashboard";
+  }
+
+  function openCommunicationModule(actionName) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "documentCenterModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule", "cardsStudio"].forEach(function (id) {
+      var module = document.getElementById(id);
+      if (module) module.hidden = true;
+    });
+    setWorkspaceDashboardVisible(false);
+    var cardsProtected = document.getElementById("cardsProtected");
+    if (cardsProtected) cardsProtected.hidden = true;
+    if (window.SchoolSafeCommunication && typeof window.SchoolSafeCommunication.render === "function") {
+      window.SchoolSafeCommunication.render("communicationModule");
+      window.SchoolSafeCommunication.open(communicationTabForAction(actionName || ""));
+    }
+    setBreadcrumb("Communication");
+    var workspaceContent = document.querySelector(".workspace-content");
+    if (workspaceContent) workspaceContent.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeCommunicationModule() {
+    if (window.SchoolSafeCommunication && typeof window.SchoolSafeCommunication.close === "function") window.SchoolSafeCommunication.close();
+    else showDashboard();
+  }
+
   function openDocumentCenter() {
     ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule", "cardsStudio"].forEach(function (id) {
       var module = document.getElementById(id);
@@ -2636,7 +2671,7 @@
     if (branchKey === "people") { openHrModule(); return; }
     if (branchKey === "accounting") { openAccountingModule(); return; }
     if (branchKey === "inventory") { openInventoryModule(); return; }
-    if (branchKey === "communication") { notify("Communication — ouverture dans une prochaine étape."); return; }
+    if (branchKey === "communication") { openCommunicationModule(); return; }
     if (branchKey === "reports") { notify("Contrôle et rapports — ouverture dans une prochaine étape."); return; }
     notify(definition.label + " — ouverture dans une prochaine étape.");
   }
@@ -2669,6 +2704,7 @@
     if (branchKey === "accounting") { openAccountingModule(); return; }
     if (branchKey === "people") { openHrModule(actionName); return; }
     if (branchKey === "inventory") { openInventoryModule(actionName); return; }
+    if (branchKey === "communication") { openCommunicationModule(actionName); return; }
     if (branchKey === "feeControl") { openFeeControlModule(actionName); return; }
     if (branchKey === "security") { openSecurityModule(actionName); return; }
     if (branchKey === "school") { openSchoolModule(schoolTabForAction(actionName) || "school"); return; }
@@ -2987,6 +3023,7 @@
   bindIfExists("closeAccountingModule", "click", closeAccountingModule);
   bindIfExists("closeHrModule", "click", closeHrModule);
   bindIfExists("closeInventoryModule", "click", closeInventoryModule);
+  bindIfExists("closeCommunicationModule", "click", closeCommunicationModule);
   bindIfExists("closeDocumentCenter", "click", closeDocumentCenter);
   bindIfExists("closeSecurityModule", "click", closeSecurityModule);
   bindIfExists("closePilotageModule", "click", closePilotageModule);
