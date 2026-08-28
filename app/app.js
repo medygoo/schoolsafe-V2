@@ -236,7 +236,7 @@
     accountant: ["reports.financial.read", "finance.report.read", "finance.receipt.read", "safe.assistant.use"],
     hr: ["staff.read", "staff.manage", "staff.attendance.read", "reports.hr.read", "safe.assistant.use"],
     cashier: ["finance.payment.record", "finance.receipt.read", "finance.status.read", "safe.assistant.use"],
-    communication: ["communication.message.send", "communication.announcement.manage"]
+    communication: ["communication.message.send", "communication.announcement.manage", "notification.subscribe"]
   };
 
   var DEMO_ACCESS_CONTEXT_BY_ROLE = {
@@ -352,7 +352,8 @@
     communication: {
       scopes: [
         { permission: "communication.message.send", type: "school" },
-        { permission: "communication.announcement.manage", type: "school" }
+        { permission: "communication.announcement.manage", type: "school" },
+        { permission: "notification.subscribe", type: "own" }
       ]
     },
     cashier: {

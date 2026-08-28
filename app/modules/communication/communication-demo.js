@@ -7,6 +7,7 @@
   var messageDrafts = [];
   var announcementDrafts = [];
   var convocationDrafts = [];
+  var notificationPreference = { subscription: "opt-in", channels: ["in-app"], prepared: false };
 
   var SECTIONS = [
     { key: "messages", label: "Messages", icon: "messages-square", note: "Composition bornée par permission et portée." },
@@ -58,6 +59,16 @@
 
   function canPrepareConvocation(subject) {
     return isDemoMode(subject || user());
+  }
+
+  function canManageOwnNotifications(subject) {
+    var engine = access();
+    var current = subject || user();
+    return !!(engine && typeof engine.allowsScope === "function" && engine.allowsScope(current, "notification.subscribe", "own"));
+  }
+
+  function canSendNotification() {
+    return false;
   }
 
   function labelForChild(id) {
@@ -310,6 +321,43 @@
     });
   }
 
+  function renderNotifications() {
+    var subject = user();
+    if (!canManageOwnNotifications(subject)) {
+      return '<section class="communication-denied" data-notification-denied><i data-lucide="bell-off"></i><span>ACCÈS REFUSÉ</span><h3>Préférences de notification indisponibles</h3><p>notification.subscribe avec portée own est obligatoire. Un DENY explicite reste prioritaire.</p></section>';
+    }
+    var live = !isDemoMode(subject);
+    var categories = ["Sécurité", "Présence", "Pédagogie", "Finance", "Administration", "Communication"];
+    var history = [
+      ["Présence", "Arrivée enregistrée — exemple fictif"],
+      ["Pédagogie", "Nouveau devoir disponible — exemple fictif"],
+      ["Finance", "Reçu prêt à consulter — exemple fictif"]
+    ];
+    return '<section class="communication-notifications"><header class="communication-view-header"><div><span>ABONNEMENT PERSONNEL</span><h3>Préférences et centre de notifications</h3><p>notification.subscribe · portée <b>own</b> uniquement</p></div><span class="communication-boundary-chip">' + (live ? "SESSION LIVE" : "DÉMONSTRATION") + '</span></header>' +
+      '<aside class="communication-boundary" data-notification-boundary><i data-lucide="bell-ring"></i><div><b>PUSH — BACKEND_LATER</b><p>notification.subscribe permet seulement de gérer son propre abonnement : ni envoyer, ni gérer, ni lire toutes les notifications.</p></div></aside>' +
+      '<div class="communication-category-grid" data-notification-categories>' + categories.map(function (category) { return '<span><i data-lucide="tag"></i>' + category + '</span>'; }).join("") + '</div>' +
+      '<form class="communication-form communication-notification-form" data-notification-preferences><p class="communication-form-wide">Garde exacte : <b>notification.subscribe + own</b></p><label>État de l’abonnement<select name="subscription"><option value="opt-in"' + (notificationPreference.subscription === "opt-in" ? " selected" : "") + '>Activées (opt-in)</option><option value="opt-out"' + (notificationPreference.subscription === "opt-out" ? " selected" : "") + '>Désactivées (opt-out)</option></select></label><fieldset><legend>Canaux préparés</legend><label><input name="channel" type="checkbox" value="in-app"' + (notificationPreference.channels.indexOf("in-app") >= 0 ? " checked" : "") + '> In-app</label><label><input name="channel" type="checkbox" value="push"' + (notificationPreference.channels.indexOf("push") >= 0 ? " checked" : "") + '> Push · BACKEND_LATER</label><label><input name="channel" type="checkbox" value="email"' + (notificationPreference.channels.indexOf("email") >= 0 ? " checked" : "") + '> Email · préférence seulement</label></fieldset><button class="ss-button ss-button--primary" type="submit">Préparer mes préférences</button><output data-notification-state>' + (notificationPreference.subscription === "opt-out" ? "NOTIFICATIONS DÉSACTIVÉES · PRÉFÉRENCE " : "NOTIFICATIONS ACTIVÉES · PRÉFÉRENCE ") + (notificationPreference.prepared ? "PRÉPARÉE" : "DE SESSION") + '</output></form>' +
+      (live ? '' : '<section class="communication-notification-history" data-notification-history><header><span>HISTORIQUE DÉMO</span><h4>Exemples non réels</h4></header>' + history.map(function (item) { return '<article><b>' + item[0] + '</b><span>' + item[1] + '</span></article>'; }).join("") + '</section>') +
+      '<aside class="communication-boundary" data-notification-security-boundary><i data-lucide="siren"></i><div><b>Urgences Sécurité inchangées</b><p>Les alertes et urgences conservent leurs permissions Sécurité d’origine ; cet abonnement ne les autorise jamais.</p></div></aside></section>';
+  }
+
+  function bindNotificationEvents() {
+    var form = document.querySelector("[data-notification-preferences]");
+    if (!form || form.__communicationBound) return;
+    form.__communicationBound = true;
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!canManageOwnNotifications(user())) { renderContent(); return; }
+      var data = new FormData(form);
+      notificationPreference = {
+        subscription: String(data.get("subscription") || "opt-out"),
+        channels: data.getAll("channel").map(String),
+        prepared: true
+      };
+      renderContent();
+    });
+  }
+
   function renderFuture() {
     var selected = SECTIONS.filter(function (item) { return item.key === activeTab; })[0];
     return '<section class="communication-future"><i data-lucide="construction"></i><span>DÉMONSTRATION · BACKEND_LATER</span><h3>' +
@@ -325,7 +373,7 @@
   function renderContent() {
     var content = document.getElementById("communicationContent");
     if (!content) return;
-    content.innerHTML = activeTab === "dashboard" ? renderDashboard() : activeTab === "messages" ? renderMessages() : activeTab === "announcements" ? renderAnnouncements() : activeTab === "convocations" ? renderConvocations() : renderFuture();
+    content.innerHTML = activeTab === "dashboard" ? renderDashboard() : activeTab === "messages" ? renderMessages() : activeTab === "announcements" ? renderAnnouncements() : activeTab === "convocations" ? renderConvocations() : activeTab === "notifications" ? renderNotifications() : renderFuture();
     refreshTabs();
     content.querySelectorAll("[data-communication-open]").forEach(function (button) {
       button.addEventListener("click", function () { open(button.getAttribute("data-communication-open")); });
@@ -333,6 +381,7 @@
     if (activeTab === "messages") bindMessageEvents();
     if (activeTab === "announcements") bindAnnouncementEvents();
     if (activeTab === "convocations") bindConvocationEvents();
+    if (activeTab === "notifications") bindNotificationEvents();
     if (root.lucide && typeof root.lucide.createIcons === "function") root.lucide.createIcons();
   }
 
@@ -371,6 +420,7 @@
     messageDrafts = [];
     announcementDrafts = [];
     convocationDrafts = [];
+    notificationPreference = { subscription: "opt-in", channels: ["in-app"], prepared: false };
   }
 
   root.SchoolSafeCommunication = {
@@ -385,6 +435,9 @@
     canPrepareAnnouncement: canPrepareAnnouncement,
     getAnnouncementDrafts: function () { return announcementDrafts.map(function (draft) { return Object.assign({}, draft); }); },
     canPrepareConvocation: canPrepareConvocation,
-    getConvocationDrafts: function () { return convocationDrafts.map(function (draft) { return Object.assign({}, draft); }); }
+    getConvocationDrafts: function () { return convocationDrafts.map(function (draft) { return Object.assign({}, draft); }); },
+    canManageOwnNotifications: canManageOwnNotifications,
+    canSendNotification: canSendNotification,
+    getNotificationPreference: function () { return Object.assign({}, notificationPreference, { channels: notificationPreference.channels.slice() }); }
   };
 })(window);
