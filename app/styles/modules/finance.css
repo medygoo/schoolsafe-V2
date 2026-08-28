@@ -444,6 +444,48 @@
   margin-top: var(--ss-space-4);
 }
 
+.finance-canteen-link,
+.finance-canteen-drafts {
+  display: grid;
+  gap: var(--ss-space-4);
+}
+
+.finance-canteen-link > header,
+.finance-canteen-draft > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ss-space-3);
+}
+
+.finance-canteen-link > header h3,
+.finance-canteen-drafts > header h3,
+.finance-canteen-draft h4 {
+  margin: var(--ss-space-1) 0 0;
+}
+
+.finance-canteen-link-form {
+  display: grid;
+  gap: var(--ss-space-4);
+}
+
+.finance-canteen-draft {
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-warning-border);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-warning-bg);
+  color: var(--ss-text-primary);
+}
+
+.finance-canteen-draft p {
+  margin: var(--ss-space-3) 0;
+}
+
+.finance-canteen-draft small {
+  color: var(--ss-warning-text);
+  font-weight: var(--ss-font-bold);
+}
+
 @media (max-width: 1180px) {
   .finance-dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -488,5 +530,10 @@
   .fee-control-campaign-form,
   .fee-control-scan form {
     grid-template-columns: 1fr;
+  }
+
+  .finance-canteen-link > header,
+  .finance-canteen-draft > header {
+    flex-direction: column;
   }
 }

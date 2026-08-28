@@ -139,7 +139,8 @@
         { id: "demo-1", name: "Frais scolaires", cycle: "Primaire", amount: 300000, currency: "CDF", frequency: "Trimestre", due: "30 septembre 2026", active: true },
         { id: "demo-2", name: "Frais scolaires", cycle: "Humanités", amount: 450000, currency: "CDF", frequency: "Trimestre", due: "30 septembre 2026", active: true },
         { id: "demo-3", name: "Inscription", cycle: "Tous les cycles", amount: 50000, currency: "CDF", frequency: "Une fois", due: "À l’inscription", active: true },
-        { id: "demo-4", name: "Transport scolaire", cycle: "Service facultatif", amount: 100000, currency: "USD", frequency: "Mois", due: "Chaque 5 du mois", active: true }
+        { id: "demo-4", name: "Transport scolaire", cycle: "Service facultatif", amount: 100000, currency: "USD", frequency: "Mois", due: "Chaque 5 du mois", active: true },
+        { id: "demo-5", name: "Frais de cantine", cycle: "Service facultatif", amount: 75000, currency: "CDF", frequency: "Mois", due: "Chaque 5 du mois", active: true }
       ],
       feeAssignment: { feeStructureId: "", targetingMode: "cycle", classIds: [], studentIds: [], prepared: false },
       campaignDraft: { feeStructureId: "", label: "", startsAt: "", endsAt: "", description: "", prepared: false, preparedSummary: null },
@@ -241,6 +242,7 @@
   var FEE_ASSIGNMENT_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-assignment-drafts";
   var FEE_EXEMPTION_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-exemption-drafts";
   var PAYMENT_CANCELLATION_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-payment-cancellation-drafts";
+  var CANTEEN_LINK_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-canteen-link-drafts";
 
   function readLocalDrafts(key) {
     try {
@@ -263,6 +265,7 @@
   financeState.assignmentDrafts = readLocalDrafts(FEE_ASSIGNMENT_DRAFT_STORAGE_KEY);
   financeState.exemptionDrafts = readLocalDrafts(FEE_EXEMPTION_DRAFT_STORAGE_KEY);
   financeState.cancellationDrafts = readLocalDrafts(PAYMENT_CANCELLATION_DRAFT_STORAGE_KEY);
+  financeState.canteenLinkDrafts = readLocalDrafts(CANTEEN_LINK_DRAFT_STORAGE_KEY);
 
   // ---------------------------------------------------------------------------
   // Mapping données backend
@@ -459,6 +462,7 @@
         "finance.status.read",
         "safe.assistant.use"
       ],
+      canteen: ["canteen.manage"],
       school_head: ["finance.status.read", "finance.report.read", "safe.assistant.use"]
     };
     var permissions = templates[role] || [];
@@ -535,6 +539,10 @@
   // finance.control.campaign.* restent BACKEND_LATER ; aucun rôle ne décide seul.
   function canManageControlCampaigns() {
     return canAccessFeeCatalog("finance.control.manage");
+  }
+
+  function canManageCanteenFinanceLink() {
+    return canAccessFeeCatalog("canteen.manage");
   }
 
   function exemptionDraftState() {
@@ -802,6 +810,7 @@
   // Onglets et autorisation des onglets
   // ---------------------------------------------------------------------------
   function financeTabForAction(actionName) {
+    if (/liaison financière|frais de cantine|finance cantine/i.test(actionName)) return "canteen";
     if (/campagne/i.test(actionName)) return "campaigns";
     if (/exemption|exonération/i.test(actionName)) return "exemptions";
     if (/affectation des frais|affecter un frais/i.test(actionName)) return "assignments";
@@ -834,6 +843,7 @@
     if (canReadFinancialDetails() || canReadFinancialStatus()) tabs.push("balances");
     if (canPrepareExemption()) tabs.push("exemptions");
     if (canReadFinanceReports()) tabs.push("reports");
+    if (canManageCanteenFinanceLink()) tabs.push("canteen");
     // La gestion de campagnes legacy reste disponible uniquement pour un
     // utilisateur déjà autorisé dans Finance générale ; control.* seul ne crée
     // donc jamais une entrée Finance générale.
@@ -1012,6 +1022,24 @@
       window.ssField({ label: "Type de frais", labelFor: "financeAssignmentFee", required: true, inputHtml: window.ssSelect({ name: "fee_structure_id", id: "financeAssignmentFee", required: true, value: assignment.feeStructureId, options: feeOptions }) }) +
       window.ssField({ label: "Mode de ciblage", labelFor: "financeAssignmentTargetMode", required: true, inputHtml: window.ssSelect({ name: "targeting_mode", id: "financeAssignmentTargetMode", required: true, value: assignment.targetingMode, options: targetingModes }) }) +
       targetField + '</div><section class="finance-panel"><header><div><span>Type sélectionné</span><h3>' + escapeMarkup(fee ? fee.name : "—") + '</h3></div>' + window.ssBadge({ variant: fee && fee.active ? "success" : "warning", label: fee && fee.local ? "BROUILLON LOCAL" : "DÉMONSTRATION" }) + '</header><dl class="student-finance-facts"><div><dt>Montant attendu</dt><dd>' + assignmentAmountLabel(fee) + '</dd></div><div><dt>Devise</dt><dd>' + escapeMarkup(fee ? fee.currency : "—") + '</dd></div><div><dt>Fréquence</dt><dd>' + escapeMarkup(fee ? fee.frequency || "Non définie" : "—") + '</dd></div><div><dt>Échéance</dt><dd>' + escapeMarkup(fee ? fee.due : "—") + '</dd></div><div><dt>Statut</dt><dd>Préparation locale</dd></div></dl></section>' + window.ssButton({ label: "Préparer l’affectation", icon: "clipboard-check", type: "submit", disabled: !fee }) + '</form></section><aside class="finance-panel"><header><div><span>Obligations futures</span><h3>Statuts attendus</h3></div></header><div class="finance-obligation-statuses">' + statusLegend + '</div><p>Aucun statut n’est modifié par ce brouillon.</p></aside></div><section class="finance-assignment-drafts"><header><span>Préparations locales</span><h3>Affectations distinctes</h3></header>' + (draftRows || window.ssState({ type: "empty", title: "Aucune affectation préparée", message: "Préparez un brouillon sans créer de student_fee." })) + '</section></section>';
+  }
+
+  function renderCanteenFinanceLink() {
+    if (!canManageCanteenFinanceLink()) {
+      return window.ssState({ type: "denied", title: "Liaison financière Cantine non autorisée", message: "La permission existante canteen.manage avec portée school est requise. Aucun droit Finance n’est déduit." });
+    }
+    var canteenFees = feeCatalog().filter(function (fee) { return fee.active && /cantine/i.test(fee.name || ""); });
+    var activeStudents = (financeState.students || []).map(mapFinancialStudent).filter(function (student) { return student.lifecycleStatus === "active"; });
+    var options = canteenFees.map(function (fee) { return { value: fee.id, label: fee.name + " · " + formatFinancialAmount(fee.amount, fee.currency) + " · " + (fee.frequency || "Fréquence non définie") }; });
+    var drafts = (financeState.canteenLinkDrafts || []).map(function (draft) {
+      return '<article class="finance-canteen-draft" data-finance-canteen-draft><header><div><span>BROUILLON LOCAL</span><h4>' + escapeMarkup(draft.serviceLabel) + '</h4></div>' + window.ssBadge({ variant: "warning", label: "BACKEND_LATER" }) + '</header><p>' + escapeMarkup(draft.feeLabel) + ' · ' + escapeMarkup(draft.populationLabel) + '</p><small>Configuration de liaison uniquement · student_fee non créé</small></article>';
+    }).join("");
+    var form = canteenFees.length ? '<form id="financeCanteenLinkForm" class="finance-canteen-link-form"><div class="ss-form-grid">' +
+      window.ssField({ label: "Service financier Cantine", labelFor: "financeCanteenService", required: true, inputHtml: window.ssInput({ id: "financeCanteenService", name: "service_label", required: true, maxlength: 120, placeholder: "Ex. Service cantine primaire" }) }) +
+      window.ssField({ label: "Type de frais existant", labelFor: "financeCanteenFee", required: true, inputHtml: window.ssSelect({ id: "financeCanteenFee", name: "fee_structure_id", required: true, value: canteenFees[0].id, options: options }) }) +
+      window.ssField({ label: "Population de liaison", labelFor: "financeCanteenTargeting", required: true, inputHtml: window.ssSelect({ id: "financeCanteenTargeting", name: "targeting_mode", required: true, value: "active_students", options: [{ value: "active_students", label: "Élèves actifs éligibles" }] }) }) +
+      '</div>' + window.ssButton({ label: "Préparer la liaison", icon: "link-2", type: "submit" }) + '</form>' : window.ssState({ type: "empty", title: "Type de frais Cantine indisponible", message: "Finance doit d’abord définir un type de frais générique ; canteen.manage ne peut pas le créer." });
+    return '<section class="finance-canteen-link" data-finance-canteen><header><div><span>F6-FE · Cantine financière uniquement</span><h3>Liaison du service Cantine</h3><p>canteen.manage prépare la liaison avec un type de frais existant, sans gérer le catalogue ni encaisser.</p></div>' + window.ssBadge({ variant: "info", label: "CONFIGURATION FRONTEND" }) + '</header><div class="finance-workflow-steps"><span>TYPE DE FRAIS</span><i data-lucide="arrow-right"></i><span>AFFECTATION</span><i data-lucide="arrow-right"></i><span>STUDENT_FEE</span></div><aside class="finance-audit-note"><i data-lucide="shield-check"></i><p>Seuls ' + activeStudents.length + ' élèves actifs sont comptés. Toute affectation et tout student_fee officiel restent BACKEND_LATER.</p></aside><div class="finance-two-column"><section class="finance-panel"><header><div><span>Configuration de liaison</span><h3>Préparation locale</h3></div></header>' + form + '</section><aside class="finance-panel"><header><div><span>Périmètre opérationnel</span><h3>FEATURE_LATER</h3></div></header><p>Repas, menus, stocks et présences ne font pas partie de la Phase F. Aucune action opérationnelle n’est exposée ici.</p><p>Le paiement reste sous finance.payment.record ; le type de frais reste sous finance.fee.manage.</p></aside></div><section class="finance-canteen-drafts"><header><span>Préparations distinctes</span><h3>Liaisons locales</h3></header>' + (drafts || window.ssState({ type: "empty", title: "Aucune liaison préparée", message: "La configuration n’entraîne aucune obligation financière." })) + '</section></section>';
   }
 
   function renderCash() {
@@ -1477,7 +1505,7 @@
     }
     if (allowedTabs.indexOf(financeState.activeTab) === -1 && !deniedReports) financeState.activeTab = allowedTabs[0];
 
-    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", exemptions: "Exemptions", campaigns: "Campagnes de contrôle", cash: "Encaissements", receipts: "Reçus", "cash-register": "Caisse", balances: "Soldes et régularité", reports: "Rapports financiers", family: "Situation familiale" };
+    var titles = { overview: "Pilotage financier", fees: "Structure des frais", assignments: "Affectation des frais", exemptions: "Exemptions", campaigns: "Campagnes de contrôle", cash: "Encaissements", receipts: "Reçus", "cash-register": "Caisse", balances: "Soldes et régularité", reports: "Rapports financiers", family: "Situation familiale", canteen: "Liaison financière Cantine" };
     if (titleEl) titleEl.textContent = titles[financeState.activeTab];
     if (workspaceTitle) workspaceTitle.textContent = titles[financeState.activeTab];
 
@@ -1503,6 +1531,7 @@
       overview: renderFinanceOverview,
       fees: renderFeeStructure,
       assignments: renderFeeAssignment,
+      canteen: renderCanteenFinanceLink,
       exemptions: renderExemptions,
       campaigns: renderControlCampaignManagement,
       cash: renderCash,
@@ -1728,6 +1757,23 @@
         renderFinanceModule();
       });
     }
+
+    var canteenLinkForm = document.getElementById("financeCanteenLinkForm");
+    if (canteenLinkForm) canteenLinkForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!canManageCanteenFinanceLink()) { d.notify("Action non autorisée.", "error"); return; }
+      var data = new FormData(canteenLinkForm);
+      var serviceLabel = String(data.get("service_label") || "").trim();
+      var feeStructureId = String(data.get("fee_structure_id") || "");
+      var targetingMode = String(data.get("targeting_mode") || "");
+      var fee = feeCatalog().find(function (item) { return item.id === feeStructureId && item.active && /cantine/i.test(item.name || ""); });
+      var activeStudents = (financeState.students || []).map(mapFinancialStudent).filter(function (student) { return student.lifecycleStatus === "active"; });
+      if (!serviceLabel || !fee || targetingMode !== "active_students") { d.notify("Vérifiez le service, le type de frais Cantine et la population active.", "error"); return; }
+      financeState.canteenLinkDrafts.unshift({ id: "local-canteen-link-" + Date.now(), serviceLabel: serviceLabel, feeStructureId: fee.id, feeLabel: fee.name, targetingMode: targetingMode, populationLabel: activeStudents.length + " élèves actifs éligibles", local: true, backendLater: true });
+      persistLocalDrafts(CANTEEN_LINK_DRAFT_STORAGE_KEY, financeState.canteenLinkDrafts);
+      d.notify("Liaison Cantine préparée en BROUILLON LOCAL · BACKEND_LATER.");
+      renderFinanceModule();
+    });
 
     document.querySelectorAll("[data-toggle-fee]").forEach(function (button) {
       button.addEventListener("click", function () {

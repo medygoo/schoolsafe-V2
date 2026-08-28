@@ -580,7 +580,7 @@
       label: "Responsable cantine", short: "Cantine", initials: "RC", scope: "Service cantine", eyebrow: "Cantine scolaire",
       welcome: "Organisez les repas et les présences au service.", copy: "L’espace cantine ne donne aucun accès aux notes, à la paie ou à la caisse scolaire.",
       today: [["Repas prévus","318","utensils"],["Présences","À confirmer","clipboard-check"],["Allergies","6 signalées","triangle-alert"],["Menus","Semaine active","notebook-tabs"]],
-      branches: [branch("care","Service de cantine",[group("Aujourd’hui",[["Présences repas","clipboard-check"],["Service des repas","utensils"],["Allergies","triangle-alert"]]),group("Organisation",[["Menus","notebook-tabs"],["Bénéficiaires","users"],["Historique","history"]])])]
+      branches: [branch("care","Service de cantine",[group("Aujourd’hui",[["Présences repas","clipboard-check"],["Service des repas","utensils"],["Allergies","triangle-alert"]]),group("Organisation",[["Menus","notebook-tabs"],["Bénéficiaires","users"],["Historique","history"]]),group("Finance cantine",[["Liaison financière","link-2"]])])]
     },
     communication: {
       label: "Responsable communication et site", short: "Communication", initials: "CM", scope: "Communication et site public", eyebrow: "Communication scolaire",
@@ -2369,6 +2369,7 @@
     if (branchKey === "finance") { openFinanceModule(); return; }
     if (branchKey === "feeControl") { openFeeControlModule(); return; }
     if (branchKey === "security") { openSecurityModule(currentDemoRole === "guard" ? "Personnes autorisées" : "Scanner un QR"); return; }
+    if (branchKey === "care" && currentDemoRole === "canteen") { openFinanceModule("Liaison financière"); return; }
     if (branchKey === "school") { openSchoolModule("school"); return; }
     if (branchKey === "pilotage") { openPilotageModule("Tableau de bord"); return; }
     if (branchKey === "people") { notify("Personnel — ouverture dans une prochaine étape."); return; }
@@ -2398,6 +2399,7 @@
     };
     if (branchKey === "pedagogy" && phaseDViews[actionName] && openPhaseDPedagogy(phaseDViews[actionName])) return;
     if (branchKey === "pedagogy") { openPedagogyModule(actionName); return; }
+    if (branchKey === "care" && /liaison financière/i.test(actionName)) { openFinanceModule(actionName); return; }
     if (branchKey === "finance" && feeControlTabForAction(actionName)) { openFeeControlModule(actionName); return; }
     if (branchKey === "finance") { openFinanceModule(actionName); return; }
     if (branchKey === "feeControl") { openFeeControlModule(actionName); return; }
