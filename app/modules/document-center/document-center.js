@@ -55,6 +55,10 @@
       context: value.context && typeof value.context === "object" ? Object.assign({}, value.context) : {},
       actions: Array.isArray(value.actions) && value.actions.length ? value.actions.slice() : ["preview", "pdf", "print", "download"],
       actionPermissions: value.actionPermissions && typeof value.actionPermissions === "object" ? Object.assign({}, value.actionPermissions) : {},
+      authority: "preview",
+      currencyPolicy: value.currencyPolicy ? String(value.currencyPolicy) : "not-applicable",
+      officialBoundary: value.officialBoundary ? String(value.officialBoundary) : "Aperçu frontend uniquement",
+      templateKind: value.templateKind ? String(value.templateKind) : "report",
     };
   }
 
@@ -225,7 +229,8 @@
       id: descriptor.id, type: descriptor.type, label: descriptor.label, description: descriptor.description,
       sourceModule: descriptor.sourceModule, nature: descriptor.nature, date: descriptor.date, status: descriptor.status,
       sensitivity: descriptor.sensitivity, formats: descriptor.formats.slice(), permission: descriptor.permission,
-      scope: descriptor.scope, actions: descriptor.actions.slice(),
+      scope: descriptor.scope, actions: descriptor.actions.slice(), authority: descriptor.authority,
+      currencyPolicy: descriptor.currencyPolicy, officialBoundary: descriptor.officialBoundary, templateKind: descriptor.templateKind,
     };
   }
 
