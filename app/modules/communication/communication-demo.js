@@ -6,6 +6,7 @@
   var sessionOverride = null;
   var messageDrafts = [];
   var announcementDrafts = [];
+  var convocationDrafts = [];
 
   var SECTIONS = [
     { key: "messages", label: "Messages", icon: "messages-square", note: "Composition bornée par permission et portée." },
@@ -53,6 +54,10 @@
   function canPrepareAnnouncement(subject) {
     var scope = permissionScope(subject || user(), "communication.announcement.manage");
     return !!(scope && ["own", "own_children", "assigned_classes", "assigned_subjects", "school"].indexOf(scope.type) >= 0);
+  }
+
+  function canPrepareConvocation(subject) {
+    return isDemoMode(subject || user());
   }
 
   function labelForChild(id) {
@@ -265,6 +270,46 @@
     });
   }
 
+  function renderConvocationDraft(draft) {
+    return '<article class="communication-draft" data-convocation-draft><header><div><span>BROUILLON LOCAL · DÉMONSTRATION</span><b>' + escapeMarkup(draft.reason) + '</b></div><span>' + escapeMarkup(draft.status) + '</span></header><p>' + escapeMarkup(draft.recipient) + ' · ' + escapeMarkup(draft.child) + '</p><footer><span>' + escapeMarkup(draft.date) + ' · ' + escapeMarkup(draft.time) + '</span><span>' + escapeMarkup(draft.place) + '</span><span>' + escapeMarkup(draft.contact) + '</span></footer></article>';
+  }
+
+  function renderConvocations() {
+    var subject = user();
+    if (!canPrepareConvocation(subject)) {
+      return '<section class="communication-denied communication-convocation-denied" data-convocation-live-denied><i data-lucide="shield-x"></i><span>PERMISSION CONVOCATION DÉDIÉE REQUISE</span><h3>Convocation réelle indisponible</h3><p>Aucune permission dédiée n’existe dans Access_Law. communication.message.send, communication.announcement.manage et email.send ne sont jamais réutilisées : message de classe ≠ convocation individuelle.</p><b>BACKEND_LATER</b></section>';
+    }
+    var preview = convocationDrafts.length ? convocationDrafts[convocationDrafts.length - 1] : null;
+    return '<section class="communication-convocations"><header class="communication-view-header"><div><span>CONVOCATION · DÉMONSTRATION</span><h3>Préparer une convocation fictive</h3><p>Aucune permission officielle n’est simulée par cette surface locale.</p></div><span class="communication-boundary-chip">BROUILLON LOCAL</span></header>' +
+      '<aside class="communication-boundary" data-convocation-boundary><i data-lucide="shield-alert"></i><div><b>PERMISSION CONVOCATION DÉDIÉE REQUISE</b><p>La création, l’envoi et le document officiel restent BACKEND_LATER. Aucune permission Message, Annonce, Pilotage ou Email ne s’y substitue.</p></div></aside>' +
+      '<form class="communication-form" data-convocation-form><label>Motif<input name="reason" required maxlength="140"></label><label>Destinataire fictif<input name="recipient" required maxlength="100"></label><label>Enfant fictif concerné<input name="child" required maxlength="100"></label><label>Date<input name="date" type="date" required></label><label>Heure<input name="time" type="time" required></label><label>Lieu<input name="place" value="Bureau de la Direction" required maxlength="120"></label><label>Interlocuteur<input name="contact" value="Direction — démo" required maxlength="120"></label><label>Statut<select name="status"><option>BROUILLON</option><option>À RELIRE</option></select></label><label class="communication-form-wide">Note<textarea name="note" rows="4" maxlength="800"></textarea></label><button class="ss-button ss-button--primary" type="submit">Préparer le brouillon démo</button></form>' +
+      '<aside class="communication-preview" data-convocation-preview><span>APERÇU NON OFFICIEL · COMPATIBLE CENTRE DE DOCUMENTS</span><h4>' + escapeMarkup(preview ? preview.reason : "Aucune convocation préparée") + '</h4><p>' + escapeMarkup(preview ? preview.recipient + " · " + preview.date + " à " + preview.time : "Un aperçu préparatoire apparaîtra ici, sans numéro officiel ni preuve d’envoi.") + '</p></aside>' +
+      '<div class="communication-draft-list">' + convocationDrafts.map(renderConvocationDraft).join("") + '</div></section>';
+  }
+
+  function bindConvocationEvents() {
+    var form = document.querySelector("[data-convocation-form]");
+    if (!form || form.__communicationBound) return;
+    form.__communicationBound = true;
+    var today = new Date().toISOString().slice(0, 10);
+    var date = form.querySelector('[name="date"]');
+    var time = form.querySelector('[name="time"]');
+    if (date) date.value = today;
+    if (time) time.value = "09:00";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!canPrepareConvocation(user())) { renderContent(); return; }
+      var data = new FormData(form);
+      convocationDrafts = convocationDrafts.concat([{
+        reason: String(data.get("reason") || "").trim(), recipient: String(data.get("recipient") || "").trim(),
+        child: String(data.get("child") || "").trim(), date: String(data.get("date") || ""), time: String(data.get("time") || ""),
+        place: String(data.get("place") || "").trim(), contact: String(data.get("contact") || "").trim(),
+        note: String(data.get("note") || "").trim(), status: String(data.get("status") || "BROUILLON")
+      }]);
+      renderContent();
+    });
+  }
+
   function renderFuture() {
     var selected = SECTIONS.filter(function (item) { return item.key === activeTab; })[0];
     return '<section class="communication-future"><i data-lucide="construction"></i><span>DÉMONSTRATION · BACKEND_LATER</span><h3>' +
@@ -280,13 +325,14 @@
   function renderContent() {
     var content = document.getElementById("communicationContent");
     if (!content) return;
-    content.innerHTML = activeTab === "dashboard" ? renderDashboard() : activeTab === "messages" ? renderMessages() : activeTab === "announcements" ? renderAnnouncements() : renderFuture();
+    content.innerHTML = activeTab === "dashboard" ? renderDashboard() : activeTab === "messages" ? renderMessages() : activeTab === "announcements" ? renderAnnouncements() : activeTab === "convocations" ? renderConvocations() : renderFuture();
     refreshTabs();
     content.querySelectorAll("[data-communication-open]").forEach(function (button) {
       button.addEventListener("click", function () { open(button.getAttribute("data-communication-open")); });
     });
     if (activeTab === "messages") bindMessageEvents();
     if (activeTab === "announcements") bindAnnouncementEvents();
+    if (activeTab === "convocations") bindConvocationEvents();
     if (root.lucide && typeof root.lucide.createIcons === "function") root.lucide.createIcons();
   }
 
@@ -324,6 +370,7 @@
     sessionOverride = session || null;
     messageDrafts = [];
     announcementDrafts = [];
+    convocationDrafts = [];
   }
 
   root.SchoolSafeCommunication = {
@@ -336,6 +383,8 @@
     messageRecipients: messageRecipients,
     getMessageDrafts: function () { return messageDrafts.map(function (draft) { return Object.assign({}, draft); }); },
     canPrepareAnnouncement: canPrepareAnnouncement,
-    getAnnouncementDrafts: function () { return announcementDrafts.map(function (draft) { return Object.assign({}, draft); }); }
+    getAnnouncementDrafts: function () { return announcementDrafts.map(function (draft) { return Object.assign({}, draft); }); },
+    canPrepareConvocation: canPrepareConvocation,
+    getConvocationDrafts: function () { return convocationDrafts.map(function (draft) { return Object.assign({}, draft); }); }
   };
 })(window);
