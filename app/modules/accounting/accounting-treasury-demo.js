@@ -276,6 +276,54 @@
     });
   }
 
+  function reconciliationAnomalies() {
+    var data = snapshot();
+    var anomalies = [];
+    var references = {};
+    (data.transactions || []).forEach(function (transaction) {
+      var reference = transaction.receipt || transaction.reference || "";
+      if (!transaction.studentFeeId && !transaction.student_fee_id) {
+        anomalies.push({ type: "Lien student_fee absent", reference: reference || transaction.id || "—", detail: "Le paiement visible ne porte aucun studentFeeId démontrable." });
+      }
+      if (!reference) {
+        anomalies.push({ type: "Référence de transaction absente", reference: transaction.id || "—", detail: "Ni reçu ni référence visible pour cette transaction." });
+      } else {
+        references[reference] = (references[reference] || 0) + 1;
+      }
+      if (!transaction.currency) anomalies.push({ type: "Devise manquante", reference: reference || transaction.id || "—", detail: "Transaction exclue des calculs par devise." });
+    });
+    Object.keys(references).forEach(function (reference) {
+      if (references[reference] > 1) anomalies.push({ type: "Référence dupliquée", reference: reference, detail: references[reference] + " transactions portent la même référence." });
+    });
+    (data.receipts || []).forEach(function (receipt) {
+      var reference = receipt.reference || receipt.receipt || receipt.id || "";
+      var transaction = (data.transactions || []).find(function (item) { return (item.receipt || item.reference || item.id) === reference; });
+      if (!transaction) {
+        anomalies.push({ type: "Reçu sans transaction", reference: reference || "—", detail: "Aucune transaction visible ne correspond à ce reçu." });
+      } else if (Number(receipt.amount || 0) !== Number(transaction.amount || 0)) {
+        anomalies.push({ type: "Montant incohérent", reference: reference || "—", detail: "Reçu " + amountLabel(receipt.amount, receipt.currency) + " · transaction " + amountLabel(transaction.amount, transaction.currency) + "." });
+      }
+    });
+    (data.expenses || []).forEach(function (expense, index) {
+      var reference = expense.reference || "Dépense #" + (index + 1);
+      if (!expense.reference) anomalies.push({ type: "Dépense sans référence", reference: reference, detail: expense.label || "Dépense visible sans référence." });
+      if (!expense.currency) anomalies.push({ type: "Devise manquante", reference: reference, detail: "Dépense exclue des calculs par devise." });
+    });
+    if (closingDraft && Number(closingDraft.variance || 0) !== 0) {
+      anomalies.push({ type: "Écart de clôture", reference: closingDraft.till || "Caisse", detail: amountLabel(closingDraft.variance, closingDraft.currency) + " · brouillon local à revoir." });
+    }
+    return anomalies;
+  }
+
+  function renderReconciliation() {
+    var anomalies = reconciliationAnomalies();
+    var rows = anomalies.map(function (anomaly) {
+      return '<tr data-reconciliation-anomaly><td><b>' + escapeMarkup(anomaly.type) + '</b></td><td>' + escapeMarkup(anomaly.reference) + '</td><td>' + escapeMarkup(anomaly.detail) + '</td><td><span class="accounting-review-only">Voir / expliquer</span></td></tr>';
+    }).join("");
+    if (!rows) rows = '<tr><td colspan="4"><div class="accounting-empty">Aucune anomalie démontrable dans les données visibles.</div></td></tr>';
+    return '<section class="accounting-reconciliation" data-accounting-reconciliation><header><div><span>Rapprochement frontend</span><h3>Chaîne de contrôle visible</h3><p>Paiement → student_fee → reçu / référence → journal → caisse → écart / anomalie</p></div><span class="accounting-boundary-chip">LECTURE SEULE · BACKEND_LATER</span></header><div class="accounting-reconciliation-chain"><span>Paiement</span><i data-lucide="arrow-right"></i><span>student_fee</span><i data-lucide="arrow-right"></i><span>Reçu / référence</span><i data-lucide="arrow-right"></i><span>Journal</span><i data-lucide="arrow-right"></i><span>Caisse</span><i data-lucide="arrow-right"></i><span>Anomalie</span></div><aside class="accounting-boundary accounting-boundary--warning"><i data-lucide="shield-alert"></i><p>AUCUNE CORRECTION AUTOMATIQUE · aucune mutation de paiement, reçu, montant, devise, student_fee ou dépense.</p></aside><div class="accounting-reconciliation-summary"><b>' + anomalies.length + '</b><span>signaux démontrables à examiner</span></div><div class="accounting-table-wrap" tabindex="0"><table class="accounting-table accounting-reconciliation-table"><thead><tr><th>Anomalie</th><th>Référence</th><th>Explication</th><th>Action permise</th></tr></thead><tbody>' + rows + "</tbody></table></div></section>";
+  }
+
   function renderFutureSurface() {
     var labels = {
       journal: "Journal de trésorerie",
@@ -312,7 +360,7 @@
       button.hidden = tab === "closing" && !closeAllowed;
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : activeTab === "closing" ? renderClosing() : renderFutureSurface()) : renderDenied();
+    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : activeTab === "closing" ? renderClosing() : activeTab === "reconciliation" ? renderReconciliation() : renderFutureSurface()) : renderDenied();
     bindNavigation();
     if (activeTab === "journal") bindJournalFilters();
     if (activeTab === "closing") bindClosing();
@@ -343,6 +391,7 @@
     setSession: setSession,
     canReadAccounting: canReadAccounting,
     canPrepareClosing: canPrepareClosing,
+    getReconciliationAnomalies: reconciliationAnomalies,
     getSnapshot: snapshot
   };
 })(window);

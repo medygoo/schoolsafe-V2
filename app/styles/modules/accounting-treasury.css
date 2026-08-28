@@ -16,7 +16,8 @@
 .accounting-expense-boundary,
 .accounting-treasury,
 .accounting-closing,
-.accounting-closing-summary {
+.accounting-closing-summary,
+.accounting-reconciliation {
   display: grid;
   gap: var(--ss-space-4);
 }
@@ -27,6 +28,7 @@
 .accounting-expense-boundary > header,
 .accounting-treasury > header,
 .accounting-closing > header,
+.accounting-reconciliation > header,
 .accounting-shortcuts,
 .accounting-future {
   padding: var(--ss-space-5);
@@ -52,7 +54,8 @@
 .accounting-expenses > header,
 .accounting-expense-boundary > header,
 .accounting-treasury > header,
-.accounting-closing > header {
+.accounting-closing > header,
+.accounting-reconciliation > header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -355,6 +358,39 @@
 .accounting-closing-summary dd { margin: var(--ss-space-1) 0 0; font-weight: var(--ss-font-bold); overflow-wrap: anywhere; }
 .accounting-closing-state { display: flex; gap: var(--ss-space-2); width: fit-content; }
 
+.accounting-reconciliation-chain {
+  display: flex;
+  align-items: center;
+  gap: var(--ss-space-2);
+  max-width: 100%;
+  overflow-x: auto;
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-md);
+  background: var(--ss-surface-raised);
+}
+
+.accounting-reconciliation-chain span {
+  flex: 0 0 auto;
+  padding: var(--ss-space-2) var(--ss-space-3);
+  border-radius: var(--ss-radius-full);
+  color: var(--ss-text-primary);
+  background: var(--ss-bg-primary);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-bold);
+}
+
+.accounting-reconciliation-summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ss-space-2);
+  color: var(--ss-text-secondary);
+}
+
+.accounting-reconciliation-summary b { color: var(--ss-text-primary); font-size: var(--ss-text-3xl); }
+.accounting-reconciliation-table { min-width: 850px; }
+.accounting-review-only { display: inline-flex; padding: var(--ss-space-1) var(--ss-space-2); border-radius: var(--ss-radius-full); color: var(--ss-info-text); background: var(--ss-info-bg); font-size: var(--ss-text-xs); font-weight: var(--ss-font-bold); }
+
 .accounting-table :is(th, td) {
   padding: var(--ss-space-3);
   border-bottom: 1px solid var(--ss-border-subtle);
@@ -409,6 +445,7 @@
   .accounting-expense-boundary > header,
   .accounting-treasury > header { flex-direction: column; }
   .accounting-closing > header { flex-direction: column; }
+  .accounting-reconciliation > header { flex-direction: column; }
   .accounting-dashboard-grid,
   .accounting-shortcuts > div { grid-template-columns: 1fr; }
   .accounting-journal-filters { grid-template-columns: 1fr; }

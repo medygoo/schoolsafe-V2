@@ -2357,6 +2357,7 @@
     return {
       dayStatus: financeState.dayStatus || "Indisponible",
       transactions: (financeState.transactions || []).map(function (item) { return Object.assign({}, item); }),
+      receipts: (financeState.receipts || []).map(function (item) { return Object.assign({}, item); }),
       expenses: (financeState.expenses || []).map(function (item) { return Object.assign({}, item); }),
       studentFees: (financeState.studentFees || []).map(function (item) { return Object.assign({}, item); })
     };
