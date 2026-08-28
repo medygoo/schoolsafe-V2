@@ -265,6 +265,25 @@
       }
     }
 
+    if (global.SchoolSafeCommunication && typeof global.SchoolSafeCommunication.answerJaspe === "function") {
+      var communicationContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
+        ? global.SchoolSafeAppContext.getAssistantContext()
+        : null;
+      var communicationAnswer = communicationContext
+        ? global.SchoolSafeCommunication.answerJaspe(raw, communicationContext)
+        : null;
+      if (communicationAnswer) {
+        state.currentMessage = communicationAnswer.message;
+        state.pose = communicationAnswer.refusal ? "reflechie" : "sourire";
+        state.suggestions = [];
+        if (!communicationAnswer.refusal && communicationAnswer.action && global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.openCommunication === "function") {
+          global.SchoolSafeAppContext.openCommunication(communicationAnswer.action);
+        }
+        render();
+        return;
+      }
+    }
+
     if (global.SchoolSafeParentPortal && typeof global.SchoolSafeParentPortal.answerJaspe === "function") {
       var assistantContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()

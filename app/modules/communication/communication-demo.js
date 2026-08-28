@@ -115,6 +115,54 @@
     return { allowed: true, context: minimal };
   }
 
+  function normalizeJaspeText(value) {
+    return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  function jaspeRefusal(message) {
+    return { allowed: false, refusal: true, action: null, message: "REFUS — " + message };
+  }
+
+  function answerJaspe(query, context) {
+    var text = normalizeJaspeText(query);
+    var communicationIntent = /message|annonc|notification|convocation|convoqu|email|e-mail|websync|site public|evenement|communication|destinataire|alerte.*securite/.test(text);
+    if (!communicationIntent) return null;
+    var subject = context && context.user ? context.user : user();
+    var engine = access();
+    if (!engine || typeof engine.allowsScope !== "function" || !engine.allowsScope(subject, "safe.assistant.use", "own")) {
+      return jaspeRefusal("safe.assistant.use avec portée own est obligatoire.");
+    }
+
+    if (/websync|publie.*site|publication.*site/.test(text)) return jaspeRefusal("Jaspe ne publie ni sur le site public ni via WebSync ; une permission future et le backend sont requis.");
+    if (/(declenche|envoie|active).*(alerte|urgence).*(securite)|alerte.*securite.*urgente/.test(text)) return jaspeRefusal("Jaspe ne déclenche aucune urgence Sécurité et conserve les permissions Sécurité d’origine.");
+    if (/(envoie|envoyer|expedie|distribue).*(message|email|notification)|(publie|publier).*(annonce|evenement)|(convoque|convoquer).*(parent|tuteur|eleve)|(elargis|elargir).*(destinataire|toute l.ecole)|(lis|lire|montre).*(toutes les notifications)/.test(text)) {
+      return jaspeRefusal("Jaspe ne peut envoyer, publier, convoquer, élargir les destinataires ni lire les notifications d’autrui.");
+    }
+
+    if (/convocation/.test(text)) {
+      if (!canPrepareConvocation(subject)) return jaspeRefusal("PERMISSION CONVOCATION DÉDIÉE REQUISE · BACKEND_LATER.");
+      return { allowed: true, refusal: false, action: "convocations", message: "CONVOCATION DÉMONSTRATION — je peux expliquer ou ouvrir un brouillon fictif, jamais créer ou envoyer une convocation officielle." };
+    }
+    if (/annonc/.test(text)) {
+      if (!canPrepareAnnouncement(subject)) return jaspeRefusal("communication.announcement.manage avec portée effective est obligatoire.");
+      return { allowed: true, refusal: false, action: "announcements", message: "ANNONCE — je peux aider à reformuler le ton et ouvrir un brouillon. PUBLICATION RÉELLE — BACKEND_LATER." };
+    }
+    if (/email|e-mail/.test(text)) {
+      if (!canPrepareEmail(subject)) return jaspeRefusal("email.send avec portée effective est obligatoire.");
+      return { allowed: true, refusal: false, action: "channels", message: "EMAIL — je peux aider au brouillon et au ton. ENVOI EMAIL — BACKEND_LATER." };
+    }
+    if (/notification/.test(text)) {
+      if (!canManageOwnNotifications(subject)) return jaspeRefusal("notification.subscribe avec portée own est obligatoire.");
+      return { allowed: true, refusal: false, action: "notifications", message: "NOTIFICATIONS — je peux expliquer vos préférences personnelles. Cette permission ne permet aucun envoi ni lecture globale." };
+    }
+    if (/message|communication|destinataire/.test(text)) {
+      if (!canPrepareMessage(subject)) return jaspeRefusal("communication.message.send avec portée effective est obligatoire.");
+      return { allowed: true, refusal: false, action: "messages", message: "MESSAGE — je peux aider à rédiger, reformuler et ajuster le ton dans les destinataires autorisés. ENVOI RÉEL — BACKEND_LATER." };
+    }
+    if (/evenement/.test(text)) return jaspeRefusal("Les événements publics restent un aperçu de démonstration sous permission future.");
+    return null;
+  }
+
   function labelForChild(id) {
     var labels = {
       "demo-parent-child-lucas": "Lucas",
@@ -591,6 +639,7 @@
     canPrepareEmail: canPrepareEmail,
     canPublishWebSync: canPublishWebSync,
     getEmailDrafts: function () { return emailDrafts.map(function (draft) { return Object.assign({}, draft); }); },
-    prepareHandoff: prepareHandoff
+    prepareHandoff: prepareHandoff,
+    answerJaspe: answerJaspe
   };
 })(window);

@@ -236,7 +236,7 @@
     accountant: ["reports.financial.read", "finance.report.read", "finance.receipt.read", "safe.assistant.use"],
     hr: ["staff.read", "staff.manage", "staff.attendance.read", "reports.hr.read", "safe.assistant.use"],
     cashier: ["finance.payment.record", "finance.receipt.read", "finance.status.read", "safe.assistant.use"],
-    communication: ["communication.message.send", "communication.announcement.manage", "notification.subscribe", "email.send"]
+    communication: ["communication.message.send", "communication.announcement.manage", "notification.subscribe", "email.send", "safe.assistant.use"]
   };
 
   var DEMO_ACCESS_CONTEXT_BY_ROLE = {
@@ -354,7 +354,8 @@
         { permission: "communication.message.send", type: "school" },
         { permission: "communication.announcement.manage", type: "school" },
         { permission: "notification.subscribe", type: "own" },
-        { permission: "email.send", type: "school" }
+        { permission: "email.send", type: "school" },
+        { permission: "safe.assistant.use", type: "own" }
       ]
     },
     cashier: {
@@ -2489,7 +2490,7 @@
   }
 
   function openAccountingModule() {
-    ["pedagogyModule", "financeModule", "hrModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "financeModule", "hrModule", "inventoryModule", "communicationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2527,7 +2528,7 @@
   }
 
   function openHrModule(actionName) {
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "inventoryModule", "communicationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2562,7 +2563,7 @@
   }
 
   function openInventoryModule(actionName) {
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "communicationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2587,6 +2588,7 @@
   }
 
   function communicationTabForAction(actionName) {
+    if (["dashboard", "messages", "announcements", "convocations", "notifications", "channels", "events", "handoffs"].indexOf(actionName) >= 0) return actionName;
     if (/message|direction|parents autorisés/i.test(actionName)) return "messages";
     if (/annonce/i.test(actionName)) return "announcements";
     if (/convocation|rendez-vous/i.test(actionName)) return "convocations";
@@ -2620,7 +2622,7 @@
   }
 
   function openDocumentCenter() {
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule", "cardsStudio"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "communicationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule", "cardsStudio"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2658,7 +2660,7 @@
     if (!window.SchoolSafeTeacherPedagogy || (currentDemoRole !== "teacher" && currentDemoRole !== "pedagogy")) return false;
     if (currentDemoRole === "pedagogy" && view !== "direction") return false;
     setWorkspaceDashboardVisible(false);
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "communicationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
