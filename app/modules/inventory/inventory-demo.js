@@ -7,6 +7,7 @@
   var ITEM_DRAFTS_STORAGE_KEY = "schoolsafe-v2-inventory-item-drafts";
   var MOVEMENT_DRAFTS_STORAGE_KEY = "schoolsafe-v2-inventory-movement-drafts";
   var PURCHASE_DRAFTS_STORAGE_KEY = "schoolsafe-v2-inventory-purchase-drafts";
+  var RECEIPT_DRAFTS_STORAGE_KEY = "schoolsafe-v2-inventory-receipt-drafts";
   var ITEMS = [
     { code: "ART-001", name: "Papier A4", category: "Fournitures administratives", unit: "rame", type: "CONSOMMABLE", status: "ACTIF", service: "Administration" },
     { code: "ART-002", name: "Craie blanche", category: "Fournitures pédagogiques", unit: "boîte", type: "CONSOMMABLE", status: "ACTIF", service: "Pédagogie" },
@@ -34,6 +35,14 @@
     { reference: "DA-DEM-001", service: "Pédagogie", item: "Craie blanche", quantity: 24, priority: "NORMALE", supplier: "Papeterie Démo", quote: "DEV-DEM-101", amount: "180 000", currency: "CDF", status: "DEMANDE EN REVUE — simulation" },
     { reference: "DA-DEM-002", service: "Cantine", item: "Farine de maïs", quantity: 10, priority: "HAUTE", supplier: "Marché Démo", quote: "DEV-DEM-102", amount: "240", currency: "USD", status: "COMMANDE SIMULÉE CMD-DEM-02" },
     { reference: "DA-DEM-003", service: "Entretien", item: "Détergent multiusage", quantity: 18, priority: "NORMALE", supplier: "Hygiène Démo", quote: "À rapprocher", amount: "—", currency: "CDF", status: "BESOIN IDENTIFIÉ" }
+  ];
+  var RECEIPTS = [
+    { reference: "REC-DEM-001", order: "CMD-DEM-01", item: "Papier A4", ordered: 20, received: 20, status: "COMPLET", observation: "Comptage démo conforme", anomaly: "Aucune" },
+    { reference: "REC-DEM-002", order: "CMD-DEM-02", item: "Farine de maïs", ordered: 10, received: 8, status: "PARTIEL", observation: "Deux sacs non présentés", anomaly: "Manquant à rapprocher" },
+    { reference: "REC-DEM-003", order: "CMD-DEM-03", item: "Craie blanche", ordered: 12, received: 0, status: "MANQUANT", observation: "Aucune marchandise reçue", anomaly: "Livraison absente" },
+    { reference: "REC-DEM-004", order: "CMD-DEM-04", item: "Marqueurs effaçables", ordered: 10, received: 12, status: "SURPLUS", observation: "Deux lots supplémentaires", anomaly: "Surplus à isoler" },
+    { reference: "REC-DEM-005", order: "CMD-DEM-05", item: "Ordinateur portable démo", ordered: 3, received: 3, status: "ENDOMMAGÉ", observation: "Emballage endommagé", anomaly: "Contrôle matériel requis" },
+    { reference: "REC-DEM-006", order: "CMD-DEM-06", item: "Détergent multiusage", ordered: 18, received: 18, status: "À CONTRÔLER", observation: "Référence à vérifier", anomaly: "Étiquette divergente" }
   ];
   var METRICS = [
     ["Articles", "12 références démo", "boxes"],
@@ -81,6 +90,7 @@
   var itemDrafts = readDraftList(ITEM_DRAFTS_STORAGE_KEY);
   var movementDrafts = readDraftList(MOVEMENT_DRAFTS_STORAGE_KEY);
   var purchaseDrafts = readDraftList(PURCHASE_DRAFTS_STORAGE_KEY);
+  var receiptDrafts = readDraftList(RECEIPT_DRAFTS_STORAGE_KEY);
 
   function metric(item, live) {
     return '<article class="inventory-dashboard-metric"><span><i data-lucide="' + item[2] + '"></i></span><div><small>' + escapeMarkup(item[0]) + '</small><b>' + escapeMarkup(live ? "Agrégat disponible" : item[1]) + "</b></div></article>";
@@ -198,6 +208,46 @@
     });
   }
 
+  function renderReceiptRow(receipt, draft) {
+    var difference = Number(receipt.received) - Number(receipt.ordered);
+    return '<tr' + (draft ? ' data-inventory-receipt-draft' : '') + '><td><b>' + escapeMarkup(receipt.reference) + '</b>' + (draft ? '<small>BROUILLON LOCAL · BACKEND_LATER</small>' : '<small>DONNÉE DÉMO</small>') + '</td><td>' + escapeMarkup(receipt.order) + '</td><td>' + escapeMarkup(receipt.item) + '</td><td>' + escapeMarkup(receipt.ordered) + '</td><td>' + escapeMarkup(receipt.received) + '</td><td>' + (difference > 0 ? "+" : "") + escapeMarkup(difference) + '</td><td><span class="inventory-level-state">' + escapeMarkup(receipt.status) + '</span></td><td>' + escapeMarkup(receipt.observation) + '</td><td>' + escapeMarkup(receipt.anomaly) + '</td></tr>';
+  }
+
+  function renderReceipts() {
+    var rows = RECEIPTS.map(function (receipt) { return renderReceiptRow(receipt, false); }).concat(receiptDrafts.map(function (receipt) { return renderReceiptRow(receipt, true); })).join("");
+    return '<section class="inventory-receipts" data-inventory-receipts><header><div><span>COMMANDE → RÉCEPTION</span><h3>Rapprochement et anomalies</h3><p>Contrôle frontend de démonstration, sans réception officielle.</p></div><span class="inventory-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><div class="inventory-level-legend"><span>COMPLET</span><span>PARTIEL</span><span>MANQUANT</span><span>SURPLUS</span><span>ENDOMMAGÉ</span><span>À CONTRÔLER</span></div><aside class="inventory-boundary"><i data-lucide="unlink"></i><p>Aucune entrée Stock automatique · Aucune dépense Finance automatique · reçu financier ≠ réception de marchandises.</p></aside><div class="inventory-table-wrap"><table><thead><tr><th>Référence réception</th><th>COMMANDE</th><th>Article</th><th>Quantité commandée</th><th>Quantité reçue</th><th>Écart</th><th>Statut</th><th>Observation</th><th>Anomalie</th></tr></thead><tbody>' + rows + '</tbody></table></div><form class="inventory-form" data-inventory-receipt-form><header><div><span>Préparation locale</span><h4>Préparer un contrôle de RÉCEPTION</h4></div><span class="inventory-boundary-chip">BROUILLON LOCAL</span></header><label>Commande<input name="order" required></label><label>Article<input name="item" required></label><label>Quantité commandée<input name="ordered" type="number" min="0" step="0.01" required></label><label>Quantité reçue<input name="received" type="number" min="0" step="0.01" required></label><label>État physique<select name="condition"><option>CONFORME</option><option>ENDOMMAGÉ</option><option>À CONTRÔLER</option></select></label><label class="inventory-form-wide">Observation<textarea name="observation" rows="3" required></textarea></label><button class="ss-button ss-button--primary" type="submit">Préparer le rapprochement</button><p class="inventory-form-wide">Aucune entrée Stock, dépense Finance ou écriture comptable automatique.</p></form><section class="inventory-finance-link"><b>Lien futur contrôlé</b><span>Achat / Commande → Réception → référence / pièce / montant éventuel → Finance / Comptabilité</span><small>BACKEND_LATER · devises séparées · aucune conversion automatique.</small></section></section>';
+  }
+
+  function receiptState(ordered, received, condition) {
+    if (condition === "ENDOMMAGÉ") return "ENDOMMAGÉ";
+    if (condition === "À CONTRÔLER") return "À CONTRÔLER";
+    if (received === 0) return "MANQUANT";
+    if (received < ordered) return "PARTIEL";
+    if (received > ordered) return "SURPLUS";
+    return "COMPLET";
+  }
+
+  function bindReceiptEvents() {
+    var form = document.querySelector("[data-inventory-receipt-form]");
+    if (!form || form.__inventoryBound) return;
+    form.__inventoryBound = true;
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var data = new FormData(form);
+      var ordered = Math.max(0, Number(data.get("ordered")) || 0);
+      var received = Math.max(0, Number(data.get("received")) || 0);
+      var condition = String(data.get("condition") || "CONFORME");
+      var status = receiptState(ordered, received, condition);
+      receiptDrafts = receiptDrafts.concat([{
+        reference: "REC-BR-" + String(receiptDrafts.length + 1).padStart(3, "0"), order: String(data.get("order") || "").trim(),
+        item: String(data.get("item") || "").trim(), ordered: ordered, received: received, status: status,
+        observation: String(data.get("observation") || "").trim(), anomaly: status === "COMPLET" ? "Aucune anomalie préparée" : status + " · À rapprocher"
+      }]);
+      persistDraftList(RECEIPT_DRAFTS_STORAGE_KEY, receiptDrafts);
+      renderContent();
+    });
+  }
+
   function bindCatalogEvents() {
     var form = document.querySelector("[data-inventory-item-form]");
     if (!form || form.__inventoryBound) return;
@@ -230,12 +280,14 @@
     else if (activeTab === "levels") content.innerHTML = isDemoMode(subject) ? renderLevels() : renderDenied();
     else if (activeTab === "movements") content.innerHTML = isDemoMode(subject) ? renderMovements() : renderDenied();
     else if (activeTab === "procurement") content.innerHTML = isDemoMode(subject) ? renderProcurement() : renderDenied();
+    else if (activeTab === "receipts") content.innerHTML = isDemoMode(subject) ? renderReceipts() : renderDenied();
     else if (activeTab !== "dashboard") content.innerHTML = isDemoMode(subject) ? renderFuture(activeTab) : (canReadAggregates(subject) && activeTab === "reports" ? renderLiveAggregates() : renderDenied());
     else content.innerHTML = isDemoMode(subject) ? renderDemoDashboard() : (canReadAggregates(subject) ? renderLiveAggregates() : renderDenied());
     refreshTabs();
     if (activeTab === "catalog" && isDemoMode(subject)) bindCatalogEvents();
     if (activeTab === "movements" && isDemoMode(subject)) bindMovementEvents();
     if (activeTab === "procurement" && isDemoMode(subject)) bindProcurementEvents();
+    if (activeTab === "receipts" && isDemoMode(subject)) bindReceiptEvents();
     if (root.lucide && typeof root.lucide.createIcons === "function") root.lucide.createIcons();
   }
 
