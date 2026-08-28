@@ -16,7 +16,8 @@
     permissionCatalog: null,
     permissionsLoading: false,
     permissionsError: "",
-    permissionFilters: { query: "", domain: "all", operation: "all", scope: "all", code: "" }
+    permissionFilters: { query: "", domain: "all", operation: "all", scope: "all", code: "" },
+    inspectorInput: { permission: "roles.manage", scope: "school", contextId: "" }
   };
   var SECTIONS = [
     { key: "school", label: "École", description: "Identité, année et structure via le module École existant.", permission: "school.manage", scope: "school", icon: "school", action: "school", actionLabel: "Ouvrir le module École" },
@@ -51,6 +52,8 @@
         ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="accounts">Gérer les comptes et rôles</button>'
         : section.key === "permissions"
           ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="permissions">Consulter le catalogue</button>'
+        : section.key === "access"
+          ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="inspector">Inspecter un accès</button>'
         : '<span class="administration-card__boundary">FRONTEND · contrôle d’accès actif</span>';
     return '<article class="administration-card" data-admin-section="' + section.key + '">' +
       '<span class="administration-card__icon"><i data-lucide="' + section.icon + '"></i></span>' +
@@ -210,6 +213,98 @@
     });
   }
 
+  function contextRequirement(scopeType) {
+    return {
+      own_children: { key: "childId", list: "childIds" },
+      assigned_classes: { key: "classId", list: "assignedClassIds" },
+      assigned_subjects: { key: "subjectId", list: "assignedSubjectIds" },
+      assigned_portal: { key: "portalId", list: "assignedPortalIds" },
+      school: { key: "schoolId", list: null }
+    }[scopeType] || null;
+  }
+
+  function inspectAccess(user, permission, expectedScope, context) {
+    var access = global.SchoolSafeAccess;
+    var safeUser = user || {};
+    var safeContext = context || {};
+    if (!access || typeof access.explicitDeny !== "function" || typeof access.canAccess !== "function" || typeof access.scopeFor !== "function" || typeof access.allowsScope !== "function") {
+      return { allowed: false, status: "REFUSÉ", permission: permission, scope: null, exception: "NONE", reason: "MOTEUR_INDISPONIBLE" };
+    }
+    if (access.explicitDeny(safeUser, permission)) {
+      return { allowed: false, status: "DENY EXPLICITE", permission: permission, scope: null, exception: "DENY", reason: "DENY_PRIORITAIRE" };
+    }
+    if (!access.canAccess(safeUser, permission)) {
+      return { allowed: false, status: "PERMISSION ABSENTE", permission: permission, scope: null, exception: "NONE", reason: "PERMISSION_ABSENTE" };
+    }
+    var grantedScope = access.scopeFor(safeUser, permission);
+    if (!grantedScope || !grantedScope.type) {
+      return { allowed: false, status: "CONTEXTE MANQUANT", permission: permission, scope: null, exception: "NONE", reason: "PORTEE_ABSENTE" };
+    }
+    if (expectedScope && !access.allowsScope(safeUser, permission, expectedScope)) {
+      return { allowed: false, status: "SCOPE INCOMPATIBLE", permission: permission, scope: grantedScope.type, exception: "NONE", reason: "PORTEE_ATTENDUE_" + expectedScope };
+    }
+    var requirement = contextRequirement(grantedScope.type);
+    if (grantedScope.type === "own") {
+      if (!(safeUser.userId || safeUser.profileId || (safeUser.profile && safeUser.profile.id))) {
+        return { allowed: false, status: "CONTEXTE MANQUANT", permission: permission, scope: grantedScope.type, exception: "NONE", reason: "UTILISATEUR_MANQUANT" };
+      }
+    } else if (requirement) {
+      var value = safeContext[requirement.key];
+      if (!value && requirement.key === "schoolId") value = safeUser.schoolId;
+      if (!value) return { allowed: false, status: "CONTEXTE MANQUANT", permission: permission, scope: grantedScope.type, exception: "NONE", reason: requirement.key.toUpperCase() + "_MANQUANT" };
+      var assigned = requirement.list && Array.isArray(safeUser[requirement.list]) ? safeUser[requirement.list] : null;
+      if (assigned && assigned.indexOf(value) < 0) return { allowed: false, status: "SCOPE INCOMPATIBLE", permission: permission, scope: grantedScope.type, exception: "NONE", reason: "CONTEXTE_HORS_PORTEE" };
+      if (requirement.key === "schoolId" && safeUser.schoolId && safeUser.schoolId !== value) return { allowed: false, status: "SCOPE INCOMPATIBLE", permission: permission, scope: grantedScope.type, exception: "NONE", reason: "ECOLE_HORS_PORTEE" };
+    }
+    var allowException = Array.isArray(safeUser.permissionExceptions) && safeUser.permissionExceptions.some(function (item) {
+      return item && item.permission === permission && String(item.effect || "").toLowerCase() === "allow";
+    });
+    return { allowed: true, status: "AUTORISÉ", permission: permission, scope: grantedScope.type, exception: allowException ? "ALLOW" : "NONE", reason: "ACCESS_LAW_AUTORISE" };
+  }
+
+  function inspectorContext(scopeType, contextId) {
+    var user = state.user || {};
+    if (scopeType === "own_children") return { childId: contextId };
+    if (scopeType === "assigned_classes") return { classId: contextId };
+    if (scopeType === "assigned_subjects") return { subjectId: contextId };
+    if (scopeType === "assigned_portal") return { portalId: contextId };
+    if (scopeType === "school") return { schoolId: contextId || user.schoolId };
+    return {};
+  }
+
+  function renderInspector() {
+    if (!canUse(state.user, "roles.manage", "school")) return '<section class="administration-empty" data-access-inspector><i data-lucide="shield-off"></i><h3>Inspecteur non autorisé</h3><p>roles.manage + school requis.</p></section>';
+    var input = state.inspectorInput;
+    var result = inspectAccess(state.user, input.permission, input.scope, inspectorContext(input.scope, input.contextId));
+    var exceptionLabel = result.exception === "NONE" ? "Aucune" : result.exception;
+    var chain = [
+      ["Utilisateur", (state.user && (state.user.userId || (state.user.profile && state.user.profile.id))) || "Contexte utilisateur"],
+      ["Rôle", (state.user && (state.user.role || (state.user.roles || []).join(", "))) || "Aucun rôle implicite"],
+      ["Permission", input.permission],
+      ["Portée", result.scope || input.scope],
+      ["Contexte", input.contextId || (input.scope === "school" && state.user.schoolId) || (input.scope === "own" ? "Utilisateur courant" : "Non fourni")],
+      ["Exception", exceptionLabel],
+      ["Résultat", result.status]
+    ];
+    return '<section class="administration-inspector" data-access-inspector>' +
+      '<div class="administration-view-heading"><button class="ss-button ss-button--secondary" type="button" data-admin-home><i data-lucide="arrow-left"></i> Centre Administration</button><div><span>DIAGNOSTIC UNIQUEMENT</span><h3>Inspecteur d’accès effectif</h3><p>Aucune permission, portée ou exception n’est modifiée.</p></div><span class="administration-readonly"><i data-lucide="scan-search"></i> Access_Law</span></div>' +
+      '<form class="administration-inspector-form"><label>Permission<input name="permission" value="' + escapeMarkup(input.permission) + '"></label><label>Portée attendue<select name="scope">' + ["own", "own_children", "assigned_classes", "assigned_subjects", "assigned_portal", "school"].map(function (scope) { return '<option value="' + scope + '"' + (input.scope === scope ? ' selected' : '') + '>' + scope + '</option>'; }).join("") + '</select></label><label>Identifiant de contexte<input name="contextId" value="' + escapeMarkup(input.contextId) + '" placeholder="classe, enfant, matière, portail ou école"></label><button class="ss-button" type="submit">Inspecter</button></form>' +
+      '<div class="administration-access-chain">' + chain.map(function (step, index) { return '<article><span>' + (index + 1) + '</span><div><strong>' + escapeMarkup(step[0]) + '</strong><small>' + escapeMarkup(step[1]) + '</small></div></article>'; }).join("") + '</div>' +
+      '<div class="administration-inspection-result administration-inspection-result--' + (result.allowed ? 'allowed' : 'denied') + '"><strong>' + escapeMarkup(result.status) + '</strong><span>' + escapeMarkup(result.reason) + '</span></div></section>';
+  }
+
+  function bindInspector(container) {
+    var home = container.querySelector("[data-admin-home]");
+    if (home) home.addEventListener("click", function () { open("dashboard"); });
+    var form = container.querySelector(".administration-inspector-form");
+    if (!form) return;
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      state.inspectorInput = { permission: form.permission.value.trim(), scope: form.scope.value, contextId: form.contextId.value.trim() };
+      render(state.containerId, state.user, state.options);
+    });
+  }
+
   function loadAccounts() {
     var api = global.SchoolSafeSchoolAPI;
     if (state.accountsLoading || state.staff) return;
@@ -346,7 +441,7 @@
         '<div><span>Administration / Accès / Jaspe logiciel</span><h2>Centre Administration</h2><p>Vue de contrôle frontend : chaque surface exige sa permission et sa portée réelles.</p></div>' +
         '<span class="administration-header__badge"><i data-lucide="shield-check"></i> DENY explicite prioritaire</span>' +
       '</header>' +
-      (state.activeView === "accounts" ? renderAccounts() : state.activeView === "permissions" ? renderPermissions() : dashboardMarkup(allowed));
+      (state.activeView === "accounts" ? renderAccounts() : state.activeView === "permissions" ? renderPermissions() : state.activeView === "inspector" ? renderInspector() : dashboardMarkup(allowed));
 
     var closeButton = container.querySelector("[data-admin-close]");
     if (closeButton) closeButton.addEventListener("click", function () {
@@ -370,6 +465,7 @@
       bindPermissions(container);
       if (!state.permissionCatalog && !state.permissionsLoading && !state.permissionsError) loadPermissions();
     }
+    if (state.activeView === "inspector") bindInspector(container);
     if (global.lucide && typeof global.lucide.createIcons === "function") global.lucide.createIcons();
   }
 
@@ -379,7 +475,7 @@
   }
 
   function open(view) {
-    state.activeView = ["accounts", "permissions"].indexOf(view) >= 0 ? view : "dashboard";
+    state.activeView = ["accounts", "permissions", "inspector"].indexOf(view) >= 0 ? view : "dashboard";
     state.notice = "";
     state.selectedStaffId = null;
     state.mutationPanel = null;
@@ -391,5 +487,5 @@
     if (container) container.hidden = true;
   }
 
-  global.SchoolSafeAdministration = { render: render, setSession: setSession, open: open, close: close, canUse: canUse, visibleSections: visibleSections };
+  global.SchoolSafeAdministration = { render: render, setSession: setSession, open: open, close: close, canUse: canUse, visibleSections: visibleSections, inspectAccess: inspectAccess };
 })(window);
