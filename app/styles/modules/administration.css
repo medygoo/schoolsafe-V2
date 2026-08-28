@@ -14,6 +14,36 @@
 .administration-card__icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; color: #1d4ed8; background: color-mix(in srgb, #dbeafe 82%, var(--ss-surface, #fff)); }
 .administration-card__icon svg, .administration-header__badge svg { width: 20px; height: 20px; }
 .administration-empty { display: grid; justify-items: center; gap: 8px; padding: 48px 24px; text-align: center; border: 1px dashed var(--ss-border, #d7e1ef); border-radius: 20px; color: var(--ss-text, #10233f); background: var(--ss-surface, #fff); }
+.administration-accounts { display: grid; gap: 16px; min-width: 0; }
+.administration-view-heading { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 20px; border: 1px solid var(--ss-border); border-radius: 20px; color: var(--ss-text); background: var(--ss-surface); }
+.administration-view-heading h3 { margin: 0; font-size: 1.35rem; }
+.administration-view-heading p { margin: 4px 0 0; color: var(--ss-text-secondary); }
+.administration-view-heading > div > span, .administration-mutation > div > span { color: var(--ss-text-link); font-size: .74rem; font-weight: 800; letter-spacing: .06em; }
+.administration-boundaries { display: flex; flex-wrap: wrap; gap: 8px; }
+.administration-boundaries span { padding: 8px 12px; border: 1px solid var(--ss-border); border-radius: 999px; color: var(--ss-text-secondary); background: var(--ss-surface); font-size: .8rem; font-weight: 750; }
+.administration-notice { padding: 12px 16px; border: 1px solid var(--ss-success-border); border-radius: 14px; color: var(--ss-success-text); background: var(--ss-success-bg); font-weight: 750; }
+.administration-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--ss-border); border-radius: 18px; background: var(--ss-surface); }
+.administration-table { width: 100%; min-width: 720px; border-collapse: collapse; color: var(--ss-text); }
+.administration-table th, .administration-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--ss-border); vertical-align: top; }
+.administration-table th { color: var(--ss-text-secondary); background: var(--ss-surface-raised); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+.administration-table td:first-child { display: grid; gap: 3px; }
+.administration-table td:first-child span { color: var(--ss-text-secondary); font-size: .85rem; }
+.administration-row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.administration-status { display: inline-flex; padding: 6px 10px; border-radius: 999px; font-size: .78rem; font-weight: 800; }
+.administration-status--active { color: var(--ss-success-text); background: var(--ss-success-bg); }
+.administration-status--inactive { color: var(--ss-error-text); background: var(--ss-error-bg); }
+.administration-mutation { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr); gap: 20px; padding: 20px; border: 1px solid var(--ss-border-strong); border-radius: 18px; color: var(--ss-text); background: var(--ss-surface); }
+.administration-mutation h3 { margin: 4px 0 0; }
+.administration-mutation p { margin: 6px 0 0; color: var(--ss-text-secondary); }
+.administration-role-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.administration-role-options label, .administration-confirm { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 8px 10px; border: 1px solid var(--ss-border); border-radius: 12px; }
+.administration-confirm { margin-top: 12px; }
+.administration-mutation__actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.administration-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.administration-form-grid > label:not(.administration-confirm) { display: grid; gap: 6px; color: var(--ss-text-secondary); font-weight: 700; }
+.administration-form-grid input:not([type="checkbox"]) { min-height: 44px; padding: 0 12px; border: 1px solid var(--ss-border-strong); border-radius: 12px; color: var(--ss-text); background: var(--ss-surface); }
+.administration-form-grid .administration-confirm, .administration-form-grid .administration-mutation__actions { grid-column: 1 / -1; }
 html[data-theme="dark"] .administration-header__badge { color: #fca5a5; background: rgba(127, 29, 29, .28); }
-@media (max-width: 834px) { .administration-header { grid-template-columns: 1fr; } .administration-grid { grid-template-columns: 1fr; } .administration-summary { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 834px) { .administration-header, .administration-view-heading, .administration-mutation { grid-template-columns: 1fr; } .administration-grid { grid-template-columns: 1fr; } .administration-summary { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 560px) { .administration-role-options, .administration-form-grid { grid-template-columns: 1fr; } .administration-form-grid .administration-confirm, .administration-form-grid .administration-mutation__actions { grid-column: auto; } }
 @media (max-width: 480px) { .administration-header, .administration-card { padding: 16px; border-radius: 18px; } }
