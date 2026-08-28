@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { enterDemoWorkspace } from "./helpers";
+import { enterDemoWorkspace, openDocumentsCenter } from "./helpers";
 
 test.describe("J5 — Documents École et Pédagogie", () => {
   test.beforeEach(async ({ page }) => {
@@ -74,7 +74,7 @@ test.describe("J5 — Documents École et Pédagogie", () => {
   });
 
   test("affiche les documents de la classe affectée dans le Centre", async ({ page }) => {
-    await page.locator("#documentsNav").click();
+    await openDocumentsCenter(page);
     await expect(page.locator("[data-document-id='pedagogy-assignment']")).toBeVisible();
     await expect(page.locator("[data-document-id='school-student-summary-class']")).toBeVisible();
     await expect(page.locator("[data-document-id='school-student-summary-school']")).toHaveCount(0);

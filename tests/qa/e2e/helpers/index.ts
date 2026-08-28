@@ -264,3 +264,14 @@ export async function openPermissionsConsole(page: Page) {
   }
   await page.locator("#permissionsNav").evaluate((element: HTMLElement) => element.click());
 }
+
+export async function openDocumentsCenter(page: Page) {
+  // Sur mobile, le Centre se trouve dans la sidebar ouverte depuis le menu bas.
+  const mobileMenu = page.locator('[data-bottom-nav="menu"]');
+  if (await mobileMenu.isVisible().catch(() => false)) {
+    await domClick(page, '[data-bottom-nav="menu"]');
+    await expect(page.locator("#workspaceSidebar.open")).toBeVisible();
+  }
+  await domClick(page, "#documentsNav");
+  await expect(page.locator("#documentCenterModule")).toBeVisible();
+}

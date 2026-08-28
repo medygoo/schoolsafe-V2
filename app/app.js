@@ -239,6 +239,7 @@
   var DEMO_ACCESS_CONTEXT_BY_ROLE = {
     admin: {
       scopes: [
+        { type: "school" },
         { permission: "school.student.read", type: "school" },
         { permission: "school.class.read", type: "school" },
         { permission: "security.card.create", type: "school" },
@@ -378,6 +379,7 @@
       return { activeRole: currentDemoRole, user: getCurrentUser() };
     },
     getCurrentUser: getCurrentUser,
+    openDocuments: openDocumentCenter,
     openAccounting: function (tab) {
       openAccountingModule();
       if (tab && window.SchoolSafeAccountingTreasury && typeof window.SchoolSafeAccountingTreasury.open === "function") {

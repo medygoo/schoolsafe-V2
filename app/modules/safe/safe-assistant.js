@@ -248,6 +248,23 @@
     var text = String(raw || "").toLowerCase();
     if (!text) return;
 
+    if (global.SchoolSafeDocumentAssistant && typeof global.SchoolSafeDocumentAssistant.answer === "function") {
+      var documentContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
+        ? global.SchoolSafeAppContext.getAssistantContext()
+        : null;
+      var documentAnswer = global.SchoolSafeDocumentAssistant.answer(raw, documentContext);
+      if (documentAnswer) {
+        state.currentMessage = documentAnswer.message;
+        state.pose = documentAnswer.refusal ? "reflechie" : "sourire";
+        state.suggestions = [];
+        if (!documentAnswer.refusal && documentAnswer.action === "documents" && global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.openDocuments === "function") {
+          global.SchoolSafeAppContext.openDocuments();
+        }
+        render();
+        return;
+      }
+    }
+
     if (global.SchoolSafeParentPortal && typeof global.SchoolSafeParentPortal.answerJaspe === "function") {
       var assistantContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
         ? global.SchoolSafeAppContext.getAssistantContext()

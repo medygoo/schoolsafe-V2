@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { enterDemoWorkspace } from "./helpers";
+import { enterDemoWorkspace, openDocumentsCenter } from "./helpers";
 
 const reportUser = (deniedPermissions: string[] = []) => ({
   userId: "finance-1",
@@ -70,8 +70,7 @@ async function renderCenter(page: any, user = reportUser()) {
 test.describe("J3 — Centre de documents", () => {
   test.beforeEach(async ({ page }) => {
     await enterDemoWorkspace(page, "finance");
-    await page.locator("#documentsNav").click();
-    await expect(page.locator("#documentCenterModule")).toBeVisible();
+    await openDocumentsCenter(page);
   });
 
   test("n’affiche que les documents autorisés et fait primer DENY", async ({ page }) => {

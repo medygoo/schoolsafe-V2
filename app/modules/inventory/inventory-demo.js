@@ -355,7 +355,7 @@
   function answerJaspe(query, context) {
     var text = normalizeJaspeText(query);
     var subject = context && context.user ? context.user : user();
-    var inventoryIntent = /stock|inventair|article|quantite|seuil|rupture|mouvement|approvision|achat|fournisseur|devis|commande|reception|marchandise|anomalie/.test(text);
+    var inventoryIntent = /stock|inventair|article|quantite|seuil|rupture|mouvement|approvision|achat|fournisseur|devis\b|commande|reception|marchandise|anomalie/.test(text);
     if (!inventoryIntent) return null;
     if (!allowsFor(subject, "safe.assistant.use", "own")) return jaspeRefusal("safe.assistant.use avec portée own est obligatoire.");
 
@@ -366,7 +366,7 @@
 
     var action = /rapport|agregat/.test(text) ? "reports"
       : /reception|marchandise|anomalie|endommag/.test(text) ? "receipts"
-      : /achat|fournisseur|devis|commande|approvision/.test(text) ? "procurement"
+      : /achat|fournisseur|devis\b|commande|approvision/.test(text) ? "procurement"
       : /mouvement|entree|sortie|transfert|ajustement/.test(text) ? "movements"
       : /seuil|rupture|emplacement|niveau|quantite/.test(text) ? "levels"
       : /article|catalog|categorie/.test(text) ? "catalog" : "dashboard";

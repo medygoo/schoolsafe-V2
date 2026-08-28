@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { enterDemoWorkspace } from "./helpers";
+import { enterDemoWorkspace, openDocumentsCenter } from "./helpers";
 
 test.describe("J4 — Documents Finance et Comptabilité", () => {
   test.beforeEach(async ({ page }) => {
@@ -68,8 +68,7 @@ test.describe("J4 — Documents Finance et Comptabilité", () => {
   });
 
   test("affiche dans le Centre uniquement les sorties Finance du profil", async ({ page }) => {
-    await page.locator("#documentsNav").click();
-    await expect(page.locator("#documentCenterModule")).toBeVisible();
+    await openDocumentsCenter(page);
     await expect(page.locator("[data-document-id='finance-cash-report']")).toBeVisible();
     await expect(page.locator("[data-document-id='finance-receipt-school']")).toBeVisible();
     await expect(page.locator("[data-document-id='finance-receipt-family']")).toHaveCount(0);

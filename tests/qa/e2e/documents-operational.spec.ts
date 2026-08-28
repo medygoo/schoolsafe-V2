@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { enterDemoWorkspace } from "./helpers";
+import { enterDemoWorkspace, openDocumentsCenter } from "./helpers";
 
 test.describe("J6 — Documents opérationnels", () => {
   test.beforeEach(async ({ page }) => {
@@ -57,7 +57,7 @@ test.describe("J6 — Documents opérationnels", () => {
   });
 
   test("affiche au profil RH uniquement ses synthèses autorisées", async ({ page }) => {
-    await page.locator("#documentsNav").click();
+    await openDocumentsCenter(page);
     await expect(page.locator("[data-document-id='hr-summary']")).toBeVisible();
     await expect(page.locator("[data-document-id='hr-attendance-summary']")).toBeVisible();
     await expect(page.locator("[data-document-id^='security-']")).toHaveCount(0);
