@@ -431,6 +431,12 @@
     openCommunication: function (tab) {
       openCommunicationModule(tab);
     },
+    prepareCommunicationHandoff: function (payload) {
+      if (!window.SchoolSafeCommunication || typeof window.SchoolSafeCommunication.prepareHandoff !== "function") return { allowed: false, reason: "MODULE_INDISPONIBLE" };
+      var result = window.SchoolSafeCommunication.prepareHandoff(payload, getCurrentUser());
+      if (result.allowed) openCommunicationModule("messages");
+      return result;
+    },
     openDocuments: function () {
       openDocumentCenter();
     },
@@ -2587,6 +2593,7 @@
     if (/notification/i.test(actionName)) return "notifications";
     if (/site|galerie|synchronisation|websync/i.test(actionName)) return "channels";
     if (/événement/i.test(actionName)) return "events";
+    if (/liaison/i.test(actionName)) return "handoffs";
     return "dashboard";
   }
 

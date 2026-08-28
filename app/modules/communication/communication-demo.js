@@ -9,6 +9,7 @@
   var convocationDrafts = [];
   var notificationPreference = { subscription: "opt-in", channels: ["in-app"], prepared: false };
   var emailDrafts = [];
+  var pendingHandoff = null;
 
   var SECTIONS = [
     { key: "messages", label: "Messages", icon: "messages-square", note: "Composition bornée par permission et portée." },
@@ -17,6 +18,7 @@
     { key: "convocations", label: "Convocations", icon: "mail-plus", note: "Préparation locale sous permission future dédiée." },
     { key: "channels", label: "Site public / WebSync", icon: "globe-2", note: "Publication réelle indisponible sans permission future." },
     { key: "events", label: "Événements", icon: "calendar-days", note: "Aperçu de démonstration, jamais présenté comme publié." }
+    ,{ key: "handoffs", label: "Liaisons autorisées", icon: "route", note: "Contexte minimal après deux contrôles Access_Law." }
   ];
 
   function escapeMarkup(value) {
@@ -79,6 +81,38 @@
 
   function canPublishWebSync() {
     return false;
+  }
+
+  function scopeMatchesContext(subject, scope, context) {
+    if (!scope || !context) return false;
+    if (scope.type === "school") return true;
+    if (scope.type === "own") return context.type === "own" && (!context.id || context.id === subject.userId || (subject.profile && context.id === subject.profile.id));
+    if (scope.type === "own_children") return context.type === "child" && (subject.childIds || []).indexOf(context.id) >= 0;
+    if (scope.type === "assigned_classes") return context.type === "class" && (subject.assignedClassIds || []).indexOf(context.id) >= 0;
+    if (scope.type === "assigned_subjects") return context.type === "subject" && (subject.assignedSubjectIds || []).indexOf(context.id) >= 0;
+    if (scope.type === "assigned_portal") return context.type === "portal" && (subject.assignedPortalIds || []).indexOf(context.id) >= 0;
+    return false;
+  }
+
+  function prepareHandoff(payload, subject) {
+    var current = subject || user();
+    var request = payload || {};
+    var sourcePermission = String(request.sourcePermission || "");
+    var engine = access();
+    if (!engine || !sourcePermission || !engine.canAccess(current, sourcePermission)) return { allowed: false, reason: "SOURCE_NON_AUTORISÉE" };
+    var sourceScope = engine.scopeFor(current, sourcePermission);
+    if (!scopeMatchesContext(current, sourceScope, request.context)) return { allowed: false, reason: "PORTÉE_SOURCE_REFUSÉE" };
+    if (!engine.canAccess(current, "communication.message.send")) return { allowed: false, reason: "MESSAGE_NON_AUTORISÉ" };
+    var messageScope = engine.scopeFor(current, "communication.message.send");
+    if (!scopeMatchesContext(current, messageScope, request.context)) return { allowed: false, reason: "PORTÉE_MESSAGE_REFUSÉE" };
+    var minimal = {
+      source: String(request.source || "source"),
+      contextType: String(request.context.type || ""),
+      contextId: String(request.context.id || ""),
+      summaryCategory: String(request.summaryCategory || "Contexte autorisé")
+    };
+    pendingHandoff = minimal;
+    return { allowed: true, context: minimal };
   }
 
   function labelForChild(id) {
@@ -167,13 +201,17 @@
     var options = recipients.map(function (item) {
       return '<option value="' + escapeMarkup(item.value) + '">' + escapeMarkup(item.label) + '</option>';
     }).join("");
+    var handoffLabels = { security: "Sécurité", pedagogy: "Pédagogie", finance: "Finance", direction: "Direction" };
+    var handoffSubject = pendingHandoff ? '[' + (handoffLabels[pendingHandoff.source] || pendingHandoff.source) + '] ' + pendingHandoff.summaryCategory : '';
+    var handoffContent = pendingHandoff ? 'Contexte minimal autorisé : ' + pendingHandoff.summaryCategory + ' (' + pendingHandoff.contextType + ').' : '';
     return '<section class="communication-messages" data-communication-messages><header class="communication-view-header"><div><span>MESSAGE BORNÉ</span><h3>Préparer un message</h3><p data-message-boundary>communication.message.send · portée effective <b>' + escapeMarkup(scope.type) + '</b></p></div><span class="communication-boundary-chip">' + (live ? "SESSION LIVE" : "DÉMONSTRATION") + '</span></header>' +
       '<aside class="communication-boundary"><i data-lucide="shield-check"></i><div><b>Destinataires limités par Access_Law</b><p>Un message de classe ne vaut jamais convocation individuelle. Aucun envoi réseau n’est déclenché ici.</p></div></aside>' +
+      (pendingHandoff ? '<aside class="communication-boundary" data-handoff-pending><i data-lucide="route"></i><div><b>CONTEXTE MINIMAL · PRÉPARATION UNIQUEMENT</b><p>' + escapeMarkup(pendingHandoff.source + ' · ' + pendingHandoff.summaryCategory) + '</p></div></aside>' : '') +
       '<form class="communication-form" data-message-form><label>Destinataire / groupe<select name="recipient" required>' + options + '</select></label>' +
-      '<label>Objet<input name="subject" maxlength="120" required></label>' +
+      '<label>Objet<input name="subject" maxlength="120" value="' + escapeMarkup(handoffSubject) + '" required></label>' +
       '<label>Priorité<select name="priority"><option>NORMALE</option><option>HAUTE</option><option>URGENTE</option></select></label>' +
       '<label>Date<input name="date" type="date" required></label>' +
-      '<label class="communication-form-wide">Contenu<textarea name="content" rows="5" maxlength="1200" required></textarea></label>' +
+      '<label class="communication-form-wide">Contenu<textarea name="content" rows="5" maxlength="1200" required>' + escapeMarkup(handoffContent) + '</textarea></label>' +
       '<label>Pièce jointe préparatoire<input name="attachment" type="file" aria-describedby="messageAttachmentBoundary"></label>' +
       '<label>Statut<select name="status"><option>BROUILLON</option><option>À RELIRE</option></select></label>' +
       '<p class="communication-form-wide" id="messageAttachmentBoundary">Le fichier n’est ni téléversé ni envoyé ; seul son nom est conservé dans la session courante.</p>' +
@@ -215,6 +253,7 @@
         attachment: fileName,
         status: isDemoMode(subject) ? "BROUILLON LOCAL · DÉMONSTRATION" : "BROUILLON DE SESSION · ENVOI RÉEL — BACKEND_LATER"
       }]);
+      pendingHandoff = null;
       renderContent();
     });
   }
@@ -417,6 +456,53 @@
     return '<section class="communication-events" data-events-demo><header class="communication-view-header"><div><span>APERÇU DÉMO</span><h3>Événements publics fictifs</h3><p>Prévisualisation frontend sans données ni publication réelles.</p></div><span class="communication-boundary-chip">DÉMONSTRATION</span></header><div class="communication-event-grid"><article><span>15 SEPT.</span><b>Réunion de rentrée — exemple</b><p>Cour principale · 09 h 00</p></article><article><span>30 SEPT.</span><b>Journée culturelle — exemple</b><p>APERÇU NON PUBLIÉ</p></article></div><button class="ss-button" type="button" data-events-publish disabled>Publier sur le site — BACKEND_LATER</button></section>';
   }
 
+  var HANDOFF_SOURCES = [
+    { key: "security", label: "Sécurité", permission: "security.events.read", summary: "Anomalie de sécurité à expliquer", icon: "shield-check" },
+    { key: "pedagogy", label: "Pédagogie", permission: "pedagogy.report.read", summary: "Suivi pédagogique à communiquer", icon: "book-open-check" },
+    { key: "finance", label: "Finance", permission: "finance.status.read", summary: "Situation financière à expliquer", icon: "wallet-cards" },
+    { key: "direction", label: "Direction", permission: "pilotage.dashboard.read", summary: "Information de Direction", icon: "school" }
+  ];
+
+  function defaultHandoffContext(subject, permission) {
+    var scope = permissionScope(subject, permission);
+    if (!scope) return null;
+    if (scope.type === "school") return { type: "school", id: subject.schoolId || "school" };
+    if (scope.type === "own_children") {
+      var childId = (subject.childIds || []).filter(function (id) { return id !== "demo-draft-student"; })[0];
+      return childId ? { type: "child", id: childId } : null;
+    }
+    if (scope.type === "assigned_classes") return subject.assignedClassIds && subject.assignedClassIds[0] ? { type: "class", id: subject.assignedClassIds[0] } : null;
+    if (scope.type === "assigned_subjects") return subject.assignedSubjectIds && subject.assignedSubjectIds[0] ? { type: "subject", id: subject.assignedSubjectIds[0] } : null;
+    if (scope.type === "assigned_portal") return subject.assignedPortalIds && subject.assignedPortalIds[0] ? { type: "portal", id: subject.assignedPortalIds[0] } : null;
+    if (scope.type === "own") return { type: "own", id: subject.userId || (subject.profile && subject.profile.id) || "own" };
+    return null;
+  }
+
+  function renderHandoffs() {
+    var subject = user();
+    var cards = HANDOFF_SOURCES.map(function (source) {
+      var context = defaultHandoffContext(subject, source.permission);
+      var probe = context ? prepareHandoff({ source: source.key, sourcePermission: source.permission, context: context, summaryCategory: source.summary }, subject) : { allowed: false, reason: "SOURCE_NON_AUTORISÉE" };
+      pendingHandoff = null;
+      return '<article><i data-lucide="' + source.icon + '"></i><b>' + source.label + '</b><span>' + escapeMarkup(source.permission) + '</span><small>' + (probe.allowed ? "SOURCE + MESSAGE AUTORISÉS" : escapeMarkup(probe.reason)) + '</small><button class="ss-button ss-button--secondary" type="button" data-handoff-prepare="' + source.key + '"' + (probe.allowed ? '' : ' disabled') + '>Préparer un message</button></article>';
+    }).join("");
+    return '<section class="communication-handoffs"><header class="communication-view-header"><div><span>DOUBLE CONTRÔLE ACCESS_LAW</span><h3>Liaisons transversales</h3><p>Donnée source autorisée → contexte minimal → permission Communication → préparation uniquement.</p></div><span class="communication-boundary-chip">AUCUN ENVOI AUTOMATIQUE</span></header><aside class="communication-boundary"><i data-lucide="route"></i><div><b>Deux gardes indépendantes</b><p>Une permission source ne donne pas le droit d’envoyer ; une permission Communication ne révèle aucune donnée source.</p></div></aside><div class="communication-handoff-grid" data-handoff-grid>' + cards + '</div></section>';
+  }
+
+  function bindHandoffEvents() {
+    document.querySelectorAll("[data-handoff-prepare]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var key = button.getAttribute("data-handoff-prepare");
+        var source = HANDOFF_SOURCES.filter(function (item) { return item.key === key; })[0];
+        if (!source) return;
+        var subject = user();
+        var context = defaultHandoffContext(subject, source.permission);
+        var result = prepareHandoff({ source: source.key, sourcePermission: source.permission, context: context, summaryCategory: source.summary }, subject);
+        if (result.allowed) open("messages");
+      });
+    });
+  }
+
   function renderFuture() {
     var selected = SECTIONS.filter(function (item) { return item.key === activeTab; })[0];
     return '<section class="communication-future"><i data-lucide="construction"></i><span>DÉMONSTRATION · BACKEND_LATER</span><h3>' +
@@ -432,7 +518,7 @@
   function renderContent() {
     var content = document.getElementById("communicationContent");
     if (!content) return;
-    content.innerHTML = activeTab === "dashboard" ? renderDashboard() : activeTab === "messages" ? renderMessages() : activeTab === "announcements" ? renderAnnouncements() : activeTab === "convocations" ? renderConvocations() : activeTab === "notifications" ? renderNotifications() : activeTab === "channels" ? renderChannels() : activeTab === "events" ? renderEvents() : renderFuture();
+    content.innerHTML = activeTab === "dashboard" ? renderDashboard() : activeTab === "messages" ? renderMessages() : activeTab === "announcements" ? renderAnnouncements() : activeTab === "convocations" ? renderConvocations() : activeTab === "notifications" ? renderNotifications() : activeTab === "channels" ? renderChannels() : activeTab === "events" ? renderEvents() : activeTab === "handoffs" ? renderHandoffs() : renderFuture();
     refreshTabs();
     content.querySelectorAll("[data-communication-open]").forEach(function (button) {
       button.addEventListener("click", function () { open(button.getAttribute("data-communication-open")); });
@@ -442,6 +528,7 @@
     if (activeTab === "convocations") bindConvocationEvents();
     if (activeTab === "notifications") bindNotificationEvents();
     if (activeTab === "channels") bindChannelEvents();
+    if (activeTab === "handoffs") bindHandoffEvents();
     if (root.lucide && typeof root.lucide.createIcons === "function") root.lucide.createIcons();
   }
 
@@ -482,6 +569,7 @@
     convocationDrafts = [];
     notificationPreference = { subscription: "opt-in", channels: ["in-app"], prepared: false };
     emailDrafts = [];
+    pendingHandoff = null;
   }
 
   root.SchoolSafeCommunication = {
@@ -502,6 +590,7 @@
     getNotificationPreference: function () { return Object.assign({}, notificationPreference, { channels: notificationPreference.channels.slice() }); },
     canPrepareEmail: canPrepareEmail,
     canPublishWebSync: canPublishWebSync,
-    getEmailDrafts: function () { return emailDrafts.map(function (draft) { return Object.assign({}, draft); }); }
+    getEmailDrafts: function () { return emailDrafts.map(function (draft) { return Object.assign({}, draft); }); },
+    prepareHandoff: prepareHandoff
   };
 })(window);
