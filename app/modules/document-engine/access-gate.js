@@ -53,19 +53,22 @@ export function createAccessGate(options = {}) {
         return deny(`Missing permission ${requiredPermission}`);
       }
 
-      const requiredScope = permissionDef.scope;
-      if (!requiredScope || typeof access.scopeFor !== "function") {
+      const catalogueScope = permissionDef.scope;
+      if (!catalogueScope || typeof access.scopeFor !== "function") {
         return deny(`Scope unresolved for ${requiredPermission}`);
       }
       const grantedScope = access.scopeFor(user, requiredPermission);
-      if (!grantedScope || grantedScope.type !== requiredScope) {
-        return deny(`Missing required scope ${requiredScope} for ${requiredPermission}`);
+      if (!grantedScope || !isRecognizedScope(grantedScope.type)) {
+        return deny(`Scope unresolved for ${requiredPermission}`);
       }
       if (!contextMatchesScope(user, grantedScope, request.context || {})) {
         return deny(`Scope context mismatch for ${requiredPermission}`);
       }
 
-      return allow(requiredPermission, requiredScope);
+      // The catalogue scope is the standard default. Access_Law may grant a
+      // different explicit scope to a role or user; the effective scope still
+      // has to match the request context and never bypasses DENY.
+      return allow(requiredPermission, grantedScope.type);
     },
 
     reset() {
@@ -136,6 +139,10 @@ function contextMatchesScope(user, scope, context) {
     return !!portalId && Array.isArray(user.assignedPortalIds) && user.assignedPortalIds.includes(portalId);
   }
   return false;
+}
+
+function isRecognizedScope(type) {
+  return ["none", "school", "own", "own_children", "assigned_classes", "assigned_subjects", "assigned_portal"].includes(type);
 }
 
 function allow(permission, scope) {

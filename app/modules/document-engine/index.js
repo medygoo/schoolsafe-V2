@@ -3,6 +3,7 @@
 
 // New DOC-01 engine
 export { createDocumentEngine } from "./document-engine.js";
+export { createUniversalDocumentActions, DOCUMENT_CENTER_ACTION_MAP } from "./document-actions.js";
 export {
   DOCUMENT_ACTIONS,
   DOCUMENT_FORMATS,

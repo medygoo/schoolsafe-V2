@@ -237,7 +237,17 @@
   };
 
   var DEMO_ACCESS_CONTEXT_BY_ROLE = {
-    admin: { scopes: [{ type: "school" }] },
+    admin: {
+      scopes: [
+        { permission: "school.student.read", type: "school" },
+        { permission: "school.class.read", type: "school" },
+        { permission: "security.card.create", type: "school" },
+        { permission: "finance.status.read", type: "school" },
+        { permission: "finance.report.read", type: "school" },
+        { permission: "reports.financial.read", type: "school" },
+        { permission: "safe.assistant.use", type: "own" }
+      ]
+    },
     admissions: { scopes: [{ type: "school" }] },
     parent: {
       profile: { id: "demo-parent-1" },

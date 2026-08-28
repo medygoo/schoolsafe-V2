@@ -66,6 +66,7 @@
   function canAccessDescriptor(user, descriptor, action) {
     var access = window.SchoolSafeAccess;
     if (!access || !user || !descriptor) return false;
+    if (action && descriptor.actions.indexOf(action) < 0) return false;
     var permission = descriptor.actionPermissions[action] || descriptor.permission;
     if (typeof access.explicitDeny === "function" && access.explicitDeny(user, permission)) return false;
     if (typeof access.canAccess !== "function" || !access.canAccess(user, permission)) return false;
@@ -73,6 +74,12 @@
     var scope = access.scopeFor(user, permission);
     if (!scope || scope.type !== descriptor.scope) return false;
     return contextMatchesScope(user, scope, descriptor.context || {});
+  }
+
+  function getAuthorizedDescriptor(descriptorId, user, action) {
+    var descriptor = registry.find(function (item) { return item.id === descriptorId; });
+    if (!descriptor || !canAccessDescriptor(user, descriptor, action || "preview")) return null;
+    return cloneAuthorizedDescriptor(descriptor);
   }
 
   function contextMatchesScope(user, scope, context) {
@@ -236,6 +243,13 @@
     };
   }
 
+  function cloneAuthorizedDescriptor(descriptor) {
+    return Object.assign(cloneMetadata(descriptor), {
+      context: Object.assign({}, descriptor.context),
+      actionPermissions: Object.assign({}, descriptor.actionPermissions),
+    });
+  }
+
   function displayValue(value) {
     var labels = { draft: "Brouillon", generated: "Aperçu généré", internal: "Interne", confidential: "Confidentiel", restricted: "Restreint" };
     return labels[value] || value;
@@ -266,6 +280,7 @@
     listRegistered: listRegistered,
     visibleDocuments: visibleDocuments,
     canAccessDescriptor: canAccessDescriptor,
+    getAuthorizedDescriptor: getAuthorizedDescriptor,
     render: render,
     recordHistory: recordHistory,
     getHistory: getHistory,

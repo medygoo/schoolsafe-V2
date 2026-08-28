@@ -44,7 +44,7 @@ test.describe("J1 — Access_Law documentaire", () => {
     const allowed = await checkAccess(page, { action: "download", requestedBy: baseUser, context: { childId: "child-1" } }, templateInfo);
     const otherChild = await checkAccess(page, { action: "download", requestedBy: baseUser, context: { childId: "child-2" } }, templateInfo);
     const wrongScope = await checkAccess(page, {
-      action: "download", requestedBy: { ...baseUser, scopes: [{ permission: "finance.receipt.read", type: "school" }] }, context: { childId: "child-1" },
+      action: "download", requestedBy: { ...baseUser, scopes: [{ permission: "finance.receipt.read", type: "unsupported" }] }, context: { childId: "child-1" },
     }, templateInfo);
     expect(allowed).toMatchObject({ allowed: true, permission: "finance.receipt.read", scope: "own_children" });
     expect(otherChild).toMatchObject({ allowed: false });
