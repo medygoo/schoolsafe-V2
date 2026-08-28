@@ -335,7 +335,19 @@
     container.querySelectorAll("[data-pickup-person]").forEach(function (button) {
       button.addEventListener("click", function () {
         if (!isStudentActive(controlStudent)) return;
-        controlState.selectedId = button.getAttribute("data-pickup-person"); controlState.record = null; rerenderControl();
+        controlState.selectedId = button.getAttribute("data-pickup-person");
+        controlState.record = null;
+        var state = familyStateFor(controlStudent);
+        var person = selectedPerson(peopleFor(controlStudent, state));
+        var decision = decisionFor(person);
+        if (!decision.allowed && typeof root.CustomEvent === "function") {
+          root.dispatchEvent(new root.CustomEvent("schoolsafe:pickup-decision", { detail: {
+            studentId: controlStudent.id,
+            allowed: false,
+            label: decision.label
+          } }));
+        }
+        rerenderControl();
       });
     });
     var validate = container.querySelector("[data-validate-pickup]");
@@ -360,6 +372,9 @@
       if (!saveRecord(controlState.record, controlStudent)) {
         controlState.record = null;
         return;
+      }
+      if (typeof root.CustomEvent === "function") {
+        root.dispatchEvent(new root.CustomEvent("schoolsafe:pickup-recorded", { detail: controlState.record }));
       }
       rerenderControl();
     });

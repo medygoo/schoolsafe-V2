@@ -3,6 +3,8 @@
 
   var activeContainerId = null;
   var activeUser = null;
+  var activePickupStudent = null;
+  var DISMISSAL_STORAGE_KEY = "schoolsafe-v2-security-dismissal-v1";
 
   var PORTALS = [
     { id: "demo-portal-main", name: "Portail principal", station: "Poste A", status: "POSTE ACTIF" },
@@ -69,6 +71,78 @@
     };
   }
 
+  function readDismissalStore() {
+    try {
+      return JSON.parse(root.localStorage.getItem(DISMISSAL_STORAGE_KEY) || '{"statuses":{},"timeline":[],"notification":null}');
+    } catch (error) {
+      return { statuses: {}, timeline: [], notification: null };
+    }
+  }
+
+  function writeDismissalStore(store) {
+    try { root.localStorage.setItem(DISMISSAL_STORAGE_KEY, JSON.stringify(store)); }
+    catch (error) {}
+  }
+
+  function pickupPortalFor(user) {
+    if (!root.SchoolSafeStudentPickup || !root.SchoolSafeStudentPickup.canControlPickup(user || {})) return null;
+    var assignedIds = Array.isArray(user && user.assignedPortalIds) ? user.assignedPortalIds : [];
+    return PORTALS.find(function (portal) { return assignedIds.indexOf(portal.id) >= 0; }) || null;
+  }
+
+  function getDismissalProjection(user) {
+    var portal = pickupPortalFor(user);
+    if (!portal) return { allowed: false, portal: null, students: [], drafts: [], timeline: [], notification: null };
+    var store = readDismissalStore();
+    return {
+      allowed: true,
+      portal: portal,
+      students: STUDENTS.filter(function (student) { return student.lifecycleStatus === "active"; }).map(function (student) {
+        return Object.assign({}, student, { dismissalStatus: store.statuses[student.id] || student.dismissalStatus });
+      }),
+      drafts: STUDENTS.filter(function (student) { return student.lifecycleStatus !== "active"; }),
+      timeline: Array.isArray(store.timeline) ? store.timeline : [],
+      notification: store.notification || null
+    };
+  }
+
+  function recordDismissal(student, status, eventType, detail) {
+    if (!student || student.lifecycleStatus !== "active" || !pickupPortalFor(activeUser)) return false;
+    var store = readDismissalStore();
+    store.statuses = store.statuses || {};
+    store.timeline = Array.isArray(store.timeline) ? store.timeline : [];
+    store.statuses[student.id] = status;
+    store.timeline.unshift({
+      id: "dismissal-" + Date.now() + "-" + store.timeline.length,
+      studentId: student.id,
+      student: student.name,
+      eventType: eventType,
+      detail: detail || "",
+      time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+      portalId: pickupPortalFor(activeUser).id
+    });
+    store.timeline = store.timeline.slice(0, 30);
+    if (eventType === "PRÉPARÉ") {
+      store.notification = { studentId: student.id, student: student.name, text: "Votre enfant est en préparation de sortie" };
+    }
+    writeDismissalStore(store);
+    return true;
+  }
+
+  function pickupStudentFrom(student) {
+    var names = String(student.name || "Élève SchoolSafe").split(" ");
+    return {
+      id: student.id,
+      matricule: student.id === "demo-active-student" ? "B1-0001" : "E5-" + student.id.slice(-4).toUpperCase(),
+      first_name: names.shift() || "Élève",
+      last_name: names.join(" ") || "SchoolSafe",
+      lifecycle_status: student.lifecycleStatus,
+      class_id: student.classId,
+      enrollment: { status: "active", planned_class_id: student.classId, planned_class_name: student.className },
+      primary_parent: { display_name: student.id === "demo-active-student" ? "Sophie Martin" : "Parent principal", account_status: "active" }
+    };
+  }
+
   function dashboardCard(label, value, detail, iconName) {
     return '<article class="guard-security-metric"><span>' + icon(iconName) + '</span><div><small>' + escapeMarkup(label) + '</small><strong>' + escapeMarkup(value) + '</strong><p>' + escapeMarkup(detail) + '</p></div></article>';
   }
@@ -114,7 +188,12 @@
           return;
         }
         if (target === "pickup") {
+          activePickupStudent = null;
           open("pickup");
+          return;
+        }
+        if (target === "dismissal") {
+          open("dismissal");
           return;
         }
         var feature = container.querySelector("[data-guard-feature]");
@@ -146,6 +225,48 @@
     if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
   }
 
+  function dismissalAction(student) {
+    if (student.dismissalStatus === "RÉCUPÉRÉ") return '<small>Cycle local terminé.</small>';
+    if (student.dismissalStatus === "PRÊT" || student.dismissalStatus === "EN ATTENTE DU CONTRÔLE") {
+      return '<button type="button" data-dismissal-control="' + escapeMarkup(student.id) + '">' + icon("badge-check") + ' Passer au contrôle</button>';
+    }
+    return '<button type="button" data-dismissal-prepare="' + escapeMarkup(student.id) + '">' + icon("clock-3") + ' Préparer la sortie</button>';
+  }
+
+  function renderDismissal(container, projection) {
+    var rows = projection.students.map(function (student) {
+      return '<article class="guard-dismissal-row" data-dismissal-student="' + escapeMarkup(student.id) + '"><div><p class="guard-security-eyebrow">' + escapeMarkup(student.className) + '</p><h3>' + escapeMarkup(student.name) + '</h3><span>' + escapeMarkup(student.dismissalStatus) + '</span></div>' + dismissalAction(student) + '</article>';
+    }).join("");
+    var drafts = projection.drafts.map(function (student) {
+      return '<article class="guard-dismissal-draft" data-dismissal-draft="' + escapeMarkup(student.id) + '">' + icon("shield-x") + '<div><strong>' + escapeMarkup(student.name) + '</strong><p>DOSSIER NON ACTIF · aucune préparation possible</p></div></article>';
+    }).join("");
+    var timeline = projection.timeline.map(function (event) {
+      return '<li><time>' + escapeMarkup(event.time) + '</time><span><strong>' + escapeMarkup(event.eventType) + '</strong> · ' + escapeMarkup(event.student) + (event.detail ? '<small>' + escapeMarkup(event.detail) + '</small>' : '') + '</span></li>';
+    }).join("");
+    var notification = projection.notification
+      ? '<aside class="guard-dismissal-notification" data-dismissal-notification-preview><span>Prévisualisation Parent · BACKEND_LATER</span><strong>' + escapeMarkup(projection.notification.student) + '</strong><p>' + escapeMarkup(projection.notification.text) + '</p></aside>'
+      : '';
+    container.innerHTML = '<div class="guard-security-shell guard-dismissal-view" data-guard-dismissal><header class="guard-security-workspace-header"><button type="button" data-guard-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="guard-security-eyebrow">E5 · Préparation frontend</p><h1>Préparer les sorties</h1><p>security.pickup.manage · assigned_portal</p></div><span>' + escapeMarkup(projection.portal.name) + ' · BACKEND_LATER</span></header><aside class="guard-security-honesty"><strong>PRÊT ≠ SORTI</strong><p>La préparation n’autorise aucune remise. Seul un contrôle E4 autorisé produit l’état RÉCUPÉRÉ.</p></aside><div class="guard-security-columns"><section class="guard-security-panel"><header><div><p class="guard-security-eyebrow">Élèves actifs</p><h2>File de préparation</h2></div><span>DRAFTS EXCLUS</span></header><div class="guard-dismissal-list">' + rows + '</div>' + drafts + '</section><section class="guard-security-panel"><header><div><p class="guard-security-eyebrow">Chronologie locale</p><h2>Préparé → contrôlé → résultat</h2></div><span>LECTURE SEULE</span></header><ol class="guard-dismissal-timeline" data-dismissal-timeline>' + (timeline || '<li class="guard-dismissal-empty">Aucun changement local pour cette session.</li>') + '</ol></section></div>' + notification + '</div>';
+    container.querySelectorAll("[data-dismissal-prepare]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var student = projection.students.find(function (item) { return item.id === button.getAttribute("data-dismissal-prepare"); });
+        if (!recordDismissal(student, "PRÊT", "PRÉPARÉ", "Notification Parent prévisualisée · BACKEND_LATER")) return;
+        renderDismissal(container, getDismissalProjection(activeUser));
+        if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+      });
+    });
+    container.querySelectorAll("[data-dismissal-control]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var student = projection.students.find(function (item) { return item.id === button.getAttribute("data-dismissal-control"); });
+        if (!recordDismissal(student, "EN ATTENTE DU CONTRÔLE", "CONTRÔLE DEMANDÉ", "Validation E4 obligatoire")) return;
+        activePickupStudent = student;
+        open("pickup");
+      });
+    });
+    var back = container.querySelector("[data-guard-back]");
+    if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
+  }
+
   function renderScannerWorkspace(container, projection) {
     container.innerHTML = '<div class="guard-security-shell guard-scan-view"><header class="guard-security-workspace-header"><button type="button" data-guard-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="guard-security-eyebrow">E3 · Scanner existant</p><h1>Entrée / sortie au ' + escapeMarkup(projection.portal.name) + '</h1><p>security.scan · assigned_portal</p></div><span>FRONTEND · BACKEND_LATER</span></header><section class="guard-security-panel"><div id="guardScannerHost" class="guard-scanner-host"></div></section></div>';
     root.SchoolSafeSecurityModule.render("guardScannerHost", { mode: "scan", user: activeUser, portalId: projection.portal.id, frontendDemo: true, hideModeTabs: true });
@@ -156,7 +277,7 @@
   function renderPickupWorkspace(container, projection) {
     container.innerHTML = '<div class="guard-security-shell guard-pickup-view"><header class="guard-security-workspace-header"><button type="button" data-guard-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="guard-security-eyebrow">E4 · Contrôle frontend</p><h1>Contrôler une récupération</h1><p>security.pickup.manage · assigned_portal</p></div><span>' + escapeMarkup(projection.portal.name) + ' · BACKEND_LATER</span></header><section class="guard-security-panel"><div id="guardPickupHost" class="guard-pickup-host"></div></section></div>';
     root.SchoolSafeStudentPickup.resetControl();
-    root.SchoolSafeStudentPickup.renderControl("guardPickupHost", activeUser);
+    root.SchoolSafeStudentPickup.renderControl("guardPickupHost", activeUser, activePickupStudent ? pickupStudentFrom(activePickupStudent) : undefined);
     var back = container.querySelector("[data-guard-back]");
     if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
   }
@@ -197,6 +318,17 @@
       if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
       return true;
     }
+    if (view === "dismissal") {
+      var dismissalProjection = getDismissalProjection(activeUser);
+      if (!dismissalProjection.allowed) {
+        renderDenied(container, activeUser);
+        if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+        return false;
+      }
+      renderDismissal(container, dismissalProjection);
+      if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+      return true;
+    }
     return false;
   }
 
@@ -214,13 +346,31 @@
   function clear() {
     activeContainerId = null;
     activeUser = null;
+    activePickupStudent = null;
   }
+
+  root.addEventListener("schoolsafe:pickup-decision", function (event) {
+    var detail = event.detail || {};
+    if (detail.allowed || !activeUser || !pickupPortalFor(activeUser)) return;
+    var student = STUDENTS.find(function (item) { return item.id === detail.studentId && item.lifecycleStatus === "active"; });
+    if (student) recordDismissal(student, "BLOQUÉ", "REFUSÉ", detail.label || "Contrôle non autorisé");
+  });
+
+  root.addEventListener("schoolsafe:pickup-recorded", function (event) {
+    var detail = event.detail || {};
+    if (!activeUser || !pickupPortalFor(activeUser)) return;
+    var student = STUDENTS.find(function (item) { return item.id === detail.studentId && item.lifecycleStatus === "active"; });
+    if (!student) return;
+    recordDismissal(student, "EN ATTENTE DU CONTRÔLE", "CONTRÔLÉ", detail.result || "Personne autorisée");
+    recordDismissal(student, "RÉCUPÉRÉ", "RÉCUPÉRÉ", detail.picker || "Remise locale validée");
+  });
 
   root.SchoolSafeGuardSecurity = {
     PORTALS: PORTALS,
     STUDENTS: STUDENTS,
     getPortalProjection: getPortalProjection,
     getAttendanceProjection: getAttendanceProjection,
+    getDismissalProjection: getDismissalProjection,
     open: open,
     clear: clear,
     render: render
