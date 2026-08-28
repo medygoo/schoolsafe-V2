@@ -235,7 +235,8 @@
     finance: ["finance.fee.read", "finance.fee.manage", "finance.receipt.read", "finance.report.read", "finance.cash_register.close", "finance.control.read", "finance.control.manage", "finance.status.read", "safe.assistant.use"],
     accountant: ["reports.financial.read", "finance.report.read", "finance.receipt.read", "safe.assistant.use"],
     hr: ["staff.read", "staff.manage", "staff.attendance.read", "reports.hr.read", "safe.assistant.use"],
-    cashier: ["finance.payment.record", "finance.receipt.read", "finance.status.read", "safe.assistant.use"]
+    cashier: ["finance.payment.record", "finance.receipt.read", "finance.status.read", "safe.assistant.use"],
+    communication: ["communication.message.send"]
   };
 
   var DEMO_ACCESS_CONTEXT_BY_ROLE = {
@@ -346,6 +347,11 @@
         { permission: "staff.attendance.read", type: "school" },
         { permission: "reports.hr.read", type: "school" },
         { permission: "safe.assistant.use", type: "own" }
+      ]
+    },
+    communication: {
+      scopes: [
+        { permission: "communication.message.send", type: "school" }
       ]
     },
     cashier: {

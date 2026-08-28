@@ -142,6 +142,116 @@
   text-align: center;
 }
 
+.communication-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding: 1.1rem;
+  border: 1px solid var(--ss-border, #d9e1ec);
+  border-radius: 16px;
+  background: var(--ss-surface, #fff);
+}
+
+.communication-form label {
+  display: grid;
+  gap: .45rem;
+  min-width: 0;
+  color: var(--ss-text-muted, #64748b);
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.communication-form input,
+.communication-form select,
+.communication-form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: .7rem .8rem;
+  border: 1px solid var(--ss-border, #cbd5e1);
+  border-radius: 10px;
+  background: var(--ss-surface, #fff);
+  color: var(--ss-text, #172033);
+  font: inherit;
+}
+
+.communication-form textarea {
+  min-height: 116px;
+  resize: vertical;
+}
+
+.communication-form-wide {
+  grid-column: 1 / -1;
+}
+
+.communication-form > p,
+.communication-submit-boundary {
+  margin: 0;
+  color: var(--ss-text-muted, #64748b);
+  font-size: .78rem;
+}
+
+.communication-submit-boundary {
+  align-self: center;
+  font-weight: 800;
+}
+
+.communication-draft-list {
+  display: grid;
+  gap: .8rem;
+  margin-top: 1rem;
+}
+
+.communication-draft {
+  padding: 1rem;
+  border: 1px solid var(--ss-border, #d9e1ec);
+  border-left: 4px solid var(--communication-accent);
+  border-radius: 12px;
+  background: var(--ss-surface, #fff);
+}
+
+.communication-draft header,
+.communication-draft footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .5rem 1rem;
+}
+
+.communication-draft header > div {
+  display: grid;
+  gap: .2rem;
+}
+
+.communication-draft header span,
+.communication-draft footer {
+  color: var(--ss-text-muted, #64748b);
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.communication-denied {
+  display: grid;
+  place-items: center;
+  gap: .7rem;
+  min-height: 320px;
+  padding: 2rem;
+  border: 1px solid color-mix(in srgb, #dc2626 35%, var(--ss-border, #d9e1ec));
+  border-radius: 16px;
+  background: color-mix(in srgb, #dc2626 7%, var(--ss-surface, #fff));
+  text-align: center;
+}
+
+.communication-denied > svg,
+.communication-denied > span {
+  color: #dc2626;
+}
+
+.communication-denied h3,
+.communication-denied p {
+  margin: 0;
+}
+
 .communication-future > svg {
   width: 48px;
   height: 48px;
@@ -177,6 +287,14 @@
   .communication-card__state {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .communication-form {
+    grid-template-columns: 1fr;
+  }
+
+  .communication-form-wide {
+    grid-column: auto;
   }
 }
 
