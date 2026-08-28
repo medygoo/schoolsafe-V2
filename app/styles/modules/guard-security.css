@@ -56,6 +56,9 @@
 .guard-attendance-row dt { color: var(--ss-text-secondary); font-size: .72rem; }
 .guard-attendance-row dd { margin: .15rem 0 0; font-weight: 800; }
 .guard-attendance-row > p { color: var(--ss-text-secondary); }
+.guard-scanner-host { min-width: 0; }
+.guard-scanner-host .security-scan-panel { margin: 0; }
+.security-demo-boundary { margin: .8rem 0 0; color: var(--ss-text-secondary); font-size: .78rem; }
 @media (max-width: 960px) { .guard-security-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 960px) { .guard-attendance-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .guard-security-hero { align-items: flex-start; flex-direction: column; } .guard-security-shortcuts, .guard-security-columns { grid-template-columns: 1fr; } .guard-security-workspace-header { grid-template-columns: 1fr; align-items: start; } .guard-security-workspace-header > span { width: fit-content; } .guard-attendance-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -4,6 +4,10 @@
   var currentEventType = "entry";
   var currentMode = "scan";
   var currentUser = null;
+  var currentPortalId = null;
+  var frontendDemo = false;
+  var hideModeTabs = false;
+  var LOCAL_EVENT_KEY = "schoolsafe-v2-security-local-events";
 
   function escapeHtml(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
@@ -14,6 +18,24 @@
   var scanStream = null;
   var scanTimeout = null;
 
+  function readLocalEvents() {
+    try {
+      var parsed = JSON.parse(root.localStorage.getItem(LOCAL_EVENT_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) { return []; }
+  }
+
+  function saveLocalEvent(event) {
+    var events = readLocalEvents();
+    events.unshift(event);
+    try { root.localStorage.setItem(LOCAL_EVENT_KEY, JSON.stringify(events.slice(0, 60))); } catch (error) {}
+  }
+
+  function canScanAssignedPortal(user) {
+    var access = root.SchoolSafeAccess;
+    return !!(access && typeof access.allowsScope === "function" && access.allowsScope(user || {}, "security.scan", "assigned_portal"));
+  }
+
   function refreshIcons() {
     if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
   }
@@ -21,9 +43,13 @@
   function renderScanner(containerId) {
     var container = document.getElementById(containerId);
     if (!container) return;
+    if (frontendDemo && !canScanAssignedPortal(currentUser)) {
+      container.innerHTML = '<div class="security-scan-panel">' + window.ssState({ type: "error", title: "REFUSÉ", message: "security.scan avec assigned_portal est obligatoire.", size: "compact" }) + '</div>';
+      return;
+    }
     container.innerHTML =
       '<div class="security-scan-panel">' +
-        '<header><span>Contrôle d’accès</span><h2>Scanner une carte SchoolSafe</h2><p>Saisissez le contenu du QR, utilisez un lecteur connecté ou activez la caméra.</p></header>' +
+        '<header><span>Contrôle d’accès' + (frontendDemo ? " · assigned_portal" : "") + '</span><h2>Scanner une carte SchoolSafe</h2><p>Saisissez le contenu du QR, utilisez un lecteur connecté ou activez la caméra.</p></header>' +
         '<div class="scan-form ss-form-grid">' +
           window.ssField({
             label: "QR payload",
@@ -42,6 +68,7 @@
           '<p class="camera-hint">Placez le QR code devant la caméra.</p>' +
         '</div>' +
         '<div id="scanResult" class="scan-result hidden"></div>' +
+        (frontendDemo ? '<p class="security-demo-boundary"><b>DÉMONSTRATION LOCALE</b> · BACKEND_LATER</p>' : '') +
       '</div>';
 
     bind(containerId);
@@ -69,9 +96,12 @@
     options = options || {};
     currentMode = options.mode || currentMode || "scan";
     currentUser = options.user || currentUser || { permissions: [] };
+    currentPortalId = options.portalId || currentPortalId;
+    frontendDemo = options.frontendDemo === true;
+    hideModeTabs = options.hideModeTabs === true;
     var container = document.getElementById(containerId);
     if (!container) return;
-    container.innerHTML = modeTabs();
+    container.innerHTML = hideModeTabs ? '<div id="securityModeContent"></div>' : modeTabs();
     if (currentMode === "pickup" && root.SchoolSafeStudentPickup) {
       root.SchoolSafeStudentPickup.resetControl();
       root.SchoolSafeStudentPickup.renderControl("securityModeContent", currentUser);
@@ -79,7 +109,7 @@
       currentMode = "scan";
       renderScanner("securityModeContent");
     }
-    bindModeTabs(containerId);
+    if (!hideModeTabs) bindModeTabs(containerId);
     refreshIcons();
   }
 
@@ -227,6 +257,11 @@
       return;
     }
 
+    if (frontendDemo) {
+      performLocalScan(containerId, payload);
+      return;
+    }
+
     if (!window.SchoolSafeSecurityAPI) {
       showResult(containerId, "error", "API de sécurité non disponible.");
       return;
@@ -272,7 +307,53 @@
     });
   }
 
+  function localDecision(payload) {
+    var match = /^schoolsafe:\/\/card\/([^?]+)(?:\?portal=([^&]+))?$/.exec(payload);
+    if (!match) return { title: "REFUSÉ", type: "error", message: "QR invalide.", student: null };
+    var studentId = decodeURIComponent(match[1]);
+    var portalId = match[2] ? decodeURIComponent(match[2]) : "";
+    var assignedPortalIds = Array.isArray(currentUser && currentUser.assignedPortalIds) ? currentUser.assignedPortalIds : [];
+    if (!portalId || portalId !== currentPortalId || assignedPortalIds.indexOf(portalId) < 0) {
+      return { title: "REFUSÉ", type: "error", message: "QR hors du portail affecté.", student: null, studentId: studentId, portalId: portalId };
+    }
+    var catalog = root.SchoolSafeGuardSecurity && Array.isArray(root.SchoolSafeGuardSecurity.STUDENTS) ? root.SchoolSafeGuardSecurity.STUDENTS : [];
+    var student = catalog.find(function (item) { return item.id === studentId; }) || null;
+    if (!student) return { title: "VÉRIFICATION", type: "unavailable", message: "QR inconnu. Contrôle manuel requis.", student: null, studentId: studentId, portalId: portalId };
+    if (student.lifecycleStatus !== "active") return { title: "DOSSIER NON ACTIF", type: "error", message: "Ce dossier brouillon ne peut produire aucun passage.", student: student, studentId: studentId, portalId: portalId };
+    if (currentEventType === "incident") return { title: "VÉRIFICATION", type: "unavailable", message: "Incident enregistré localement au poste autorisé.", student: student, studentId: studentId, portalId: portalId };
+    return { title: "AUTORISÉ", type: "success", message: (currentEventType === "exit" ? "Sortie" : "Entrée") + " enregistrée localement.", student: student, studentId: studentId, portalId: portalId };
+  }
+
+  function performLocalScan(containerId, payload) {
+    var container = document.getElementById(containerId);
+    var input = container && container.querySelector("#qrPayloadInput");
+    var resultBox = container && container.querySelector("#scanResult");
+    if (!container || !resultBox) return;
+    if (!canScanAssignedPortal(currentUser)) {
+      showResult(containerId, "error", "security.scan avec assigned_portal est obligatoire.");
+      return;
+    }
+    var decision = localDecision(payload);
+    var html = window.ssState({ type: decision.type, title: decision.title, message: decision.message, size: "compact" });
+    html += '<div class="scan-result-details"><p><b>' + escapeHtml(decision.student ? decision.student.name : "Identité non confirmée") + '</b>' + (decision.student ? " · " + escapeHtml(decision.student.className) : "") + '</p><p>Portail : ' + escapeHtml(decision.portalId || currentPortalId || "Non reconnu") + '</p><p><b>BACKEND_LATER</b> · événement local uniquement</p></div>';
+    resultBox.innerHTML = html;
+    resultBox.classList.remove("hidden");
+    saveLocalEvent({
+      id: "security-event-" + Date.now(),
+      type: currentEventType,
+      decision: decision.title,
+      studentId: decision.studentId || null,
+      studentName: decision.student && decision.student.name || null,
+      portalId: decision.portalId || currentPortalId || null,
+      occurredAt: new Date().toISOString(),
+      backendState: "BACKEND_LATER"
+    });
+    if (input) input.value = "";
+    refreshIcons();
+  }
+
   root.SchoolSafeSecurityModule = {
+    readLocalEvents: readLocalEvents,
     render: render,
   };
 })(window);

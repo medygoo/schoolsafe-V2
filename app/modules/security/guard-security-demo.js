@@ -108,6 +108,11 @@
     '</div>';
     container.querySelectorAll("[data-guard-open]").forEach(function (button) {
       button.addEventListener("click", function () {
+        var target = button.getAttribute("data-guard-open");
+        if (target === "scan") {
+          open("scan");
+          return;
+        }
         var feature = container.querySelector("[data-guard-feature]");
         if (!feature) return;
         feature.hidden = false;
@@ -137,6 +142,13 @@
     if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
   }
 
+  function renderScannerWorkspace(container, projection) {
+    container.innerHTML = '<div class="guard-security-shell guard-scan-view"><header class="guard-security-workspace-header"><button type="button" data-guard-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="guard-security-eyebrow">E3 · Scanner existant</p><h1>Entrée / sortie au ' + escapeMarkup(projection.portal.name) + '</h1><p>security.scan · assigned_portal</p></div><span>FRONTEND · BACKEND_LATER</span></header><section class="guard-security-panel"><div id="guardScannerHost" class="guard-scanner-host"></div></section></div>';
+    root.SchoolSafeSecurityModule.render("guardScannerHost", { mode: "scan", user: activeUser, portalId: projection.portal.id, frontendDemo: true, hideModeTabs: true });
+    var back = container.querySelector("[data-guard-back]");
+    if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
+  }
+
   function open(view) {
     var container = root.document.getElementById(activeContainerId || "guardSecurityPortal");
     if (!container || !activeUser) return false;
@@ -148,6 +160,17 @@
         return false;
       }
       renderAttendance(container, projection);
+      if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+      return true;
+    }
+    if (view === "scan") {
+      var portalProjection = getPortalProjection(activeUser);
+      if (!portalProjection.allowed || !root.SchoolSafeSecurityModule) {
+        renderDenied(container, activeUser);
+        if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+        return false;
+      }
+      renderScannerWorkspace(container, portalProjection);
       if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
       return true;
     }
