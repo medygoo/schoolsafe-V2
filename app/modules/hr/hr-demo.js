@@ -15,6 +15,18 @@
     { id: "hr-demo-5", hrId: "HR-DEM-005", firstName: "Esther", lastName: "Ilunga", job: "Responsable cantine", service: "Cantine", status: "ACTIF", entryDate: "2020-10-19", contact: "esther.ilunga@example.test", assignment: "Service cantine", history: ["Entrée démo · 19/10/2020"] },
     { id: "hr-demo-6", hrId: "HR-DEM-006", firstName: "Jean", lastName: "Kabeya", job: "Agent administratif", service: "Administration", status: "INACTIF", entryDate: "2019-03-18", contact: "jean.kabeya@example.test", assignment: "Archives · historique", history: ["Entrée démo · 18/03/2019", "Passage INACTIF · simulation"] }
   ];
+  var CONTRACTS = [
+    { id: "contract-demo-1", reference: "CTR-DEM-001", staffId: "hr-demo-1", type: "Exemple durée déterminée", job: "Enseignante", service: "Primaire", startDate: "2023-09-04", endDate: "2027-08-31", status: "ACTIF", deadline: "31/08/2027", observation: "Contrat fictif de démonstration" },
+    { id: "contract-demo-2", reference: "CTR-DEM-002", staffId: "hr-demo-2", type: "Exemple renouvelable", job: "Enseignant", service: "Secondaire", startDate: "2022-08-29", endDate: "2026-09-30", status: "À RENOUVELER", deadline: "30/09/2026", observation: "Échéance à examiner" },
+    { id: "contract-demo-3", reference: "CTR-DEM-003", staffId: "hr-demo-6", type: "Exemple mission terminée", job: "Agent administratif", service: "Administration", startDate: "2019-03-18", endDate: "2025-06-30", status: "TERMINÉ", deadline: "Terminée", observation: "Historique fictif conservé" }
+  ];
+  var ASSIGNMENTS = [
+    { id: "assignment-demo-1", staffId: "hr-demo-1", service: "Primaire", job: "Enseignante", className: "4e A", subject: "Français", site: "Bâtiment A", startDate: "2026-09-01", endDate: "" },
+    { id: "assignment-demo-2", staffId: "hr-demo-2", service: "Secondaire", job: "Enseignant", className: "6e A", subject: "Mathématiques", site: "Bâtiment B", startDate: "2026-09-01", endDate: "" },
+    { id: "assignment-demo-3", staffId: "hr-demo-4", service: "Sécurité", job: "Gardien", className: "Sans objet", subject: "Sans objet", site: "Portail principal", startDate: "2026-01-08", endDate: "" }
+  ];
+  var CONTRACT_DRAFTS_STORAGE_KEY = "schoolsafe-v2-hr-contract-drafts";
+  var ASSIGNMENT_DRAFTS_STORAGE_KEY = "schoolsafe-v2-hr-assignment-drafts";
 
   function readStaffDrafts() {
     try {
@@ -28,6 +40,20 @@
   }
 
   var staffDrafts = readStaffDrafts();
+
+  function readDraftList(key) {
+    try {
+      var parsed = JSON.parse(root.localStorage.getItem(key) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) { return []; }
+  }
+
+  function persistDraftList(key, drafts) {
+    try { root.localStorage.setItem(key, JSON.stringify(drafts)); } catch (error) {}
+  }
+
+  var contractDrafts = readDraftList(CONTRACT_DRAFTS_STORAGE_KEY);
+  var assignmentDrafts = readDraftList(ASSIGNMENT_DRAFTS_STORAGE_KEY);
 
   function escapeMarkup(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
@@ -143,6 +169,41 @@
     return '<section class="hr-staff" data-hr-staff><header><div><span>Dossier personnel</span><h3>Personnel visible</h3><p>Données fictives non sensibles · consultation school.</p></div><span class="hr-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><div class="hr-staff-filters"><label>Rechercher<input data-hr-staff-filter="search" type="search" value="' + escapeMarkup(staffFilters.search) + '" placeholder="Nom, identifiant, fonction"></label><label>Statut<select data-hr-staff-filter="status"><option value="">Tous</option>' + staffOptions(["ACTIF", "INACTIF"], staffFilters.status) + '</select></label></div><div class="hr-staff-layout"><div class="hr-staff-list">' + (rows.length ? rows.map(function (item) { return '<button type="button" data-hr-staff-row="' + item.id + '" class="' + (item.id === member.id ? "active" : "") + '"><span><b>' + escapeMarkup(item.firstName + " " + item.lastName) + '</b><small>' + escapeMarkup(item.hrId + " · " + item.job) + '</small></span><span class="hr-status">' + escapeMarkup(item.status) + '</span></button>'; }).join("") : '<p class="hr-empty">Aucun membre ne correspond aux filtres.</p>') + '</div><div class="hr-staff-detail" data-hr-staff-dossier>' + renderStaffOriginal(member) + renderStaffDraft(member) + renderStaffForm(member) + '</div></div></section>';
   }
 
+  function staffById(id) { return STAFF.find(function (member) { return member.id === id; }) || STAFF[0]; }
+  function staffMemberOptions(selectedId) {
+    return STAFF.map(function (member) { return '<option value="' + member.id + '"' + (member.id === selectedId ? " selected" : "") + '>' + escapeMarkup(member.firstName + " " + member.lastName + " · " + member.hrId) + '</option>'; }).join("");
+  }
+
+  function renderContractDrafts() {
+    if (!contractDrafts.length) return "";
+    return '<section class="hr-draft-list"><header><div><span>BROUILLONS LOCAUX</span><h4>Contrats préparés</h4></div><span class="hr-boundary-chip">BACKEND_LATER</span></header>' + contractDrafts.map(function (draft) { var member = staffById(draft.staffId); return '<article data-hr-contract-draft><small>BROUILLON LOCAL · BACKEND_LATER</small><b>' + escapeMarkup(draft.type) + '</b><span>' + escapeMarkup(member.firstName + " " + member.lastName + " · " + draft.status) + '</span><span>' + escapeMarkup(draft.startDate + " → " + (draft.endDate || "Sans fin préparée")) + '</span><p>' + escapeMarkup(draft.observation || "Aucune observation") + '</p></article>'; }).join("") + '</section>';
+  }
+
+  function renderContractForm() {
+    if (!canManageStaff()) return '<aside class="hr-boundary"><i data-lucide="lock-keyhole"></i><p>Lecture seule · staff.manage avec portée school est requis pour préparer un contrat.</p></aside>';
+    return '<form class="hr-preparation-form" data-hr-contract-form><header><div><span>Préparation locale</span><h4>Nouveau brouillon de contrat</h4></div><span class="hr-boundary-chip">BROUILLON LOCAL</span></header><label>Membre<select name="staffId">' + staffMemberOptions(STAFF[0].id) + '</select></label><label>Type exemple<input name="type" value="Exemple de contrat" required></label><label>Fonction<input name="job" value="Fonction à confirmer" required></label><label>Service<select name="service">' + staffOptions(["Primaire", "Secondaire", "Administration", "Sécurité", "Cantine"], "Primaire") + '</select></label><label>Date début<input name="startDate" type="date" value="2026-09-01" required></label><label>Date fin éventuelle<input name="endDate" type="date"></label><label>Statut<select name="status">' + staffOptions(["BROUILLON", "ACTIF", "À RENOUVELER", "EXPIRÉ", "TERMINÉ"], "BROUILLON") + '</select></label><label>Observation<input name="observation" value=""></label><button class="ss-button ss-button--primary" type="submit">Préparer le contrat</button><p class="hr-form-wide">Types configurables à confirmer · aucune décision ou signature officielle.</p></form>';
+  }
+
+  function renderContracts() {
+    if (!canReadStaff()) return '<section>' + renderStaffDenied() + '</section>';
+    return '<section class="hr-records" data-hr-contracts><header><div><span>Contrats du personnel</span><h3>Échéances visibles</h3><p>Les types présentés comme exemples ne constituent pas une enum juridique fermée.</p></div><span class="hr-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><div class="hr-table-wrap"><table class="hr-table"><thead><tr><th>Référence</th><th>Personnel</th><th>Type</th><th>Fonction / service</th><th>Période</th><th>Statut</th><th>Échéance</th><th>Observation</th></tr></thead><tbody>' + CONTRACTS.map(function (contract) { var member = staffById(contract.staffId); return '<tr data-hr-contract-row="' + contract.id + '"><td>' + escapeMarkup(contract.reference) + '</td><td>' + escapeMarkup(member.firstName + " " + member.lastName) + '</td><td>' + escapeMarkup(contract.type) + '</td><td>' + escapeMarkup(contract.job + " · " + contract.service) + '</td><td>' + escapeMarkup(contract.startDate + " → " + contract.endDate) + '</td><td><span class="hr-status">' + escapeMarkup(contract.status) + '</span></td><td>' + escapeMarkup(contract.deadline) + '</td><td>' + escapeMarkup(contract.observation) + '</td></tr>'; }).join("") + '</tbody></table></div>' + renderContractDrafts() + renderContractForm() + '</section>';
+  }
+
+  function renderAssignmentDrafts() {
+    if (!assignmentDrafts.length) return "";
+    return '<section class="hr-draft-list"><header><div><span>BROUILLONS LOCAUX</span><h4>Affectations projetées</h4></div><span class="hr-boundary-chip">BACKEND_LATER</span></header>' + assignmentDrafts.map(function (draft) { var member = staffById(draft.staffId); return '<article data-hr-assignment-draft><small>BROUILLON LOCAL · BACKEND_LATER</small><b>' + escapeMarkup(member.firstName + " " + member.lastName) + '</b><span>' + escapeMarkup(draft.job + " · " + draft.service) + '</span><span>' + escapeMarkup([draft.className, draft.subject, draft.site].filter(Boolean).join(" · ")) + '</span><p>teacher_assignments backend inchangé · projection RH uniquement.</p></article>'; }).join("") + '</section>';
+  }
+
+  function renderAssignmentForm() {
+    if (!canManageStaff()) return '<aside class="hr-boundary"><i data-lucide="lock-keyhole"></i><p>Lecture seule · staff.manage avec portée school est requis pour préparer une affectation.</p></aside>';
+    return '<form class="hr-preparation-form" data-hr-assignment-form><header><div><span>Préparation locale</span><h4>Nouvelle projection d’affectation</h4></div><span class="hr-boundary-chip">BROUILLON LOCAL</span></header><label>Membre<select name="staffId">' + staffMemberOptions(STAFF[0].id) + '</select></label><label>Service<select name="service">' + staffOptions(["Primaire", "Secondaire", "Administration", "Sécurité", "Cantine"], "Primaire") + '</select></label><label>Fonction<input name="job" value="Fonction projetée" required></label><label>Classe si pertinent<input name="className" value=""></label><label>Matière si pertinent<input name="subject" value=""></label><label>Site / poste<input name="site" value="Site principal"></label><label>Date début<input name="startDate" type="date" value="2026-09-01" required></label><label>Date fin éventuelle<input name="endDate" type="date"></label><button class="ss-button ss-button--primary" type="submit">Préparer l’affectation</button><p class="hr-form-wide">teacher_assignments backend inchangé · BACKEND_LATER.</p></form>';
+  }
+
+  function renderAssignments() {
+    if (!canReadStaff()) return '<section>' + renderStaffDenied() + '</section>';
+    return '<section class="hr-records" data-hr-assignments><header><div><span>Affectations du personnel</span><h3>Projections visibles</h3><p>Lecture RH des affectations fictives sans mutation pédagogique.</p></div><span class="hr-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><div class="hr-table-wrap"><table class="hr-table"><thead><tr><th>Personnel</th><th>Service</th><th>Fonction</th><th>Classe</th><th>Matière</th><th>Site / poste</th><th>Période</th></tr></thead><tbody>' + ASSIGNMENTS.map(function (assignment) { var member = staffById(assignment.staffId); return '<tr data-hr-assignment-row="' + assignment.id + '"><td>' + escapeMarkup(member.firstName + " " + member.lastName) + '</td><td>' + escapeMarkup(assignment.service) + '</td><td>' + escapeMarkup(assignment.job) + '</td><td>' + escapeMarkup(assignment.className) + '</td><td>' + escapeMarkup(assignment.subject) + '</td><td>' + escapeMarkup(assignment.site) + '</td><td>' + escapeMarkup(assignment.startDate + " → " + (assignment.endDate || "En cours")) + '</td></tr>'; }).join("") + '</tbody></table></div>' + renderAssignmentDrafts() + renderAssignmentForm() + '<aside class="hr-boundary"><i data-lucide="shield-check"></i><p>teacher_assignments backend inchangé · aucune affectation pédagogique officielle n’est écrite.</p></aside></section>';
+  }
+
   function bindStaff() {
     var search = document.querySelector('[data-hr-staff-filter="search"]');
     var status = document.querySelector('[data-hr-staff-filter="status"]');
@@ -170,6 +231,38 @@
     };
   }
 
+  function bindContracts() {
+    var form = document.querySelector("[data-hr-contract-form]");
+    if (!form) return;
+    form.onsubmit = function (event) {
+      event.preventDefault();
+      var data = new root.FormData(form);
+      contractDrafts.push({
+        id: "contract-draft-" + Date.now(), staffId: String(data.get("staffId") || ""), type: String(data.get("type") || ""),
+        job: String(data.get("job") || ""), service: String(data.get("service") || ""), startDate: String(data.get("startDate") || ""),
+        endDate: String(data.get("endDate") || ""), status: String(data.get("status") || "BROUILLON"), observation: String(data.get("observation") || "")
+      });
+      persistDraftList(CONTRACT_DRAFTS_STORAGE_KEY, contractDrafts);
+      renderContent();
+    };
+  }
+
+  function bindAssignments() {
+    var form = document.querySelector("[data-hr-assignment-form]");
+    if (!form) return;
+    form.onsubmit = function (event) {
+      event.preventDefault();
+      var data = new root.FormData(form);
+      assignmentDrafts.push({
+        id: "assignment-draft-" + Date.now(), staffId: String(data.get("staffId") || ""), service: String(data.get("service") || ""),
+        job: String(data.get("job") || ""), className: String(data.get("className") || ""), subject: String(data.get("subject") || ""),
+        site: String(data.get("site") || ""), startDate: String(data.get("startDate") || ""), endDate: String(data.get("endDate") || "")
+      });
+      persistDraftList(ASSIGNMENT_DRAFTS_STORAGE_KEY, assignmentDrafts);
+      renderContent();
+    };
+  }
+
   function renderFuture() {
     var labels = { staff: "Dossier personnel", contracts: "Contrats", assignments: "Affectations", absence: "Absences / congés", attendance: "Présence personnel", biometric: "Biométrie", payroll: "Paie", reports: "Rapports RH" };
     return '<section class="hr-future"><span>Phase H</span><h3>' + escapeMarkup(labels[activeTab] || "Ressources humaines") + '</h3><p>Surface frontend prévue dans le lot dédié, sans opération officielle.</p><span class="hr-boundary-chip">FEATURE_LATER · BACKEND_LATER</span></section>';
@@ -192,9 +285,11 @@
       button.hidden = !tabAllowed(tab);
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = !canAccessHr() ? renderDenied() : !tabAllowed(activeTab) ? renderDenied() : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : renderFuture();
+    content.innerHTML = !canAccessHr() ? renderDenied() : !tabAllowed(activeTab) ? renderDenied() : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : renderFuture();
     bindNavigation();
     if (activeTab === "staff") bindStaff();
+    if (activeTab === "contracts") bindContracts();
+    if (activeTab === "assignments") bindAssignments();
     if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
   }
 
