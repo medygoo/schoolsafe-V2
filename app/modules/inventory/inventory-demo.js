@@ -4,6 +4,15 @@
 
   var activeTab = "dashboard";
   var sessionOverride = null;
+  var ITEM_DRAFTS_STORAGE_KEY = "schoolsafe-v2-inventory-item-drafts";
+  var ITEMS = [
+    { code: "ART-001", name: "Papier A4", category: "Fournitures administratives", unit: "rame", type: "CONSOMMABLE", status: "ACTIF", service: "Administration" },
+    { code: "ART-002", name: "Craie blanche", category: "Fournitures pédagogiques", unit: "boîte", type: "CONSOMMABLE", status: "ACTIF", service: "Pédagogie" },
+    { code: "ART-003", name: "Marqueurs effaçables", category: "Fournitures pédagogiques", unit: "lot", type: "CONSOMMABLE", status: "ACTIF", service: "Pédagogie" },
+    { code: "ART-004", name: "Détergent multiusage", category: "Produits de nettoyage", unit: "litre", type: "CONSOMMABLE", status: "ACTIF", service: "Entretien" },
+    { code: "ART-005", name: "Ordinateur portable démo", category: "Matériel informatique", unit: "pièce", type: "ÉQUIPEMENT", status: "À CONTRÔLER", service: "Administration" },
+    { code: "ART-006", name: "Farine de maïs", category: "Ingrédients Cantine", unit: "sac", type: "CONSOMMABLE", status: "ACTIF", service: "Cantine" }
+  ];
   var METRICS = [
     ["Articles", "12 références démo", "boxes"],
     ["Catégories", "5 familles", "tags"],
@@ -36,6 +45,19 @@
     return !!(access && typeof access.allowsScope === "function" && access.allowsScope(subject || user(), "reports.operational.read", "school"));
   }
 
+  function readDraftList(key) {
+    try {
+      var parsed = JSON.parse(root.localStorage.getItem(key) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) { return []; }
+  }
+
+  function persistDraftList(key, drafts) {
+    try { root.localStorage.setItem(key, JSON.stringify(drafts)); } catch (error) {}
+  }
+
+  var itemDrafts = readDraftList(ITEM_DRAFTS_STORAGE_KEY);
+
   function metric(item, live) {
     return '<article class="inventory-dashboard-metric"><span><i data-lucide="' + item[2] + '"></i></span><div><small>' + escapeMarkup(item[0]) + '</small><b>' + escapeMarkup(live ? "Agrégat disponible" : item[1]) + "</b></div></article>";
   }
@@ -58,6 +80,33 @@
     return '<section class="inventory-future"><span>FEATURE_LATER</span><h3>' + escapeMarkup(labels[tab] || "Stock") + '</h3><p>Ce parcours sera activé dans son lot Phase I dédié.</p><small>FRONTEND UNIQUEMENT · BACKEND_LATER</small></section>';
   }
 
+  function renderItemRow(item, draft) {
+    return '<tr data-inventory-item' + (draft ? '-draft' : '') + '><td><b>' + escapeMarkup(item.code) + '</b>' + (draft ? '<small>BROUILLON LOCAL · BACKEND_LATER</small>' : '<small>DONNÉE DÉMO</small>') + '</td><td>' + escapeMarkup(item.name) + '</td><td>' + escapeMarkup(item.category) + '</td><td>' + escapeMarkup(item.unit) + '</td><td>' + escapeMarkup(item.type) + '</td><td>' + escapeMarkup(item.status) + '</td><td>' + escapeMarkup(item.service || "Tous services") + '</td></tr>';
+  }
+
+  function renderCatalog() {
+    var rows = ITEMS.map(function (item) { return renderItemRow(item, false); }).concat(itemDrafts.map(function (item) { return renderItemRow(item, true); })).join("");
+    return '<section class="inventory-catalog" data-inventory-catalog><header><div><span>Catalogue générique</span><h3>Articles et catégories</h3><p>Les catégories et services restent libres : aucune enum métier fermée.</p></div><span class="inventory-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><div class="inventory-table-wrap"><table><thead><tr><th>Code article</th><th>Nom</th><th>Catégorie</th><th>Unité</th><th>Type</th><th>Statut</th><th>Service principal</th></tr></thead><tbody>' + rows + '</tbody></table></div><form class="inventory-form" data-inventory-item-form><header><div><span>Préparation locale</span><h4>Ajouter un article générique</h4></div><span class="inventory-boundary-chip">BROUILLON LOCAL</span></header><label>Code article<input name="code" required placeholder="ART-..."></label><label>Nom<input name="name" required></label><label>Catégorie libre<input name="category" required list="inventoryCategorySuggestions"></label><datalist id="inventoryCategorySuggestions"><option value="Fournitures administratives"><option value="Produits de nettoyage"><option value="Matériel informatique"><option value="Ingrédients Cantine"></datalist><label>Unité libre<input name="unit" required placeholder="pièce, kg, litre..."></label><label>Type<select name="type"><option>CONSOMMABLE</option><option>ÉQUIPEMENT</option></select></label><label>Statut<select name="status"><option>ACTIF</option><option>INACTIF</option><option>À CONTRÔLER</option></select></label><label>Service principal éventuel<input name="service" placeholder="Tous services"></label><button class="ss-button ss-button--primary" type="submit">Préparer l’article</button><p class="inventory-form-wide">Aucune création officielle · navigateur non source de vérité · BACKEND_LATER.</p></form></section>';
+  }
+
+  function bindCatalogEvents() {
+    var form = document.querySelector("[data-inventory-item-form]");
+    if (!form || form.__inventoryBound) return;
+    form.__inventoryBound = true;
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var data = new FormData(form);
+      itemDrafts = itemDrafts.concat([{
+        code: String(data.get("code") || "").trim(), name: String(data.get("name") || "").trim(),
+        category: String(data.get("category") || "").trim(), unit: String(data.get("unit") || "").trim(),
+        type: String(data.get("type") || "CONSOMMABLE"), status: String(data.get("status") || "ACTIF"),
+        service: String(data.get("service") || "").trim()
+      }]);
+      persistDraftList(ITEM_DRAFTS_STORAGE_KEY, itemDrafts);
+      renderContent();
+    });
+  }
+
   function refreshTabs() {
     document.querySelectorAll("[data-inventory-tab]").forEach(function (button) {
       button.classList.toggle("active", button.getAttribute("data-inventory-tab") === activeTab);
@@ -68,9 +117,11 @@
     var content = document.getElementById("inventoryContent");
     if (!content) return;
     var subject = user();
-    if (activeTab !== "dashboard") content.innerHTML = isDemoMode(subject) ? renderFuture(activeTab) : (canReadAggregates(subject) && activeTab === "reports" ? renderLiveAggregates() : renderDenied());
+    if (activeTab === "catalog") content.innerHTML = isDemoMode(subject) ? renderCatalog() : renderDenied();
+    else if (activeTab !== "dashboard") content.innerHTML = isDemoMode(subject) ? renderFuture(activeTab) : (canReadAggregates(subject) && activeTab === "reports" ? renderLiveAggregates() : renderDenied());
     else content.innerHTML = isDemoMode(subject) ? renderDemoDashboard() : (canReadAggregates(subject) ? renderLiveAggregates() : renderDenied());
     refreshTabs();
+    if (activeTab === "catalog" && isDemoMode(subject)) bindCatalogEvents();
     if (root.lucide && typeof root.lucide.createIcons === "function") root.lucide.createIcons();
   }
 
