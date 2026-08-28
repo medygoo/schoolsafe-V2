@@ -225,7 +225,7 @@
    * Elle ne crée aucun droit backend et permet aux modules de passer par Access_Law sans bypass de rôle.
    */
   var DEMO_PERMISSIONS_BY_ROLE = {
-    admin: ["school.manage", "staff.read", "staff.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "finance.report.read", "reports.financial.read", "finance.cash_register.close", "safe.assistant.use", "canteen.manage", "communication.message.send"],
+    admin: ["school.manage", "staff.read", "staff.manage", "roles.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "finance.report.read", "reports.financial.read", "finance.cash_register.close", "safe.assistant.use", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
     teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage", "safe.assistant.use"],
@@ -243,6 +243,10 @@
     admin: {
       scopes: [
         { type: "school" },
+        { permission: "school.manage", type: "school" },
+        { permission: "staff.read", type: "school" },
+        { permission: "staff.manage", type: "school" },
+        { permission: "roles.manage", type: "school" },
         { permission: "school.student.read", type: "school" },
         { permission: "school.class.read", type: "school" },
         { permission: "security.card.create", type: "school" },
@@ -432,6 +436,9 @@
     openCommunication: function (tab) {
       openCommunicationModule(tab);
     },
+    openAdministration: function () {
+      openAdministrationModule();
+    },
     prepareCommunicationHandoff: function (payload) {
       if (!window.SchoolSafeCommunication || typeof window.SchoolSafeCommunication.prepareHandoff !== "function") return { allowed: false, reason: "MODULE_INDISPONIBLE" };
       var result = window.SchoolSafeCommunication.prepareHandoff(payload, getCurrentUser());
@@ -486,7 +493,7 @@
    */
   function showDashboard() {
     setWorkspaceDashboardVisible(true);
-    var modules = ["pedagogyModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "communicationModule", "documentCenterModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
+    var modules = ["pedagogyModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "communicationModule", "documentCenterModule", "administrationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"];
     modules.forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.hidden = true;
@@ -996,6 +1003,7 @@
 
   function openPalmaresModule() {
     document.getElementById("accessConsole").hidden = true;
+    document.getElementById("administrationModule").hidden = true;
     document.getElementById("financeModule").hidden = true;
     document.getElementById("securityModule").hidden = true;
     document.getElementById("pilotageModule").hidden = true;
@@ -2090,6 +2098,7 @@
     document.getElementById("pilotageModule").hidden = true;
     document.getElementById("feeControlModule").hidden = true;
     document.getElementById("accessConsole").hidden = true;
+    document.getElementById("administrationModule").hidden = true;
     document.getElementById("schoolModule").hidden = true;
 
     var dashboardContainer = document.getElementById("dashboardContainer");
@@ -2490,7 +2499,7 @@
   }
 
   function openAccountingModule() {
-    ["pedagogyModule", "financeModule", "hrModule", "inventoryModule", "communicationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "financeModule", "hrModule", "inventoryModule", "communicationModule", "administrationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2528,7 +2537,7 @@
   }
 
   function openHrModule(actionName) {
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "inventoryModule", "communicationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "inventoryModule", "communicationModule", "administrationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2563,7 +2572,7 @@
   }
 
   function openInventoryModule(actionName) {
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "communicationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "communicationModule", "administrationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2600,7 +2609,7 @@
   }
 
   function openCommunicationModule(actionName) {
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "documentCenterModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule", "cardsStudio"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "documentCenterModule", "administrationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule", "cardsStudio"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2622,7 +2631,7 @@
   }
 
   function openDocumentCenter() {
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "communicationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule", "cardsStudio"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "communicationModule", "administrationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule", "cardsStudio"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2656,11 +2665,36 @@
     showDashboard();
   }
 
+  function openAdministrationModule() {
+    var access = window.SchoolSafeAccess;
+    var user = getCurrentUser();
+    var canOpen = access && typeof access.canAccessAny === "function" && access.canAccessAny(user, ["school.manage", "staff.read", "staff.manage", "roles.manage", "safe.assistant.use"]);
+    if (!canOpen || !window.SchoolSafeAdministration || typeof window.SchoolSafeAdministration.render !== "function") {
+      notify("Centre Administration non autorisé pour cette session.");
+      return;
+    }
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "communicationModule", "documentCenterModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule", "cardsStudio"].forEach(function (id) {
+      var module = document.getElementById(id);
+      if (module) module.hidden = true;
+    });
+    setWorkspaceDashboardVisible(false);
+    var cardsProtected = document.getElementById("cardsProtected");
+    if (cardsProtected) cardsProtected.hidden = true;
+    window.SchoolSafeAdministration.render("administrationModule", user, {
+      onClose: showDashboard,
+      openSchool: function () { openSchoolModule("school"); },
+      openStaff: function () { openHrModule("staff"); }
+    });
+    setBreadcrumb("Administration");
+    var workspaceContent = document.querySelector(".workspace-content");
+    if (workspaceContent) workspaceContent.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function openPhaseDPedagogy(view) {
     if (!window.SchoolSafeTeacherPedagogy || (currentDemoRole !== "teacher" && currentDemoRole !== "pedagogy")) return false;
     if (currentDemoRole === "pedagogy" && view !== "direction") return false;
     setWorkspaceDashboardVisible(false);
-    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "communicationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
+    ["pedagogyModule", "palmaresModule", "financeModule", "accountingModule", "hrModule", "inventoryModule", "communicationModule", "administrationModule", "securityModule", "pilotageModule", "feeControlModule", "accessConsole", "schoolModule"].forEach(function (id) {
       var module = document.getElementById(id);
       if (module) module.hidden = true;
     });
@@ -2690,6 +2724,7 @@
     if (branchKey === "accounting") { openAccountingModule(); return; }
     if (branchKey === "inventory") { openInventoryModule(); return; }
     if (branchKey === "communication") { openCommunicationModule(); return; }
+    if (branchKey === "administration") { openAdministrationModule(); return; }
     if (branchKey === "reports") { notify("Contrôle et rapports — ouverture dans une prochaine étape."); return; }
     notify(definition.label + " — ouverture dans une prochaine étape.");
   }
@@ -2723,6 +2758,7 @@
     if (branchKey === "people") { openHrModule(actionName); return; }
     if (branchKey === "inventory") { openInventoryModule(actionName); return; }
     if (branchKey === "communication") { openCommunicationModule(actionName); return; }
+    if (branchKey === "administration") { openAdministrationModule(); return; }
     if (branchKey === "feeControl") { openFeeControlModule(actionName); return; }
     if (branchKey === "security") { openSecurityModule(actionName); return; }
     if (branchKey === "school") { openSchoolModule(schoolTabForAction(actionName) || "school"); return; }

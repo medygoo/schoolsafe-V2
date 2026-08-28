@@ -36,12 +36,12 @@ test.describe("Profil administrateur principal", () => {
     await expect(page.locator("#staffList")).toBeVisible();
   });
 
-  test("documente que la branche administration avancée est masquée en mode démo", async ({ page }) => {
+  test("ouvre la branche Administration Phase L avec les permissions démo explicites", async ({ page }) => {
     await enterDemoWorkspace(page, "admin");
-    // En mode démo sans session live, le filtre visibleBranches masque la branche
-    // "administration" (actions École & Personnel / Comptes et droits).
-    await expect(page.locator("#branch-administration")).toHaveCount(0);
-    await expect(page.locator('[data-action="Comptes et droits"]')).toHaveCount(0);
-    await expect(page.locator('[data-action="École & Personnel"]')).toHaveCount(0);
+    const entry = page.locator('button[data-branch="administration"]:visible').first();
+    await expect(entry).toBeVisible();
+    await entry.evaluate((element: HTMLElement) => element.click());
+    await expect(page.locator("#administrationModule")).toBeVisible();
+    await expect(page.locator("#administrationModule").getByText("8 domaines autorisés sur 8")).toBeVisible();
   });
 });
