@@ -4,6 +4,7 @@
 
   var activeTab = "dashboard";
   var sessionOverride = null;
+  var journalFilters = { from: "", to: "", direction: "", currency: "", search: "" };
 
   function escapeMarkup(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
@@ -81,6 +82,113 @@
     return '<section class="accounting-dashboard" data-accounting-dashboard><header><div><span>Trésorerie frontend · démonstration</span><h3>Comptabilité / Trésorerie</h3><p>Projection en lecture seule des données Finance déjà visibles.</p></div><span class="accounting-boundary-chip">DÉMONSTRATION · BACKEND_LATER</span></header><aside class="accounting-boundary"><i data-lucide="shield-check"></i><p>Aucune écriture comptable officielle, aucun journal légal, aucun débit/crédit et aucune conversion de devise.</p></aside><div class="accounting-dashboard-grid">' + metrics + '</div><section class="accounting-shortcuts"><header><span>Raccourcis autorisés</span><h3>Accès selon permission et portée</h3></header><div>' + shortcuts.join("") + "</div></section></section>";
   }
 
+  function amountLabel(amount, currency) {
+    var value = Number(amount || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+    return value + " " + (currency || "DEVISE MANQUANTE");
+  }
+
+  function frenchDateIso(value) {
+    var source = String(value || "").toLowerCase();
+    var match = source.match(/(\d{1,2})\s+(janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre)\s+(\d{4})/);
+    if (!match) return "";
+    var months = { janvier: 1, "février": 2, fevrier: 2, mars: 3, avril: 4, mai: 5, juin: 6, juillet: 7, "août": 8, aout: 8, septembre: 9, octobre: 10, novembre: 11, "décembre": 12, decembre: 12 };
+    return match[3] + "-" + String(months[match[2]]).padStart(2, "0") + "-" + String(Number(match[1])).padStart(2, "0");
+  }
+
+  function journalRows() {
+    var data = snapshot();
+    var inputs = data.transactions.map(function (item) {
+      return {
+        id: item.id || item.receipt,
+        date: item.date || item.day || "Date indisponible",
+        isoDate: item.isoDate || frenchDateIso(item.date || item.day),
+        reference: item.receipt || item.reference || item.id || "RÉFÉRENCE MANQUANTE",
+        nature: "Recette",
+        label: [item.student, item.fee].filter(Boolean).join(" · ") || "Paiement Finance",
+        direction: "in",
+        amount: Number(item.amount || 0),
+        currency: item.currency || "",
+        source: "Finance · paiement",
+        status: item.status || "Statut indisponible",
+        link: item.studentFeeId || item.student_fee_id || "Lien non disponible"
+      };
+    });
+    var outputs = data.expenses.map(function (item, index) {
+      return {
+        id: item.id || item.reference || "expense-" + index,
+        date: item.date || "Date indisponible",
+        isoDate: item.isoDate || frenchDateIso(item.date),
+        reference: item.reference || "RÉFÉRENCE MANQUANTE",
+        nature: "Sortie",
+        label: item.label || "Dépense Finance",
+        direction: "out",
+        amount: Number(item.amount || 0),
+        currency: item.currency || "",
+        source: "Finance · dépense visible",
+        status: item.status || "Statut indisponible",
+        link: item.justification || "Lien non disponible"
+      };
+    });
+    return inputs.concat(outputs);
+  }
+
+  function visibleJournalRows(rows) {
+    var search = String(journalFilters.search || "").toLowerCase();
+    return rows.filter(function (row) {
+      if (journalFilters.direction && row.direction !== journalFilters.direction) return false;
+      if (journalFilters.currency && row.currency !== journalFilters.currency) return false;
+      if (journalFilters.from && (!row.isoDate || row.isoDate < journalFilters.from)) return false;
+      if (journalFilters.to && (!row.isoDate || row.isoDate > journalFilters.to)) return false;
+      if (search && [row.reference, row.label, row.source, row.status, row.link].join(" ").toLowerCase().indexOf(search) < 0) return false;
+      return true;
+    });
+  }
+
+  function journalCurrencySummaries(rows) {
+    var currencies = [];
+    rows.forEach(function (row) {
+      if (row.currency && currencies.indexOf(row.currency) < 0) currencies.push(row.currency);
+    });
+    return currencies.sort().map(function (currency) {
+      var incoming = rows.filter(function (row) { return row.currency === currency && row.direction === "in"; }).reduce(function (sum, row) { return sum + row.amount; }, 0);
+      var outgoing = rows.filter(function (row) { return row.currency === currency && row.direction === "out"; }).reduce(function (sum, row) { return sum + row.amount; }, 0);
+      return '<article data-journal-currency-summary="' + escapeMarkup(currency) + '"><small>' + escapeMarkup(currency) + '</small><b>Entrées ' + amountLabel(incoming, currency) + '</b><span>Sorties ' + amountLabel(outgoing, currency) + "</span></article>";
+    }).join("");
+  }
+
+  function renderJournal() {
+    var rows = journalRows();
+    var visibleRows = visibleJournalRows(rows);
+    var currencies = [];
+    rows.forEach(function (row) { if (row.currency && currencies.indexOf(row.currency) < 0) currencies.push(row.currency); });
+    var currencyOptions = ['<option value="">Toutes les devises</option>'].concat(currencies.sort().map(function (currency) {
+      return '<option value="' + escapeMarkup(currency) + '"' + (journalFilters.currency === currency ? " selected" : "") + ">" + escapeMarkup(currency) + "</option>";
+    })).join("");
+    var tableRows = visibleRows.map(function (row) {
+      return '<tr data-journal-direction="' + row.direction + '"><td>' + escapeMarkup(row.date) + '</td><td><b>' + escapeMarkup(row.reference) + '</b></td><td>' + escapeMarkup(row.nature) + '</td><td>' + escapeMarkup(row.label) + '</td><td><span class="accounting-direction accounting-direction--' + row.direction + '">' + (row.direction === "in" ? "ENTRÉE" : "SORTIE") + '</span></td><td><b>' + escapeMarkup(amountLabel(row.amount, row.currency)) + '</b></td><td>' + escapeMarkup(row.source) + '</td><td>' + escapeMarkup(row.status) + '</td><td>' + escapeMarkup(row.link) + "</td></tr>";
+    }).join("");
+    if (!tableRows) tableRows = '<tr><td colspan="9"><div class="accounting-empty">Aucun mouvement visible avec ces filtres.</div></td></tr>';
+    return '<section class="accounting-journal" data-accounting-journal><header><div><span>Journal de trésorerie</span><h3>Mouvements Finance visibles</h3><p>Entrées et sorties projetées sans écriture manuelle.</p></div><span class="accounting-boundary-chip">LECTURE SEULE · BACKEND_LATER</span></header><aside class="accounting-boundary"><i data-lucide="split"></i><p>CDF, USD et toute autre devise restent strictement séparés · AUCUNE CONVERSION · aucun total général multidevise.</p></aside><div class="accounting-journal-filters"><label>Du<input id="journalFrom" type="date" value="' + escapeMarkup(journalFilters.from) + '"></label><label>Au<input id="journalTo" type="date" value="' + escapeMarkup(journalFilters.to) + '"></label><label>Sens<select id="journalDirection"><option value="">Entrées et sorties</option><option value="in"' + (journalFilters.direction === "in" ? " selected" : "") + '>Entrées</option><option value="out"' + (journalFilters.direction === "out" ? " selected" : "") + '>Sorties</option></select></label><label>Devise<select id="journalCurrency">' + currencyOptions + '</select></label><label class="accounting-filter-search">Référence ou libellé<input id="journalSearch" type="search" value="' + escapeMarkup(journalFilters.search) + '" placeholder="Rechercher"></label></div><div class="accounting-currency-summaries">' + journalCurrencySummaries(rows) + '</div><div class="accounting-table-wrap" tabindex="0"><table class="accounting-table"><thead><tr><th>Date / heure</th><th>Référence</th><th>Nature</th><th>Libellé</th><th>Sens</th><th>Montant / devise</th><th>Source</th><th>Statut</th><th>Lien logique</th></tr></thead><tbody>' + tableRows + "</tbody></table></div></section>";
+  }
+
+  function bindJournalFilters() {
+    var bindings = [
+      ["journalFrom", "from", "change"],
+      ["journalTo", "to", "change"],
+      ["journalDirection", "direction", "change"],
+      ["journalCurrency", "currency", "change"],
+      ["journalSearch", "search", "input"]
+    ];
+    bindings.forEach(function (binding) {
+      var control = document.getElementById(binding[0]);
+      if (!control) return;
+      control.addEventListener(binding[2], function () {
+        journalFilters[binding[1]] = control.value;
+        renderContent();
+      });
+    });
+  }
+
   function renderFutureSurface() {
     var labels = {
       journal: "Journal de trésorerie",
@@ -117,8 +225,9 @@
       button.hidden = tab === "closing" && !closeAllowed;
       button.classList.toggle("active", tab === activeTab);
     });
-    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : renderFutureSurface()) : renderDenied();
+    content.innerHTML = canReadAccounting() ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : renderFutureSurface()) : renderDenied();
     bindNavigation();
+    if (activeTab === "journal") bindJournalFilters();
     if (typeof root.lucide !== "undefined" && root.lucide.createIcons) root.lucide.createIcons();
   }
 
