@@ -17,7 +17,9 @@
     permissionsLoading: false,
     permissionsError: "",
     permissionFilters: { query: "", domain: "all", operation: "all", scope: "all", code: "" },
-    inspectorInput: { permission: "roles.manage", scope: "school", contextId: "" }
+    inspectorInput: { permission: "roles.manage", scope: "school", contextId: "" },
+    simulationDraft: { baseRole: "admin", permission: "roles.manage", scope: "school", effect: "allow", condition: "", justification: "", contextId: "" },
+    simulationResult: null
   };
   var SECTIONS = [
     { key: "school", label: "École", description: "Identité, année et structure via le module École existant.", permission: "school.manage", scope: "school", icon: "school", action: "school", actionLabel: "Ouvrir le module École" },
@@ -54,6 +56,8 @@
           ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="permissions">Consulter le catalogue</button>'
         : section.key === "access"
           ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="inspector">Inspecter un accès</button>'
+        : section.key === "exceptions"
+          ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="simulation">Simuler une exception</button>'
         : '<span class="administration-card__boundary">FRONTEND · contrôle d’accès actif</span>';
     return '<article class="administration-card" data-admin-section="' + section.key + '">' +
       '<span class="administration-card__icon"><i data-lucide="' + section.icon + '"></i></span>' +
@@ -305,6 +309,62 @@
     });
   }
 
+  function simulateAccessLaw(user, draft) {
+    var source = user || {};
+    var input = draft || {};
+    var simulatedUser = Object.assign({}, source, {
+      role: input.baseRole || source.role,
+      permissions: Array.isArray(source.permissions) ? source.permissions.slice() : [],
+      scopes: Array.isArray(source.scopes) ? source.scopes.map(function (scope) { return Object.assign({}, scope); }) : [],
+      permissionExceptions: Array.isArray(source.permissionExceptions) ? source.permissionExceptions.map(function (item) { return Object.assign({}, item); }) : []
+    });
+    var exception = {
+      permission: input.permission,
+      effect: String(input.effect || "allow").toLowerCase(),
+      scope: input.scope,
+      condition: input.condition || "",
+      justification: input.justification || ""
+    };
+    simulatedUser.permissionExceptions.push(exception);
+    var context = {};
+    if (input.scope === "school") context.schoolId = input.contextId || simulatedUser.schoolId;
+    if (input.scope === "own_children") context = { childId: input.contextId };
+    if (input.scope === "assigned_classes") context = { classId: input.contextId };
+    if (input.scope === "assigned_subjects") context = { subjectId: input.contextId };
+    if (input.scope === "assigned_portal") context = { portalId: input.contextId };
+    return {
+      boundary: "SIMULATION UNIQUEMENT",
+      draft: Object.assign({}, input),
+      simulatedUser: simulatedUser,
+      result: inspectAccess(simulatedUser, input.permission, input.scope, context)
+    };
+  }
+
+  function renderSimulation() {
+    if (!canUse(state.user, "roles.manage", "school")) return '<section class="administration-empty" data-access-simulation><i data-lucide="shield-off"></i><h3>Simulation non autorisée</h3><p>roles.manage + school requis.</p></section>';
+    var draft = state.simulationDraft;
+    var outcome = state.simulationResult;
+    var scopes = ["own", "own_children", "assigned_classes", "assigned_subjects", "assigned_portal", "school"];
+    return '<section class="administration-simulation" data-access-simulation>' +
+      '<div class="administration-view-heading"><button class="ss-button ss-button--secondary" type="button" data-admin-home><i data-lucide="arrow-left"></i> Centre Administration</button><div><span>GESTION FINE ACCESS_LAW — BACKEND_LATER</span><h3>Simulation des accès</h3><p>Le résultat reste éphémère en mémoire et ne modifie jamais la session réelle.</p></div><span class="administration-simulation-badge">SIMULATION UNIQUEMENT</span></div>' +
+      '<form class="administration-simulation-form"><label>Rôle de base<input name="baseRole" value="' + escapeMarkup(draft.baseRole) + '"></label><label>Permission additionnelle<input name="permission" value="' + escapeMarkup(draft.permission) + '" required></label><label>Portée<select name="scope">' + scopes.map(function (scope) { return '<option value="' + scope + '"' + (draft.scope === scope ? ' selected' : '') + '>' + scope + '</option>'; }).join("") + '</select></label><label>Effet<select name="effect"><option value="allow"' + (draft.effect === "allow" ? ' selected' : '') + '>ALLOW</option><option value="deny"' + (draft.effect === "deny" ? ' selected' : '') + '>DENY</option></select></label><label>Condition<input name="condition" value="' + escapeMarkup(draft.condition) + '" placeholder="Diagnostic uniquement"></label><label>Justification<textarea name="justification" rows="3">' + escapeMarkup(draft.justification) + '</textarea></label><label>Identifiant de contexte<input name="contextId" value="' + escapeMarkup(draft.contextId) + '" placeholder="Optionnel selon la portée"></label><button class="ss-button" type="submit">Simuler l’impact</button></form>' +
+      (outcome ? '<div class="administration-simulation-result"><div><span>Utilisateur réel</span><strong>INCHANGÉ</strong></div><div><span>Exception simulée</span><strong>' + escapeMarkup(String(outcome.draft.effect || "").toUpperCase()) + '</strong></div><div><span>Résultat</span><strong>' + escapeMarkup(outcome.result.status) + '</strong></div><p>' + escapeMarkup(outcome.result.reason) + ' · condition et justification limitées à cette simulation.</p></div>' : '<div class="administration-empty"><i data-lucide="flask-conical"></i><h3>Aucune simulation exécutée</h3><p>Renseignez une exception temporaire pour observer son impact sans mutation.</p></div>') +
+      '</section>';
+  }
+
+  function bindSimulation(container) {
+    var home = container.querySelector("[data-admin-home]");
+    if (home) home.addEventListener("click", function () { open("dashboard"); });
+    var form = container.querySelector(".administration-simulation-form");
+    if (!form) return;
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      state.simulationDraft = { baseRole: form.baseRole.value.trim(), permission: form.permission.value.trim(), scope: form.scope.value, effect: form.effect.value, condition: form.condition.value.trim(), justification: form.justification.value.trim(), contextId: form.contextId.value.trim() };
+      state.simulationResult = simulateAccessLaw(state.user, state.simulationDraft);
+      render(state.containerId, state.user, state.options);
+    });
+  }
+
   function loadAccounts() {
     var api = global.SchoolSafeSchoolAPI;
     if (state.accountsLoading || state.staff) return;
@@ -441,7 +501,7 @@
         '<div><span>Administration / Accès / Jaspe logiciel</span><h2>Centre Administration</h2><p>Vue de contrôle frontend : chaque surface exige sa permission et sa portée réelles.</p></div>' +
         '<span class="administration-header__badge"><i data-lucide="shield-check"></i> DENY explicite prioritaire</span>' +
       '</header>' +
-      (state.activeView === "accounts" ? renderAccounts() : state.activeView === "permissions" ? renderPermissions() : state.activeView === "inspector" ? renderInspector() : dashboardMarkup(allowed));
+      (state.activeView === "accounts" ? renderAccounts() : state.activeView === "permissions" ? renderPermissions() : state.activeView === "inspector" ? renderInspector() : state.activeView === "simulation" ? renderSimulation() : dashboardMarkup(allowed));
 
     var closeButton = container.querySelector("[data-admin-close]");
     if (closeButton) closeButton.addEventListener("click", function () {
@@ -466,6 +526,7 @@
       if (!state.permissionCatalog && !state.permissionsLoading && !state.permissionsError) loadPermissions();
     }
     if (state.activeView === "inspector") bindInspector(container);
+    if (state.activeView === "simulation") bindSimulation(container);
     if (global.lucide && typeof global.lucide.createIcons === "function") global.lucide.createIcons();
   }
 
@@ -475,7 +536,7 @@
   }
 
   function open(view) {
-    state.activeView = ["accounts", "permissions", "inspector"].indexOf(view) >= 0 ? view : "dashboard";
+    state.activeView = ["accounts", "permissions", "inspector", "simulation"].indexOf(view) >= 0 ? view : "dashboard";
     state.notice = "";
     state.selectedStaffId = null;
     state.mutationPanel = null;
@@ -487,5 +548,5 @@
     if (container) container.hidden = true;
   }
 
-  global.SchoolSafeAdministration = { render: render, setSession: setSession, open: open, close: close, canUse: canUse, visibleSections: visibleSections, inspectAccess: inspectAccess };
+  global.SchoolSafeAdministration = { render: render, setSession: setSession, open: open, close: close, canUse: canUse, visibleSections: visibleSections, inspectAccess: inspectAccess, simulateAccessLaw: simulateAccessLaw };
 })(window);

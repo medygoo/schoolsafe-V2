@@ -63,10 +63,19 @@
 .administration-inspection-result { display: flex; justify-content: space-between; gap: 12px; padding: 16px; border: 1px solid; border-radius: 16px; font-weight: 750; }
 .administration-inspection-result--allowed { color: var(--ss-success-text); border-color: var(--ss-success-border); background: var(--ss-success-bg); }
 .administration-inspection-result--denied { color: var(--ss-error-text); border-color: var(--ss-error-border); background: var(--ss-error-bg); }
+.administration-simulation { display: grid; gap: 16px; min-width: 0; }
+.administration-simulation-badge { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 12px; border: 1px solid var(--ss-warning-border); border-radius: 12px; color: var(--ss-warning-text); background: var(--ss-warning-bg); font-size: .78rem; font-weight: 850; }
+.administration-simulation-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; gap: 12px; padding: 18px; border: 1px solid var(--ss-border); border-radius: 18px; background: var(--ss-surface); }
+.administration-simulation-form label { display: grid; gap: 6px; color: var(--ss-text-secondary); font-size: .8rem; font-weight: 750; }
+.administration-simulation-form input, .administration-simulation-form select, .administration-simulation-form textarea { width: 100%; min-height: 44px; padding: 10px 11px; border: 1px solid var(--ss-border-strong); border-radius: 11px; color: var(--ss-text); background: var(--ss-surface); resize: vertical; }
+.administration-simulation-result { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 18px; border: 1px solid var(--ss-warning-border); border-radius: 18px; color: var(--ss-text); background: var(--ss-warning-bg); }
+.administration-simulation-result div { display: grid; gap: 4px; }
+.administration-simulation-result span { color: var(--ss-warning-text); font-size: .78rem; font-weight: 750; }
+.administration-simulation-result p { grid-column: 1 / -1; margin: 4px 0 0; color: var(--ss-warning-text); }
 html[data-theme="dark"] .administration-header__badge { color: #fca5a5; background: rgba(127, 29, 29, .28); }
-@media (max-width: 1100px) { .administration-permission-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .administration-permission-filters, .administration-simulation-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .administration-inspector-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 834px) { .administration-header, .administration-view-heading, .administration-mutation { grid-template-columns: 1fr; } .administration-grid { grid-template-columns: 1fr; } .administration-summary { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 560px) { .administration-role-options, .administration-form-grid { grid-template-columns: 1fr; } .administration-form-grid .administration-confirm, .administration-form-grid .administration-mutation__actions { grid-column: auto; } }
-@media (max-width: 480px) { .administration-permission-filters, .administration-inspector-form { grid-template-columns: 1fr; } .administration-inspection-result { flex-direction: column; } }
+@media (max-width: 480px) { .administration-permission-filters, .administration-inspector-form, .administration-simulation-form, .administration-simulation-result { grid-template-columns: 1fr; } .administration-inspection-result { flex-direction: column; } .administration-simulation-result p { grid-column: auto; } }
 @media (max-width: 480px) { .administration-header, .administration-card { padding: 16px; border-radius: 18px; } }
