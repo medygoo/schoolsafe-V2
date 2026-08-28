@@ -1,393 +1,285 @@
 (function (root) {
   "use strict";
 
-  var campaigns = [];
-  var selectedCampaignId = null;
-  var demoAuthorizedCampaigns = [
+  var controlSessionOverride = null;
+  var selectedCampaignId = "demo-control-september";
+  var CAMPAIGN_DRAFT_STORAGE_KEY = "schoolsafe-v2-finance-control-campaign-drafts";
+  var CONTROL_HISTORY_STORAGE_KEY = "schoolsafe-v2-finance-control-history-drafts";
+
+  var feeTypes = [
+    { id: "school-fees", label: "Frais scolaires" },
+    { id: "transport-fees", label: "Transport scolaire" },
+    { id: "canteen-fees", label: "Cantine · frais financiers" }
+  ];
+  var classes = [
+    { id: "demo-class-5", label: "5e primaire", activeStudents: 5 },
+    { id: "demo-class-4", label: "4e primaire", activeStudents: 4 },
+    { id: "demo-class-3", label: "3e primaire", activeStudents: 6 }
+  ];
+  var controllers = [
+    { id: "demo-controller-gate", label: "Grâce Mbuyi" },
+    { id: "demo-controller-library", label: "Jean Ilunga" }
+  ];
+  var demoCampaigns = [
     {
       id: "demo-control-september",
       label: "Contrôle du portail · septembre",
+      feeTypeId: "school-fees",
+      feeTypeLabel: "Frais scolaires",
+      classIds: ["demo-class-5"],
+      classLabels: ["5e primaire"],
+      studentIds: ["demo-control-student-paid", "demo-control-student-partial", "demo-control-student-pending", "demo-control-student-exempted", "demo-control-student-anomaly"],
+      activeStudentCount: 5,
+      controllerIds: ["demo-controller-gate"],
+      controllerLabels: ["Grâce Mbuyi"],
       starts_at: "2026-09-01",
       ends_at: "2026-09-30",
       status: "published",
-      description: "Vérifiez la carte de l’élève au portail et appliquez la consigne de contrôle affichée."
+      instruction: "Laisser poursuivre si le statut est en règle ou exempté ; orienter vers Finance pour toute régularisation ou anomalie."
     }
   ];
-  // FE-FIN-08A : projection locale explicitement démo. Elle ne remplace ni
-  // l'identification sécurisée, ni le calcul serveur du résultat futur.
   var demoScanRecords = {
-    "schoolsafe://card/DEMO-PAID/verification": { name: "Amina Kalonji", matricule: "DEMO-001", className: "5e primaire", studentFeeStatus: "paid" },
-    "schoolsafe://card/DEMO-PARTIAL/verification": { name: "Noah Ilunga", matricule: "DEMO-002", className: "4e primaire", studentFeeStatus: "partial" },
-    "schoolsafe://card/DEMO-PENDING/verification": { name: "Sarah Mbuyi", matricule: "DEMO-003", className: "3e primaire", studentFeeStatus: "pending" },
-    "schoolsafe://card/DEMO-EXEMPTED/verification": { name: "David Tshibangu", matricule: "DEMO-004", className: "6e primaire", studentFeeStatus: "exempted" },
-    "schoolsafe://card/DEMO-NO-FEE/verification": { name: "Lina Kabasele", matricule: "DEMO-005", className: "2e primaire", studentFeeStatus: null }
+    "schoolsafe://card/DEMO-PAID/verification": { id: "demo-control-student-paid", name: "Amina Kalonji", matricule: "DEMO-001", classId: "demo-class-5", className: "5e primaire", status: "paid", lifecycleStatus: "active" },
+    "schoolsafe://card/DEMO-PARTIAL/verification": { id: "demo-control-student-partial", name: "Noah Ilunga", matricule: "DEMO-002", classId: "demo-class-5", className: "5e primaire", status: "partial", lifecycleStatus: "active" },
+    "schoolsafe://card/DEMO-PENDING/verification": { id: "demo-control-student-pending", name: "Sarah Mbuyi", matricule: "DEMO-003", classId: "demo-class-5", className: "5e primaire", status: "pending", lifecycleStatus: "active" },
+    "schoolsafe://card/DEMO-EXEMPTED/verification": { id: "demo-control-student-exempted", name: "David Tshibangu", matricule: "DEMO-004", classId: "demo-class-5", className: "5e primaire", status: "exempted", lifecycleStatus: "active" },
+    "schoolsafe://card/DEMO-NO-FEE/verification": { id: "demo-control-student-anomaly", name: "Lina Kabasele", matricule: "DEMO-005", classId: "demo-class-5", className: "5e primaire", status: "anomaly", lifecycleStatus: "active" }
   };
-  // FE-FIN-09A : projection locale explicitement démo de l'historique
-  // autorisé. Elle reste distincte de tout historique serveur futur et ne
-  // contient aucune donnée financière ou issue du module Sécurité.
-  var demoAuthorizedHistory = [
-    { reference: "DÉMO-HIST-001", scanned_at: "2026-09-08 07:42", campaign: { id: "demo-history-gate", label: "Portail · septembre" }, student: { display_name: "Amina Kalonji", matricule: "DEMO-001", class_name: "5e primaire" }, result: "ok", operational_status_snapshot: "paid", duplicate: { is_duplicate: false } },
-    { reference: "DÉMO-HIST-002", scanned_at: "2026-09-08 07:51", campaign: { id: "demo-history-gate", label: "Portail · septembre" }, student: { display_name: "Noah Ilunga", matricule: "DEMO-002", class_name: "4e primaire" }, result: "partial", operational_status_snapshot: "partial", duplicate: { is_duplicate: false } },
-    { reference: "DÉMO-HIST-003", scanned_at: "2026-09-08 08:03", campaign: { id: "demo-history-gate", label: "Portail · septembre" }, student: { display_name: "Sarah Mbuyi", matricule: "DEMO-003", class_name: "3e primaire" }, result: "unpaid", operational_status_snapshot: "pending", duplicate: { is_duplicate: true, reference: "DÉMO-HIST-002" } },
-    { reference: "DÉMO-HIST-004", scanned_at: "2026-09-08 08:16", campaign: { id: "demo-history-library", label: "Bibliothèque · septembre" }, student: { display_name: "David Tshibangu", matricule: "DEMO-004", class_name: "6e primaire" }, result: "exempted", operational_status_snapshot: "exempted", duplicate: { is_duplicate: false } },
-    { reference: "DÉMO-HIST-005", scanned_at: "2026-09-08 08:25", campaign: { id: "demo-history-gate", label: "Portail · septembre" }, student: { display_name: "Lina Kabasele", matricule: "DEMO-005", class_name: "2e primaire" }, result: "anomaly", anomaly: { code: "NO_STUDENT_FEE", note: "Aucune obligation démo configurée." }, duplicate: { is_duplicate: false } }
+  var demoHistory = [
+    { reference: "DÉMO-HIST-001", scannedAt: "8 septembre · 07:42", student: "Amina Kalonji", matricule: "DEMO-001", className: "5e primaire", status: "paid" },
+    { reference: "DÉMO-HIST-002", scannedAt: "8 septembre · 07:51", student: "Noah Ilunga", matricule: "DEMO-002", className: "5e primaire", status: "partial" },
+    { reference: "DÉMO-HIST-003", scannedAt: "8 septembre · 08:03", student: "Sarah Mbuyi", matricule: "DEMO-003", className: "5e primaire", status: "pending" },
+    { reference: "DÉMO-HIST-004", scannedAt: "8 septembre · 08:16", student: "David Tshibangu", matricule: "DEMO-004", className: "5e primaire", status: "exempted" },
+    { reference: "DÉMO-HIST-005", scannedAt: "8 septembre · 08:25", student: "Lina Kabasele", matricule: "DEMO-005", className: "5e primaire", status: "anomaly" }
   ];
-  var historyFilters = { campaign: "", result: "", search: "" };
 
   function escapeHtml(value) {
-    return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character];
     });
   }
 
-  function money(amount, currency) {
-    var value = Number(amount || 0);
-    var sym = currency === "USD" ? "$" : "FC";
-    return sym + " " + value.toLocaleString("fr-FR");
-  }
-
-  function hasValidSessionToken() {
+  function readLocalRows(key) {
     try {
-      var raw = root.localStorage.getItem("schoolsafe-v2-session");
-      if (!raw) return false;
-      var session = JSON.parse(raw);
-      return !!(session && session.token);
-    } catch (e) { return false; }
+      var parsed = JSON.parse(root.localStorage.getItem(key) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
   }
 
-  function isDemoMode() {
-    if (root.schoolSafeDemoMode === true) return true;
-    var host = String(root.location && root.location.hostname || "").toLowerCase();
-    return (host === "localhost" || host === "127.0.0.1") && !hasValidSessionToken();
+  function persistLocalRows(key, values) {
+    try {
+      root.localStorage.setItem(key, JSON.stringify(Array.isArray(values) ? values : []));
+    } catch (error) {
+      console.warn("[FeeControl] brouillon local indisponible", error);
+    }
+  }
+
+  var campaignDrafts = readLocalRows(CAMPAIGN_DRAFT_STORAGE_KEY);
+  var localHistory = readLocalRows(CONTROL_HISTORY_STORAGE_KEY);
+
+  function demoControlUser() {
+    var role = String(root.currentDemoRole || "");
+    if (role !== "finance" && role !== "admin") return { role: role, permissions: [], scopes: [] };
+    return {
+      role: role,
+      permissions: ["finance.control.read", "finance.control.manage"],
+      scopes: [
+        { permission: "finance.control.read", type: "school" },
+        { permission: "finance.control.manage", type: "school" }
+      ]
+    };
   }
 
   function controlAccessUser() {
-    if (root.currentSession) return root.currentSession;
-    return { role: root.currentDemoRole || "", permissions: [] };
+    if (controlSessionOverride) return controlSessionOverride;
+    var appUser = root.SchoolSafeAppContext && typeof root.SchoolSafeAppContext.getCurrentUser === "function"
+      ? root.SchoolSafeAppContext.getCurrentUser()
+      : null;
+    if (appUser && Array.isArray(appUser.permissions) && appUser.permissions.some(function (permission) { return permission.indexOf("finance.control.") === 0; })) return appUser;
+    return demoControlUser();
   }
 
-  // FE-FIN-07B : garde transitoire, sans élargir les droits ni décider par rôle.
-  function canOpenFeeControl() {
+  function permissionScopes(user, permission) {
+    return (user && Array.isArray(user.scopes) ? user.scopes : []).filter(function (scope) {
+      return scope && (!scope.permission || scope.permission === permission);
+    });
+  }
+
+  function canUse(permission, allowedScopeTypes) {
     var access = root.SchoolSafeAccess;
-    return !!(access && typeof access.canAccessAny === "function" && access.canAccessAny(controlAccessUser(), [
-      "finance.control.read",
-      "finance.control.manage",
-      "finance.control.scan"
-    ]));
+    var user = controlAccessUser();
+    if (!access || typeof access.canAccess !== "function" || !access.canAccess(user, permission)) return false;
+    return permissionScopes(user, permission).some(function (scope) {
+      return allowedScopeTypes.indexOf(scope.type) !== -1;
+    });
+  }
+
+  function canReadFeeControl() {
+    return canUse("finance.control.read", ["school", "assigned_classes"]);
+  }
+
+  function canManageFeeControl() {
+    return canUse("finance.control.manage", ["school"]);
+  }
+
+  function canScanFeeControl() {
+    return canUse("finance.control.scan", ["assigned_classes"]);
+  }
+
+  function assignedClassIdsForScan() {
+    var user = controlAccessUser();
+    var ids = (user && Array.isArray(user.assignedClassIds) ? user.assignedClassIds : []).slice();
+    permissionScopes(user, "finance.control.scan").forEach(function (scope) {
+      (Array.isArray(scope.classIds) ? scope.classIds : []).forEach(function (id) {
+        if (ids.indexOf(id) === -1) ids.push(id);
+      });
+    });
+    return ids;
+  }
+
+  function authorizedCampaigns() {
+    if (!canScanFeeControl() || canReadFeeControl() || canManageFeeControl()) return demoCampaigns.slice();
+    var assigned = assignedClassIdsForScan();
+    return demoCampaigns.filter(function (campaign) {
+      return campaign.classIds.some(function (classId) { return assigned.indexOf(classId) !== -1; });
+    });
+  }
+
+  function statusDefinition(status) {
+    return {
+      paid: { title: "EN RÈGLE", label: "En règle", variant: "success", state: "ready", message: "Le statut de contrôle autorise la poursuite selon la consigne." },
+      partial: { title: "PAIEMENT PARTIEL", label: "Paiement partiel", variant: "warning", state: "unavailable", message: "Orienter l’élève vers Finance selon la consigne." },
+      pending: { title: "NON EN RÈGLE", label: "Non en règle", variant: "danger", state: "error", message: "La régularisation doit être traitée par Finance." },
+      exempted: { title: "EXEMPTÉ", label: "Exempté", variant: "success", state: "ready", message: "Le statut d’exemption autorise la poursuite selon la consigne." },
+      anomaly: { title: "ANOMALIE", label: "Anomalie", variant: "danger", state: "error", message: "Aucun statut exploitable : orienter vers Finance sans déduire de décision." }
+    }[status] || { title: "ANOMALIE", label: "Anomalie", variant: "danger", state: "error", message: "Statut indisponible." };
+  }
+
+  function optionRows(rows) {
+    return rows.map(function (row) { return '<option value="' + escapeHtml(row.id) + '">' + escapeHtml(row.label) + '</option>'; }).join("");
   }
 
   function formatPeriod(campaign) {
-    if (!campaign.starts_at || !campaign.ends_at) return "Période à confirmer";
     return escapeHtml(campaign.starts_at) + " → " + escapeHtml(campaign.ends_at);
   }
 
-  function renderScannerBacklog() {
-    return '<div id="feeControlScan" class="fee-control-scan">' +
-      '<h3>Scanner un élève</h3>' +
-      window.ssState({
-        type: "unavailable",
-        title: "Scanner sécurisé — BACKEND_LATER",
-        message: "Le scan et le résultat opérationnel seront connectés après validation du contrat sécurisé.",
-        details: "Aucun appel Sécurité ni résultat financier n’est déclenché depuis cette surface."
-      }) +
-      '<div id="feeControlResult" class="scan-result hidden"></div>' +
-    '</div>';
+  function renderCampaignCard(campaign) {
+    return '<article class="fee-control-campaign" data-fee-control-campaign><label><input type="radio" name="feeControlCampaign" value="' + escapeHtml(campaign.id) + '"' + (selectedCampaignId === campaign.id ? " checked" : "") + '><span><small>' + escapeHtml(campaign.feeTypeLabel) + '</small><strong>' + escapeHtml(campaign.label) + '</strong><em>' + formatPeriod(campaign) + '</em></span></label><dl><div><dt>Classes</dt><dd>' + escapeHtml(campaign.classLabels.join(", ")) + '</dd></div><div><dt>Élèves actifs</dt><dd>' + escapeHtml(campaign.activeStudentCount) + '</dd></div><div><dt>Contrôleurs</dt><dd>' + escapeHtml(campaign.controllerLabels.join(", ")) + '</dd></div><div><dt>Statut</dt><dd>' + escapeHtml(campaign.status) + '</dd></div></dl><p><strong>Consigne :</strong> ' + escapeHtml(campaign.instruction) + '</p></article>';
   }
 
-  function renderDemoScanner() {
-    return '<div id="feeControlScan" class="fee-control-scan">' +
-      '<header><span>Scanner démo</span><h3>Résultat opérationnel simulé</h3><p>Utilisez uniquement un QR de démonstration. Ces résultats ne proviennent pas du serveur.</p></header>' +
-      window.ssBadge({ variant: "info", label: "DÉMO" }) +
-      window.ssState({ type: "ready", title: "Prêt à analyser", message: "Sélectionnez une campagne puis saisissez un QR de démonstration.", size: "compact" }) +
-      '<form id="feeControlDemoScanForm" novalidate>' +
-        '<label for="feeControlQrInput">QR de démonstration<input type="text" id="feeControlQrInput" placeholder="schoolsafe://card/DEMO-PAID/verification" autocomplete="off"></label>' +
-        window.ssButton({ label: "Analyser", type: "submit", icon: "scan-line" }) +
-      '</form>' +
-      '<div id="feeControlResult" class="scan-result hidden" aria-live="polite"></div>' +
-    '</div>';
+  function renderCampaigns() {
+    var rows = authorizedCampaigns();
+    if (!rows.length) return window.ssState({ type: "empty", title: "Aucune campagne autorisée", message: "Aucune campagne ne correspond aux classes affectées." });
+    if (!rows.some(function (campaign) { return campaign.id === selectedCampaignId; })) selectedCampaignId = rows[0].id;
+    return '<section id="feeControlCampaigns" class="fee-control-campaigns"><header><div><span>Projection locale</span><h3>Campagnes de contrôle autorisées</h3><p>Types de frais, classes, élèves actifs et contrôleurs restent bornés à la campagne.</p></div>' + window.ssBadge({ variant: "info", label: "DÉMONSTRATION" }) + '</header><div class="fee-control-campaign-grid">' + rows.map(renderCampaignCard).join("") + '</div></section>';
+  }
+
+  function renderManagement() {
+    if (!canManageFeeControl()) return "";
+    var drafts = campaignDrafts.map(function (draft) {
+      return '<article class="fee-control-campaign-draft" data-fee-control-campaign-draft><header><div><span>BROUILLON LOCAL</span><h4>' + escapeHtml(draft.label) + '</h4></div>' + window.ssBadge({ variant: "warning", label: "BACKEND_LATER" }) + '</header><p>' + escapeHtml(draft.feeTypeLabel) + ' · ' + escapeHtml(draft.classLabel) + ' · ' + escapeHtml(draft.activeStudentCount) + ' élèves actifs</p><small>Contrôleur : ' + escapeHtml(draft.controllerLabel) + ' · ' + escapeHtml(draft.startsAt) + ' → ' + escapeHtml(draft.endsAt) + '</small></article>';
+    }).join("");
+    return '<section class="fee-control-management"><header><div><span>Gestion autorisée</span><h3>Préparer une campagne</h3><p>La préparation reste locale et ne publie aucune campagne officielle.</p></div>' + window.ssBadge({ variant: "warning", label: "BACKEND_LATER" }) + '</header><form id="feeControlCampaignForm" class="fee-control-campaign-form"><label>Nom de campagne<input name="label" required maxlength="120"></label><label>Type de frais<select name="fee_type" required>' + optionRows(feeTypes) + '</select></label><label>Classe active<select name="class_id" required>' + optionRows(classes) + '</select></label><label>Contrôleur autorisé<select name="controller_id" required>' + optionRows(controllers) + '</select></label><label>Début<input type="date" name="starts_at" required></label><label>Fin<input type="date" name="ends_at" required></label>' + window.ssButton({ label: "Préparer la campagne", type: "submit", icon: "calendar-check-2" }) + '</form><div class="fee-control-campaign-drafts">' + drafts + '</div></section>';
   }
 
   function renderScanner() {
-    return isDemoMode() ? renderDemoScanner() : renderScannerBacklog();
-  }
-
-  function historyResult(result) {
-    return {
-      ok: { label: "En règle", variant: "success" },
-      partial: { label: "Paiement partiel", variant: "warning" },
-      unpaid: { label: "Non en règle", variant: "danger" },
-      exempted: { label: "Exempté", variant: "success" },
-      anomaly: { label: "Anomalie", variant: "danger" }
-    }[result] || { label: "Anomalie", variant: "danger" };
-  }
-
-  function renderHistoryBacklog() {
-    return '<section id="feeControlHistory" class="fee-control-history">' +
-      '<header><span>Historique autorisé</span><h3>Lecture réelle à venir</h3></header>' +
-      window.ssState({
-        type: "unavailable",
-        title: "Historique autorisé — BACKEND_LATER",
-        message: "La lecture réelle attend une permission dédiée, des filtres serveur et une pagination sûre.",
-        details: "Aucune liste globale, aucun scan et aucune donnée Sécurité ne sont chargés depuis cette surface."
-      }) +
-    '</section>';
-  }
-
-  function historyCampaignOptions() {
-    var seen = {};
-    var options = '<option value="">Toutes les campagnes démo</option>';
-    demoAuthorizedHistory.forEach(function (entry) {
-      if (seen[entry.campaign.id]) return;
-      seen[entry.campaign.id] = true;
-      options += '<option value="' + escapeHtml(entry.campaign.id) + '">' + escapeHtml(entry.campaign.label) + '</option>';
-    });
-    return options;
-  }
-
-  function historyResultOptions() {
-    return '<option value="">Tous les résultats démo</option>' +
-      '<option value="ok">En règle</option>' +
-      '<option value="partial">Paiement partiel</option>' +
-      '<option value="unpaid">Non en règle</option>' +
-      '<option value="exempted">Exempté</option>' +
-      '<option value="anomaly">Anomalie</option>';
-  }
-
-  function filteredDemoHistory() {
-    var query = String(historyFilters.search || "").trim().toLowerCase();
-    return demoAuthorizedHistory.filter(function (entry) {
-      if (historyFilters.campaign && entry.campaign.id !== historyFilters.campaign) return false;
-      if (historyFilters.result && entry.result !== historyFilters.result) return false;
-      if (!query) return true;
-      return (entry.student.display_name + " " + entry.student.matricule).toLowerCase().indexOf(query) !== -1;
-    });
-  }
-
-  function renderDemoHistoryRows() {
-    var entries = filteredDemoHistory();
-    if (!entries.length) {
-      return window.ssState({ type: "empty", title: "Aucun contrôle démo", message: "Aucun résultat ne correspond aux filtres locaux." });
+    if (!canScanFeeControl()) {
+      return '<section class="fee-control-scanner-boundary">' + window.ssState({ type: "denied", title: "Scanner non autorisé", message: "finance.control.scan avec scope assigned_classes est obligatoire." }) + '</section>';
     }
-    var html = '<div class="ss-table-wrap"><table class="ss-table"><thead><tr><th>Référence</th><th>Date / heure</th><th>Campagne</th><th>Élève</th><th>Résultat</th></tr></thead><tbody>';
-    entries.forEach(function (entry) {
-      var result = historyResult(entry.result);
-      var duplicate = entry.duplicate && entry.duplicate.is_duplicate
-        ? '<small>Doublon démo · réf. ' + escapeHtml(entry.duplicate.reference) + '</small>'
-        : '';
-      var anomaly = entry.result === "anomaly" && entry.anomaly
-        ? '<small>' + escapeHtml(entry.anomaly.code) + (entry.anomaly.note ? ' · ' + escapeHtml(entry.anomaly.note) : '') + '</small>'
-        : '';
-      html += '<tr><td>' + escapeHtml(entry.reference) + duplicate + '</td>' +
-        '<td>' + escapeHtml(entry.scanned_at) + '</td>' +
-        '<td>' + escapeHtml(entry.campaign.label) + '</td>' +
-        '<td><strong>' + escapeHtml(entry.student.display_name) + '</strong><small>Matricule : ' + escapeHtml(entry.student.matricule) + (entry.student.class_name ? ' · ' + escapeHtml(entry.student.class_name) : '') + '</small></td>' +
-        '<td>' + window.ssBadge({ variant: result.variant, label: result.label }) + anomaly + '</td></tr>';
-    });
-    return html + '</tbody></table></div>';
-  }
-
-  function renderDemoHistory() {
-    return '<section id="feeControlHistory" class="fee-control-history">' +
-      '<header><div><span>Historique autorisé</span><h3>Projection locale non sensible</h3><p>Les lignes, filtres et références ci-dessous sont fictifs et servent uniquement à visualiser le futur historique autorisé.</p></div>' + window.ssBadge({ variant: "info", label: "DÉMO" }) + '</header>' +
-      '<div class="fee-control-history-filters">' +
-        '<label for="feeControlHistoryCampaign">Campagne démo<select id="feeControlHistoryCampaign">' + historyCampaignOptions() + '</select></label>' +
-        '<label for="feeControlHistoryResult">Résultat démo<select id="feeControlHistoryResult">' + historyResultOptions() + '</select></label>' +
-        '<label for="feeControlHistorySearch">Rechercher un élève démo<input type="search" id="feeControlHistorySearch" placeholder="Nom ou matricule" autocomplete="off"></label>' +
-      '</div>' +
-      '<div id="feeControlHistoryList" aria-live="polite">' + renderDemoHistoryRows() + '</div>' +
-    '</section>';
+    return '<section id="feeControlScan" class="fee-control-scan"><header><div><span>Contrôleur affecté</span><h3>Scanner de contrôle · démonstration</h3><p>Identité, classe, résultat, consigne et statut uniquement.</p></div>' + window.ssBadge({ variant: "info", label: "BACKEND_LATER" }) + '</header><form id="feeControlDemoScanForm"><label>QR de démonstration<input id="feeControlQrInput" required autocomplete="off" placeholder="schoolsafe://card/DEMO-PAID/verification"></label>' + window.ssButton({ label: "Analyser le statut", type: "submit", icon: "scan-line" }) + '</form><div id="feeControlResult" class="fee-control-result" aria-live="polite"></div></section>';
   }
 
   function renderHistory() {
-    return isDemoMode() ? renderDemoHistory() : renderHistoryBacklog();
+    if (!canReadFeeControl()) return "";
+    var entries = localHistory.concat(demoHistory);
+    var rows = entries.map(function (entry) {
+      var definition = statusDefinition(entry.status);
+      return '<tr><td><strong>' + escapeHtml(entry.reference) + '</strong><small>' + escapeHtml(entry.scannedAt) + '</small></td><td><strong>' + escapeHtml(entry.student) + '</strong><small>' + escapeHtml(entry.matricule) + ' · ' + escapeHtml(entry.className) + '</small></td><td>' + window.ssBadge({ variant: definition.variant, label: definition.label }) + '</td></tr>';
+    }).join("");
+    return '<section id="feeControlHistory" class="fee-control-history"><header><div><span>Historique local autorisé</span><h3>Contrôles de démonstration</h3><p>Aucune donnée de caisse ou transactionnelle n’est exposée.</p></div>' + window.ssBadge({ variant: "warning", label: "BACKEND_LATER" }) + '</header>' + window.ssTable({ headers: ["Référence", "Élève", "Résultat"], rows: rows, empty: "Aucun contrôle local.", emptyTitle: "Historique de contrôle", responsive: true }) + '</section>';
   }
 
-  function refreshDemoHistory() {
-    var list = document.getElementById("feeControlHistoryList");
-    if (list) list.innerHTML = renderDemoHistoryRows();
-  }
-
-  function render(containerId) {
+  function render(containerId, user) {
+    if (user) controlSessionOverride = user;
     var container = document.getElementById(containerId);
-    if (!container) return;
-    container.innerHTML =
-      '<div class="fee-control-panel">' +
-        '<header><span>Contrôle des frais</span><h2>Mes campagnes autorisées</h2><p>Consultez la consigne de campagne. Le scan sécurisé et le résultat seront raccordés dans un lot distinct.</p></header>' +
-        '<div id="feeControlCampaigns" class="fee-control-campaigns">' + window.ssState({ type: "loading", title: "Chargement...", message: "Chargement des campagnes…" }) + '</div>' +
-        renderScanner() +
-        renderHistory() +
-      '</div>';
-    loadCampaigns();
+    if (!container) return false;
+    var canOpen = canReadFeeControl() || canManageFeeControl() || canScanFeeControl();
+    if (!canOpen) {
+      container.innerHTML = window.ssState({ type: "denied", title: "Contrôle des frais non autorisé", message: "Une permission et une portée compatibles sont requises." });
+      return false;
+    }
+    container.innerHTML = '<div class="fee-control-panel"><header class="fee-control-hero"><div><span>F5-FE · frontend uniquement</span><h2>Contrôle des frais</h2><p>Campagnes, scan et historique appliquent des gardes indépendantes. Les résultats ne montrent aucun détail financier.</p></div>' + window.ssBadge({ variant: "info", label: "PÉRIMÈTRE MINIMAL" }) + '</header>' + renderCampaigns() + renderManagement() + renderScanner() + renderHistory() + '</div>';
     bind(containerId);
+    if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+    return true;
   }
 
   function bind(containerId) {
     var container = document.getElementById(containerId);
-    container.querySelectorAll("input[name='feeControlCampaign']").forEach(function (radio) {
-      radio.addEventListener("change", function () { selectedCampaignId = this.value; });
+    container.querySelectorAll('input[name="feeControlCampaign"]').forEach(function (radio) {
+      radio.addEventListener("change", function () { selectedCampaignId = this.value; render(containerId); });
     });
-    var demoForm = container.querySelector("#feeControlDemoScanForm");
-    var qrInput = container.querySelector("#feeControlQrInput");
-    if (demoForm && qrInput) {
-      demoForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        performDemoScan(containerId);
-      });
-      qrInput.addEventListener("keydown", function (event) {
-        if (event.key !== "Enter") return;
-        event.preventDefault();
-        performDemoScan(containerId);
-      });
-    }
-    var historyCampaign = container.querySelector("#feeControlHistoryCampaign");
-    var historyResult = container.querySelector("#feeControlHistoryResult");
-    var historySearch = container.querySelector("#feeControlHistorySearch");
-    if (historyCampaign) historyCampaign.addEventListener("change", function () { historyFilters.campaign = this.value; refreshDemoHistory(); });
-    if (historyResult) historyResult.addEventListener("change", function () { historyFilters.result = this.value; refreshDemoHistory(); });
-    if (historySearch) historySearch.addEventListener("input", function () { historyFilters.search = this.value; refreshDemoHistory(); });
-  }
 
-  function loadCampaigns() {
-    var box = document.getElementById("feeControlCampaigns");
-    if (!canOpenFeeControl()) {
-      box.innerHTML = window.ssState({ type: "denied", title: "Contrôle des frais non autorisé", message: "Une permission de contrôle des frais est requise." });
-      return;
-    }
-    if (!isDemoMode()) {
-      box.innerHTML = window.ssState({
-        type: "unavailable",
-        title: "Mes campagnes autorisées — BACKEND_LATER",
-        message: "Le serveur doit filtrer les campagnes par contrôleur autorisé, portée et période avant leur affichage.",
-        details: "La liste globale de l’école n’est jamais présentée comme une liste autorisée."
-      });
-      return;
-    }
-
-    campaigns = demoAuthorizedCampaigns.slice();
-    if (!campaigns.length) {
-      box.innerHTML = window.ssState({ type: "empty", title: "Aucune campagne démo", message: "Aucune projection démo non sensible n’est disponible." });
-      return;
-    }
-    if (!campaigns.some(function (campaign) { return campaign.id === selectedCampaignId; })) selectedCampaignId = campaigns[0].id;
-    var html = '<header><div><span>Mes campagnes autorisées</span><h3>Projection non sensible</h3><p>Les campagnes ci-dessous sont uniquement une visualisation démo.</p></div>' + window.ssBadge({ variant: "info", label: "DÉMO" }) + '</header><ul>';
-    campaigns.forEach(function (campaign) {
-      html += '<li><label><input type="radio" name="feeControlCampaign" value="' + escapeHtml(campaign.id) + '"' + (selectedCampaignId === campaign.id ? " checked" : "") + '> ' +
-        '<b>' + escapeHtml(campaign.label) + '</b> · ' + formatPeriod(campaign) + ' · Statut déclaré : ' + escapeHtml(campaign.status) +
-        '</label><p><strong>Consigne :</strong> ' + escapeHtml(campaign.description) + '</p></li>';
+    var campaignForm = container.querySelector("#feeControlCampaignForm");
+    if (campaignForm) campaignForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!canManageFeeControl()) return;
+      var data = new FormData(campaignForm);
+      var label = String(data.get("label") || "").trim();
+      var feeType = feeTypes.find(function (item) { return item.id === data.get("fee_type"); });
+      var classItem = classes.find(function (item) { return item.id === data.get("class_id"); });
+      var controller = controllers.find(function (item) { return item.id === data.get("controller_id"); });
+      var startsAt = String(data.get("starts_at") || "");
+      var endsAt = String(data.get("ends_at") || "");
+      if (!label || !feeType || !classItem || !controller || !startsAt || !endsAt || endsAt < startsAt) return;
+      campaignDrafts.unshift({ id: "local-control-campaign-" + Date.now(), label: label, feeTypeId: feeType.id, feeTypeLabel: feeType.label, classId: classItem.id, classLabel: classItem.label, activeStudentCount: classItem.activeStudents, controllerId: controller.id, controllerLabel: controller.label, startsAt: startsAt, endsAt: endsAt, local: true, backendLater: true });
+      persistLocalRows(CAMPAIGN_DRAFT_STORAGE_KEY, campaignDrafts);
+      render(containerId);
     });
-    box.innerHTML = html + '</ul>';
+
+    var scanForm = container.querySelector("#feeControlDemoScanForm");
+    if (scanForm) scanForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      performDemoScan(containerId);
+    });
   }
 
-  function parseQrPayload(payload) {
-    var match = payload.match(/^schoolsafe:\/\/card\/([^/]+)\/([^/]+)$/);
-    if (!match) return null;
-    return { cardNumber: match[1], signature: match[2] };
-  }
-
-  function demoResultForStatus(studentFeeStatus) {
-    var results = {
-      paid: { code: "ok", title: "En règle", state: "success", message: "La situation de démonstration est conforme." },
-      partial: { code: "partial", title: "Paiement partiel", state: "unavailable", message: "La situation de démonstration requiert une régularisation." },
-      pending: { code: "unpaid", title: "Non en règle", state: "error", message: "La situation de démonstration n’est pas régularisée." },
-      exempted: { code: "exempted", title: "Exempté", state: "success", message: "Une exemption de démonstration est appliquée." }
-    };
-    return results[studentFeeStatus] || { code: "anomaly", title: "Anomalie", state: "error", message: "NO_STUDENT_FEE — aucune obligation de démonstration n’est configurée pour cet élève." };
-  }
-
-  function renderDemoControlResult(resultBox, record) {
-    var outcome = demoResultForStatus(record.studentFeeStatus);
-    var identity = '<p><strong>' + escapeHtml(record.name) + '</strong> · Matricule : ' + escapeHtml(record.matricule) + ' · Classe : ' + escapeHtml(record.className) + '</p>';
-    resultBox.innerHTML = identity + window.ssState({ type: outcome.state, title: outcome.title, message: outcome.message, size: "compact" });
-    resultBox.classList.remove("hidden");
+  function selectedCampaign() {
+    return authorizedCampaigns().find(function (campaign) { return campaign.id === selectedCampaignId; }) || null;
   }
 
   function performDemoScan(containerId) {
+    if (!canScanFeeControl()) return false;
     var container = document.getElementById(containerId);
     var input = container.querySelector("#feeControlQrInput");
     var resultBox = container.querySelector("#feeControlResult");
-    var payload = input.value.trim();
-    if (!selectedCampaignId) {
-      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "Veuillez d’abord sélectionner une campagne.", size: "compact" });
-      resultBox.classList.remove("hidden");
-      return;
+    var campaign = selectedCampaign();
+    var payload = String(input && input.value || "").trim();
+    var record = demoScanRecords[payload];
+    var assignedClasses = assignedClassIdsForScan();
+    if (!campaign || !record || record.lifecycleStatus !== "active" || campaign.studentIds.indexOf(record.id) === -1 || assignedClasses.indexOf(record.classId) === -1) {
+      resultBox.innerHTML = '<div data-fee-control-result>' + window.ssState({ type: "error", title: "QR non autorisé", message: "Élève inconnu, non actif ou hors des classes affectées.", size: "compact" }) + '</div>';
+      return false;
     }
-    if (!payload) {
-      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "Veuillez saisir un QR de démonstration.", size: "compact" });
-      resultBox.classList.remove("hidden");
-      return;
+    var definition = statusDefinition(record.status);
+    resultBox.innerHTML = '<article class="fee-control-minimal-result" data-fee-control-result data-control-status="' + escapeHtml(record.status) + '"><header><div><span>' + escapeHtml(record.matricule) + '</span><h3>' + escapeHtml(record.name) + '</h3><p>' + escapeHtml(record.className) + '</p></div>' + window.ssBadge({ variant: definition.variant, label: definition.title }) + '</header><p><strong>Résultat :</strong> ' + escapeHtml(definition.message) + '</p><p><strong>Consigne :</strong> ' + escapeHtml(campaign.instruction) + '</p><small>Statut local de démonstration · BACKEND_LATER</small></article>';
+    if (canReadFeeControl()) {
+      localHistory.unshift({ reference: "LOCAL-CTRL-" + Date.now(), scannedAt: new Date().toLocaleString("fr-FR"), student: record.name, matricule: record.matricule, className: record.className, status: record.status, local: true, backendLater: true });
+      persistLocalRows(CONTROL_HISTORY_STORAGE_KEY, localHistory);
     }
-    if (!parseQrPayload(payload)) {
-      resultBox.innerHTML = window.ssState({ type: "error", title: "QR invalide", message: "Le format du QR de démonstration n’est pas reconnu.", size: "compact" });
-      resultBox.classList.remove("hidden");
-      return;
-    }
-    resultBox.innerHTML = window.ssState({ type: "loading", title: "Analyse démo", message: "Résolution de la projection de démonstration…", size: "compact" });
-    resultBox.classList.remove("hidden");
-    Promise.resolve().then(function () {
-      var record = demoScanRecords[payload];
-      if (!record) {
-        resultBox.innerHTML = window.ssState({ type: "error", title: "QR démo inconnu", message: "Ce QR n’existe pas dans la projection de démonstration.", size: "compact" });
-        return;
-      }
-      renderDemoControlResult(resultBox, record);
-      input.value = "";
-      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
-    });
-  }
-
-  function performScan(containerId, result) {
-    var container = document.getElementById(containerId);
-    var input = container.querySelector("#feeControlQrInput");
-    var resultBox = container.querySelector("#feeControlResult");
-    var payload = input.value.trim();
-    if (!selectedCampaignId) {
-      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "Veuillez d’abord sélectionner une campagne.", size: "compact" });
-      resultBox.classList.remove("hidden");
-      return;
-    }
-    if (!payload) {
-      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "Veuillez saisir un QR.", size: "compact" });
-      resultBox.classList.remove("hidden");
-      return;
-    }
-    var parsed = parseQrPayload(payload);
-    if (!parsed) {
-      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "Format de QR non reconnu.", size: "compact" });
-      resultBox.classList.remove("hidden");
-      return;
-    }
-
-    if (!window.SchoolSafeSecurityAPI || !window.SchoolSafeFinanceAPI) {
-      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: "API non disponible.", size: "compact" });
-      resultBox.classList.remove("hidden");
-      return;
-    }
-
-    resultBox.innerHTML = window.ssState({ type: "loading", title: "Vérification du QR", message: "Analyse en cours…", size: "compact" });
-    resultBox.classList.remove("hidden");
-
-    // Étape 1 : vérifier le QR via l’API sécurité pour identifier l’élève
-    window.SchoolSafeSecurityAPI.scan({ qr_payload: payload, event_type: "incident" }).then(function (scanData) {
-      var studentId = scanData.student && scanData.student.id;
-      if (!studentId) throw new Error("Élève non identifié");
-      // Étape 2 : enregistrer le résultat du contrôle des frais
-      return window.SchoolSafeFinanceAPI.createScan({
-        campaign_id: selectedCampaignId,
-        student_id: studentId,
-        result: result,
-      });
-    }).then(function (controlData) {
-      var statusType = controlData.result === "ok" || controlData.result === "exempted" ? "success" : controlData.result === "partial" ? "unavailable" : "error";
-      var statusText = { ok: "EN RÈGLE", partial: "PAIEMENT PARTIEL", unpaid: "NON EN RÈGLE", exempted: "EXEMPTÉ", anomaly: "ANOMALIE" }[controlData.result];
-      resultBox.innerHTML = window.ssState({ type: statusType, title: statusText, message: "Contrôle enregistré sous référence " + escapeHtml(controlData.id.slice(0, 8)), size: "compact" });
-      input.value = "";
-      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
-    }).catch(function (err) {
-      resultBox.innerHTML = window.ssState({ type: "error", title: "Erreur", message: escapeHtml(err.message), size: "compact" });
-    });
+    input.value = "";
+    if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+    return true;
   }
 
   root.SchoolSafeFeeControlModule = {
     render: render,
+    setSession: function (user) { controlSessionOverride = user || null; },
+    canRead: canReadFeeControl,
+    canManage: canManageFeeControl,
+    canScan: canScanFeeControl,
+    _state: function () { return { campaignDrafts: campaignDrafts, localHistory: localHistory, selectedCampaignId: selectedCampaignId }; }
   };
 })(window);

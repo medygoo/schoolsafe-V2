@@ -306,6 +306,144 @@
   margin-top: var(--ss-space-2);
 }
 
+.fee-control-panel {
+  display: grid;
+  gap: var(--ss-space-5);
+  padding: var(--ss-space-5);
+  color: var(--ss-text-primary);
+}
+
+.fee-control-hero,
+.fee-control-campaigns > header,
+.fee-control-management > header,
+.fee-control-scan > header,
+.fee-control-history > header,
+.fee-control-campaign-draft > header,
+.fee-control-minimal-result > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ss-space-4);
+}
+
+.fee-control-hero,
+.fee-control-campaigns,
+.fee-control-management,
+.fee-control-scan,
+.fee-control-history,
+.fee-control-scanner-boundary {
+  padding: var(--ss-space-5);
+  border: 1px solid var(--ss-border-subtle);
+  border-radius: var(--ss-radius-xl);
+  background: var(--ss-surface-raised);
+}
+
+.fee-control-hero h2,
+.fee-control-campaigns h3,
+.fee-control-management h3,
+.fee-control-scan h3,
+.fee-control-history h3,
+.fee-control-campaign-draft h4,
+.fee-control-minimal-result h3 {
+  margin: var(--ss-space-1) 0 0;
+}
+
+.fee-control-campaign-grid,
+.fee-control-campaign-drafts {
+  display: grid;
+  gap: var(--ss-space-3);
+  margin-top: var(--ss-space-4);
+}
+
+.fee-control-campaign {
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-bg-primary);
+}
+
+.fee-control-campaign label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ss-space-3);
+  cursor: pointer;
+}
+
+.fee-control-campaign label span {
+  display: grid;
+  gap: var(--ss-space-1);
+}
+
+.fee-control-campaign em,
+.fee-control-campaign small {
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-sm);
+  font-style: normal;
+}
+
+.fee-control-campaign dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ss-space-3);
+  margin: var(--ss-space-4) 0;
+}
+
+.fee-control-campaign dt {
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-xs);
+}
+
+.fee-control-campaign dd {
+  margin: var(--ss-space-1) 0 0;
+  font-weight: var(--ss-font-bold);
+}
+
+.fee-control-campaign-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ss-space-3);
+  margin-top: var(--ss-space-4);
+}
+
+.fee-control-campaign-form label,
+.fee-control-scan form label {
+  display: grid;
+  gap: var(--ss-space-2);
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-bold);
+}
+
+.fee-control-campaign-form input,
+.fee-control-campaign-form select,
+.fee-control-scan form input {
+  min-height: 44px;
+}
+
+.fee-control-campaign-form .ss-button {
+  align-self: end;
+}
+
+.fee-control-campaign-draft,
+.fee-control-minimal-result {
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-warning-border);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-warning-bg);
+}
+
+.fee-control-scan form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--ss-space-3);
+  margin-top: var(--ss-space-4);
+}
+
+.fee-control-result:not(:empty) {
+  margin-top: var(--ss-space-4);
+}
+
 @media (max-width: 1180px) {
   .finance-dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -330,5 +468,25 @@
   .finance-cancellation-draft > header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .fee-control-panel {
+    padding: var(--ss-space-3);
+  }
+
+  .fee-control-hero,
+  .fee-control-campaigns > header,
+  .fee-control-management > header,
+  .fee-control-scan > header,
+  .fee-control-history > header,
+  .fee-control-campaign-draft > header,
+  .fee-control-minimal-result > header {
+    flex-direction: column;
+  }
+
+  .fee-control-campaign dl,
+  .fee-control-campaign-form,
+  .fee-control-scan form {
+    grid-template-columns: 1fr;
   }
 }

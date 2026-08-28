@@ -2398,6 +2398,7 @@
     };
     if (branchKey === "pedagogy" && phaseDViews[actionName] && openPhaseDPedagogy(phaseDViews[actionName])) return;
     if (branchKey === "pedagogy") { openPedagogyModule(actionName); return; }
+    if (branchKey === "finance" && feeControlTabForAction(actionName)) { openFeeControlModule(actionName); return; }
     if (branchKey === "finance") { openFinanceModule(actionName); return; }
     if (branchKey === "feeControl") { openFeeControlModule(actionName); return; }
     if (branchKey === "security") { openSecurityModule(actionName); return; }
