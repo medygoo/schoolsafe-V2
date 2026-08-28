@@ -97,6 +97,89 @@
   outline: none;
 }
 
+.finance-backend-note {
+  margin: 0 var(--ss-space-4) var(--ss-space-4);
+  color: var(--ss-warning-text);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-bold);
+}
+
+.finance-assignment-workflow,
+.finance-assignment-drafts {
+  display: grid;
+  gap: var(--ss-space-4);
+}
+
+.finance-workflow-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--ss-space-2);
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-surface-raised);
+  color: var(--ss-text-brand);
+  font-size: var(--ss-text-sm);
+  font-weight: var(--ss-font-extrabold);
+}
+
+.finance-obligation-statuses {
+  display: grid;
+  gap: var(--ss-space-2);
+  padding: var(--ss-space-4);
+}
+
+.finance-obligation-statuses > span {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ss-space-3);
+  border-bottom: 1px solid var(--ss-border-subtle);
+}
+
+.finance-assignment-drafts > header {
+  color: var(--ss-text-primary);
+}
+
+.finance-assignment-drafts > header span {
+  color: var(--ss-text-secondary);
+  font-size: var(--ss-text-xs);
+  font-weight: var(--ss-font-extrabold);
+  text-transform: uppercase;
+}
+
+.finance-assignment-drafts > header h3 {
+  margin: var(--ss-space-1) 0 0;
+}
+
+.finance-assignment-draft {
+  padding: var(--ss-space-4);
+  border: 1px solid var(--ss-warning-border);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-warning-bg);
+  color: var(--ss-text-primary);
+}
+
+.finance-assignment-draft > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ss-space-3);
+}
+
+.finance-assignment-draft h4,
+.finance-assignment-draft p {
+  margin: var(--ss-space-1) 0 0;
+}
+
+.finance-assignment-draft small {
+  color: var(--ss-warning-text);
+  font-weight: var(--ss-font-bold);
+}
+
 @media (max-width: 1180px) {
   .finance-dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -110,5 +193,9 @@
 
   .finance-dashboard-action {
     width: 100%;
+  }
+
+  .finance-workflow-steps svg {
+    transform: rotate(90deg);
   }
 }
