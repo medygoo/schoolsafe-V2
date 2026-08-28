@@ -43,7 +43,17 @@
 .administration-form-grid > label:not(.administration-confirm) { display: grid; gap: 6px; color: var(--ss-text-secondary); font-weight: 700; }
 .administration-form-grid input:not([type="checkbox"]) { min-height: 44px; padding: 0 12px; border: 1px solid var(--ss-border-strong); border-radius: 12px; color: var(--ss-text); background: var(--ss-surface); }
 .administration-form-grid .administration-confirm, .administration-form-grid .administration-mutation__actions { grid-column: 1 / -1; }
+.administration-permissions { display: grid; gap: 16px; min-width: 0; }
+.administration-readonly { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--ss-border); border-radius: 12px; color: var(--ss-text-secondary); font-size: .82rem; font-weight: 800; }
+.administration-permission-filters { display: grid; grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(130px, .8fr)) minmax(200px, 1fr); gap: 10px; padding: 16px; border: 1px solid var(--ss-border); border-radius: 18px; background: var(--ss-surface); }
+.administration-permission-filters label { display: grid; gap: 6px; color: var(--ss-text-secondary); font-size: .8rem; font-weight: 750; }
+.administration-permission-filters input, .administration-permission-filters select { width: 100%; min-height: 44px; padding: 0 11px; border: 1px solid var(--ss-border-strong); border-radius: 11px; color: var(--ss-text); background: var(--ss-surface); }
+.administration-catalog-count { color: var(--ss-text-secondary); }
+.administration-catalog-count strong { color: var(--ss-text); font-size: 1.2rem; }
+.administration-permission-table code { color: var(--ss-text-link); font-weight: 800; }
 html[data-theme="dark"] .administration-header__badge { color: #fca5a5; background: rgba(127, 29, 29, .28); }
+@media (max-width: 1100px) { .administration-permission-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 834px) { .administration-header, .administration-view-heading, .administration-mutation { grid-template-columns: 1fr; } .administration-grid { grid-template-columns: 1fr; } .administration-summary { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 560px) { .administration-role-options, .administration-form-grid { grid-template-columns: 1fr; } .administration-form-grid .administration-confirm, .administration-form-grid .administration-mutation__actions { grid-column: auto; } }
+@media (max-width: 480px) { .administration-permission-filters { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .administration-header, .administration-card { padding: 16px; border-radius: 18px; } }

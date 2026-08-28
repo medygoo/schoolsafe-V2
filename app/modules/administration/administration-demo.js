@@ -12,7 +12,11 @@
     accountsError: "",
     notice: "",
     selectedStaffId: null,
-    mutationPanel: null
+    mutationPanel: null,
+    permissionCatalog: null,
+    permissionsLoading: false,
+    permissionsError: "",
+    permissionFilters: { query: "", domain: "all", operation: "all", scope: "all", code: "" }
   };
   var SECTIONS = [
     { key: "school", label: "École", description: "Identité, année et structure via le module École existant.", permission: "school.manage", scope: "school", icon: "school", action: "school", actionLabel: "Ouvrir le module École" },
@@ -45,6 +49,8 @@
       ? '<button class="ss-button ss-button--secondary" type="button" data-admin-link="' + section.action + '">' + escapeMarkup(section.actionLabel) + '</button>'
       : section.key === "roles"
         ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="accounts">Gérer les comptes et rôles</button>'
+        : section.key === "permissions"
+          ? '<button class="ss-button ss-button--secondary" type="button" data-admin-open="permissions">Consulter le catalogue</button>'
         : '<span class="administration-card__boundary">FRONTEND · contrôle d’accès actif</span>';
     return '<article class="administration-card" data-admin-section="' + section.key + '">' +
       '<span class="administration-card__icon"><i data-lucide="' + section.icon + '"></i></span>' +
@@ -113,6 +119,95 @@
   function dashboardMarkup(allowed) {
     return '<section class="administration-summary" aria-label="Résumé des accès"><div><strong>' + allowed.length + ' domaine' + (allowed.length > 1 ? 's' : '') + ' autorisé' + (allowed.length > 1 ? 's' : '') + ' sur ' + SECTIONS.length + '</strong><span>Utilisateur → Rôle → Permission → Portée → Condition → Exception</span></div><span>Administrateur sans bypass implicite</span></section>' +
       (allowed.length ? '<div class="administration-grid">' + allowed.map(renderCard).join("") + '</div>' : '<div class="administration-empty"><i data-lucide="shield-off"></i><h3>Administration non autorisée</h3><p>Aucune permission avec portée compatible n’est accordée à cette session.</p></div>');
+  }
+
+  function permissionDomain(permission) {
+    return String(permission && permission.code || "other").split(".")[0] || "other";
+  }
+
+  function permissionOperation(permission) {
+    var code = String(permission && permission.code || "");
+    if (/\.manage$/.test(code)) return "manage";
+    if (/\.read$/.test(code)) return "read";
+    return "other";
+  }
+
+  function filteredPermissions() {
+    var filters = state.permissionFilters;
+    var query = filters.query.trim().toLowerCase();
+    var exactCode = filters.code.trim().toLowerCase();
+    return (state.permissionCatalog || []).filter(function (permission) {
+      var code = String(permission.code || "");
+      var label = String(permission.label || "");
+      if (query && (code + " " + label).toLowerCase().indexOf(query) < 0) return false;
+      if (filters.domain !== "all" && permissionDomain(permission) !== filters.domain) return false;
+      if (filters.operation !== "all" && permissionOperation(permission) !== filters.operation) return false;
+      if (filters.scope !== "all" && permission.scope !== filters.scope) return false;
+      if (exactCode && code.toLowerCase() !== exactCode) return false;
+      return true;
+    });
+  }
+
+  function optionMarkup(values, selected, allLabel) {
+    return '<option value="all">' + escapeMarkup(allLabel) + '</option>' + values.map(function (value) {
+      return '<option value="' + escapeMarkup(value) + '"' + (value === selected ? ' selected' : '') + '>' + escapeMarkup(value) + '</option>';
+    }).join("");
+  }
+
+  function renderPermissions() {
+    if (!canUse(state.user, "roles.manage", "school")) {
+      return '<section class="administration-empty" data-permission-catalog><i data-lucide="shield-off"></i><h3>Catalogue non autorisé</h3><p>roles.manage + school requis ; DENY prioritaire.</p></section>';
+    }
+    if (state.permissionsLoading) return '<section class="administration-empty" data-permission-catalog><i data-lucide="loader-2"></i><h3>Chargement du catalogue canonique…</h3></section>';
+    if (state.permissionsError) return '<section class="administration-empty" data-permission-catalog><i data-lucide="wifi-off"></i><h3>Catalogue indisponible</h3><p>' + escapeMarkup(state.permissionsError) + '</p></section>';
+    var catalog = state.permissionCatalog || [];
+    var domains = Array.from(new Set(catalog.map(permissionDomain))).sort();
+    var scopes = Array.from(new Set(catalog.map(function (permission) { return permission.scope || "none"; }))).sort();
+    var rows = filteredPermissions();
+    return '<section class="administration-permissions" data-permission-catalog>' +
+      '<div class="administration-view-heading"><button class="ss-button ss-button--secondary" type="button" data-admin-home><i data-lucide="arrow-left"></i> Centre Administration</button><div><span>LECTURE SEULE</span><h3>Catalogue des permissions</h3><p>Source canonique · shared/permissions.json</p></div><span class="administration-readonly"><i data-lucide="lock-keyhole"></i> Aucun droit d’édition</span></div>' +
+      '<div class="administration-permission-filters"><label>Rechercher une permission<input type="search" data-permission-filter="query" value="' + escapeMarkup(state.permissionFilters.query) + '"></label><label>Domaine<select data-permission-filter="domain">' + optionMarkup(domains, state.permissionFilters.domain, "Tous") + '</select></label><label>Opération<select data-permission-filter="operation"><option value="all">Toutes</option><option value="read"' + (state.permissionFilters.operation === "read" ? ' selected' : '') + '>read</option><option value="manage"' + (state.permissionFilters.operation === "manage" ? ' selected' : '') + '>manage</option><option value="other"' + (state.permissionFilters.operation === "other" ? ' selected' : '') + '>autre</option></select></label><label>Portée<select data-permission-filter="scope">' + optionMarkup(scopes, state.permissionFilters.scope, "Toutes") + '</select></label><label>Code exact<input type="search" data-permission-filter="code" value="' + escapeMarkup(state.permissionFilters.code) + '"></label></div>' +
+      '<div class="administration-catalog-count"><strong>' + rows.length + '</strong> permission' + (rows.length > 1 ? 's' : '') + ' affichée' + (rows.length > 1 ? 's' : '') + '</div>' +
+      (rows.length ? '<div class="administration-table-wrap"><table class="administration-table administration-permission-table"><thead><tr><th>Code</th><th>Libellé</th><th>Domaine</th><th>Portée par défaut</th><th>Type</th></tr></thead><tbody>' + rows.map(function (permission) {
+        return '<tr data-permission-row><td><code>' + escapeMarkup(permission.code) + '</code></td><td>' + escapeMarkup(permission.label) + '</td><td>' + escapeMarkup(permissionDomain(permission)) + '</td><td>' + escapeMarkup(permission.scope || "none") + '</td><td>' + escapeMarkup(permissionOperation(permission)) + '</td></tr>';
+      }).join("") + '</tbody></table></div>' : '<div class="administration-empty"><i data-lucide="search-x"></i><h3>Aucune permission</h3><p>Aucun code canonique ne correspond aux filtres.</p></div>') + '</section>';
+  }
+
+  function loadPermissions() {
+    var access = global.SchoolSafeAccess;
+    if (state.permissionsLoading || state.permissionCatalog) return;
+    if (!access || typeof access.loadPermissions !== "function") {
+      state.permissionsError = "SchoolSafeAccess indisponible";
+      render(state.containerId, state.user, state.options);
+      return;
+    }
+    state.permissionsLoading = true;
+    render(state.containerId, state.user, state.options);
+    access.loadPermissions().then(function (permissions) {
+      state.permissionCatalog = asList(permissions);
+      state.permissionsError = "";
+    }).catch(function (error) {
+      state.permissionsError = error && error.message ? error.message : "Source canonique indisponible";
+    }).finally(function () {
+      state.permissionsLoading = false;
+      render(state.containerId, state.user, state.options);
+    });
+  }
+
+  function bindPermissions(container) {
+    var home = container.querySelector("[data-admin-home]");
+    if (home) home.addEventListener("click", function () { open("dashboard"); });
+    container.querySelectorAll("[data-permission-filter]").forEach(function (control) {
+      control.addEventListener(control.tagName === "SELECT" ? "change" : "input", function () {
+        state.permissionFilters[control.getAttribute("data-permission-filter")] = control.value;
+        render(state.containerId, state.user, state.options);
+        var replacement = global.document.querySelector('[data-permission-filter="' + control.getAttribute("data-permission-filter") + '"]');
+        if (replacement && replacement.tagName !== "SELECT") {
+          replacement.focus();
+          replacement.setSelectionRange(replacement.value.length, replacement.value.length);
+        }
+      });
+    });
   }
 
   function loadAccounts() {
@@ -251,7 +346,7 @@
         '<div><span>Administration / Accès / Jaspe logiciel</span><h2>Centre Administration</h2><p>Vue de contrôle frontend : chaque surface exige sa permission et sa portée réelles.</p></div>' +
         '<span class="administration-header__badge"><i data-lucide="shield-check"></i> DENY explicite prioritaire</span>' +
       '</header>' +
-      (state.activeView === "accounts" ? renderAccounts() : dashboardMarkup(allowed));
+      (state.activeView === "accounts" ? renderAccounts() : state.activeView === "permissions" ? renderPermissions() : dashboardMarkup(allowed));
 
     var closeButton = container.querySelector("[data-admin-close]");
     if (closeButton) closeButton.addEventListener("click", function () {
@@ -271,6 +366,10 @@
       bindAccounts(container);
       if (!state.staff && !state.accountsLoading && !state.accountsError) loadAccounts();
     }
+    if (state.activeView === "permissions") {
+      bindPermissions(container);
+      if (!state.permissionCatalog && !state.permissionsLoading && !state.permissionsError) loadPermissions();
+    }
     if (global.lucide && typeof global.lucide.createIcons === "function") global.lucide.createIcons();
   }
 
@@ -280,7 +379,7 @@
   }
 
   function open(view) {
-    state.activeView = view === "accounts" ? "accounts" : "dashboard";
+    state.activeView = ["accounts", "permissions"].indexOf(view) >= 0 ? view : "dashboard";
     state.notice = "";
     state.selectedStaffId = null;
     state.mutationPanel = null;
