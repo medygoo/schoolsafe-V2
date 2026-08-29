@@ -101,6 +101,11 @@
     return demoControlUser();
   }
 
+  function isLiveSession() {
+    var user = controlAccessUser();
+    return !!(user && user.token);
+  }
+
   function permissionScopes(user, permission) {
     return (user && Array.isArray(user.scopes) ? user.scopes : []).filter(function (scope) {
       return scope && (!scope.permission || scope.permission === permission);
@@ -209,6 +214,11 @@
     if (!canOpen) {
       container.innerHTML = window.ssState({ type: "denied", title: "Contrôle des frais non autorisé", message: "Une permission et une portée compatibles sont requises." });
       return false;
+    }
+    if (isLiveSession()) {
+      container.innerHTML = '<section class="fee-control-panel" data-fee-control-live-unavailable role="status">' + window.ssState({ type: "unavailable", title: "DONNÉES INDISPONIBLES", message: "Les campagnes, élèves, statuts et historiques réels ne sont pas connectés.", details: "Aucune fixture de contrôle des frais n’est affichée · BACKEND_LATER." }) + '</section>';
+      if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();
+      return true;
     }
     container.innerHTML = '<div class="fee-control-panel"><header class="fee-control-hero"><div><span>F5-FE · frontend uniquement</span><h2>Contrôle des frais</h2><p>Campagnes, scan et historique appliquent des gardes indépendantes. Les résultats ne montrent aucun détail financier.</p></div>' + window.ssBadge({ variant: "info", label: "PÉRIMÈTRE MINIMAL" }) + '</header>' + renderCampaigns() + renderManagement() + renderScanner() + renderHistory() + '</div>';
     bind(containerId);

@@ -93,6 +93,11 @@
   function canReadAttendance() { return allows("staff.attendance.read", "school"); }
   function canReadReports() { return allows("reports.hr.read", "school"); }
   function canAccessHr() { return canReadStaff() || canManageStaff() || canReadAttendance() || canReadReports(); }
+  function isLiveSession() { return !!(user() && user().token); }
+
+  function renderLiveUnavailable() {
+    return '<section class="hr-future" data-hr-live-unavailable role="status"><span>SESSION LIVE</span><h3>DONNÉES INDISPONIBLES</h3><p>Les dossiers, contrats, affectations, absences, présences et statistiques RH réels ne sont pas connectés.</p><span class="hr-boundary-chip">BACKEND_LATER</span></section>';
+  }
 
   function tabAllowed(tab) {
     if (tab === "dashboard") return canAccessHr();
@@ -502,13 +507,14 @@
   function renderContent() {
     var content = document.getElementById("hrContent");
     if (!content) return;
+    var live = isLiveSession();
     document.querySelectorAll("#hrTabs [data-hr-tab]").forEach(function (button) {
       var tab = button.getAttribute("data-hr-tab") || "dashboard";
-      button.hidden = !tabAllowed(tab);
+      button.hidden = live || !tabAllowed(tab);
       button.classList.toggle("active", tab === activeTab);
     });
     var blocked = !canAccessHr() || !tabAllowed(activeTab);
-    content.innerHTML = blocked ? (activeTab === "attendance" || activeTab === "biometric" ? renderAttendanceDenied() : activeTab === "payroll" ? renderPayrollDenied() : activeTab === "reports" ? renderReportsDenied() : renderDenied()) : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : activeTab === "absence" ? renderAbsence() : activeTab === "attendance" ? renderAttendance() : activeTab === "biometric" ? renderBiometric() : activeTab === "payroll" ? renderPayroll() : activeTab === "reports" ? renderReports() : renderFuture();
+    content.innerHTML = blocked ? (activeTab === "attendance" || activeTab === "biometric" ? renderAttendanceDenied() : activeTab === "payroll" ? renderPayrollDenied() : activeTab === "reports" ? renderReportsDenied() : renderDenied()) : live ? renderLiveUnavailable() : activeTab === "dashboard" ? renderDashboard() : activeTab === "staff" ? renderStaff() : activeTab === "contracts" ? renderContracts() : activeTab === "assignments" ? renderAssignments() : activeTab === "absence" ? renderAbsence() : activeTab === "attendance" ? renderAttendance() : activeTab === "biometric" ? renderBiometric() : activeTab === "payroll" ? renderPayroll() : activeTab === "reports" ? renderReports() : renderFuture();
     bindNavigation();
     if (activeTab === "staff") bindStaff();
     if (activeTab === "contracts") bindContracts();

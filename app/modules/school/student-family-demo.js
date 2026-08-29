@@ -415,6 +415,20 @@
   }
 
   function open(student, user) {
+    if (user && user.token) {
+      activeUser = user;
+      activeModal = root.ssModal({
+        title: "Dossier familial",
+        subtitle: "Session live · frontend uniquement",
+        size: "full",
+        className: "student-family-modal",
+        content: '<section class="student-family-unavailable" role="status"><i data-lucide="cloud-off"></i><div><span>SESSION LIVE</span><h2>DONNÉES INDISPONIBLES</h2><p>La lecture et la préparation du dossier familial réel exigent une projection serveur sécurisée. Aucun contenu fictif ou sensible n’est conservé dans localStorage · BACKEND_LATER.</p></div></section>',
+        actions: [{ label: "Fermer le dossier", variant: "secondary" }],
+        onClose: function () { activeModal = null; activeStudent = null; activeState = null; activeUser = null; }
+      });
+      if (root.lucide) root.lucide.createIcons();
+      return;
+    }
     activeStudent = student;
     activeState = stateFor(student);
     activeUser = user || { permissions: [] };

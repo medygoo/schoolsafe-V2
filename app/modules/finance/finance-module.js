@@ -114,6 +114,8 @@
   // Mode démo vs mode réel
   // ---------------------------------------------------------------------------
   function isDemoMode() {
+    var session = currentSession();
+    if (session && session.token) return false;
     if (root.schoolSafeDemoMode === true) return true;
     var host = String(root.location && root.location.hostname || "").toLowerCase();
     var isLocalhost = host === "localhost" || host === "127.0.0.1";
@@ -2293,7 +2295,7 @@
     if (!financeJaspeHasAny(user, ["finance.fee.read", "finance.fee.manage", "finance.payment.record", "finance.payment.cancel", "finance.receipt.read", "finance.report.read", "finance.cash_register.close", "finance.control.read", "finance.control.manage", "finance.control.scan", "finance.status.read"])) {
       return financeJaspeRefusal("aucune permission Finance ou Contrôle des frais n’est accordée à cette session.");
     }
-    return { allowed: true, refusal: false, action: null, message: "Jaspe Finance explique les données visibles et prépare uniquement les brouillons permis. Aucun paiement, reçu, montant, exemption ou student_fee n’est modifié silencieusement." };
+    return null;
   }
 
   // ---------------------------------------------------------------------------

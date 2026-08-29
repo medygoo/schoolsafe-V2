@@ -274,9 +274,10 @@
 
   function renderSection(options) {
     var student = options.student;
-    var state = options.state || stateFor(student);
     var user = options.user || {};
     if (!canView(user, student)) return "";
+    if (user.token) return '<section class="family-section student-lifecycle" data-lifecycle-live-unavailable role="status"><header><i data-lucide="cloud-off"></i><h2>DONNÉES INDISPONIBLES</h2></header><p>Le cycle, l’historique et les préparations scolaires réels exigent une projection serveur sécurisée.</p><div class="lifecycle-backend"><span>Aucune fixture ni donnée sensible n’est conservée localement dans cette session.</span><b>BACKEND_LATER</b></div></section>';
+    var state = options.state || stateFor(student);
     if (student.lifecycle_status !== "active") return renderBlocked(student, state);
     return '<section class="family-section student-lifecycle" data-lifecycle-section><header><i data-lucide="route"></i><h2>Parcours scolaire</h2></header>' +
       renderSummary(student, state) +
@@ -348,6 +349,7 @@
   function bind(options) {
     var rootElement = options.rootElement;
     if (!rootElement || !canView(options.user, options.student)) return;
+    if (options.user && options.user.token) return;
     activeStudent = options.student;
     activeUser = options.user || {};
     activeState = options.state || stateFor(options.student);
@@ -395,6 +397,19 @@
         className: "student-lifecycle-modal",
         content: '<div class="lifecycle-denied"><i data-lucide="shield-x"></i><div><b>Accès au cycle scolaire indisponible</b><p>Ce profil ne dispose pas de la permission ou de la portée requise.</p></div></div>',
         actions: [{ label: "Fermer", variant: "secondary" }]
+      });
+      if (root.lucide) root.lucide.createIcons();
+      return;
+    }
+    if (user && user.token) {
+      activeUser = user;
+      activeModal = root.ssModal({
+        title: "Parcours scolaire",
+        subtitle: "Session live · frontend uniquement",
+        className: "student-lifecycle-modal",
+        content: renderSection({ student: student, user: user }),
+        actions: [{ label: "Fermer", variant: "secondary" }],
+        onClose: function () { activeModal = null; activeStudent = null; activeUser = null; activeState = null; }
       });
       if (root.lucide) root.lucide.createIcons();
       return;

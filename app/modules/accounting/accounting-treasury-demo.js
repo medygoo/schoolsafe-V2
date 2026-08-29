@@ -54,6 +54,14 @@
     return allows("finance.cash_register.close", "school");
   }
 
+  function isLiveSession() {
+    return !!(user() && user().token);
+  }
+
+  function renderLiveUnavailable() {
+    return '<section class="accounting-future" data-accounting-live-unavailable role="status"><span>SESSION LIVE</span><h3>DONNÉES INDISPONIBLES</h3><p>Les journaux, dépenses, positions, clôtures, rapprochements et statistiques réels exigent une projection serveur sûre.</p><span class="accounting-boundary-chip">BACKEND_LATER</span></section>';
+  }
+
   function snapshot() {
     var finance = root.SchoolSafeFinanceModule;
     if (!finance || typeof finance.getAccountingSnapshot !== "function") {
@@ -403,13 +411,14 @@
     if (!content) return;
     var closeAllowed = canPrepareClosing();
     var readAllowed = canReadAccounting();
+    var live = isLiveSession();
     document.querySelectorAll("#accountingTabs [data-accounting-tab]").forEach(function (button) {
       var tab = button.getAttribute("data-accounting-tab");
-      button.hidden = tab === "closing" ? !closeAllowed : !readAllowed;
+      button.hidden = live || (tab === "closing" ? !closeAllowed : !readAllowed);
       button.classList.toggle("active", tab === activeTab);
     });
     var surfaceAllowed = readAllowed || (activeTab === "closing" && closeAllowed);
-    content.innerHTML = surfaceAllowed ? (activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : activeTab === "closing" ? renderClosing() : activeTab === "reconciliation" ? renderReconciliation() : activeTab === "reports" ? renderReports() : renderFutureSurface()) : renderDenied();
+    content.innerHTML = surfaceAllowed ? (live ? renderLiveUnavailable() : activeTab === "dashboard" ? renderDashboard() : activeTab === "journal" ? renderJournal() : activeTab === "expenses" ? renderExpenses() : activeTab === "treasury" ? renderTreasury() : activeTab === "closing" ? renderClosing() : activeTab === "reconciliation" ? renderReconciliation() : activeTab === "reports" ? renderReports() : renderFutureSurface()) : renderDenied();
     bindNavigation();
     if (activeTab === "journal") bindJournalFilters();
     if (activeTab === "closing") bindClosing();

@@ -902,6 +902,9 @@
     var directionProjection = !projection.allowed && canOpenDirection(activeUser) ? getDirectionProjection(activeUser) : null;
     if (!projection.allowed && directionProjection && directionProjection.allowed) renderDirection(container, directionProjection);
     else if (!projection.allowed) renderDenied(container);
+    else if (activeUser.token) {
+      container.innerHTML = '<section class="teacher-operational-state" role="status"><i data-lucide="cloud-off"></i><div><span>SESSION LIVE</span><h1>DONNÉES INDISPONIBLES</h1><p>Les classes, matières, élèves, devoirs, notes et statistiques réels ne sont pas connectés. Aucune fixture pédagogique n’est affichée · BACKEND_LATER.</p></div></section>';
+    }
     else if (!projection.classes.length || !projection.subjects.length) renderOperationalState(container, "empty");
     else renderDashboard(container, projection);
     if (root.lucide && root.lucide.createIcons) root.lucide.createIcons();

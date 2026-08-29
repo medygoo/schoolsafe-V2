@@ -6,6 +6,10 @@
   var FINANCE_PERMISSIONS = ["finance.status.read", "finance.fee.read", "finance.receipt.read"];
   var SECURITY_PERMISSIONS = ["school.guardian.read", "security.pickup.read", "security.events.read"];
 
+  function isLiveSession(user) {
+    return !!(user && user.token);
+  }
+
   var CHILDREN = [
     {
       id: "demo-parent-child-lucas",
@@ -632,6 +636,13 @@
     '</section>';
   }
 
+  function renderLiveUnavailable(container) {
+    container.innerHTML = '<section class="parent-portal-unavailable" role="status">' +
+      '<span>' + icon("cloud-off") + '</span><div><p class="parent-eyebrow">Session live</p>' +
+      '<h1>DONNÉES INDISPONIBLES</h1><p>La projection réelle <code>own_children</code> n’est pas connectée. Aucun enfant, message, montant ou événement de démonstration n’est affiché · BACKEND_LATER.</p></div>' +
+    '</section>';
+  }
+
   function renderEmpty(container) {
     container.innerHTML = '<section class="parent-portal-empty" role="status">' +
       '<span>' + icon("users-round") + '</span><div><p class="parent-eyebrow">Périmètre familial</p>' +
@@ -655,6 +666,12 @@
     if (!baseAccessAllowed) {
       selectedChildId = null;
       renderDenied(container);
+      if (root.lucide) root.lucide.createIcons();
+      return;
+    }
+    if (isLiveSession(activeUser)) {
+      selectedChildId = null;
+      renderLiveUnavailable(container);
       if (root.lucide) root.lucide.createIcons();
       return;
     }
