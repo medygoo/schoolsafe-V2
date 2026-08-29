@@ -38,7 +38,7 @@
     } else {
       inputHtml = window.ssInput(Object.assign({ name: name, id: id, type: type, value: value }, extra));
     }
-    return window.ssField({ label: label, inputHtml: inputHtml, required: extra.required });
+    return window.ssField({ label: label, labelFor: id, inputHtml: inputHtml, required: extra.required });
   }
 
   function formCheckbox(name, value, label, checked) {

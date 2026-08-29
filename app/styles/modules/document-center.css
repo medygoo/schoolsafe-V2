@@ -27,7 +27,7 @@
 .document-card__formats { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .8rem; }
 .document-card__formats span { border-radius: 999px; padding: .25rem .5rem; background: var(--ss-bg-tertiary); color: var(--ss-text-secondary); font-size: .68rem; font-weight: 800; }
 .document-card footer { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: auto; padding-top: 1rem; }
-.document-card footer button { display: inline-flex; min-height: 40px; align-items: center; gap: .3rem; border: 1px solid var(--ss-border-default); border-radius: .65rem; padding: .45rem .6rem; background: var(--ss-bg-secondary); color: var(--ss-text-primary); font-weight: 700; cursor: pointer; }
+.document-card footer button { display: inline-flex; min-height: 44px; align-items: center; gap: .3rem; border: 1px solid var(--ss-border-default); border-radius: .65rem; padding: .45rem .6rem; background: var(--ss-bg-secondary); color: var(--ss-text-primary); font-weight: 700; cursor: pointer; }
 .document-card footer button:hover { border-color: var(--ss-info-border); color: var(--ss-text-link); }
 .document-card footer svg { width: 1rem; }
 .document-center__empty { grid-column: 1 / -1; border: 1px dashed var(--ss-border-strong); border-radius: var(--ss-radius-lg); padding: 2.5rem 1rem; background: var(--ss-bg-primary); text-align: center; }

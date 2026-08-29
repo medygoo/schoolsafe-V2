@@ -162,8 +162,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: var(--ss-radius);
@@ -479,6 +479,7 @@
    Input
    -------------------------------------------------------------------------- */
 .ss-input {
+  box-sizing: border-box;
   width: 100%;
   min-height: 48px;
   padding: var(--ss-space-3) var(--ss-space-4);
@@ -569,6 +570,7 @@
    Select
    -------------------------------------------------------------------------- */
 .ss-select {
+  box-sizing: border-box;
   width: 100%;
   min-height: 48px;
   padding: var(--ss-space-3) calc(var(--ss-space-4) + 20px) var(--ss-space-3) var(--ss-space-4);
@@ -607,6 +609,7 @@
    Textarea
    -------------------------------------------------------------------------- */
 .ss-textarea {
+  box-sizing: border-box;
   width: 100%;
   min-height: 96px;
   padding: var(--ss-space-3) var(--ss-space-4);
@@ -657,6 +660,7 @@
    -------------------------------------------------------------------------- */
 .ss-field {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: var(--ss-space-1);
 }
@@ -786,9 +790,9 @@
 }
 
 @media (min-width: 768px) {
-  .ss-form-grid--2 { grid-template-columns: repeat(2, 1fr); }
-  .ss-form-grid--3 { grid-template-columns: repeat(3, 1fr); }
-  .ss-form-grid--4 { grid-template-columns: repeat(4, 1fr); }
+  .ss-form-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ss-form-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ss-form-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .ss-form-grid .wide,

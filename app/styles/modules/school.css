@@ -4,6 +4,24 @@
   padding: var(--ss-space-4);
 }
 
+.school-module .module-back {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius);
+  background: var(--ss-bg-secondary);
+  color: var(--ss-text-secondary);
+  cursor: pointer;
+}
+
+.school-module .module-back:focus-visible {
+  outline: 3px solid var(--ss-blue-300);
+  outline-offset: 2px;
+}
+
 @media (min-width: 769px) {
   .school-module {
     width: calc(100vw - 260px - (var(--ss-space-6) * 2));

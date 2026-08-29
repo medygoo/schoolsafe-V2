@@ -570,7 +570,7 @@
       '<button type="button" data-parent-jaspe-query="Résume la situation de mon enfant">Résumer la situation</button>' +
       '<button type="button" data-parent-jaspe-query="Quels devoirs sont visibles ?">Voir les devoirs visibles</button>' +
       '<button type="button" data-parent-jaspe-query="Prépare un message à la Direction">Préparer un message à la Direction</button></div>' +
-      '<div class="parent-jaspe-input"><input id="parentJaspeInput" type="text" placeholder="Posez une question sur l’enfant sélectionné"><button type="button" data-parent-jaspe-send aria-label="Interroger Jaspe">' + icon("send") + '</button></div>' +
+      '<div class="parent-jaspe-input"><input id="parentJaspeInput" type="text" aria-label="Question à Jaspe sur l’enfant sélectionné" placeholder="Posez une question sur l’enfant sélectionné"><button type="button" data-parent-jaspe-send aria-label="Interroger Jaspe">' + icon("send") + '</button></div>' +
       '<p class="parent-jaspe-response" role="status">Jaspe respecte toujours permission, portée et DENY explicite.</p></div></section>';
   }
 

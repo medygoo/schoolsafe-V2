@@ -243,7 +243,7 @@
 .teacher-pedagogy-state--loading { border-color: var(--ss-info-border); background: var(--ss-info-bg); color: var(--ss-info-text); }
 .teacher-pedagogy-state--error { border-color: var(--ss-error-border); background: var(--ss-error-bg); color: var(--ss-error-text); }
 .teacher-pedagogy-state--empty { color: var(--ss-text-secondary); }
-.teacher-pedagogy-portal button { min-height: 2.5rem; }
+.teacher-pedagogy-portal button { min-height: 2.75rem; }
 
 @media (min-width: 769px) and (max-width: 1024px) {
   .workspace-screen.teacher-pedagogy-active .workspace-topbar { padding-inline: var(--ss-space-4); }
