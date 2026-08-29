@@ -1,7 +1,4 @@
-@import url("./styles-original.css");
-/* v4-theme.css est maintenant chargé conditionnellement via ?legacy=1 pour comparaison ;
-   le Design System --ss-* dans design-tokens.css + components.css + dashboard.css
-   est la source de vérité pour .workspace-screen. */
+/* Compléments du Design System pour les états et la lisibilité du workspace. */
 
 /* === Dashboard states & readability overrides === */
 .workspace-demo-banner {

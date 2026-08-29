@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const stylesheets = [
-  "styles-original.css",
+  "styles/screens/entry.css",
   "styles.css",
   "styles/design-tokens.css",
   "styles/components.css",
