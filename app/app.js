@@ -607,17 +607,17 @@
 
   var branchDefinitions = {
     pilotage: { label: "Pilotage", icon: "layout-dashboard", color: "#1d4ed8", background: "#dbeafe" },
-    school: { label: "École", icon: "school", color: "#2563eb", background: "#eff6ff" },
-    pedagogy: { label: "Pédagogie", icon: "book-open-check", color: "#1e3a8a", background: "#dbeafe" },
-    security: { label: "Sécurité et contrôle", icon: "shield-check", color: "#1d4ed8", background: "#dbeafe" },
+    school: { label: "École", icon: "school", color: "#1d4ed8", background: "#eff6ff" },
+    pedagogy: { label: "Pédagogie", icon: "book-open-check", color: "#7c3aed", background: "#f5f3ff" },
+    security: { label: "Sécurité et contrôle", icon: "shield-check", color: "#1e293b", background: "#f1f5f9" },
     finance: { label: "Finance", icon: "wallet-cards", color: "#d97706", background: "#fffbeb" },
     feeControl: { label: "Contrôle des frais", icon: "badge-check", color: "#0f766e", background: "#f0fdfa" },
-    accounting: { label: "Comptabilité", icon: "landmark", color: "#475569", background: "#f1f5f9" },
-    people: { label: "Personnel", icon: "contact-round", color: "#64748b", background: "#f1f5f9" },
+    accounting: { label: "Comptabilité", icon: "landmark", color: "#3a6ea5", background: "#eef3f8" },
+    people: { label: "Personnel", icon: "contact-round", color: "#8e4585", background: "#faf5f9" },
     inventory: { label: "Stock / Inventaire", icon: "package-search", color: "#0f766e", background: "#f0fdfa" },
-    communication: { label: "Communication", icon: "messages-square", color: "#3b82f6", background: "#eff6ff" },
+    communication: { label: "Communication", icon: "messages-square", color: "#0ea5e9", background: "#f0f9ff" },
     care: { label: "Vie et bien-être", icon: "heart-pulse", color: "#1d4ed8", background: "#dbeafe" },
-    administration: { label: "Administration", icon: "folder-cog", color: "#475569", background: "#f1f5f9" },
+    administration: { label: "Administration", icon: "folder-cog", color: "#1e3a8a", background: "#e8edf5" },
     reports: { label: "Contrôle et rapports", icon: "chart-no-axes-combined", color: "#1e40af", background: "#dbeafe" }
   };
 

@@ -291,41 +291,97 @@
 [data-theme="light"] {
   --ss-domain-pilotage: var(--ss-blue-600);
   --ss-domain-pilotage-bg: var(--ss-blue-50);
-  --ss-domain-ecole: var(--ss-emerald-600);
-  --ss-domain-ecole-bg: var(--ss-emerald-50);
-  --ss-domain-personnel: var(--ss-violet-600);
-  --ss-domain-personnel-bg: var(--ss-violet-50);
-  --ss-domain-pedagogie: var(--ss-orange-500);
-  --ss-domain-pedagogie-bg: var(--ss-orange-50);
-  --ss-domain-finance: var(--ss-emerald-700);
-  --ss-domain-finance-bg: var(--ss-emerald-50);
-  --ss-domain-comptabilite: var(--ss-cyan-600);
-  --ss-domain-comptabilite-bg: var(--ss-cyan-50);
-  --ss-domain-communication: var(--ss-pink-600);
-  --ss-domain-communication-bg: var(--ss-pink-50);
+  /* Élèves / Scolarité — bleu royal + cyan */
+  --ss-domain-ecole: #1d4ed8;
+  --ss-domain-ecole-2: #06b6d4;
+  --ss-domain-ecole-bg: #eff6ff;
+  /* Parent / Tuteur — indigo + violet doux */
+  --ss-domain-parent: #4f46e5;
+  --ss-domain-parent-2: #8b5cf6;
+  --ss-domain-parent-bg: #eef2ff;
+  /* Pédagogie / Enseignant — violet + bleu */
+  --ss-domain-pedagogie: #7c3aed;
+  --ss-domain-pedagogie-2: #2563eb;
+  --ss-domain-pedagogie-bg: #f5f3ff;
+  /* Sécurité / Gardien — bleu nuit + orange maîtrisé */
+  --ss-domain-securite: #1e293b;
+  --ss-domain-securite-2: #ea580c;
+  --ss-domain-securite-bg: #f1f5f9;
+  /* Finance — ambre + or */
+  --ss-domain-finance: #d97706;
+  --ss-domain-finance-2: #f59e0b;
+  --ss-domain-finance-bg: #fffbeb;
+  /* Comptabilité / Trésorerie — bleu acier + ardoise */
+  --ss-domain-comptabilite: #3a6ea5;
+  --ss-domain-comptabilite-2: #475569;
+  --ss-domain-comptabilite-bg: #f1f5f9;
+  /* RH / Personnel — prune + bordeaux doux */
+  --ss-domain-personnel: #8e4585;
+  --ss-domain-personnel-2: #a83a54;
+  --ss-domain-personnel-bg: #faf5f9;
+  /* Stock / Inventaire — teal + bleu (référence conservée) */
+  --ss-domain-stock: #0f766e;
+  --ss-domain-stock-2: #2563eb;
+  --ss-domain-stock-bg: #f0fdfa;
+  /* Documents — bleu pétrole + ardoise */
+  --ss-domain-documents: #0d5c6b;
+  --ss-domain-documents-2: #475569;
+  --ss-domain-documents-bg: #e9f4f6;
+  /* Communication — bleu clair + violet */
+  --ss-domain-communication: #0ea5e9;
+  --ss-domain-communication-2: #8b5cf6;
+  --ss-domain-communication-bg: #f0f9ff;
+  /* Administration — marine + gris premium */
+  --ss-domain-administration: #1e3a8a;
+  --ss-domain-administration-2: #64748b;
+  --ss-domain-administration-bg: #e8edf5;
+  /* Jaspe logiciel — bleu électrique + indigo/violet */
+  --ss-domain-jaspe: #2f6bff;
+  --ss-domain-jaspe-2: #7c3aed;
+  --ss-domain-jaspe-bg: #eef3ff;
   --ss-domain-rapports: var(--ss-blue-700);
   --ss-domain-rapports-bg: var(--ss-blue-50);
-  --ss-domain-securite: var(--ss-coral-600);
-  --ss-domain-securite-bg: var(--ss-coral-50);
 }
 
 [data-theme="dark"] {
   --ss-domain-pilotage: var(--ss-blue-400);
   --ss-domain-pilotage-bg: rgba(59, 130, 246, 0.14);
-  --ss-domain-ecole: var(--ss-emerald-400);
-  --ss-domain-ecole-bg: rgba(16, 185, 129, 0.14);
-  --ss-domain-personnel: var(--ss-violet-400);
-  --ss-domain-personnel-bg: rgba(139, 92, 246, 0.14);
-  --ss-domain-pedagogie: var(--ss-orange-400);
-  --ss-domain-pedagogie-bg: rgba(251, 146, 60, 0.14);
-  --ss-domain-finance: var(--ss-emerald-400);
-  --ss-domain-finance-bg: rgba(16, 185, 129, 0.14);
-  --ss-domain-comptabilite: var(--ss-cyan-400);
-  --ss-domain-comptabilite-bg: rgba(34, 211, 238, 0.14);
-  --ss-domain-communication: var(--ss-pink-400);
-  --ss-domain-communication-bg: rgba(244, 114, 182, 0.14);
+  --ss-domain-ecole: #60a5fa;
+  --ss-domain-ecole-2: #22d3ee;
+  --ss-domain-ecole-bg: rgba(37, 99, 235, 0.16);
+  --ss-domain-parent: #a5b4fc;
+  --ss-domain-parent-2: #a78bfa;
+  --ss-domain-parent-bg: rgba(79, 70, 229, 0.18);
+  --ss-domain-pedagogie: #a78bfa;
+  --ss-domain-pedagogie-2: #60a5fa;
+  --ss-domain-pedagogie-bg: rgba(124, 58, 237, 0.18);
+  --ss-domain-securite: #fb923c;
+  --ss-domain-securite-2: #94a3b8;
+  --ss-domain-securite-bg: rgba(234, 88, 12, 0.16);
+  --ss-domain-finance: #fbbf24;
+  --ss-domain-finance-2: #fcd34d;
+  --ss-domain-finance-bg: rgba(217, 119, 6, 0.18);
+  --ss-domain-comptabilite: #7ca7d9;
+  --ss-domain-comptabilite-2: #94a3b8;
+  --ss-domain-comptabilite-bg: rgba(58, 110, 165, 0.22);
+  --ss-domain-personnel: #d79bc9;
+  --ss-domain-personnel-2: #e2637b;
+  --ss-domain-personnel-bg: rgba(142, 69, 133, 0.24);
+  --ss-domain-stock: #5eead4;
+  --ss-domain-stock-2: #60a5fa;
+  --ss-domain-stock-bg: rgba(15, 118, 110, 0.24);
+  --ss-domain-documents: #45a3b3;
+  --ss-domain-documents-2: #94a3b8;
+  --ss-domain-documents-bg: rgba(13, 92, 107, 0.3);
+  --ss-domain-communication: #38bdf8;
+  --ss-domain-communication-2: #a78bfa;
+  --ss-domain-communication-bg: rgba(14, 165, 233, 0.16);
+  --ss-domain-administration: #8fabf0;
+  --ss-domain-administration-2: #94a3b8;
+  --ss-domain-administration-bg: rgba(30, 58, 138, 0.3);
+  --ss-domain-jaspe: #6ea8ff;
+  --ss-domain-jaspe-2: #a78bfa;
+  --ss-domain-jaspe-bg: rgba(47, 107, 255, 0.18);
   --ss-domain-rapports: var(--ss-blue-400);
   --ss-domain-rapports-bg: rgba(59, 130, 246, 0.14);
-  --ss-domain-securite: var(--ss-coral-400);
-  --ss-domain-securite-bg: rgba(248, 113, 113, 0.14);
 }
