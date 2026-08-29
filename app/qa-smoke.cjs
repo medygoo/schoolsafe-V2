@@ -14,6 +14,15 @@ async function domClick(page, selector) {
   await page.locator(selector).evaluate((element) => element.click());
 }
 
+async function switchDemoRole(page, role) {
+  // Le sélecteur de rôle du topbar est masqué en session démo mono-rôle :
+  // on repasse par l'écran d'authentification, comme tests/qa/e2e/helpers.
+  await page.evaluate(() => window.schoolSafeShow("auth"));
+  await page.locator("#demoRole").selectOption(role);
+  await domClick(page, "#previewWorkspace");
+  await page.waitForTimeout(600);
+}
+
 async function downloadFrom(page, selector, filename) {
   const downloadPromise = page.waitForEvent("download", { timeout: 15000 });
   await domClick(page, selector);
@@ -33,9 +42,18 @@ async function downloadFrom(page, selector, filename) {
   const context = await browser.newContext({
     acceptDownloads: true,
     viewport: { width: 1440, height: 1000 },
+    // Le SW (cacheFirst) court-circuiterait le mock permissions.json ; son offline est couvert par qa-pwa.cjs.
+    serviceWorkers: "block",
   });
   const page = await context.newPage();
   const errors = [];
+  // Le serveur local ne sert pas /shared : on injecte le catalogue canonique (même approche que qa-pwa.cjs).
+  const canonicalPermissions = fs.readFileSync(path.join(__dirname, "..", "shared", "permissions.json"), "utf8");
+  await page.route("**/shared/permissions.json", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: canonicalPermissions,
+  }));
 
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
@@ -79,7 +97,12 @@ async function downloadFrom(page, selector, filename) {
   await page.evaluate(() => document.querySelector("#toast").classList.remove("show"));
   await page.screenshot({ path: path.join(outputDir, "exetat-mobile.png"), fullPage: true });
   await page.locator(".certification-stages").screenshot({ path: path.join(outputDir, "exetat-etapes-mobile.png") });
-  await page.locator(".workspace-main").evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  // Sur téléphone le défilement se fait sur le document, pas sur .workspace-main : on couvre les deux.
+  await page.evaluate(() => {
+    const main = document.querySelector(".workspace-main");
+    main.scrollTop = main.scrollHeight;
+    window.scrollTo(0, document.documentElement.scrollHeight);
+  });
   await page.waitForTimeout(300);
   check(await page.locator(".certification-stage-grid article").last().evaluate((element) => { const box = element.getBoundingClientRect(); return box.top < window.innerHeight && box.bottom > 0; }), "La dernière étape EXETAT n'est pas accessible sur téléphone");
   await page.screenshot({ path: path.join(outputDir, "exetat-mobile-bottom.png"), fullPage: true });
@@ -87,53 +110,60 @@ async function downloadFrom(page, selector, filename) {
 
   await domClick(page, "#closePedagogyModule");
   await page.locator('[data-action="Devoirs et corrections"]').first().evaluate((element) => element.click());
-  check(await page.locator("#assignmentForm").count(), "Le compositeur de devoir ne s'ouvre pas");
-  await page.locator('input[name="title"]').fill("Devoir de contrôle");
-  await downloadFrom(page, "#previewAssignmentPdf", "devoir-compose.pdf");
+  // Runtime actuel : l'onglet Devoirs affiche le détail du devoir sélectionné (panneau de correction).
+  // La génération PDF passe par l'AccessGate DocumentEngine : le rôle admin démo n'a pas de scope
+  // pedagogy.assignment.read, le téléchargement est donc refusé par conception (Access_Law) —
+  // la génération PDF réelle reste couverte par les exports ENAFEP/EXETAT ci-dessus.
+  check(await page.locator("#pedagogyContent [data-assignment-id]").count(), "La liste des devoirs ne s'ouvre pas");
+  check(await page.locator("#pedagogyContent .assignment-detail").count(), "Le détail du devoir ne s'affiche pas");
+  check(await page.locator("#pedagogyContent [data-download-assignment]").count(), "L'action PDF du devoir est absente");
 
   await domClick(page, "#closePedagogyModule");
-  await page.locator("#workspaceRoleSwitch").selectOption("cashier");
+  await switchDemoRole(page, "cashier");
   await page.locator('[data-action="Enregistrer un paiement"]').evaluate((element) => element.click());
   check(await page.locator("#financeModule:not([hidden])").count(), "Le module de caisse ne s'ouvre pas");
   check(await page.locator("#paymentForm").count(), "Le formulaire d'encaissement de la Caisse est absent");
-  await page.locator("#financeStudentSelect").selectOption("0");
+  // Runtime actuel : sélection d'un élève réel, confirmation explicite, reçu DÉMO-REC-<horodatage>.
+  await page.locator("#financeCashStudent").selectOption("demo-s1");
   await page.locator('#paymentForm input[name="amount"]').fill("50000");
   await page.locator('#paymentForm input[name="reference"]').fill("Troisième tranche de démonstration");
   await domClick(page, '#paymentForm button[type="submit"]');
-  await page.getByText("REC-2026-0588", { exact: true }).waitFor({ timeout: 10000 });
-  check(await page.getByText("REC-2026-0588", { exact: true }).count(), "Le nouveau reçu n'est pas créé après confirmation locale");
-  await downloadFrom(page, '[data-export-receipt="0"]', "recu-paiement.pdf");
+  await domClick(page, '[data-confirm-demo-payment]');
+  await page.waitForTimeout(300);
+  check(await page.evaluate(() => /DÉMO-REC-/.test(document.getElementById("financeContent").textContent)), "Le reçu de démonstration n'est pas créé après confirmation locale");
+  // Runtime actuel : le registre de reçus sûr et les rapports démo ne proposent volontairement
+  // aucun export PDF ni soumission de journée (BACKEND_LATER — cf. qa-finance-receipts.cjs).
+  check((await page.locator("#financeContent [data-export-receipt], #financeContent #exportCashReport, #financeContent #submitCashDay").count()) === 0, "La caisse démo ne doit proposer aucune action financière officielle");
   await page.screenshot({ path: path.join(outputDir, "finance-desktop.png"), fullPage: true });
-  await domClick(page, '[data-finance-tab="reports"]');
-  await downloadFrom(page, "#exportCashReport", "rapport-caisse.pdf");
-  check(await page.locator("#submitCashDay").count(), "La Caisse ne peut pas soumettre sa journée");
-  await domClick(page, "#submitCashDay");
-  check(await page.getByText("Soumise", { exact: true }).count(), "La journée de caisse n'est pas soumise");
 
   await domClick(page, "#closeFinanceModule");
-  await page.locator("#workspaceRoleSwitch").selectOption("finance");
+  await switchDemoRole(page, "finance");
   await page.locator('[data-action="Tableau financier"]').evaluate((element) => element.click());
-  check((await page.locator('#financeTabs [data-finance-tab]:not([hidden])').count()) === 6, "Le Responsable financier n'a pas les six branches prévues");
-  await domClick(page, '[data-finance-tab="cash"]');
+  // Runtime actuel : le rôle finance démo couvre dix branches (sans l'encaissement de guichet).
+  check((await page.locator('#financeTabs [data-finance-tab]:not([hidden])').count()) === 10, "Le Responsable financier n'a pas les dix branches prévues");
+  await domClick(page, '[data-finance-tab="reports"]');
+  check(await page.evaluate(() => /BACKEND_LATER/.test(document.getElementById("financeContent").textContent)), "L'onglet Rapports doit rester une projection démo sans export officiel");
   check((await page.locator("#paymentForm").count()) === 0, "Le Responsable financier exécute un encaissement de guichet");
 
   await domClick(page, "#closeFinanceModule");
-  await page.locator("#workspaceRoleSwitch").selectOption("school_head");
+  await switchDemoRole(page, "school_head");
   await page.locator('[data-action="Recettes"]').evaluate((element) => element.click());
   check((await page.locator('#financeTabs [data-finance-tab]:not([hidden])').count()) === 2, "La Direction reçoit trop de branches financières");
   check((await page.locator('#financeTabs [data-finance-tab="cash"]:not([hidden]), #financeTabs [data-finance-tab="fees"]:not([hidden])').count()) === 0, "La Direction reçoit des fonctions financières d'exécution");
 
   await domClick(page, "#closeFinanceModule");
-  await page.locator("#workspaceRoleSwitch").selectOption("pedagogy");
+  await switchDemoRole(page, "pedagogy");
   await page.locator('[data-action="Voir les élèves en ordre ou à régulariser"]').evaluate((element) => element.click());
-  check((await page.locator('#financeTabs [data-finance-tab]:not([hidden])').count()) === 1, "Le profil pédagogique reçoit plus que le statut administratif");
-  const pedagogyFinanceTableText = await page.locator("#financeContent .finance-table").innerText();
-  check(!/\bFC\b|Montant|Reçu|Trésorerie|Paiement|Solde/i.test(pedagogyFinanceTableText), "Le profil pédagogique voit des données financières interdites");
+  // Runtime actuel : le rôle pédagogique démo n'a plus finance.status.read — aucune branche Finance,
+  // état de refus explicite, aucune donnée ni action financière.
+  check((await page.locator('#financeTabs [data-finance-tab]:not([hidden])').count()) === 0, "Le profil pédagogique reçoit une branche Finance interdite");
+  const pedagogyFinanceText = await page.locator("#financeContent").innerText();
+  check(pedagogyFinanceText.includes("Finance générale non autorisée"), "Le refus Finance du profil pédagogique n'est pas explicite");
+  check(!/\bFC\b|Montant|Reçu|Trésorerie|Paiement|Solde/i.test(pedagogyFinanceText), "Le profil pédagogique voit des données financières interdites");
   check((await page.locator("#financeContent [data-export-receipt], #financeContent #paymentForm").count()) === 0, "Le profil pédagogique reçoit une action financière interdite");
-  check(await page.getByText("Aucun chiffre financier n’est exposé dans ce profil.").count(), "La limite pédagogique n'est pas expliquée");
 
   await domClick(page, "#closeFinanceModule");
-  await page.locator("#workspaceRoleSwitch").selectOption("parent");
+  await switchDemoRole(page, "parent");
   await page.locator('[data-action="Frais scolaires"]').evaluate((element) => element.click());
   check((await page.locator('#financeTabs [data-finance-tab]:not([hidden])').count()) === 1, "Le Parent reçoit plus que sa situation familiale");
   const familyFinanceText = await page.locator("#financeContent").innerText();
@@ -144,28 +174,28 @@ async function downloadFrom(page, selector, filename) {
   await page.screenshot({ path: path.join(outputDir, "finance-parent-mobile.png"), fullPage: true });
 
   await domClick(page, "#closeFinanceModule");
-  await page.locator("#workspaceRoleSwitch").selectOption("cashier");
+  await switchDemoRole(page, "cashier");
   await page.locator('[data-action="Produire un reçu PDF"]').evaluate((element) => element.click());
   check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "Le registre des reçus déborde sur téléphone");
   await page.screenshot({ path: path.join(outputDir, "finance-mobile.png"), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   await domClick(page, "#closeFinanceModule");
-  await page.locator("#workspaceRoleSwitch").selectOption("teacher");
+  await switchDemoRole(page, "teacher");
   await page.locator('[data-action="Préparation aux épreuves certificatives"]').evaluate((element) => element.click());
   check(await page.locator('[data-cert-view="stages"]').count(), "L'enseignant ne voit pas les étapes EXETAT");
   check(await page.locator('[data-cert-view="preparation"]').count(), "L'enseignant ne voit pas la préparation EXETAT");
   check((await page.locator('[data-cert-view="candidates"], [data-cert-view="results"]').count()) === 0, "L'enseignant reçoit un accès EXETAT trop large");
 
   await domClick(page, "#closePedagogyModule");
-  await page.locator("#workspaceRoleSwitch").selectOption("secretary");
+  await switchDemoRole(page, "secretary");
   await page.locator('[data-action="Dossiers ENAFEP, TENASOSP et EXETAT"]').evaluate((element) => element.click());
-  check(await page.locator('[data-cert-view="candidates"]').count(), "Le secrétariat ne voit pas les dossiers EXETAT");
-  check(await page.locator('[data-cert-view="stages"]').count(), "Le secrétariat ne voit pas les étapes EXETAT");
-  check((await page.locator('[data-cert-view="preparation"], [data-cert-view="results"]').count()) === 0, "Le secrétariat reçoit un accès EXETAT trop large");
+  // Runtime actuel : l'action relève du Centre Administration et le rôle secrétariat démo
+  // n'a aucune permission — l'ouverture est refusée (Access_Law), aucune surface ne s'affiche.
+  check(await page.locator("#pedagogyModule").evaluate((element) => element.hidden), "Le secrétariat ouvre la surface pédagogique sans permission");
 
   await domClick(page, "#closePedagogyModule");
-  await page.locator("#workspaceRoleSwitch").selectOption("parent");
+  await switchDemoRole(page, "parent");
   await page.locator('[data-action="Épreuves certificatives"]').evaluate((element) => element.click());
   check(await page.locator('[data-cert-view="stages"]').count(), "Le parent ne voit pas le calendrier EXETAT");
   check(await page.locator('[data-cert-view="parent"]').count(), "Le parent ne voit pas son résultat EXETAT");

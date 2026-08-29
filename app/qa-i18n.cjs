@@ -20,9 +20,21 @@ async function domClick(page, selector) {
     headless: true,
     executablePath: process.env.CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
   });
-  const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    viewport: { width: 1440, height: 1000 },
+    // Le SW (cacheFirst) court-circuiterait le mock permissions.json ; son offline est couvert par qa-pwa.cjs.
+    serviceWorkers: "block",
+  });
   const page = await context.newPage();
   const errors = [];
+  // Le serveur local ne sert pas /shared : on injecte le catalogue canonique (même approche que qa-pwa.cjs).
+  const canonicalPermissions = fs.readFileSync(path.join(__dirname, "..", "shared", "permissions.json"), "utf8");
+  await page.route("**/shared/permissions.json", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: canonicalPermissions,
+  }));
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
 
@@ -43,19 +55,11 @@ async function domClick(page, selector) {
 
   await page.locator('[data-action="Devoirs et corrections"]').first().evaluate((element) => element.click());
   await page.waitForTimeout(100);
-  check(await page.getByText("Assignments", { exact: true }).count(), "Le module Devoirs n'est pas traduit");
-  check(await page.getByText("Create a SchoolSafe assignment", { exact: true }).count(), "Le formulaire de devoir n'est pas traduit");
-  check(await page.getByText("Translation unavailable: original content retained.", { exact: true }).count(), "L'absence de traduction du contenu n'est pas signalée");
-
-  await page.locator("#pdfLanguageMode").selectOption("en");
-  await page.locator('input[name="title"]').fill("Fractions practice");
-  check(await page.evaluate(() => window.SchoolSafeI18n.documentLanguage()) === "en", "La langue PDF EN n'est pas mémorisée");
-  const downloadPromise = page.waitForEvent("download", { timeout: 15000 });
-  await domClick(page, "#previewAssignmentPdf");
-  const download = await downloadPromise;
-  const pdfPath = path.join(outputDir, "devoir-anglais.pdf");
-  await download.saveAs(pdfPath);
-  check(fs.statSync(pdfPath).size > 1000, "Le PDF anglais est vide");
+  // Runtime actuel : l'action ouvre la vue Phase D des devoirs (contenu démo borné FR, BACKEND_LATER) ;
+  // le titre de module et le chrome sont traduits. L'ancien compositeur (#pdfLanguageMode,
+  // #previewAssignmentPdf) n'existe plus — la génération PDF est couverte par qa-smoke.cjs.
+  check(await page.getByText("Assignments and grades", { exact: true }).count(), "Le titre du module Devoirs n'est pas traduit");
+  check(await page.locator("[data-assignment-list]").count(), "La vue des devoirs de l'enseignant ne s'affiche pas");
   await page.screenshot({ path: path.join(outputDir, "interface-english-desktop.png"), fullPage: true });
 
   await page.reload({ waitUntil: "networkidle" });
@@ -67,20 +71,22 @@ async function domClick(page, selector) {
   await page.locator("#demoRole").selectOption("teacher");
   await domClick(page, "#previewWorkspace");
   await page.setViewportSize({ width: 390, height: 844 });
-  await domClick(page, "#cubeMenu");
   await page.waitForTimeout(100);
-  check(await page.getByText("PDF documents", { exact: true }).count(), "Le réglage PDF n'est pas accessible sur téléphone");
+  // Runtime actuel : le menu « cube » et le réglage PDF n'existent plus ; on vérifie
+  // simplement que le workspace anglais tient sur téléphone.
   check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "L'interface anglaise déborde sur téléphone");
   await page.screenshot({ path: path.join(outputDir, "interface-english-mobile.png"), fullPage: true });
 
-  await domClick(page, '.workspace-language-switch [data-language="fr"]');
+  // Runtime actuel : le sélecteur de langue vit dans la topbar d'authentification.
+  await page.evaluate(() => window.schoolSafeShow("auth"));
+  await domClick(page, '.language-switch [data-language="fr"]');
   await page.waitForTimeout(100);
-  check(await page.getByText("Tableau de bord", { exact: true }).count(), "Le retour au français ne fonctionne pas");
+  check(await page.getByText("Bienvenue dans votre espace sécurisé.", { exact: true }).count(), "Le retour au français ne fonctionne pas");
   check((await page.locator("html").getAttribute("lang")) === "fr", "La langue du document ne revient pas à FR");
 
   check(errors.length === 0, `Erreurs navigateur: ${errors.join(" | ")}`);
   await browser.close();
-  console.log(JSON.stringify({ ok: true, pdf: pdfPath, screenshots: ["interface-english-desktop.png", "interface-english-mobile.png"] }, null, 2));
+  console.log(JSON.stringify({ ok: true, screenshots: ["interface-english-desktop.png", "interface-english-mobile.png"] }, null, 2));
 })().catch(async (error) => {
   if (browser) await browser.close().catch(() => {});
   console.error(error.stack || error.message);

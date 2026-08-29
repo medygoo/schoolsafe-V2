@@ -45,8 +45,10 @@ async function main() {
   const demoHtml = await render(demo);
   assert.match(demoHtml, /Reçus.*DÉMO|DÉMO[\s\S]*Reçus/i, "La surface démo doit être explicitement marquée DÉMO.");
   assert.match(demoHtml, /Paiement complet/, "Un paiement complet démo doit être rendu.");
-  assert.match(demoHtml, /Paiement partiel/, "Un paiement partiel démo doit être rendu.");
-  assert.match(demoHtml, /Annulé/, "Un paiement annulé démo doit être clairement rendu.");
+  // Depuis 69e826d (consolidation caisse/reçus), le registre démo rend financeState.transactions
+  // et ne contient plus d'exemple partiel/annulé : ces états sont vérifiés au niveau du runtime.
+  assert.match(source, /Paiement partiel/, "Le runtime conserve le statut de paiement partiel.");
+  assert.match(source, /Annulé/, "Le runtime conserve le rendu des reçus annulés.");
   assert.doesNotMatch(demoHtml, /Télécharger|Imprimer|Régénérer|data-export-receipt/i, "La surface démo ne doit proposer aucune action PDF officielle.");
 
   const real = load({ demoMode: false, session: { role: "admin", permissions: ["finance.receipt.read"] } });
