@@ -396,6 +396,13 @@
     };
   }
 
+  function canManageRoles(user) {
+    var access = window.SchoolSafeAccess;
+    if (!access || typeof access.canAccess !== "function" || typeof access.allowsScope !== "function") return false;
+    if (typeof access.explicitDeny === "function" && access.explicitDeny(user || {}, "roles.manage")) return false;
+    return access.canAccess(user || {}, "roles.manage") && access.allowsScope(user || {}, "roles.manage", "school");
+  }
+
   function bindDocumentRuntimeContext(selectedContext) {
     if (!window.SchoolSafeDocumentRuntime || typeof window.SchoolSafeDocumentRuntime.bindContext !== "function") {
       return Promise.reject(new Error("Contexte documentaire indisponible"));
@@ -2191,7 +2198,7 @@
         '<div class="nav-section"><span>Système</span></div>' +
         '<button type="button" id="documentsNav"><i data-lucide="files"></i><span>Centre de documents</span></button>' +
         '<button type="button" data-action="Paramètres"><i data-lucide="settings"></i><span>Paramètres</span></button>' +
-        '<button type="button" id="permissionsNav"' + (currentDemoRole !== "admin" ? " hidden" : "") + '><i data-lucide="shield-ellipsis"></i><span>Rôles et accès</span></button>' +
+        '<button type="button" id="permissionsNav"' + (!canManageRoles(accessUser) ? " hidden" : "") + '><i data-lucide="shield-ellipsis"></i><span>Rôles et accès</span></button>' +
         '<button type="button" data-action="Audit et journaux"><i data-lucide="scroll-text"></i><span>Audit et journaux</span></button>' +
         '<button type="button" data-action="Intégrations"><i data-lucide="plug"></i><span>Intégrations</span></button>';
     }
@@ -2839,8 +2846,8 @@
   }
 
   function openAccessConsole() {
-    if (currentDemoRole !== "admin") {
-      notify("Seul l’Administrateur principal peut attribuer les rôles et les accès.");
+    if (!canManageRoles(getCurrentUser())) {
+      notify("Console Rôles et accès non autorisée pour cette session.");
       return;
     }
     document.getElementById("pedagogyModule").hidden = true;
