@@ -32,7 +32,7 @@ function primitives(tag) {
     if (tag === "badge" || tag === "icon") return "<span>" + (props.label || "") + "</span>";
     if (tag === "input") return '<input id="' + (props.id || "") + '" name="' + (props.name || "") + '" type="' + (props.type || "text") + '" min="' + (props.min == null ? "" : props.min) + '" max="' + (props.max == null ? "" : props.max) + '" step="' + (props.step == null ? "" : props.step) + '" value="' + (props.value || "") + '">';
     if (tag === "select") return '<select id="' + (props.id || "") + '" name="' + (props.name || "") + '" data-value="' + (props.value || "") + '">' + (props.options || []).map(function (option) { return '<option value="' + option.value + '">' + option.label + "</option>"; }).join("") + "</select>";
-    if (tag === "button") return '<button type="' + (props.type || "button") + '">' + (props.label || "") + "</button>";
+    if (tag === "button") { const attrs = Object.keys(props.attrs || {}).map(function (key) { return " " + key + '="' + props.attrs[key] + '"'; }).join(""); return '<button type="' + (props.type || "button") + '"' + attrs + ">" + (props.label || "") + "</button>"; }
     return "";
   };
 }
@@ -72,7 +72,17 @@ function loadModule(options) {
   };
   const document = {
     getElementById: function (id) { return elements[id] || null; },
-    querySelector: function (selector) { if (selector === ".workspace-grid") return makeElement(); if (selector === ".workspace-content") return { scrollTo: function () {} }; return null; },
+    querySelector: function (selector) {
+      if (selector === ".workspace-grid") return makeElement();
+      if (selector === ".workspace-content") return { scrollTo: function () {} };
+      // Bouton de confirmation démo : capturé uniquement si le rendu courant l'affiche.
+      if (selector === "[data-confirm-demo-payment]") {
+        if (html.indexOf("data-confirm-demo-payment") === -1) return null;
+        if (!elements.confirmDemoPayment) elements.confirmDemoPayment = makeElement();
+        return elements.confirmDemoPayment;
+      }
+      return null;
+    },
     querySelectorAll: function () { return []; }
   };
   function FormData(form) { this.get = function (name) { return form.fields[name] == null ? "" : form.fields[name]; }; }
@@ -114,18 +124,24 @@ async function submit(subject, fields) {
 }
 
 async function main() {
+  // Contrat actuel (Phase F) : la soumission prépare un paymentDraft local vérifié ;
+  // aucune écriture serveur (createPayment) n'est déclenchée et la confirmation
+  // officielle reste explicitement BACKEND_LATER. Seule la démo confirme, en fictif.
   const transportCalls = [];
   const transport = realPaymentSubject(transportCalls);
   transport.module._state.selectedCashStudentId = "demo-s1";
   transport.module._state.selectedCashStudentFeeId = "demo-sf-lucas-transport";
   await render(transport);
   await submit(transport, { amount: "40.50", mode: "mobile_money", reference: "Transport août" });
-  assert.equal(transportCalls.length, 1, "Transport doit produire un unique appel API.");
-  assert.equal(transportCalls[0].student_fee_id, "demo-sf-lucas-transport", "Transport affiché doit envoyer exactement son student_fee_id.");
-  assert.equal(transportCalls[0].currency, "USD", "Transport doit conserver USD.");
-  assert.equal(transportCalls[0].amount, 40.5, "Le montant USD doit conserver ses décimales.");
-  assert.equal(transportCalls[0].mode, "mobile_money", "Le mode sélectionné doit être conservé.");
-  assert.equal(transportCalls[0].reference, "Transport août", "La référence doit être conservée.");
+  assert.equal(transportCalls.length, 0, "La préparation ne doit produire aucun appel API.");
+  const transportDraft = transport.module._state.paymentDraft;
+  assert.ok(transportDraft, "Une soumission valide doit préparer un brouillon de paiement local.");
+  assert.equal(transportDraft.studentFeeId, "demo-sf-lucas-transport", "Transport affiché doit préparer exactement son student_fee_id.");
+  assert.equal(transportDraft.currency, "USD", "Transport doit conserver USD.");
+  assert.equal(transportDraft.amount, 40.5, "Le montant USD doit conserver ses décimales.");
+  assert.equal(transportDraft.mode, "mobile_money", "Le mode sélectionné doit être conservé.");
+  assert.equal(transportDraft.reference, "Transport août", "La référence doit être conservée.");
+  assert.match(transport.elements.financeContent.innerHTML, /Confirmation officielle — BACKEND_LATER/, "La confirmation officielle doit rester explicitement non connectée.");
 
   const schoolCalls = [];
   const school = realPaymentSubject(schoolCalls);
@@ -133,8 +149,9 @@ async function main() {
   school.module._state.selectedCashStudentFeeId = "demo-sf-lucas-school";
   await render(school);
   await submit(school, { amount: "1000", mode: "cash", reference: "Scolarité" });
-  assert.equal(schoolCalls[0].student_fee_id, "demo-sf-lucas-school", "Scolarité affichée doit envoyer son student_fee_id.");
-  assert.equal(schoolCalls[0].currency, "CDF", "CDF doit être conservé sans conversion.");
+  assert.equal(schoolCalls.length, 0, "La préparation CDF ne doit produire aucun appel API.");
+  assert.equal(school.module._state.paymentDraft.studentFeeId, "demo-sf-lucas-school", "Scolarité affichée doit préparer son student_fee_id.");
+  assert.equal(school.module._state.paymentDraft.currency, "CDF", "CDF doit être conservé sans conversion.");
 
   const mismatchCalls = [];
   const mismatch = realPaymentSubject(mismatchCalls);
@@ -144,6 +161,7 @@ async function main() {
   mismatch.elements.paymentForm.attributes["data-student-fee-id"] = "demo-sf-lucas-school";
   await submit(mismatch, { amount: "10", mode: "cash", reference: "Ne doit pas passer" });
   assert.equal(mismatchCalls.length, 0, "Un formulaire dont le student_fee affiché diffère de la sélection active doit être bloqué.");
+  assert.equal(mismatch.module._state.paymentDraft, null, "Une sélection modifiée ne doit produire aucun brouillon.");
 
   const tooHighCalls = [];
   const tooHigh = realPaymentSubject(tooHighCalls);
@@ -152,6 +170,7 @@ async function main() {
   await render(tooHigh);
   await submit(tooHigh, { amount: "100001", mode: "cash", reference: "Trop élevé" });
   assert.equal(tooHighCalls.length, 0, "Un montant supérieur au restant doit être refusé.");
+  assert.equal(tooHigh.module._state.paymentDraft, null, "Un montant supérieur au restant ne doit produire aucun brouillon.");
 
   const fractionalCdfCalls = [];
   const fractionalCdf = realPaymentSubject(fractionalCdfCalls);
@@ -160,6 +179,7 @@ async function main() {
   await render(fractionalCdf);
   await submit(fractionalCdf, { amount: "0.5", mode: "cash", reference: "Décimale CDF" });
   assert.equal(fractionalCdfCalls.length, 0, "CDF doit refuser les décimales côté JavaScript.");
+  assert.equal(fractionalCdf.module._state.paymentDraft, null, "Une décimale CDF ne doit produire aucun brouillon.");
 
   const overPreciseUsdCalls = [];
   const overPreciseUsd = realPaymentSubject(overPreciseUsdCalls);
@@ -168,6 +188,7 @@ async function main() {
   await render(overPreciseUsd);
   await submit(overPreciseUsd, { amount: "40.501", mode: "cash", reference: "Trop de décimales" });
   assert.equal(overPreciseUsdCalls.length, 0, "USD doit refuser plus de deux décimales côté JavaScript.");
+  assert.equal(overPreciseUsd.module._state.paymentDraft, null, "Un montant USD trop précis ne doit produire aucun brouillon.");
 
   const demo = loadModule();
   demo.module._state.selectedCashStudentId = "demo-s1";
@@ -175,6 +196,11 @@ async function main() {
   await render(demo);
   await submit(demo, { amount: "40.5", mode: "cash", reference: "Démo transport" });
   assert.equal(demo.calls.length, 0, "Le mode démo ne doit jamais appeler l’API de paiement.");
+  assert.ok(demo.module._state.paymentDraft, "La démo prépare d’abord un brouillon local.");
+  assert.ok(demo.elements.confirmDemoPayment, "La démo doit proposer une confirmation explicitement fictive.");
+  demo.elements.confirmDemoPayment.trigger("click");
+  await Promise.resolve();
+  assert.equal(demo.calls.length, 0, "La confirmation démo ne doit jamais appeler l’API de paiement.");
   assert.equal(demo.module._state.transactions[0].status, "Démonstration", "Le paiement démo doit rester explicitement non officiel.");
   assert.equal(demo.module._state.transactions[0].currency, "USD", "Le journal démo doit conserver la devise du student_fee.");
   assert.match(demo.elements.financeContent.innerHTML, /Montants mixtes non cumulés/, "Le journal de caisse ne doit jamais cumuler silencieusement CDF et USD.");

@@ -101,10 +101,12 @@ async function main() {
   const selectedOptions = html.match(/<select id="financeFinancialStudent">([\s\S]*?)<\/select>/)[1].match(/<option /g) || [];
   assert.equal(selectedOptions.length, state.studentFinancialProfiles.length, "Chaque élève doit apparaître une seule fois dans la sélection.");
 
+  // Le runtime distingue désormais cinq statuts, dont "anomaly" (structure de frais
+  // manquante ou statut inconnu) : la projection doit tous les conserver.
   assert.deepEqual(
     Array.from(new Set(state.studentFinancialProfiles.flatMap(function (profile) { return profile.fees.map(function (fee) { return fee.status; }); }))).sort(),
-    ["exempted", "paid", "partial", "pending"],
-    "Les quatre statuts financiers doivent être conservés dans la projection."
+    ["anomaly", "exempted", "paid", "partial", "pending"],
+    "Les cinq statuts financiers doivent être conservés dans la projection."
   );
 
   state.selectedFinancialStudentId = "demo-s2";
@@ -115,7 +117,18 @@ async function main() {
   html = await renderSituation(subject);
   assert.match(html, /Exempté/, "exempted doit être affiché comme Exempté.");
 
+  // demo-student-no-fee porte désormais une obligation "anomaly" dont la structure de
+  // frais est manquante : le libellé ne doit pas être inventé ni les montants cumulés.
   state.selectedFinancialStudentId = "demo-student-no-fee";
+  html = await renderSituation(subject);
+  assert.match(html, /Anomalie à examiner/, "anomaly doit être affiché comme Anomalie à examiner.");
+  assert.match(html, /Type de frais indisponible/, "Une structure de frais manquante ne doit jamais être inventée.");
+  assert.match(html, /Montants cumulés indisponibles/, "Une devise inconnue ne doit jamais être cumulée.");
+
+  // La fixture démo n'a plus d'élève sans obligation : on en injecte un pour vérifier
+  // qu'un élève sans frais n'est pas présenté comme non en règle.
+  state.studentFinancialProfiles.push({ student: { id: "demo-student-sans-frais", name: "Témoin Sansfrais", initials: "TS", sex: "Fille", className: "3e A", guardian: "—", matricule: "", lifecycleStatus: "active" }, fees: [] });
+  state.selectedFinancialStudentId = "demo-student-sans-frais";
   html = await renderSituation(subject);
   assert.match(html, /Aucune obligation financière affectée/, "Un élève sans frais ne doit pas être présenté comme non en règle.");
 

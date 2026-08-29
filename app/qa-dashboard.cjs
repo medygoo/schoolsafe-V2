@@ -10,6 +10,17 @@ function check(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+// Le serveur local ne sert pas /shared : on injecte le catalogue canonique (même approche que qa-pwa.cjs).
+// Le SW (cacheFirst) court-circuiterait le mock : il est bloqué ici, son offline est couvert par qa-pwa.cjs.
+const canonicalPermissions = fs.readFileSync(path.join(__dirname, "..", "shared", "permissions.json"), "utf8");
+async function mockCanonicalPermissions(page) {
+  await page.route("**/shared/permissions.json", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: canonicalPermissions,
+  }));
+}
+
 async function domClick(page, selector) {
   await page.locator(selector).evaluate((element) => element.click());
 }
@@ -40,8 +51,10 @@ async function captureDashboard(page, name) {
     const context = await browser.newContext({
       acceptDownloads: true,
       viewport: { width: 1440, height: 1000 },
+      serviceWorkers: "block",
     });
     const page = await context.newPage();
+    await mockCanonicalPermissions(page);
     page.on("pageerror", (error) => errors.push(`${role}-desktop: ${error.message}`));
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(`${role}-desktop: ${message.text()}`);
@@ -60,9 +73,10 @@ async function captureDashboard(page, name) {
     check(found.length === 0, `Données codées en dur détectées pour ${role}: ${found.join(", ")}`);
 
     // Les indicateurs doivent afficher un état propre (pas de chiffre de démo)
-    const overviewText = await page.locator("#profileOverview").innerText();
+    // Runtime actuel : les KPI vivent dans #dashboardKpi (#profileOverview n'existe plus).
+    const overviewText = await page.locator("#dashboardKpi").innerText();
     check(
-      /Données indisponibles|Chargement|Indicateurs non accessibles|Aucun indicateur/i.test(overviewText),
+      /Non disponible|Non accessible|Source non connectée|Aucun indicateur|Chargement|Données indisponibles|Indicateurs non accessibles/i.test(overviewText),
       `L'état des indicateurs n'est pas explicite pour ${role}`
     );
 
@@ -74,8 +88,10 @@ async function captureDashboard(page, name) {
     const mobileContext = await browser.newContext({
       acceptDownloads: true,
       viewport: { width: 390, height: 844 },
+      serviceWorkers: "block",
     });
     const mobilePage = await mobileContext.newPage();
+    await mockCanonicalPermissions(mobilePage);
     mobilePage.on("pageerror", (error) => errors.push(`${role}-mobile: ${error.message}`));
     mobilePage.on("console", (message) => {
       if (message.type() === "error") errors.push(`${role}-mobile: ${message.text()}`);

@@ -60,7 +60,9 @@ async function main() {
 
   const demoOverview = load({ demoMode: true, session: { role: "admin", permissions: [] } });
   const demoOverviewHtml = await render(demoOverview, "finance");
-  assert.match(demoOverviewHtml, /DÉMO[\s\S]*Non officiel|Non officiel[\s\S]*DÉMO/i, "La vue d’ensemble de démonstration doit être explicitement non officielle.");
+  // Aligné sur le runtime actuel : la vue d'ensemble démo porte le badge DÉMONSTRATION
+  // et déclare explicitement « aucune donnée officielle » (marquage non officiel requis).
+  assert.match(demoOverviewHtml, /DÉMONSTRATION[\s\S]*aucune donnée officielle|aucune donnée officielle[\s\S]*DÉMONSTRATION/i, "La vue d’ensemble de démonstration doit être explicitement non officielle.");
   assert.match(demoOverviewHtml, /CDF[\s\S]*USD|USD[\s\S]*CDF/, "Les devises de démonstration doivent rester séparées.");
   assert.match(demoOverviewHtml, /Aucun total CDF \+ USD/i, "La démonstration ne doit jamais additionner CDF et USD.");
 

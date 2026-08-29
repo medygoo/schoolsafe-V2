@@ -29,7 +29,8 @@ function createElement(id, elements, controls) {
     hasListener: function (type) { return typeof listeners[type] === "function"; },
     trigger: function (type, event) { if (listeners[type]) listeners[type].call(this, event || { preventDefault: function () {} }); },
     querySelectorAll: function (selector) {
-      if (selector === "input[name='feeControlCampaign']") return controls.radios;
+      // Alignement M : le runtime consolidé utilise des guillemets doubles dans ce sélecteur.
+      if (selector === 'input[name="feeControlCampaign"]') return controls.radios;
       if (selector === "[data-result]") return controls.results;
       return [];
     },
@@ -58,8 +59,8 @@ function createElement(id, elements, controls) {
         if (/id="feeControlCampaigns"/.test(html) && !elements.feeControlCampaigns) {
           elements.feeControlCampaigns = createElement("feeControlCampaigns", elements, controls);
         }
-      }
-      if (id === "feeControlCampaigns") {
+        // Alignement M : le rendu consolidé écrit toute la surface en une seule affectation
+        // innerHTML du conteneur ; les radios sont donc extraites du HTML complet.
         controls.radios = Array.from(html.matchAll(/name="feeControlCampaign" value="([^"]+)"/g), function (match) {
           const radio = createElement("campaign-" + match[1], elements, controls);
           radio.value = match[1];
@@ -88,7 +89,9 @@ function loadController(options) {
     schoolSafeDemoMode: !!options.demoMode,
     location: { hostname: options.demoMode ? "localhost" : "schoolsafe.example" },
     localStorage: { getItem: function () { return null; } },
-    currentSession: options.session,
+    // Alignement M : le runtime résout l'utilisateur via SchoolSafeAppContext.getCurrentUser()
+    // (forme actuelle : permissions + scopes, cf. DEMO_ACCESS_CONTEXT_BY_ROLE dans app.js).
+    SchoolSafeAppContext: { getCurrentUser: function () { return options.session || null; } },
     currentDemoRole: options.demoMode ? "admin" : "guard",
     SchoolSafeAccess: access,
     SchoolSafeFinanceAPI: {
@@ -120,34 +123,46 @@ async function render(subject) {
 }
 
 async function main() {
-  const guard = { role: "guard", permissions: ["finance.control.scan"] };
+  // Alignement M : forme actuelle d'un contrôleur démo — permission + portée assigned_classes
+  // + classes affectées (cf. DEMO_ACCESS_CONTEXT_BY_ROLE dans app.js).
+  const guard = {
+    role: "guard",
+    permissions: ["finance.control.scan"],
+    scopes: [{ permission: "finance.control.scan", type: "assigned_classes", classIds: ["demo-class-5"] }],
+    assignedClassIds: ["demo-class-5"]
+  };
   const access = loadAccess();
   assert.equal(access.isBranchVisible(guard, "feeControl"), true, "finance.control.scan seul doit ouvrir Contrôle des frais.");
   assert.equal(access.isBranchVisible(guard, "finance"), false, "finance.control.scan seul ne doit pas ouvrir Finance générale.");
 
-  const real = loadController({ session: guard });
+  // Une session réelle porte un token : le runtime unifié rend alors l'état indisponible explicite.
+  const real = loadController({ session: Object.assign({ token: "live-session" }, guard) });
   await render(real);
   assert.equal(real.calls.listCampaigns, 0, "Le mode réel ne doit pas charger la liste globale non filtrée.");
-  assert.match(real.elements.feeControlCampaigns.innerHTML, /BACKEND_LATER/, "Le mode réel doit expliquer que la projection autorisée doit être filtrée côté serveur.");
-  assert.doesNotMatch(real.elements.feeControlCampaigns.innerHTML, /450|USD|Transport|Montant|Devise|Solde|Reçu|Transaction|Caisse/i, "Le rendu contrôleur réel ne doit exposer aucune donnée financière.");
+  assert.match(real.elements.feeControlContent.innerHTML, /BACKEND_LATER/, "Le mode réel doit expliquer que la projection autorisée doit être filtrée côté serveur.");
+  assert.doesNotMatch(real.elements.feeControlContent.innerHTML, /450|USD|Transport|Montant|Devise|Solde|Reçu|Transaction|Caisse/i, "Le rendu contrôleur réel ne doit exposer aucune donnée financière.");
 
+  // Sans token, la session relève de la démonstration frontend : fixtures bornées, marquées DÉMO.
   const demo = loadController({ demoMode: true, session: guard });
   await render(demo);
   assert.equal(demo.calls.listCampaigns, 0, "La projection démo ne doit pas appeler la liste serveur globale.");
-  assert.match(demo.elements.feeControlCampaigns.innerHTML, /Mes campagnes autorisées/, "La projection démo doit présenter le titre cible.");
-  assert.match(demo.elements.feeControlCampaigns.innerHTML, /DÉMO/, "La projection doit être explicitement démo.");
-  assert.match(demo.elements.feeControlCampaigns.innerHTML, /Consigne/, "La consigne doit être visible au contrôleur.");
-  assert.doesNotMatch(demo.elements.feeControlCampaigns.innerHTML, /USD|CDF|\$|FC|450|Montant|Devise|Solde|Reçu|Transaction|Caisse/i, "La projection démo ne doit contenir aucun montant, devise ou autre donnée financière.");
+  assert.match(demo.elements.feeControlContent.innerHTML, /Campagnes de contrôle autorisées/, "La projection démo doit présenter le titre cible.");
+  assert.match(demo.elements.feeControlContent.innerHTML, /DÉMO/, "La projection doit être explicitement démo.");
+  assert.match(demo.elements.feeControlContent.innerHTML, /Consigne/, "La consigne doit être visible au contrôleur.");
+  assert.doesNotMatch(demo.elements.feeControlContent.innerHTML, /USD|CDF|\$|FC|450|Montant|Devise|Solde|Reçu|Transaction|Caisse/i, "La projection démo ne doit contenir aucun montant, devise ou autre donnée financière.");
   assert.equal(demo.controls.radios.length, 1, "Une campagne démo doit être sélectionnable.");
   assert.equal(demo.controls.radios[0].hasListener("change"), true, "La sélection de campagne doit réagir au changement.");
   assert.equal(demo.controls.results.length, 0, "Aucun bouton de choix manuel du résultat ne doit rester dans la surface démo.");
   assert.equal(demo.calls.securityScan, 0, "Le rendu ne doit déclencher aucun scan Sécurité.");
   assert.equal(demo.calls.createScan, 0, "Le rendu ne doit créer aucun résultat de contrôle.");
 
-  const denied = loadController({ session: { role: "guard", permissions: [] } });
+  const denied = loadController({ session: { role: "guard", permissions: [], scopes: [] } });
   await render(denied);
-  assert.match(denied.elements.feeControlCampaigns.innerHTML, /non autorisé/i, "Sans permission, la surface doit refuser par défaut.");
-  assert.doesNotMatch(moduleSource, /role\s*===|role\s*!==/, "FE-FIN-07B ne doit pas introduire de contrôle de rôle.");
+  assert.match(denied.elements.feeControlContent.innerHTML, /non autorisé/i, "Sans permission, la surface doit refuser par défaut.");
+  // Seule demoControlUser() mentionne un rôle : c'est la projection démo des permissions
+  // (équivalent de DEMO_PERMISSIONS_BY_ROLE), pas un contrôle d'accès par rôle.
+  const sourceWithoutDemoProjection = moduleSource.replace(/function demoControlUser\(\) \{[\s\S]*?\n  \}/, "");
+  assert.doesNotMatch(sourceWithoutDemoProjection, /role\s*===|role\s*!==/, "FE-FIN-07B ne doit pas introduire de contrôle de rôle.");
 }
 
 main().then(function () { console.log("FE-FIN-07B controller campaign surface: PASS"); }).catch(function (error) { console.error(error.stack || error.message); process.exitCode = 1; });

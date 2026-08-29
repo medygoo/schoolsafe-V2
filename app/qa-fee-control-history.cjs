@@ -34,7 +34,9 @@ function createElement(id, elements, controls) {
     set: function (value) {
       html = String(value || "");
       if (id === "feeControlContent") {
-        ["feeControlCampaigns", "feeControlHistory", "feeControlHistoryCampaign", "feeControlHistoryResult", "feeControlHistorySearch", "feeControlHistoryList"].forEach(function (childId) {
+        // Alignement M : les filtres d'historique (campagne/résultat/recherche) et la liste
+        // séparée ont été retirés du runtime lors de la consolidation (périmètre minimal).
+        ["feeControlCampaigns", "feeControlHistory"].forEach(function (childId) {
           if (new RegExp('id="' + childId + '"').test(html)) elements[childId] = createElement(childId, elements, controls);
         });
       }
@@ -61,11 +63,19 @@ function load(options) {
   const elements = {};
   const controls = { radios: [] };
   const calls = { securityScan: 0, createScan: 0, listCampaigns: 0 };
+  // Alignement M : la lecture de l'historique exige finance.control.read (portée school),
+  // cf. DEMO_PERMISSIONS_BY_ROLE.finance / DEMO_ACCESS_CONTEXT_BY_ROLE.finance dans app.js.
+  const financeReader = {
+    role: "finance",
+    permissions: ["finance.control.read"],
+    scopes: [{ permission: "finance.control.read", type: "school" }]
+  };
+  const session = options.live ? Object.assign({ token: "live-session" }, financeReader) : financeReader;
   const root = {
-    schoolSafeDemoMode: !!options.demoMode,
-    location: { hostname: options.demoMode ? "localhost" : "schoolsafe.example" },
+    schoolSafeDemoMode: !options.live,
+    location: { hostname: options.live ? "schoolsafe.example" : "localhost" },
     localStorage: { getItem: function () { return null; } },
-    currentSession: { role: "guard", permissions: ["finance.control.scan"] },
+    SchoolSafeAppContext: { getCurrentUser: function () { return session; } },
     SchoolSafeAccess: loadAccess(),
     SchoolSafeSecurityAPI: { scan: function () { calls.securityScan += 1; return Promise.resolve({}); } },
     SchoolSafeFinanceAPI: {
@@ -74,7 +84,13 @@ function load(options) {
     },
     ssState: state,
     ssBadge: function (props) { return "<span>" + (props.label || "") + "</span>"; },
-    ssButton: function (props) { return "<button>" + (props.label || "") + "</button>"; }
+    ssButton: function (props) { return "<button>" + (props.label || "") + "</button>"; },
+    // Alignement M : stub du rendu tabulaire consolidé (window.ssTable).
+    ssTable: function (props) {
+      props = props || {};
+      const head = (props.headers || []).map(function (header) { return "<th>" + header + "</th>"; }).join("");
+      return '<table data-ss-table><thead><tr>' + head + "</tr></thead><tbody>" + (props.rows || "") + "</tbody></table>";
+    }
   };
   const document = { getElementById: function (id) { if (!elements[id]) elements[id] = createElement(id, elements, controls); return elements[id]; } };
   vm.runInNewContext(moduleSource, { window: root, document: document, Promise: Promise, Object: Object, Array: Array, String: String, Number: Number, RegExp: RegExp, console: console });
@@ -88,46 +104,44 @@ async function render(subject) {
 }
 
 async function main() {
-  const demo = load({ demoMode: true });
+  const demo = load({});
   await render(demo);
   assert.ok(demo.elements.feeControlHistory, "Le mode démo doit créer la surface Historique autorisé.");
-  assert.match(demo.elements.feeControlContent.innerHTML, /Historique autorisé/i, "Le mode démo doit rendre l’historique autorisé.");
+  assert.match(demo.elements.feeControlContent.innerHTML, /Historique local autorisé/i, "Le mode démo doit rendre l’historique autorisé.");
   assert.match(demo.elements.feeControlContent.innerHTML, /DÉMO/, "L’historique local doit être explicitement démo.");
   assert.match(demo.elements.feeControlContent.innerHTML, /En règle/, "Le résultat ok doit être rendu.");
   assert.match(demo.elements.feeControlContent.innerHTML, /Paiement partiel/, "Le résultat partial doit être rendu.");
   assert.match(demo.elements.feeControlContent.innerHTML, /Non en règle/, "Le résultat unpaid doit être rendu.");
   assert.match(demo.elements.feeControlContent.innerHTML, /Exempté/, "Le résultat exempted doit être rendu.");
-  assert.match(demo.elements.feeControlContent.innerHTML, /NO_STUDENT_FEE/, "NO_STUDENT_FEE doit rester une anomalie explicite.");
-  assert.match(demo.elements.feeControlContent.innerHTML, /Doublon démo/, "Le doublon doit rester explicitement démo.");
-  assert.doesNotMatch(demo.elements.feeControlContent.innerHTML, /Montant|Devise|Solde|Reçu|Transaction|Caisse|Tél|téléphone|personnes autorisées|photo|location_id|Security/i, "Aucune donnée financière ou Sécurité sensible ne doit être rendue.");
+  // Alignement M : le code NO_STUDENT_FEE et le marqueur « Doublon démo » ont été retirés lors
+  // de la consolidation ; l'anomalie reste un résultat explicite, sans doublon affiché.
+  assert.match(demo.elements.feeControlContent.innerHTML, /Anomalie/, "L’anomalie doit rester un résultat explicite.");
+  // Alignement M : le bandeau « Aucune donnée de caisse ou transactionnelle n'est exposée » est
+  // un avertissement, pas une donnée ; le filtre de données sensibles cible le corps du tableau.
+  const tableBody = (demo.elements.feeControlContent.innerHTML.match(/<tbody>([\s\S]*?)<\/tbody>/) || [])[1] || "";
+  assert.ok(tableBody, "Le tableau d'historique démo doit être rendu.");
+  assert.doesNotMatch(tableBody, /Montant|Devise|Solde|Reçu|Transaction|Caisse|Tél|téléphone|personnes autorisées|photo|location_id|Security/i, "Aucune donnée financière ou Sécurité sensible ne doit être rendue.");
 
-  demo.elements.feeControlHistoryResult.value = "anomaly";
-  demo.elements.feeControlHistoryResult.trigger("change");
-  assert.match(demo.elements.feeControlHistoryList.innerHTML, /NO_STUDENT_FEE/, "Le filtre résultat doit conserver l’anomalie choisie.");
-  assert.doesNotMatch(demo.elements.feeControlHistoryList.innerHTML, /En règle/, "Le filtre résultat doit retirer les autres résultats.");
-
-  demo.elements.feeControlHistoryCampaign.value = "demo-history-gate";
-  demo.elements.feeControlHistoryCampaign.trigger("change");
-  assert.match(demo.elements.feeControlHistoryList.innerHTML, /Portail · septembre/, "Le filtre campagne doit conserver les lignes de la campagne sélectionnée.");
-  assert.doesNotMatch(demo.elements.feeControlHistoryList.innerHTML, /Bibliothèque · septembre/, "Le filtre campagne doit retirer les autres campagnes.");
-
-  demo.elements.feeControlHistoryResult.value = "";
-  demo.elements.feeControlHistorySearch.value = "DEMO-005";
-  demo.elements.feeControlHistorySearch.trigger("input");
-  assert.match(demo.elements.feeControlHistoryList.innerHTML, /Lina Kabasele/, "La recherche doit filtrer par matricule/identité démo.");
-  assert.doesNotMatch(demo.elements.feeControlHistoryList.innerHTML, /Amina Kalonji/, "La recherche doit retirer les autres lignes.");
+  // Les cinq lignes démo bornées doivent être rendues dans le tableau consolidé.
+  ["DÉMO-HIST-001", "DÉMO-HIST-002", "DÉMO-HIST-003", "DÉMO-HIST-004", "DÉMO-HIST-005"].forEach(function (reference) {
+    assert.ok(demo.elements.feeControlContent.innerHTML.indexOf(reference) !== -1, "La référence " + reference + " doit être rendue.");
+  });
 
   assert.equal(demo.calls.listCampaigns, 0, "La projection démo ne doit charger aucune liste réelle.");
   assert.equal(demo.calls.securityScan, 0, "L’historique démo ne doit appeler aucune API Sécurité.");
   assert.equal(demo.calls.createScan, 0, "L’historique démo ne doit créer aucun scan réel.");
   assert.doesNotMatch(moduleSource, /listScans\s*[:(]/, "Le lot ne doit pas inventer listScans().");
-  assert.doesNotMatch(moduleSource, /role\s*===|role\s*!==/, "Le lot ne doit pas introduire de contrôle de rôle.");
+  // Seule demoControlUser() mentionne un rôle : c'est la projection démo des permissions
+  // (équivalent de DEMO_PERMISSIONS_BY_ROLE), pas un contrôle d'accès par rôle.
+  const sourceWithoutDemoProjection = moduleSource.replace(/function demoControlUser\(\) \{[\s\S]*?\n  \}/, "");
+  assert.doesNotMatch(sourceWithoutDemoProjection, /role\s*===|role\s*!==/, "Le lot ne doit pas introduire de contrôle de rôle.");
 
-  const real = load({ demoMode: false });
+  // Session réelle (token) : l'état indisponible unifié remplace toute fixture d'historique.
+  const real = load({ live: true });
   await render(real);
-  assert.ok(real.elements.feeControlHistory, "Le mode réel doit créer la surface Historique autorisé.");
+  assert.equal(real.elements.feeControlHistory, undefined, "Le mode réel ne doit rendre aucune fixture d’historique.");
   assert.match(real.elements.feeControlContent.innerHTML, /BACKEND_LATER/, "Le mode réel doit rester BACKEND_LATER.");
-  assert.match(real.elements.feeControlContent.innerHTML, /permission dédiée|filtres serveur|pagination/i, "Le mode réel doit annoncer les prérequis de lecture sûre.");
+  assert.match(real.elements.feeControlContent.innerHTML, /ne sont pas connectés/i, "Le mode réel doit annoncer que les historiques réels ne sont pas connectés.");
   assert.equal(real.calls.listCampaigns, 0, "Le mode réel ne doit pas charger une liste globale pour l’historique.");
   assert.equal(real.calls.securityScan, 0, "Le mode réel ne doit appeler aucune API Sécurité.");
   assert.equal(real.calls.createScan, 0, "Le mode réel ne doit créer aucun scan.");

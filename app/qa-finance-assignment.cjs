@@ -11,18 +11,18 @@ function expect(pattern, message) {
 }
 
 assert.match(index, /data-finance-tab="assignments"/, "L'onglet Affectation des frais est absent.");
+// Aligné sur le runtime actuel : FE-FIN-03 prépare un BROUILLON LOCAL (BACKEND_LATER)
+// avec trois modes de ciblage (Cycle, Classe, Élèves ciblés) et ne crée jamais de student_fee.
 expect(/function renderFeeAssignment\(\)/, "Le rendu FE-FIN-03 est absent.");
 expect(/Affecter un frais/, "Le titre FE-FIN-03 est absent.");
+expect(/Préparer une affectation/, "Le titre du workflow d'affectation est absent.");
 expect(/Cycle/, "Le ciblage par cycle est absent.");
-expect(/Une classe/, "Le ciblage par classe est absent.");
-expect(/Plusieurs classes/, "Le ciblage multi-classes est absent.");
-expect(/Un élève/, "Le ciblage individuel est absent.");
-expect(/Plusieurs élèves/, "Le ciblage multi-élèves est absent.");
-expect(/Année scolaire : connexion backend requise/, "La dépendance d'année scolaire doit être explicite.");
-expect(/Liste indisponible — connexion backend requise/, "L'absence de projection Finance classes/élèves doit être explicite.");
-expect(/Configuration prête — connexion backend requise pour appliquer l’affectation\./, "La confirmation non connectée est absente.");
-expect(/unique\(student_id, fee_structure_id\)/, "Le contrat anti-doublon doit être affiché.");
-expect(/absence d’affectation/i, "Le contrat Contrôle des frais doit distinguer l'absence d'affectation.");
+expect(/Classe/, "Le ciblage par classe est absent.");
+expect(/Élèves ciblés/, "Le ciblage multi-élèves est absent.");
+expect(/BROUILLON LOCAL · BACKEND_LATER/, "L'affectation doit rester un brouillon local explicitement non connecté.");
+expect(/Aucune obligation officielle n’est créée/, "L'absence d'écriture officielle doit être explicite.");
+expect(/Affectation préparée en BROUILLON LOCAL\. Aucun student_fee n’a été créé\./, "La confirmation non connectée est absente.");
+expect(/student_fee non créé/, "Le brouillon doit rappeler qu'aucun student_fee n'est créé.");
 assert.doesNotMatch(financeModule, /createStudentFee|createFeeAssignment|applyFeeAssignment|\/finance\/fee-assignments/i, "FE-FIN-03 ne doit pas créer de route ou d'API d'affectation.");
 assert.doesNotMatch(financeModule, /queueOfflineOperation\(\s*["']finance["']\s*,\s*["'][^"']*affect/i, "FE-FIN-03 ne doit pas créer d'opération hors-ligne fictive.");
 

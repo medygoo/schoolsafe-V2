@@ -7,6 +7,9 @@ const vm = require("node:vm");
 const assert = require("node:assert");
 
 const accessSource = fs.readFileSync(path.join(__dirname, "modules/core/access.js"), "utf8");
+// Runtime actuel : l'assistant route via la gouvernance + le routeur central de capacités.
+const jaspeGovernanceSource = fs.readFileSync(path.join(__dirname, "modules/safe/jaspe-governance.js"), "utf8");
+const jaspeRouterSource = fs.readFileSync(path.join(__dirname, "modules/safe/jaspe-capability-router.js"), "utf8");
 const assistantSource = fs.readFileSync(path.join(__dirname, "modules/safe/safe-assistant.js"), "utf8");
 
 function loadAccess(context) {
@@ -58,6 +61,8 @@ function loadAssistant(options) {
   };
   sandbox.window = sandbox;
   loadAccess(sandbox);
+  vm.runInNewContext(jaspeGovernanceSource, sandbox);
+  vm.runInNewContext(jaspeRouterSource, sandbox);
   vm.runInNewContext(assistantSource, sandbox);
   return { dom, sandbox };
 }
@@ -82,9 +87,10 @@ function loadAssistant(options) {
 }
 
 // Session réelle avec safe.assistant.use : init + suggestions filtrées par branche.
+// Runtime actuel : la portée own est exigée en plus de la permission (allowsScope own).
 {
   const { dom, sandbox } = loadAssistant({
-    liveSession: { token: "t", role: "teacher", permissions: ["safe.assistant.use", "school.student.read", "pedagogy.grade.read"] },
+    liveSession: { token: "t", role: "teacher", permissions: ["safe.assistant.use", "school.student.read", "pedagogy.grade.read"], scopes: [{ permission: "safe.assistant.use", type: "own" }] },
   });
   assert.strictEqual(dom.appended.length, 1, "avec safe.assistant.use : init");
   sandbox.SafeAssistant.openWithQuery("");
@@ -94,13 +100,24 @@ function loadAssistant(options) {
   assert.ok(!html.includes("Comment enregistrer un paiement ?"), "branche finance inaccessible : suggestion masquée");
 }
 
-// Session réelle : réponse FAQ vers branche inaccessible → message de repli.
+// Session réelle : requête finance sans capacité finance → refus explicite du routeur central.
 {
   const { dom, sandbox } = loadAssistant({
-    liveSession: { token: "t", role: "teacher", permissions: ["safe.assistant.use", "pedagogy.grade.read"] },
+    liveSession: {
+      token: "t", role: "teacher",
+      permissions: ["safe.assistant.use", "pedagogy.grade.read"],
+      scopes: [
+        { permission: "safe.assistant.use", type: "own" },
+        { permission: "pedagogy.grade.read", type: "assigned_classes" },
+      ],
+      assignedClassIds: ["demo-class-1"],
+    },
   });
   sandbox.SafeAssistant.openWithQuery("comment enregistrer un paiement à la caisse ?");
-  assert.ok(dom.container.innerHTML.includes("je ne suis pas sûre de comprendre"), "réponse finance masquée sans accès branche");
+  assert.ok(dom.container.innerHTML.includes("Jaspe refuse cette demande"), "refus Jaspe explicite sans capacité finance");
+  assert.ok(!dom.container.innerHTML.includes("Dans Caisse"), "réponse finance masquée sans accès branche");
+  // Le routeur exige le module cible : on fournit un module enseignant minimal qui délègue à la FAQ.
+  sandbox.SchoolSafeTeacherPedagogy = { answerJaspe: function () { return null; } };
   sandbox.SafeAssistant.openWithQuery("c’est quoi le palmarès ?");
   assert.ok(dom.container.innerHTML.includes("Top 10"), "réponse pedagogy visible avec accès branche");
 }
