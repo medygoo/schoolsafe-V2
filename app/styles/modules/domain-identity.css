@@ -270,3 +270,88 @@
   border-bottom-color: var(--domain-a);
   background: color-mix(in srgb, var(--domain-a) 16%, transparent);
 }
+
+/* --------------------------------------------------------------------------
+   Harmonisation des sous-fonctionnalités — 1 domaine = 1 famille visuelle.
+   Onglets internes, sourcils de section, icônes et hover héritent de
+   l'accent du domaine. Les couleurs sémantiques (succès/erreur/alerte/
+   inactif/info) restent universelles et ne sont jamais remplacées.
+   -------------------------------------------------------------------------- */
+
+/* Stock / Inventaire : les onglets rentrent dans la famille teal + bleu. */
+.inventory-module .pedagogy-tabs button:hover,
+.inventory-module .pedagogy-tabs button.active {
+  color: var(--ss-domain-stock);
+  border-bottom-color: var(--ss-domain-stock);
+  background: var(--ss-domain-stock-bg);
+}
+
+/* Pédagogie : onglets du module principal verrouillés sur violet + bleu. */
+#pedagogyModule .pedagogy-tabs button:hover,
+#pedagogyModule .pedagogy-tabs button.active {
+  color: var(--ss-domain-pedagogie);
+  border-bottom-color: var(--ss-domain-pedagogie-2);
+  background: var(--ss-domain-pedagogie-bg);
+}
+
+/* Sécurité : sous-onglets de mode en bleu nuit, soulignement orange maîtrisé. */
+.security-module .security-mode-tabs button.active {
+  color: var(--domain-a);
+  box-shadow: inset 0 -2px 0 var(--domain-b), var(--ss-shadow-sm, 0 1px 2px rgba(16, 24, 40, .06));
+}
+.security-module .security-mode-tabs button:hover { color: var(--domain-b); }
+
+/* Sourcils de section : chaque domaine teinte ses sous-fonctionnalités. */
+.finance-module :is(
+  .finance-overview > header span:first-child,
+  .finance-panel > header span,
+  .finance-report-head > div > span,
+  .family-finance > header > div > span,
+  .finance-panel > header > b
+) {
+  color: var(--domain-a);
+}
+#pedagogyModule .panel-heading span,
+#pedagogyModule .gradebook-head > div > span { color: var(--domain-a); }
+.accounting-module .panel-heading span,
+.hr-module .panel-heading span,
+.document-center-module .panel-heading span,
+.communication-module .panel-heading span { color: var(--domain-a); }
+
+/* Icônes de sous-fonctionnalités dans la famille du domaine. */
+.teacher-pedagogy-portal .teacher-priority-icon,
+.teacher-pedagogy-portal .teacher-scope-card > svg {
+  background: var(--domain-soft);
+  color: var(--domain-a);
+}
+.hr-module .hr-dashboard-metric > span {
+  background: var(--domain-soft);
+  color: var(--domain-a);
+}
+
+/* Hover et bordures légères dans la famille du domaine. */
+.teacher-pedagogy-portal .teacher-priority-card:hover,
+.teacher-pedagogy-portal .teacher-priority-card:focus-visible { border-color: var(--domain-a); }
+.hr-module .hr-dashboard-action:hover,
+.hr-module .hr-dashboard-action:focus-visible { border-color: var(--domain-a); }
+.finance-module .finance-dashboard-shortcuts button:hover,
+.finance-module .finance-dashboard-shortcuts button:focus-visible { border-color: var(--domain-a); }
+.administration-module .administration-card:hover,
+.administration-module .administration-card:focus-visible {
+  border-color: color-mix(in srgb, var(--domain-a) 45%, var(--ss-border-default, #d7e1ef));
+}
+.administration-module .administration-card__boundary { color: var(--domain-a); }
+
+/* Thème bleu nuit : mêmes familles, accents éclaircis. */
+[data-theme="dark"] .inventory-module .pedagogy-tabs button:hover,
+[data-theme="dark"] .inventory-module .pedagogy-tabs button.active {
+  color: var(--ss-domain-stock);
+  border-bottom-color: var(--ss-domain-stock);
+  background: color-mix(in srgb, var(--ss-domain-stock) 16%, transparent);
+}
+[data-theme="dark"] #pedagogyModule .pedagogy-tabs button:hover,
+[data-theme="dark"] #pedagogyModule .pedagogy-tabs button.active {
+  color: var(--ss-domain-pedagogie);
+  border-bottom-color: var(--ss-domain-pedagogie);
+  background: color-mix(in srgb, var(--ss-domain-pedagogie) 16%, transparent);
+}
