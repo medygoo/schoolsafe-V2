@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { enterDemoWorkspace, openAction } from "./helpers";
+import { enterDemoWorkspace, openAction, openDocumentsCenter } from "./helpers";
 
 function rgb(hex: string): string {
   const value = hex.replace("#", "");
@@ -150,5 +150,50 @@ test.describe("Harmonisation visuelle profonde post-M8", () => {
     const category = form.locator('[name="category"]');
     await expectTouchTarget(category);
     await expectDomainFocus(category, "#0f766e");
+  });
+
+  test("Documents porte le bleu pétrole jusque dans les cartes et filtres", async ({ page }) => {
+    await enterDemoWorkspace(page, "admin");
+    await openDocumentsCenter(page);
+    const center = page.locator("#documentCenterModule");
+    await expectDomainCard(center.locator(".document-card").first(), "#0d5c6b");
+    const filter = center.locator('[data-document-filter="sourceModule"]');
+    await expectTouchTarget(filter);
+    await expectDomainFocus(filter, "#0d5c6b");
+  });
+
+  test("Communication porte le bleu clair jusque dans les cartes et le compositeur", async ({ page }) => {
+    await enterDemoWorkspace(page, "communication");
+    await page.locator('button[data-branch="communication"]:visible').first().evaluate((element: HTMLElement) => element.click());
+    await expectDomainCard(page.locator(".communication-card").first(), "#0ea5e9");
+    await page.locator('[data-communication-tab="messages"]').evaluate((element: HTMLElement) => element.click());
+    const form = page.locator("[data-message-form]");
+    await expectDomainCard(form, "#0ea5e9");
+    const subject = form.locator('[name="subject"]');
+    await expectTouchTarget(subject);
+    await expectDomainFocus(subject, "#0ea5e9");
+  });
+
+  test("Administration porte le marine jusque dans les cartes, filtres et tableaux", async ({ page }) => {
+    await enterDemoWorkspace(page, "admin");
+    await page.locator('button[data-branch="administration"]:visible').first().evaluate((element: HTMLElement) => element.click());
+    await expectDomainCard(page.locator(".administration-card").first(), "#1e3a8a");
+    await page.evaluate(() => (window as any).SchoolSafeAdministration.open("permissions"));
+    const catalog = page.locator("[data-permission-catalog]");
+    await expectDomainTable(catalog.locator("table"), "#1e3a8a");
+    const search = catalog.getByLabel("Rechercher une permission");
+    await expectTouchTarget(search);
+    await expectDomainFocus(search, "#1e3a8a");
+  });
+
+  test("Jaspe logiciel porte le bleu électrique sans aucune surface 3D", async ({ page }) => {
+    await enterDemoWorkspace(page, "admin");
+    await page.locator('button[data-branch="administration"]:visible').first().evaluate((element: HTMLElement) => element.click());
+    await page.evaluate(() => (window as any).SchoolSafeAdministration.open("jaspe"));
+    const jaspe = page.locator(".administration-jaspe");
+    await expectDomainCard(jaspe, "#2f6bff");
+    await expectDomainCard(jaspe.locator(".administration-jaspe-domain").first(), "#2f6bff");
+    await expect(page.locator("#administrationModule canvas, #administrationModule model-viewer, #administrationModule [data-jaspe-3d], #administrationModule [data-3d]")).toHaveCount(0);
+    await expect(page.locator("#administrationModule")).not.toContainText(/GLB|FBX|OBJ|Three\.js|Blender|avatar 3D/i);
   });
 });
