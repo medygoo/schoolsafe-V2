@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { enterDemoWorkspace } from "./helpers";
+import { enterDemoWorkspace, openAction } from "./helpers";
 
 function rgb(hex: string): string {
   const value = hex.replace("#", "");
@@ -36,6 +36,18 @@ async function expectDomainFocus(control: Locator, accent: string) {
   expect(focus.color).toBe(rgb(accent));
   expect(focus.style).not.toBe("none");
   expect(Number.parseFloat(focus.width)).toBeGreaterThanOrEqual(2);
+}
+
+async function expectDomainTable(table: Locator, accent: string) {
+  await expect(table).toBeVisible();
+  const header = table.locator("thead th").first();
+  const style = await header.evaluate((element) => {
+    const computed = getComputedStyle(element);
+    return { borderColor: computed.borderBottomColor, borderWidth: computed.borderBottomWidth, background: computed.backgroundColor };
+  });
+  expect(style.borderColor).toBe(rgb(accent));
+  expect(Number.parseFloat(style.borderWidth)).toBeGreaterThanOrEqual(2);
+  expect(style.background).not.toBe("rgba(0, 0, 0, 0)");
 }
 
 async function openAcademicStructure(page: Page) {
@@ -80,5 +92,63 @@ test.describe("Harmonisation visuelle profonde post-M8", () => {
     const title = form.locator('[name="title"]');
     await expectTouchTarget(title);
     await expectDomainFocus(title, "#7c3aed");
+  });
+
+  test("Sécurité opérationnelle porte le bleu nuit jusque dans les panneaux et le formulaire incident", async ({ page }) => {
+    await enterDemoWorkspace(page, "guard");
+    await page.locator("[data-guard-security-operations]").click();
+    const view = page.locator("[data-security-operations]");
+    await expect(view).toBeVisible();
+    await expectDomainCard(view.locator(".guard-security-panel").first(), "#1e293b");
+    const field = view.locator('[name="incident_type"]');
+    await expectTouchTarget(field);
+    await expectDomainFocus(field, "#1e293b");
+  });
+
+  test("Finance porte l’ambre jusque dans les KPI et raccourcis opérationnels", async ({ page }) => {
+    await enterDemoWorkspace(page, "finance");
+    await openAction(page, "Tableau financier");
+    await expectDomainCard(page.locator(".finance-dashboard-metric").first(), "#d97706");
+    const shortcut = page.locator(".finance-dashboard-action").first();
+    await expectDomainCard(shortcut, "#d97706");
+    await expectTouchTarget(shortcut);
+    await expectDomainFocus(shortcut, "#d97706");
+  });
+
+  test("Comptabilité porte le bleu acier jusque dans les synthèses, filtres et tableaux", async ({ page }) => {
+    await enterDemoWorkspace(page, "accountant");
+    await openAction(page, "Journal comptable");
+    await page.locator('[data-accounting-open="journal"]').click();
+    const journal = page.locator("[data-accounting-journal]");
+    await expectDomainCard(journal.locator(".accounting-currency-summaries > article").first(), "#3a6ea5");
+    await expectDomainTable(journal.locator("table"), "#3a6ea5");
+    const search = journal.locator("#journalSearch");
+    await expectTouchTarget(search);
+    await expectDomainFocus(search, "#3a6ea5");
+  });
+
+  test("RH porte le prune jusque dans le dossier et la préparation locale", async ({ page }) => {
+    await enterDemoWorkspace(page, "hr");
+    await openAction(page, "Personnel");
+    const surface = page.locator("[data-hr-staff]");
+    await surface.locator('[data-hr-staff-row="hr-demo-1"]').click();
+    await expectDomainCard(surface.locator(".hr-staff-dossier"), "#8e4585");
+    const form = surface.locator("[data-hr-staff-form]");
+    await expectDomainCard(form, "#8e4585");
+    const service = form.locator('[name="service"]');
+    await expectTouchTarget(service);
+    await expectDomainFocus(service, "#8e4585");
+  });
+
+  test("Stock porte le teal jusque dans le catalogue, le formulaire et son tableau", async ({ page }) => {
+    await enterDemoWorkspace(page, "admin");
+    await openAction(page, "Catalogue articles");
+    const catalog = page.locator("[data-inventory-catalog]");
+    const form = catalog.locator("[data-inventory-item-form]");
+    await expectDomainCard(form, "#0f766e");
+    await expectDomainTable(catalog.locator("table"), "#0f766e");
+    const category = form.locator('[name="category"]');
+    await expectTouchTarget(category);
+    await expectDomainFocus(category, "#0f766e");
   });
 });
