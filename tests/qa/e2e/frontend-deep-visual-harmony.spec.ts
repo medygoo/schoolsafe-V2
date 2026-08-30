@@ -196,4 +196,100 @@ test.describe("Harmonisation visuelle profonde post-M8", () => {
     await expect(page.locator("#administrationModule canvas, #administrationModule model-viewer, #administrationModule [data-jaspe-3d], #administrationModule [data-3d]")).toHaveCount(0);
     await expect(page.locator("#administrationModule")).not.toContainText(/GLB|FBX|OBJ|Three\.js|Blender|avatar 3D/i);
   });
+
+  test("matrice profonde 390/834/1440 en clair et bleu nuit sans overflow ni cible trop courte", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "chromium-mobile", "La matrice redimensionnable s’exécute dans le projet desktop.");
+
+    const surfaces = [
+      {
+        key: "school-modal",
+        root: ".academic-structure-modal .ss-modal",
+        probe: ".academic-structure-modal .ss-modal",
+        light: "#1d4ed8",
+        dark: "#60a5fa",
+        modal: true,
+        open: async () => {
+          await enterDemoWorkspace(page, "admin");
+          await openAcademicStructure(page);
+          await page.getByRole("button", { name: "Préparer une classe" }).click();
+        },
+      },
+      {
+        key: "inventory-catalog",
+        root: "[data-inventory-catalog]",
+        probe: "[data-inventory-item-form]",
+        light: "#0f766e",
+        dark: "#5eead4",
+        modal: false,
+        open: async () => {
+          await enterDemoWorkspace(page, "admin");
+          await openAction(page, "Catalogue articles");
+        },
+      },
+      {
+        key: "jaspe-governance",
+        root: ".administration-jaspe",
+        probe: ".administration-jaspe",
+        light: "#2f6bff",
+        dark: "#6ea8ff",
+        modal: false,
+        open: async () => {
+          await enterDemoWorkspace(page, "admin");
+          await page.locator('button[data-branch="administration"]:visible').first().evaluate((element: HTMLElement) => element.click());
+          await page.evaluate(() => (window as any).SchoolSafeAdministration.open("jaspe"));
+        },
+      },
+    ];
+
+    for (const surface of surfaces) {
+      await surface.open();
+      for (const theme of ["light", "dark"] as const) {
+        await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
+        for (const viewport of [{ width: 390, height: 844 }, { width: 834, height: 1112 }, { width: 1440, height: 900 }]) {
+          await page.setViewportSize(viewport);
+          const root = page.locator(surface.root);
+          await expect(root).toBeVisible();
+          const layout = await root.evaluate((element) => {
+            const visible = (candidate: Element) => {
+              const rect = candidate.getBoundingClientRect();
+              const style = getComputedStyle(candidate);
+              return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+            };
+            const viewportWidth = document.documentElement.clientWidth;
+            const scrollSelector = '[class*="table-wrap"], [class*="table-wrapper"], .pedagogy-tabs, .school-tabs, .administration-permission-list';
+            const overflow = Array.from(element.querySelectorAll("*")).filter(visible).filter((candidate) => {
+              const rect = candidate.getBoundingClientRect();
+              return !candidate.closest(scrollSelector) && (rect.left < -1 || rect.right > viewportWidth + 1);
+            }).map((candidate) => ({ tag: candidate.tagName, className: (candidate as HTMLElement).className }));
+            const shortControls = Array.from(element.querySelectorAll("button, input, select, textarea")).filter(visible).filter((candidate) => {
+              if (candidate instanceof HTMLInputElement && ["checkbox", "radio", "file"].includes(candidate.type)) return false;
+              return candidate.getBoundingClientRect().height < 43.5;
+            }).map((candidate) => ({ tag: candidate.tagName, height: Math.round(candidate.getBoundingClientRect().height) }));
+            const style = getComputedStyle(element);
+            return {
+              overflow,
+              shortControls,
+              pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+              color: style.color,
+              background: style.backgroundColor,
+              height: element.getBoundingClientRect().height,
+              viewportHeight: window.innerHeight,
+            };
+          });
+          expect(layout.pageOverflow, `${surface.key} ${theme} ${viewport.width}`).toBeLessThanOrEqual(1);
+          expect(layout.overflow, `${surface.key} ${theme} ${viewport.width}`).toEqual([]);
+          expect(layout.shortControls, `${surface.key} ${theme} ${viewport.width}`).toEqual([]);
+          expect(layout.color).not.toBe(layout.background);
+          if (surface.modal) expect(layout.height).toBeLessThanOrEqual(layout.viewportHeight + 1);
+
+          const border = await page.locator(surface.probe).evaluate((element) => getComputedStyle(element).borderTopColor);
+          expect(border, `${surface.key} ${theme} ${viewport.width}`).toBe(rgb(theme === "light" ? surface.light : surface.dark));
+
+          if (viewport.width !== 834) {
+            await page.screenshot({ path: testInfo.outputPath(`deep-${surface.key}-${theme}-${viewport.width}.png`), fullPage: true });
+          }
+        }
+      }
+    }
+  });
 });

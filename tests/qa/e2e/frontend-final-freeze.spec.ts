@@ -22,6 +22,7 @@ const PHASE_SPECS = [
   "frontend-final-runtime.spec.ts",
   "frontend-domain-identities.spec.ts",
   "frontend-subfeature-harmony.spec.ts",
+  "frontend-deep-visual-harmony.spec.ts",
   "frontend-executive-kpi.spec.ts",
   "frontend-final-security.spec.ts",
 ];
@@ -62,6 +63,22 @@ test.describe("M8 — gel final du frontend métier B à L", () => {
     }
     expect(identity, "les statuts universels restent hors des identités de domaine").not.toMatch(/\.ss-badge--/);
     expect(read("app/styles/modules/inventory.css")).toMatch(/linear-gradient/);
+
+    const index = read("app/index.html");
+    const deepStyles = [
+      "deep-school-harmony.css",
+      "deep-operations-harmony.css",
+      "deep-governance-harmony.css",
+    ];
+    for (const style of deepStyles) {
+      expect(index, `${style} chargé`).toContain(`./styles/modules/${style}`);
+      expect(index.indexOf(style), `${style} chargé après domain-identity.css`).toBeGreaterThan(index.indexOf("domain-identity.css"));
+    }
+    for (const style of deepStyles) {
+      const source = read(`app/styles/modules/${style}`);
+      expect(source, `${style} conserve les statuts universels`).not.toMatch(/\.ss-badge--(?:success|danger|warning|info|neutral)/);
+      expect(source, `${style} ne contient aucun rendu 3D`).not.toMatch(/three\.js|model-viewer|\.glb|\.fbx|\.obj/i);
+    }
   });
 
   test("conserve B à L, la navigation finale et les Executive KPI", async ({ page }) => {
