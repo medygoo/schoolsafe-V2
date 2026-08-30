@@ -2874,3 +2874,125 @@ body.screen-workspace {
 
   .sync-panel > footer .ss-button { width: 100%; }
 }
+
+/* --------------------------------------------------------------------------
+   Executive KPI — cartes détaillées du tableau de bord
+   Gros total lisible, icône teintée par domaine, sous-indicateurs en
+   mini-pills, répartition discrète. Fond neutre ; pas de gradient dans
+   les cartes. Les valeurs démo sont marquées DÉMONSTRATION.
+   -------------------------------------------------------------------------- */
+
+.dashboard-kpi {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.kpi-card--executive {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--ss-space-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.kpi-card--executive header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ss-space-3);
+  min-width: 0;
+}
+
+.kpi-card--executive .kpi-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.kpi-card--executive .kpi-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.kpi-exec-title {
+  min-width: 0;
+  font-size: var(--ss-text-xs);
+  font-weight: var(--ss-font-extrabold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ss-text-secondary);
+}
+
+.kpi-exec-chip {
+  margin-left: auto;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: var(--ss-info-bg);
+  color: var(--ss-info-text);
+  font-size: var(--ss-text-xs);
+  font-weight: var(--ss-font-extrabold);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.kpi-exec-value {
+  display: block;
+  font-size: 2rem;
+  font-weight: var(--ss-font-extrabold);
+  line-height: 1.1;
+  color: var(--ss-text-primary);
+}
+
+.kpi-exec-caption {
+  display: block;
+  font-size: var(--ss-text-sm);
+  color: var(--ss-text-secondary);
+}
+
+.kpi-exec-subs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: var(--ss-space-2);
+  min-width: 0;
+}
+
+.kpi-exec-sub {
+  max-width: 100%;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: var(--ss-bg-secondary);
+  border: 1px solid var(--ss-border-subtle);
+  font-size: var(--ss-text-xs);
+  font-weight: var(--ss-font-semibold);
+  color: var(--ss-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.kpi-exec-bar {
+  display: flex;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--ss-bg-secondary);
+  margin-top: var(--ss-space-2);
+}
+
+.kpi-exec-bar i {
+  display: block;
+}
+
+.kpi-card--executive[data-domain="ecole"] .kpi-icon { background: var(--ss-domain-ecole-bg); color: var(--ss-domain-ecole); }
+.kpi-card--executive[data-domain="personnel"] .kpi-icon { background: var(--ss-domain-personnel-bg); color: var(--ss-domain-personnel); }
+.kpi-card--executive[data-domain="pedagogie"] .kpi-icon { background: var(--ss-domain-pedagogie-bg); color: var(--ss-domain-pedagogie); }
+.kpi-card--executive[data-domain="finance"] .kpi-icon { background: var(--ss-domain-finance-bg); color: var(--ss-domain-finance); }
+.kpi-card--executive[data-domain="securite"] .kpi-icon { background: var(--ss-domain-securite-bg); color: var(--ss-domain-securite); }
+
+@media (max-width: 1100px) {
+  .dashboard-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .dashboard-kpi { grid-template-columns: 1fr; }
+  .mobile-kpi { grid-template-columns: 1fr; }
+  .kpi-card--executive header { align-items: flex-start; }
+  .kpi-exec-chip { margin-left: 0; }
+}

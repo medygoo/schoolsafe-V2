@@ -31,7 +31,11 @@ async function openWorkspace(page, role) {
   await domClick(page, "#continueGuardian");
   await page.locator("#demoRole").selectOption(role);
   await domClick(page, "#previewWorkspace");
-  await page.waitForTimeout(400);
+  await page.waitForFunction(() => {
+    const workspace = document.querySelector("#workspace.active");
+    const kpis = document.querySelector("#dashboardKpi");
+    return Boolean(workspace && kpis && kpis.textContent.includes("DÉMONSTRATION"));
+  }, null, { timeout: 10000 });
 }
 
 async function captureDashboard(page, name) {
@@ -57,7 +61,7 @@ async function captureDashboard(page, name) {
     await mockCanonicalPermissions(page);
     page.on("pageerror", (error) => errors.push(`${role}-desktop: ${error.message}`));
     page.on("console", (message) => {
-      if (message.type() === "error") errors.push(`${role}-desktop: ${message.text()}`);
+      if (message.type() === "error" && !message.text().includes("ERR_NETWORK_ACCESS_DENIED")) errors.push(`${role}-desktop: ${message.text()}`);
     });
 
     await openWorkspace(page, role);
@@ -72,12 +76,12 @@ async function captureDashboard(page, name) {
     const found = forbiddenNumbers.filter((n) => bodyText.includes(n));
     check(found.length === 0, `Données codées en dur détectées pour ${role}: ${found.join(", ")}`);
 
-    // Les indicateurs doivent afficher un état propre (pas de chiffre de démo)
-    // Runtime actuel : les KPI vivent dans #dashboardKpi (#profileOverview n'existe plus).
+    // Les cartes KPI démo sont des cartes executive calculées depuis les fixtures,
+    // explicitement marquées DÉMONSTRATION ; le live reste sans chiffres fictifs.
     const overviewText = await page.locator("#dashboardKpi").innerText();
     check(
-      /Non disponible|Non accessible|Source non connectée|Aucun indicateur|Chargement|Données indisponibles|Indicateurs non accessibles/i.test(overviewText),
-      `L'état des indicateurs n'est pas explicite pour ${role}`
+      /DÉMONSTRATION/.test(overviewText) && /Élèves inscrits/i.test(overviewText),
+      `Les KPI démo ne sont pas explicitement marqués DÉMONSTRATION pour ${role}: ${overviewText}`
     );
 
     await captureDashboard(page, `${role}-desktop`);
@@ -94,7 +98,7 @@ async function captureDashboard(page, name) {
     await mockCanonicalPermissions(mobilePage);
     mobilePage.on("pageerror", (error) => errors.push(`${role}-mobile: ${error.message}`));
     mobilePage.on("console", (message) => {
-      if (message.type() === "error") errors.push(`${role}-mobile: ${message.text()}`);
+      if (message.type() === "error" && !message.text().includes("ERR_NETWORK_ACCESS_DENIED")) errors.push(`${role}-mobile: ${message.text()}`);
     });
 
     await openWorkspace(mobilePage, role);

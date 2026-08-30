@@ -1969,6 +1969,119 @@
     return profile.label;
   }
 
+  // --- Cartes Executive KPI (démonstration) --------------------------------
+  // Mode démo (aucun token) : cartes calculées depuis les fixtures exposées
+  // (structure académique, RH, matières) et marquées DÉMONSTRATION.
+  // Mode live : seules les données réelles de l'API Pilotage sont affichées.
+  function executiveKpiCard(options) {
+    var subs = (options.subs || []).map(function (sub) {
+      return '<span class="kpi-exec-sub">' + sub + '</span>';
+    }).join("");
+    var bar = options.bar && options.bar.length
+      ? '<div class="kpi-exec-bar" aria-hidden="true">' + options.bar.map(function (seg) {
+          return '<i style="width:' + seg.width + '%;background:' + seg.color + '"></i>';
+        }).join("") + '</div>'
+      : "";
+    return '<article class="kpi-card kpi-card--executive" data-domain="' + options.domain + '">' +
+      '<header><span class="kpi-icon" aria-hidden="true"><i data-lucide="' + options.icon + '"></i></span>' +
+      '<span class="kpi-exec-title">' + options.title + '</span>' +
+      (options.demo ? '<span class="kpi-exec-chip">DÉMONSTRATION</span>' : "") + '</header>' +
+      '<b class="kpi-exec-value">' + options.value + '</b>' +
+      '<span class="kpi-exec-caption">' + options.caption + '</span>' +
+      (subs ? '<div class="kpi-exec-subs">' + subs + '</div>' : "") + bar + '</article>';
+  }
+
+  function demoExecutiveKpis() {
+    var studentsCard = null;
+    var classesCard = null;
+    var structure = window.SchoolSafeAcademicStructure;
+    var classes = structure && typeof structure.getClasses === "function"
+      ? structure.getClasses().filter(function (item) { return !item.isLocalDraft; }) : [];
+    var levels = structure && typeof structure.getLevels === "function" ? structure.getLevels() : [];
+    if (classes.length) {
+      var cycleOf = function (clazz) {
+        var level = levels.find(function (item) { return item.id === clazz.levelId; });
+        return level ? level.cycle : "";
+      };
+      var activeClasses = classes.filter(function (item) { return item.status === "ACTIVE"; });
+      var matClasses = classes.filter(function (item) { return cycleOf(item) === "Maternelle"; });
+      var primClasses = classes.filter(function (item) { return cycleOf(item) === "Primaire"; });
+      var sumEnrollment = function (list) {
+        return list.reduce(function (total, item) { return total + (Number(item.enrollment) || 0); }, 0);
+      };
+      var matStudents = sumEnrollment(activeClasses.filter(function (item) { return cycleOf(item) === "Maternelle"; }));
+      var primStudents = sumEnrollment(activeClasses.filter(function (item) { return cycleOf(item) === "Primaire"; }));
+      var totalStudents = sumEnrollment(activeClasses);
+      studentsCard = executiveKpiCard({
+        domain: "ecole", icon: "users", title: "Élèves inscrits", value: totalStudents,
+        caption: "Total élèves · classes actives", demo: true,
+        subs: [matStudents + " Maternelle", primStudents + " Primaire", activeClasses.length + " classes actives"],
+        bar: totalStudents ? [
+          { width: Math.round((matStudents / totalStudents) * 100), color: "var(--ss-domain-ecole)" },
+          { width: Math.round((primStudents / totalStudents) * 100), color: "var(--ss-domain-ecole-2)" }
+        ] : null
+      });
+      classesCard = executiveKpiCard({
+        domain: "ecole", icon: "school", title: "Classes", value: classes.length,
+        caption: "Classes référencées", demo: true,
+        subs: [
+          matClasses.length + " Maternelle",
+          primClasses.length + " Primaire",
+          activeClasses.length + " actives",
+          totalStudents && activeClasses.length ? "≈ " + Math.round(totalStudents / activeClasses.length) + " élèves / classe" : "Moyenne non disponible"
+        ]
+      });
+    }
+    var hr = window.SchoolSafeHrDemo && typeof window.SchoolSafeHrDemo.getDemoSummary === "function"
+      ? window.SchoolSafeHrDemo.getDemoSummary() : null;
+    var staffCard = hr ? executiveKpiCard({
+      domain: "personnel", icon: "contact-round", title: "Personnel", value: hr.total,
+      caption: hr.actifs + " actifs · " + hr.inactifs + " inactif(s)", demo: true,
+      subs: [hr.femmes + " Femmes", hr.hommes + " Hommes", hr.enseignants + " Enseignants", hr.administration + " Administration / autres"],
+      bar: hr.total ? [
+        { width: Math.round((hr.femmes / hr.total) * 100), color: "var(--ss-domain-personnel)" },
+        { width: Math.round((hr.hommes / hr.total) * 100), color: "var(--ss-domain-personnel-2)" }
+      ] : null
+    }) : null;
+    var pedagogy = window.SchoolSafePedagogyModule && typeof window.SchoolSafePedagogyModule.getDemoSummary === "function"
+      ? window.SchoolSafePedagogyModule.getDemoSummary() : null;
+    if (!pedagogy && window.SchoolSafeTeacherPedagogy && Array.isArray(window.SchoolSafeTeacherPedagogy.SUBJECTS)) {
+      var demoSubjects = window.SchoolSafeTeacherPedagogy.SUBJECTS;
+      var assignedSubjects = demoSubjects.filter(function (subject) {
+        return Array.isArray(subject.classIds) && subject.classIds.length > 0;
+      });
+      pedagogy = {
+        total: demoSubjects.length,
+        attribuees: assignedSubjects.length,
+        nonAttribuees: demoSubjects.length - assignedSubjects.length,
+        enseignants: null
+      };
+    }
+    var subjectsCard = pedagogy ? executiveKpiCard({
+      domain: "pedagogie", icon: "book-open", title: "Matières", value: pedagogy.total,
+      caption: "Matières du référentiel démo", demo: true,
+      subs: [pedagogy.attribuees + " attribuées", pedagogy.nonAttribuees + " non attribuées", pedagogy.enseignants == null ? "Enseignants liés · Non disponible" : pedagogy.enseignants + " enseignant(s) lié(s)"]
+    }) : null;
+    var financeCard = executiveKpiCard({
+      domain: "finance", icon: "wallet", title: "Recettes (mois)", value: "—",
+      caption: "Non disponible en démonstration",
+      subs: ["En règle · BACKEND_LATER", "Partiel / attente · BACKEND_LATER"]
+    });
+    var alertsCard = executiveKpiCard({
+      domain: "securite", icon: "siren", title: "Alertes actives", value: "0",
+      caption: "Aucune alerte fictive ajoutée", demo: true,
+      subs: ["0 incident simulé", "Données live non connectées"]
+    });
+    return [studentsCard, staffCard, classesCard, subjectsCard, financeCard, alertsCard].filter(Boolean);
+  }
+
+  function renderDemoExecutiveKpis(desktopContainer, mobileContainer) {
+    var cards = demoExecutiveKpis();
+    if (desktopContainer) desktopContainer.innerHTML = cards.join("");
+    if (mobileContainer) mobileContainer.innerHTML = cards.slice(0, 4).join("");
+    icons();
+  }
+
   function renderProfileOverview() {
     var desktopContainer = document.getElementById("dashboardKpi");
     var mobileContainer = document.getElementById("mobileKpi");
@@ -2005,7 +2118,7 @@
       return;
     }
     if (!hasToken) {
-      renderEmpty("wifi", "Non disponible");
+      renderDemoExecutiveKpis(desktopContainer, mobileContainer);
       return;
     }
     if (!window.SchoolSafePilotageAPI) {

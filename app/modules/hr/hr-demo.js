@@ -8,12 +8,12 @@
   var selectedStaffId = "hr-demo-1";
   var STAFF_DRAFTS_STORAGE_KEY = "schoolsafe-v2-hr-staff-drafts";
   var STAFF = [
-    { id: "hr-demo-1", hrId: "HR-DEM-001", firstName: "Aline", lastName: "Kalala", job: "Enseignante", service: "Primaire", status: "ACTIF", entryDate: "2023-09-04", contact: "aline.kalala@example.test", assignment: "4e A · Français", history: ["Entrée démo · 04/09/2023", "Affectation démo · Primaire"] },
-    { id: "hr-demo-2", hrId: "HR-DEM-002", firstName: "Patrick", lastName: "Mbala", job: "Enseignant", service: "Secondaire", status: "ACTIF", entryDate: "2022-08-29", contact: "patrick.mbala@example.test", assignment: "6e A · Mathématiques", history: ["Entrée démo · 29/08/2022"] },
-    { id: "hr-demo-3", hrId: "HR-DEM-003", firstName: "Chantal", lastName: "Lukusa", job: "Secrétaire", service: "Administration", status: "ACTIF", entryDate: "2021-01-11", contact: "chantal.lukusa@example.test", assignment: "Secrétariat scolaire", history: ["Entrée démo · 11/01/2021"] },
-    { id: "hr-demo-4", hrId: "HR-DEM-004", firstName: "Daniel", lastName: "Moke", job: "Gardien", service: "Sécurité", status: "ACTIF", entryDate: "2024-02-05", contact: "daniel.moke@example.test", assignment: "Portail principal", history: ["Entrée démo · 05/02/2024"] },
-    { id: "hr-demo-5", hrId: "HR-DEM-005", firstName: "Esther", lastName: "Ilunga", job: "Responsable cantine", service: "Cantine", status: "ACTIF", entryDate: "2020-10-19", contact: "esther.ilunga@example.test", assignment: "Service cantine", history: ["Entrée démo · 19/10/2020"] },
-    { id: "hr-demo-6", hrId: "HR-DEM-006", firstName: "Jean", lastName: "Kabeya", job: "Agent administratif", service: "Administration", status: "INACTIF", entryDate: "2019-03-18", contact: "jean.kabeya@example.test", assignment: "Archives · historique", history: ["Entrée démo · 18/03/2019", "Passage INACTIF · simulation"] }
+    { id: "hr-demo-1", hrId: "HR-DEM-001", firstName: "Aline", lastName: "Kalala", gender: "F", job: "Enseignante", service: "Primaire", status: "ACTIF", entryDate: "2023-09-04", contact: "aline.kalala@example.test", assignment: "4e A · Français", history: ["Entrée démo · 04/09/2023", "Affectation démo · Primaire"] },
+    { id: "hr-demo-2", hrId: "HR-DEM-002", firstName: "Patrick", lastName: "Mbala", gender: "M", job: "Enseignant", service: "Secondaire", status: "ACTIF", entryDate: "2022-08-29", contact: "patrick.mbala@example.test", assignment: "6e A · Mathématiques", history: ["Entrée démo · 29/08/2022"] },
+    { id: "hr-demo-3", hrId: "HR-DEM-003", firstName: "Chantal", lastName: "Lukusa", gender: "F", job: "Secrétaire", service: "Administration", status: "ACTIF", entryDate: "2021-01-11", contact: "chantal.lukusa@example.test", assignment: "Secrétariat scolaire", history: ["Entrée démo · 11/01/2021"] },
+    { id: "hr-demo-4", hrId: "HR-DEM-004", firstName: "Daniel", lastName: "Moke", gender: "M", job: "Gardien", service: "Sécurité", status: "ACTIF", entryDate: "2024-02-05", contact: "daniel.moke@example.test", assignment: "Portail principal", history: ["Entrée démo · 05/02/2024"] },
+    { id: "hr-demo-5", hrId: "HR-DEM-005", firstName: "Esther", lastName: "Ilunga", gender: "F", job: "Responsable cantine", service: "Cantine", status: "ACTIF", entryDate: "2020-10-19", contact: "esther.ilunga@example.test", assignment: "Service cantine", history: ["Entrée démo · 19/10/2020"] },
+    { id: "hr-demo-6", hrId: "HR-DEM-006", firstName: "Jean", lastName: "Kabeya", gender: "M", job: "Agent administratif", service: "Administration", status: "INACTIF", entryDate: "2019-03-18", contact: "jean.kabeya@example.test", assignment: "Archives · historique", history: ["Entrée démo · 18/03/2019", "Passage INACTIF · simulation"] }
   ];
   var CONTRACTS = [
     { id: "contract-demo-1", reference: "CTR-DEM-001", staffId: "hr-demo-1", type: "Exemple durée déterminée", job: "Enseignante", service: "Primaire", startDate: "2023-09-04", endDate: "2027-08-31", status: "ACTIF", deadline: "31/08/2027", observation: "Contrat fictif de démonstration" },
@@ -539,6 +539,21 @@
   }
   function setSession(session) { sessionOverride = session || null; }
 
+  // Résumé démo calculé depuis les fixtures STAFF (dashboard executive KPI).
+  function getDemoSummary() {
+    var actifs = STAFF.filter(function (member) { return member.status === "ACTIF"; });
+    var enseignants = STAFF.filter(function (member) { return /enseignant/i.test(member.job); });
+    return {
+      total: STAFF.length,
+      actifs: actifs.length,
+      inactifs: STAFF.length - actifs.length,
+      femmes: STAFF.filter(function (member) { return member.gender === "F"; }).length,
+      hommes: STAFF.filter(function (member) { return member.gender === "M"; }).length,
+      enseignants: enseignants.length,
+      administration: STAFF.length - enseignants.length
+    };
+  }
+
   root.SchoolSafeHrDemo = {
     render: render,
     open: open,
@@ -548,6 +563,7 @@
     canManageStaff: canManageStaff,
     canReadAttendance: canReadAttendance,
     canReadReports: canReadReports,
+    getDemoSummary: getDemoSummary,
     answerJaspe: answerJaspe
   };
 })(window);

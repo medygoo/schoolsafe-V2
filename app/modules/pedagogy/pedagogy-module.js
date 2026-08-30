@@ -1069,5 +1069,20 @@
       render();
     },
     load: loadAll,
+    // Résumé démo calculé depuis les fixtures (dashboard executive KPI). null hors démo.
+    getDemoSummary: function () {
+      if (!demoState) return null;
+      var subjects = demoState.subjects || [];
+      var assignments = demoState.assignments || [];
+      var teachers = [];
+      (demoState.lessonPlans || []).forEach(function (plan) {
+        var id = plan.teacher_id || (plan.profiles && plan.profiles.display_name) || "";
+        if (id && teachers.indexOf(id) < 0) teachers.push(id);
+      });
+      var assigned = subjects.filter(function (subject) {
+        return assignments.some(function (assignment) { return assignment.subject_id === subject.id; });
+      });
+      return { total: subjects.length, attribuees: assigned.length, nonAttribuees: subjects.length - assigned.length, enseignants: teachers.length };
+    },
   };
 })(window);
