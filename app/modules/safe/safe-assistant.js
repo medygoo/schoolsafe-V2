@@ -167,11 +167,18 @@
       html += '<div class="safe-input-row"><input type="text" id="safeInput" placeholder="Pose ta question…"><button type="button" id="safeSend">Envoyer</button></div>';
       html += '</div></div>';
     }
-    html += '<div class="safe-avatar' + (state.minimized ? " safe-minimized" : "") + '" role="button" tabindex="0" aria-label="Ouvrir Safe">';
-    html += '<img src="' + assetUrl(state.pose) + '" alt="Safe">';
+    html += '<div class="safe-avatar' + (state.minimized ? " safe-minimized" : "") + '" role="button" tabindex="0" aria-label="Ouvrir Jaspe">';
+    html += '<div class="safe-3d-stage" aria-hidden="true"><span class="safe-3d-fallback"><img src="' + assetUrl(state.pose) + '" alt=""><span>Jaspe</span></span></div>';
     html += '</div>';
     container.innerHTML = html;
     bindEvents();
+    mountJaspe3D();
+  }
+
+  function mountJaspe3D() {
+    var stage = container && container.querySelector(".safe-3d-stage");
+    if (!stage || !global.SchoolSafeJaspe3D || typeof global.SchoolSafeJaspe3D.mount !== "function") return;
+    global.SchoolSafeJaspe3D.mount(stage);
   }
 
   function bindEvents() {

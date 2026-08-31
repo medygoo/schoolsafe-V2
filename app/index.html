@@ -18,6 +18,14 @@
       document.documentElement.setAttribute("data-theme", theme);
     })();
   </script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/"
+      }
+    }
+  </script>
   <link rel="stylesheet" href="./styles/design-tokens.css">
   <link rel="stylesheet" href="./styles/components.css">
   <link rel="stylesheet" href="./styles/screens/entry.css">
@@ -87,6 +95,7 @@
   <script src="./modules/parent/parent-portal-demo.js" defer></script>
   <script src="./modules/pedagogy/teacher-pedagogy-demo.js" defer></script>
   <script src="./modules/security/guard-security-demo.js" defer></script>
+  <script src="./modules/jaspe3d/jaspe3d-loader.js" defer></script>
   <script src="./modules/safe/safe-assistant.js" defer></script>
   <script src="./modules/core/access.js" defer></script>
   <script src="./modules/safe/jaspe-governance.js" defer></script>
