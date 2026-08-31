@@ -2459,26 +2459,22 @@
     var bottomNav = document.getElementById("workspaceBottomNav");
     if (bottomNav) {
       bottomNav.hidden = false;
-      if (!window.__ssBottomNavObserver) {
-        window.__ssBottomNavObserver = new MutationObserver(function () {
-          bottomNav.hidden = dashboardContainer ? dashboardContainer.hidden : false;
-        });
-        if (dashboardContainer) window.__ssBottomNavObserver.observe(dashboardContainer, { attributes: true, attributeFilter: ["hidden"] });
-      }
       document.querySelectorAll("#workspaceBottomNav [data-bottom-nav]").forEach(function (btn) {
         btn.addEventListener("click", function () {
           var target = btn.getAttribute("data-bottom-nav");
-          if (target !== "create") {
-            document.querySelectorAll("#workspaceBottomNav .ss-bottom-nav__item").forEach(function (item) { item.classList.remove("active"); });
-            if (btn.classList.contains("ss-bottom-nav__item")) btn.classList.add("active");
-          }
-          if (target === "dashboard" || target === "board") {
+          document.querySelectorAll("#workspaceBottomNav .ss-bottom-nav__item").forEach(function (item) { item.classList.remove("active"); });
+          btn.classList.add("active");
+          if (target === "dashboard") {
             showDashboard();
             window.scrollTo({ top: 0, behavior: "smooth" });
             return;
           }
-          if (target === "notifications") {
-            toggleDropdown("notificationsDropdown", "topbarNotifications");
+          if (target === "jaspe") {
+            if (window.SafeAssistant && typeof window.SafeAssistant.openWithQuery === "function") {
+              window.SafeAssistant.openWithQuery("");
+            } else {
+              notify("Jaspe est momentanément indisponible.");
+            }
             return;
           }
           if (target === "menu") {
@@ -2486,11 +2482,6 @@
             var backdrop = document.getElementById("workspaceMenuBackdrop");
             if (sidebar) sidebar.classList.add("open");
             if (backdrop) backdrop.classList.add("visible");
-            return;
-          }
-          if (target === "create") {
-            renderFabMenu(accessUser);
-            toggleFabMenu(true);
             return;
           }
           notify(target + " — navigation rapide.");

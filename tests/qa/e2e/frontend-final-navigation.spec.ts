@@ -51,6 +51,62 @@ test.describe("Phase M2 — navigation et accessibilité des modules", () => {
     await expect(page.locator("#dashboardContainer")).toBeVisible();
   });
 
+  for (const viewport of [
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+    { width: 430, height: 932 },
+  ]) {
+    test(`nettoie la bottom-nav sans masquer le contenu à ${viewport.width}x${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await enterDemoWorkspace(page, "admin");
+      await page.waitForFunction(() => (window as any).__SCHOOLSAFE_JASPE3D__?.loaded === true);
+
+      const nav = page.locator("#workspaceBottomNav");
+      await expect(nav).toBeVisible();
+      const entries = await nav.locator("[data-bottom-nav]").evaluateAll((buttons) => buttons.map((button) => ({
+        target: button.getAttribute("data-bottom-nav"),
+        label: button.textContent?.trim(),
+      })));
+      expect(entries).toEqual([
+        { target: "dashboard", label: "Dashboard" },
+        { target: "jaspe", label: "Jaspe" },
+        { target: "menu", label: "Menu" },
+      ]);
+
+      const layout = await page.evaluate(() => {
+        const navElement = document.getElementById("workspaceBottomNav")!;
+        const navRect = navElement.getBoundingClientRect();
+        const buttons = Array.from(navElement.querySelectorAll("button")).map((button) => button.getBoundingClientRect());
+        const content = document.querySelector(".workspace-content") as HTMLElement;
+        const contentPaddingBottom = Number.parseFloat(getComputedStyle(content).paddingBottom);
+        const overlaps = buttons.some((button, index) => buttons.slice(index + 1).some((other) => (
+          Math.max(0, Math.min(button.right, other.right) - Math.max(button.left, other.left))
+          * Math.max(0, Math.min(button.bottom, other.bottom) - Math.max(button.top, other.top))
+        ) > 0));
+        return {
+          navInside: navRect.left >= 0 && navRect.right <= innerWidth && navRect.bottom <= innerHeight && navRect.bottom >= innerHeight - 1,
+          overlaps,
+          overflow: document.documentElement.scrollWidth > innerWidth + 1,
+          contentClearsNav: contentPaddingBottom >= navRect.height,
+        };
+      });
+      expect(layout).toEqual({ navInside: true, overlaps: false, overflow: false, contentClearsNav: true });
+
+      expect(await page.locator(".safe-3d-stage canvas").count()).toBe(1);
+      await domClick(page, '[data-bottom-nav="jaspe"]');
+      await expect(page.locator("#safeJaspeBubble")).toBeVisible();
+      expect(await page.locator(".safe-3d-stage canvas").count()).toBe(1);
+
+      await domClick(page, '[data-bottom-nav="menu"]');
+      await expect(page.locator("#workspaceSidebar.open")).toBeVisible();
+      await domClick(page, '#workspaceNav [data-branch="inventory"]');
+      await expect(page.locator("#inventoryModule")).toBeVisible();
+      await expect(nav).toBeVisible();
+      await domClick(page, '[data-bottom-nav="dashboard"]');
+      await expect(page.locator("#dashboardContainer")).toBeVisible();
+    });
+  }
+
   test("les modules B à L déjà livrés n’ouvrent aucun état prochaine étape", async ({ page }) => {
     await enterDemoWorkspace(page, "admin");
     const modules: Array<[string, string]> = [
