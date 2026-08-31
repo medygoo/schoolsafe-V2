@@ -305,7 +305,7 @@
       html += '</div></div>';
     }
     html += '<div class="safe-avatar' + (state.minimized ? " safe-minimized" : "") + '" role="button" tabindex="0" aria-label="' + (state.open ? "Fermer Jaspe" : "Ouvrir Jaspe") + '" aria-expanded="' + (state.open ? "true" : "false") + '" aria-controls="safeJaspeBubble">';
-    html += '<div class="safe-3d-stage" aria-hidden="true"><span class="safe-3d-fallback"><span class="safe-3d-fallback__mark">J</span><span>Jaspe reste disponible</span></span></div>';
+    html += '<div class="safe-3d-stage" aria-hidden="true"></div>';
     html += '</div>';
     container.innerHTML = html;
     bindEvents();

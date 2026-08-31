@@ -14,8 +14,8 @@
 }
 
 .safe-avatar {
-  width: 112px;
-  height: 168px;
+  width: 192px;
+  height: 272px;
   cursor: grab;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
   touch-action: none;
@@ -49,31 +49,6 @@
   height: 100%;
   pointer-events: none;
 }
-
-.safe-3d-fallback {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  place-items: center;
-  align-content: center;
-  gap: var(--ss-space-1);
-  color: var(--ss-text-accent);
-  font-size: var(--ss-text-xs);
-  font-weight: var(--ss-font-bold);
-  text-align: center;
-}
-
-.safe-3d-fallback__mark {
-  display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--ss-text-accent) 30%, transparent);
-  border-radius: var(--ss-radius-full);
-  background: color-mix(in srgb, var(--ss-bg-primary) 82%, transparent);
-  font-size: var(--ss-text-lg);
-}
-.safe-3d-stage.is-ready .safe-3d-fallback { opacity: 0; }
 
 .safe-bubble {
   position: fixed;
@@ -148,17 +123,17 @@
 @keyframes safe-pop { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 1024px) {
-  .safe-avatar { width: 88px; height: 132px; }
+  .safe-avatar { width: 152px; height: 216px; }
   .safe-bubble { width: 280px; }
 }
 
 @media (max-width: 600px) {
-  .safe-avatar { width: 72px; height: 108px; }
+  .safe-avatar { width: 104px; height: 156px; }
   .safe-bubble { width: 266px; }
 }
 
 @media (max-height: 500px) {
-  .safe-avatar { width: 64px; height: 96px; }
+  .safe-avatar { width: 88px; height: 132px; }
   .safe-bubble { width: min(280px, calc(100vw - 24px)); }
 }
 

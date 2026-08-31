@@ -179,6 +179,83 @@ test.describe("JASPE 3D — personnage flottant et déplaçable", () => {
     expect(bubbleInside).toBe(true);
   });
 
+  test("adapte une présence 3D lisible du desktop au mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await enterWorkspaceWithoutOnboarding(page);
+
+    for (const expected of [
+      { viewport: { width: 1440, height: 900 }, minWidth: 180, minHeight: 250 },
+      { viewport: { width: 834, height: 1112 }, minWidth: 140, minHeight: 205 },
+      { viewport: { width: 390, height: 844 }, minWidth: 96, minHeight: 145 },
+      { viewport: { width: 844, height: 390 }, minWidth: 80, minHeight: 120 },
+    ]) {
+      await page.setViewportSize(expected.viewport);
+      await page.waitForTimeout(80);
+      const size = await page.locator(".safe-avatar").evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      });
+      expect(size.width, `${expected.viewport.width}x${expected.viewport.height}`).toBeGreaterThanOrEqual(expected.minWidth);
+      expect(size.height, `${expected.viewport.width}x${expected.viewport.height}`).toBeGreaterThanOrEqual(expected.minHeight);
+    }
+  });
+
+  test("cadre le corps complet avec une marge de sécurité réelle", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await enterWorkspaceWithoutOnboarding(page);
+
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 834, height: 1112 },
+      { width: 390, height: 844 },
+      { width: 844, height: 390 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.waitForTimeout(80);
+      const framing = await page.evaluate(() => (window as any).__SCHOOLSAFE_JASPE3D__?.framing);
+      expect(framing, `${viewport.width}x${viewport.height}`).toEqual(expect.objectContaining({
+        minX: expect.any(Number),
+        maxX: expect.any(Number),
+        minY: expect.any(Number),
+        maxY: expect.any(Number),
+      }));
+      expect(framing.minX).toBeGreaterThanOrEqual(-0.9);
+      expect(framing.maxX).toBeLessThanOrEqual(0.9);
+      expect(framing.minY).toBeGreaterThanOrEqual(-0.88);
+      expect(framing.maxY).toBeLessThanOrEqual(0.88);
+    }
+  });
+
+  test("ne laisse ni case rigide ni ancien placeholder sous la 3D", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await enterWorkspaceWithoutOnboarding(page);
+
+    const visual = await page.evaluate(() => {
+      const stage = document.querySelector(".safe-3d-stage") as HTMLElement;
+      const canvas = stage.querySelector("canvas") as HTMLCanvasElement;
+      const stageRect = stage.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      const style = getComputedStyle(stage);
+      return {
+        backgroundColor: style.backgroundColor,
+        backgroundImage: style.backgroundImage,
+        borderWidth: style.borderTopWidth,
+        boxShadow: style.boxShadow,
+        placeholderCount: stage.querySelectorAll(".safe-3d-fallback, .safe-3d-fallback__mark").length,
+        canvasFillsStage: Math.abs(canvasRect.width - stageRect.width) < 1 && Math.abs(canvasRect.height - stageRect.height) < 1,
+      };
+    });
+
+    expect(visual).toEqual({
+      backgroundColor: "rgba(0, 0, 0, 0)",
+      backgroundImage: "none",
+      borderWidth: "0px",
+      boxShadow: "none",
+      placeholderCount: 0,
+      canvasFillsStage: true,
+    });
+  });
+
   test("reste utilisable au clavier, réduit les mouvements et ne bloque pas la navigation", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: "reduce" });

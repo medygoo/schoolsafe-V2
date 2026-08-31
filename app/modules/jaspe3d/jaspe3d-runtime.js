@@ -10,6 +10,7 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
   let mixer = null;
   let activeAction = null;
   let resizeObserver = null;
+  let modelBounds = null;
   let animationFrame = 0;
   let loadPromise = null;
   let pendingAction = "Idle";
@@ -19,6 +20,7 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
   let fpsFrames = 0;
   let destroyed = false;
   const actions = new Map();
+  const MODEL_FRAME_FILL = 0.78;
   const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
 
   diagnostics.threeVersion = THREE.REVISION;
@@ -61,18 +63,52 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
     diagnostics.instanceCount = 1;
   }
 
+  function updateFramingDiagnostics() {
+    if (!modelBounds || !camera) return;
+    scene.updateMatrixWorld(true);
+    camera.updateMatrixWorld(true);
+    const points = [];
+    for (const x of [modelBounds.min.x, modelBounds.max.x]) {
+      for (const y of [modelBounds.min.y, modelBounds.max.y]) {
+        for (const z of [modelBounds.min.z, modelBounds.max.z]) {
+          points.push(new THREE.Vector3(x, y, z).project(camera));
+        }
+      }
+    }
+    diagnostics.framing = {
+      minX: Number(Math.min(...points.map((point) => point.x)).toFixed(4)),
+      maxX: Number(Math.max(...points.map((point) => point.x)).toFixed(4)),
+      minY: Number(Math.min(...points.map((point) => point.y)).toFixed(4)),
+      maxY: Number(Math.max(...points.map((point) => point.y)).toFixed(4)),
+    };
+  }
+
+  function fitCameraToModel() {
+    if (!modelBounds || !camera) return;
+    const center = modelBounds.getCenter(new THREE.Vector3());
+    const size = modelBounds.getSize(new THREE.Vector3());
+    const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * Math.max(camera.aspect, 0.01));
+    const distanceForHeight = (size.y / 2) / (Math.tan(verticalFov / 2) * MODEL_FRAME_FILL);
+    const distanceForWidth = (size.x / 2) / (Math.tan(horizontalFov / 2) * MODEL_FRAME_FILL);
+    const distance = Math.max(distanceForHeight, distanceForWidth) + (size.z / 2);
+    camera.position.set(center.x, center.y, center.z + distance);
+    camera.lookAt(center);
+    camera.near = Math.max(0.01, distance - size.z - size.y);
+    camera.far = Math.max(20, distance + size.z + size.y * 3);
+    camera.updateProjectionMatrix();
+    updateFramingDiagnostics();
+  }
+
   function fitModel() {
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
     model.position.x -= center.x;
     model.position.y -= box.min.y;
     model.position.z -= center.z;
-    camera.position.set(0, Math.max(size.y * 0.5, 0.9), Math.max(size.y * 1.42, 2.4));
-    camera.lookAt(0, Math.max(size.y * 0.48, 0.85), 0);
-    camera.near = 0.01;
-    camera.far = Math.max(20, size.y * 8);
-    camera.updateProjectionMatrix();
+    model.updateMatrixWorld(true);
+    modelBounds = new THREE.Box3().setFromObject(model);
+    fitCameraToModel();
   }
 
   function validateClips(clips) {
@@ -129,6 +165,7 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    fitCameraToModel();
   }
 
   function renderFrame(now) {
@@ -222,6 +259,7 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
     actions.clear();
     diagnostics.loaded = false;
     diagnostics.instanceCount = 0;
+    diagnostics.framing = null;
   }
 
   return { mount, play, destroy };

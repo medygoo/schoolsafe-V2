@@ -14,6 +14,7 @@
     loadMs: null,
     fps: null,
     rendererInfo: null,
+    framing: null,
     reducedMotion: false,
     errors: [],
   };

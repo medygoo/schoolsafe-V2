@@ -40,7 +40,11 @@ test.describe("JASPE 3D — retrait de la présentation 2D", () => {
 
     expect(await page.locator('img[src*="safe2d"], img[src*="safe_"]').count()).toBe(0);
     await expect(page.locator('[data-open-jaspe="dashboard"]:visible')).toHaveCount(1);
-    await expect(page.locator(".safe-3d-fallback")).toContainText("Jaspe reste disponible");
+    await expect(page.locator(".safe-3d-fallback, .safe-3d-fallback__mark")).toHaveCount(0);
+    await expect(page.locator('.safe-3d-stage.is-ready canvas[aria-hidden="true"]')).toHaveCount(1);
+    await expect(page.locator(".safe-avatar")).toHaveAttribute("aria-label", "Ouvrir Jaspe");
+    await page.locator('[data-open-jaspe="dashboard"]:visible').click();
+    await expect(page.locator(".safe-bubble-body")).toBeVisible();
     expect(missingAssets).toEqual([]);
   });
 
