@@ -2,6 +2,10 @@
   "use strict";
 
   var DEFAULT_ANIMATION = "Idle";
+  var POSITION_STORAGE_KEY = "schoolsafe-v2-jaspe-position";
+  var VIEWPORT_MARGIN = 12;
+  var BUBBLE_GAP = 12;
+  var DRAG_THRESHOLD = 5;
 
   // Branche de navigation associée à chaque entrée FAQ qui pointe vers une
   // fonctionnalité (null = sujet général, toujours disponible).
@@ -88,6 +92,10 @@
   };
 
   var container = null;
+  var floatingPosition = null;
+  var layoutFrame = 0;
+  var viewportListenersBound = false;
+  var suppressAvatarClickUntil = 0;
 
   function init() {
     if (container) return;
@@ -96,10 +104,127 @@
     container.className = "safe-assistant";
     container.setAttribute("aria-label", "Assistant Jaspe");
     document.body.appendChild(container);
+    floatingPosition = readStoredPosition();
     render();
     maybeStartOnboarding();
     listenToAppEvents();
     listenToLaunchers();
+    listenToViewport();
+  }
+
+  function readStoredPosition() {
+    try {
+      var parsed = JSON.parse(global.localStorage.getItem(POSITION_STORAGE_KEY) || "null");
+      if (parsed && Number.isFinite(parsed.left) && Number.isFinite(parsed.top)) {
+        return { left: parsed.left, top: parsed.top };
+      }
+    } catch (e) { /* stockage indisponible ou valeur obsolète */ }
+    return null;
+  }
+
+  function storePosition() {
+    if (!floatingPosition) return;
+    try {
+      global.localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify({
+        left: Math.round(floatingPosition.left * 100) / 100,
+        top: Math.round(floatingPosition.top * 100) / 100,
+      }));
+    } catch (e) { /* Jaspe reste déplaçable sans stockage persistant */ }
+  }
+
+  function visibleBottomLimit() {
+    var limit = global.innerHeight - VIEWPORT_MARGIN;
+    var bottomNav = document.querySelector(".ss-bottom-nav");
+    if (!bottomNav) return limit;
+    var style = global.getComputedStyle ? global.getComputedStyle(bottomNav) : null;
+    var rect = bottomNav.getBoundingClientRect();
+    var visible = (!style || (style.display !== "none" && style.visibility !== "hidden")) && rect.height > 0 && rect.top < global.innerHeight;
+    return visible ? Math.min(limit, rect.top - VIEWPORT_MARGIN) : limit;
+  }
+
+  function clampPosition(left, top) {
+    var avatar = container && container.querySelector(".safe-avatar");
+    var width = avatar ? avatar.offsetWidth : 0;
+    var height = avatar ? avatar.offsetHeight : 0;
+    var maxLeft = Math.max(VIEWPORT_MARGIN, global.innerWidth - VIEWPORT_MARGIN - width);
+    var maxTop = Math.max(VIEWPORT_MARGIN, visibleBottomLimit() - height);
+    return {
+      left: Math.min(maxLeft, Math.max(VIEWPORT_MARGIN, Number(left) || 0)),
+      top: Math.min(maxTop, Math.max(VIEWPORT_MARGIN, Number(top) || 0)),
+    };
+  }
+
+  function defaultPosition() {
+    return clampPosition(global.innerWidth, visibleBottomLimit());
+  }
+
+  function applyFloatingPosition(left, top, persist) {
+    if (!container || !container.querySelector(".safe-avatar")) return;
+    floatingPosition = clampPosition(left, top);
+    container.style.left = floatingPosition.left + "px";
+    container.style.top = floatingPosition.top + "px";
+    container.dataset.positioned = "true";
+    if (persist) storePosition();
+    layoutBubble();
+  }
+
+  function layoutBubble() {
+    if (!container) return;
+    var avatar = container.querySelector(".safe-avatar");
+    var bubble = container.querySelector(".safe-bubble");
+    if (!avatar || !bubble) return;
+
+    var avatarRect = avatar.getBoundingClientRect();
+    var bubbleWidth = bubble.offsetWidth;
+    var bubbleHeight = bubble.offsetHeight;
+    var usableBottom = visibleBottomLimit();
+    var leftSpace = avatarRect.left - VIEWPORT_MARGIN;
+    var rightSpace = global.innerWidth - VIEWPORT_MARGIN - avatarRect.right;
+    var placement = leftSpace >= bubbleWidth + BUBBLE_GAP
+      ? "left"
+      : (rightSpace >= bubbleWidth + BUBBLE_GAP ? "right" : "top");
+    var left;
+    var top;
+
+    if (placement === "left") {
+      left = avatarRect.left - bubbleWidth - BUBBLE_GAP;
+      top = avatarRect.top + (avatarRect.height - bubbleHeight) / 2;
+    } else if (placement === "right") {
+      left = avatarRect.right + BUBBLE_GAP;
+      top = avatarRect.top + (avatarRect.height - bubbleHeight) / 2;
+    } else {
+      left = avatarRect.left + (avatarRect.width - bubbleWidth) / 2;
+      top = avatarRect.top - bubbleHeight - BUBBLE_GAP;
+    }
+
+    var maxBubbleLeft = Math.max(VIEWPORT_MARGIN, global.innerWidth - VIEWPORT_MARGIN - bubbleWidth);
+    var maxBubbleTop = Math.max(VIEWPORT_MARGIN, usableBottom - bubbleHeight);
+    left = Math.min(maxBubbleLeft, Math.max(VIEWPORT_MARGIN, left));
+    top = Math.min(maxBubbleTop, Math.max(VIEWPORT_MARGIN, top));
+    bubble.style.left = left + "px";
+    bubble.style.top = top + "px";
+    bubble.classList.remove("safe-bubble--left", "safe-bubble--right", "safe-bubble--top");
+    bubble.classList.add("safe-bubble--" + placement);
+    bubble.dataset.placement = placement;
+  }
+
+  function scheduleLayout(persistClamp) {
+    if (!container) return;
+    if (layoutFrame && typeof global.cancelAnimationFrame === "function") global.cancelAnimationFrame(layoutFrame);
+    var run = function () {
+      layoutFrame = 0;
+      var target = floatingPosition || defaultPosition();
+      applyFloatingPosition(target.left, target.top, !!persistClamp);
+    };
+    layoutFrame = typeof global.requestAnimationFrame === "function" ? global.requestAnimationFrame(run) : global.setTimeout(run, 0);
+  }
+
+  function listenToViewport() {
+    if (viewportListenersBound || !global.addEventListener) return;
+    viewportListenersBound = true;
+    var recalculate = function () { scheduleLayout(true); };
+    global.addEventListener("resize", recalculate, { passive: true });
+    global.addEventListener("orientationchange", recalculate, { passive: true });
   }
 
   function refreshAccess() {
@@ -166,7 +291,7 @@
     container.hidden = false;
     var html = "";
     if (state.open) {
-      html += '<div class="safe-bubble">';
+      html += '<div class="safe-bubble" id="safeJaspeBubble" role="dialog" aria-label="Dialogue Jaspe">';
       html += '<div class="safe-bubble-header"><strong>Jaspe</strong><button class="safe-bubble-close" aria-label="Fermer">✕</button></div>';
       html += '<div class="safe-bubble-body"><p>' + escape(state.currentMessage) + '</p>';
       if (state.suggestions.length) {
@@ -179,12 +304,13 @@
       html += '<div class="safe-input-row"><input type="text" id="safeInput" placeholder="Pose ta question…"><button type="button" id="safeSend">Envoyer</button></div>';
       html += '</div></div>';
     }
-    html += '<div class="safe-avatar' + (state.minimized ? " safe-minimized" : "") + '" role="button" tabindex="0" aria-label="Ouvrir Jaspe">';
+    html += '<div class="safe-avatar' + (state.minimized ? " safe-minimized" : "") + '" role="button" tabindex="0" aria-label="' + (state.open ? "Fermer Jaspe" : "Ouvrir Jaspe") + '" aria-expanded="' + (state.open ? "true" : "false") + '" aria-controls="safeJaspeBubble">';
     html += '<div class="safe-3d-stage" aria-hidden="true"><span class="safe-3d-fallback"><span class="safe-3d-fallback__mark">J</span><span>Jaspe reste disponible</span></span></div>';
     html += '</div>';
     container.innerHTML = html;
     bindEvents();
     mountJaspe3D();
+    scheduleLayout(false);
   }
 
   function mountJaspe3D() {
@@ -203,7 +329,21 @@
 
   function bindEvents() {
     var avatar = container.querySelector(".safe-avatar");
-    if (avatar) avatar.addEventListener("click", toggleOpen);
+    if (avatar) {
+      avatar.addEventListener("click", function (event) {
+        if (Date.now() < suppressAvatarClickUntil) {
+          event.preventDefault();
+          return;
+        }
+        toggleOpen();
+      });
+      avatar.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        toggleOpen();
+      });
+      bindDrag(avatar);
+    }
 
     var closeBtn = container.querySelector(".safe-bubble-close");
     if (closeBtn) closeBtn.addEventListener("click", function (e) { e.stopPropagation(); closeBubble(); });
@@ -218,6 +358,49 @@
     if (sendBtn) sendBtn.addEventListener("click", function () { if (input) handleUserInput(input.value); });
     if (input) input.addEventListener("input", function () { playVisual("Listening", { once: false }); });
     if (input) input.addEventListener("keydown", function (e) { if (e.key === "Enter") handleUserInput(input.value); });
+  }
+
+  function bindDrag(avatar) {
+    var drag = null;
+
+    avatar.addEventListener("pointerdown", function (event) {
+      if (typeof event.button === "number" && event.button !== 0) return;
+      var rect = container.getBoundingClientRect();
+      drag = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        left: rect.left,
+        top: rect.top,
+        moved: false,
+      };
+      container.classList.add("is-dragging");
+      try { avatar.setPointerCapture(event.pointerId); } catch (e) { /* capture optionnelle */ }
+      event.preventDefault();
+    });
+
+    avatar.addEventListener("pointermove", function (event) {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      var deltaX = event.clientX - drag.startX;
+      var deltaY = event.clientY - drag.startY;
+      if (!drag.moved && Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD) drag.moved = true;
+      if (!drag.moved) return;
+      event.preventDefault();
+      applyFloatingPosition(drag.left + deltaX, drag.top + deltaY, false);
+    });
+
+    var finishDrag = function (event) {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      if (drag.moved) {
+        suppressAvatarClickUntil = Date.now() + 300;
+        storePosition();
+      }
+      container.classList.remove("is-dragging");
+      try { avatar.releasePointerCapture(event.pointerId); } catch (e) { /* capture optionnelle */ }
+      drag = null;
+    };
+    avatar.addEventListener("pointerup", finishDrag);
+    avatar.addEventListener("pointercancel", finishDrag);
   }
 
   function listenToLaunchers() {
