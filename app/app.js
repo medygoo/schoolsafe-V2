@@ -3024,7 +3024,10 @@
     else stopImageRotation();
     if (name === "guardian") startGuardianGallery();
     else stopGuardianGallery();
-    if (name === "workspace") renderWorkspace(document.getElementById("demoRole").value || currentDemoRole);
+    if (name === "workspace") {
+      renderWorkspace(document.getElementById("demoRole").value || currentDemoRole);
+      if (window.SafeAssistant && typeof window.SafeAssistant.refreshAccess === "function") window.SafeAssistant.refreshAccess();
+    }
     icons();
   }
   window.schoolSafeShow = showScreen;

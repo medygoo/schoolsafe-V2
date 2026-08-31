@@ -102,6 +102,22 @@
     listenToAppEvents();
   }
 
+  function refreshAccess() {
+    if (!container) {
+      init();
+      return !!container;
+    }
+    if (!isAllowed()) {
+      container.innerHTML = "";
+      container.hidden = true;
+      if (global.SchoolSafeJaspe3D && typeof global.SchoolSafeJaspe3D.destroy === "function") global.SchoolSafeJaspe3D.destroy();
+      return false;
+    }
+    container.hidden = false;
+    render();
+    return true;
+  }
+
   function hasCompletedOnboarding() {
     try { return localStorage.getItem("safe_onboarding_done") === "1"; } catch (e) { return true; }
   }
@@ -513,7 +529,7 @@
     });
   }
 
-  global.SafeAssistant = { init: init, isAllowed: isAllowed, openWithQuery: openWithQuery };
+  global.SafeAssistant = { init: init, isAllowed: isAllowed, openWithQuery: openWithQuery, refreshAccess: refreshAccess };
   if (global.document && (global.document.readyState === "complete" || global.document.readyState === "interactive")) {
     init();
   } else if (global.addEventListener) {

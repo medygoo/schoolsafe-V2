@@ -117,6 +117,8 @@
 
 @media (max-width: 768px) {
   .safe-assistant { bottom: 16px; right: 16px; }
+  .screen-workspace .safe-assistant { right: 12px; bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .screen-workspace .safe-avatar { width: 72px; height: 108px; }
   .safe-bubble { right: -10px; width: 260px; }
   /* Sur l'écran de connexion mobile, placer Safe en haut à droite pour libérer le formulaire en bas */
   .screen-auth .safe-assistant {

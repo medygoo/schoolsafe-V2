@@ -221,8 +221,9 @@ export async function domClick(page: Page, selector: string) {
   await page.locator(selector).evaluate((element: HTMLElement) => element.click());
 }
 
-export async function enterDemoWorkspace(page: Page, role: string) {
+export async function enterDemoWorkspace(page: Page, role: string, beforeGoto?: (page: Page) => Promise<void>) {
   await setupRoutes(page);
+  if (beforeGoto) await beforeGoto(page);
   await page.goto("/", { waitUntil: "load" });
   await domClick(page, "#enterSplash");
   await expect(page.locator("#guardian.active")).toBeVisible();
