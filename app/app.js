@@ -494,6 +494,9 @@
         window.SchoolSafeGuardSecurity.clear();
       }
     }
+    if (window.SafeAssistant && typeof window.SafeAssistant.setDashboardVisible === "function") {
+      window.SafeAssistant.setDashboardVisible(visible);
+    }
   }
 
   /**
@@ -3026,8 +3029,8 @@
     else stopGuardianGallery();
     if (name === "workspace") {
       renderWorkspace(document.getElementById("demoRole").value || currentDemoRole);
-      if (window.SafeAssistant && typeof window.SafeAssistant.refreshAccess === "function") window.SafeAssistant.refreshAccess();
     }
+    if (window.SafeAssistant && typeof window.SafeAssistant.setSurface === "function") window.SafeAssistant.setSurface(name);
     icons();
   }
   window.schoolSafeShow = showScreen;

@@ -89,6 +89,32 @@ test.describe("JASPE 3D — contrats accès, fallback et performance", () => {
     await page.evaluate(() => (window as any).SafeAssistant.openWithQuery("Qui es-tu ?"));
     await expect(page.locator(".safe-bubble-body")).toContainText("assistante SchoolSafe");
     await expect(page.locator(".safe-3d-stage.is-fallback")).toHaveCount(1);
+    await expect(page.locator(".safe-3d-fallback-label")).toContainText("Jaspe");
+    const fallback = await page.locator(".safe-avatar").boundingBox();
+    expect(fallback!.width).toBeLessThanOrEqual(80);
+    expect(fallback!.height).toBeLessThanOrEqual(80);
+  });
+
+  test("affiche un fallback discret à la Connexion si le GLB échoue", async ({ page }) => {
+    await page.route("**/jaspe-web-v2.glb", (route) => route.abort("failed"));
+    await page.goto("/", { waitUntil: "load" });
+    await domClick(page, "#enterSplash");
+    await domClick(page, "#continueGuardian");
+    await expect(page.locator("#auth.active")).toBeVisible();
+    await expect(page.locator(".safe-3d-fallback-label")).toContainText("Jaspe");
+    const layout = await page.evaluate(() => {
+      const avatar = document.querySelector(".safe-avatar")!.getBoundingClientRect();
+      const form = document.querySelector("#loginForm")!.getBoundingClientRect();
+      return {
+        width: avatar.width,
+        height: avatar.height,
+        overlap: Math.max(0, Math.min(avatar.right, form.right) - Math.max(avatar.left, form.left))
+          * Math.max(0, Math.min(avatar.bottom, form.bottom) - Math.max(avatar.top, form.top)),
+      };
+    });
+    expect(layout.width).toBeLessThanOrEqual(80);
+    expect(layout.height).toBeLessThanOrEqual(80);
+    expect(layout.overlap).toBe(0);
   });
 
   test("conserve l’assistant HTML si WebGL est indisponible", async ({ page }) => {
@@ -111,5 +137,30 @@ test.describe("JASPE 3D — contrats accès, fallback et performance", () => {
     expect(await page.evaluate(() => (window as any).SafeAssistant.isAllowed())).toBe(false);
     await expect(page.locator(".safe-assistant")).toBeHidden();
     expect(await page.evaluate(() => (window as any).__SCHOOLSAFE_JASPE3D__?.instanceCount)).toBe(0);
+  });
+
+  test("annule un GLB retardé si un DENY intervient pendant le chargement", async ({ page }) => {
+    const glb = readFileSync(path.resolve(ROOT, "app/assets/jaspe3d/jaspe-web-v2.glb"));
+    await page.route("**/jaspe-web-v2.glb", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      await route.fulfill({ status: 200, contentType: "model/gltf-binary", body: glb });
+    });
+    await enterDemoWorkspace(page, "admin");
+    await page.evaluate(() => {
+      (window as any).currentSession = null;
+      (window as any).SchoolSafeAppContext.getCurrentUser = () => ({
+        permissions: ["safe.assistant.use"],
+        deniedPermissions: ["safe.assistant.use"],
+        scopes: [{ permission: "safe.assistant.use", type: "own" }],
+      });
+      (window as any).SafeAssistant.refreshAccess();
+    });
+    await page.waitForTimeout(900);
+
+    await expect(page.locator(".safe-assistant, .safe-3d-stage canvas")).toHaveCount(0);
+    expect(await page.evaluate(() => ({
+      loaded: (window as any).__SCHOOLSAFE_JASPE3D__?.loaded,
+      instances: (window as any).__SCHOOLSAFE_JASPE3D__?.instanceCount,
+    }))).toEqual({ loaded: false, instances: 0 });
   });
 });

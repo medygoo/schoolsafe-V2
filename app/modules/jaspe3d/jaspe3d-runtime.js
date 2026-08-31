@@ -15,6 +15,7 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
   let loadPromise = null;
   let pendingAction = "Idle";
   let pendingOptions = {};
+  let pendingFacing = 0;
   let lastFrameAt = performance.now();
   let fpsWindowAt = lastFrameAt;
   let fpsFrames = 0;
@@ -124,9 +125,15 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
     const startedAt = performance.now();
     loadPromise = new Promise((resolve, reject) => {
       new GLTFLoader().load(modelUrl, (gltf) => {
+        if (destroyed) {
+          disposeObjectTree(gltf.scene);
+          resolve(false);
+          return;
+        }
         try {
           validateClips(gltf.animations);
           model = gltf.scene;
+          model.rotation.y = pendingFacing;
           model.traverse((object) => {
             if (object.isMesh) {
               object.frustumCulled = false;
@@ -139,7 +146,9 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
           mixer = new THREE.AnimationMixer(model);
           gltf.animations.forEach((clip) => actions.set(clip.name, mixer.clipAction(clip)));
           mixer.addEventListener("finished", () => {
-            if (diagnostics.currentAction !== "Idle") play("Idle", { once: false, fadeSeconds: 0.18 });
+            if (diagnostics.currentAction !== "Idle" && pendingOptions.returnToIdle !== false) {
+              play("Idle", { once: false, fadeSeconds: 0.18 });
+            }
           });
           diagnostics.loaded = true;
           diagnostics.loadMs = Number((performance.now() - startedAt).toFixed(1));
@@ -152,7 +161,10 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
         } catch (error) {
           reject(error);
         }
-      }, undefined, reject);
+      }, undefined, (error) => {
+        if (destroyed) resolve(false);
+        else reject(error);
+      });
     }).catch(recordError);
     return loadPromise;
   }
@@ -207,7 +219,7 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
       host.classList.add("is-ready");
     }
     await loadModel();
-    return true;
+    return !destroyed;
   }
 
   function play(actionName, options = {}) {
@@ -221,6 +233,8 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
     const fadeSeconds = options.fadeSeconds ?? 0.2;
     if (activeAction && activeAction !== nextAction) activeAction.fadeOut(fadeSeconds);
     nextAction.reset();
+    nextAction.setEffectiveTimeScale(1);
+    if (Number(options.durationSeconds) > 0) nextAction.setDuration(Number(options.durationSeconds));
     nextAction.enabled = true;
     nextAction.clampWhenFinished = once;
     nextAction.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
@@ -240,6 +254,25 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
     material.dispose();
   }
 
+  function disposeObjectTree(root) {
+    root?.traverse((object) => {
+      if (!object.isMesh) return;
+      object.geometry?.dispose();
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.filter(Boolean).forEach(disposeMaterial);
+    });
+  }
+
+  function setFacing(yawRadians) {
+    pendingFacing = Number.isFinite(Number(yawRadians)) ? Number(yawRadians) : 0;
+    if (!model) return false;
+    model.rotation.y = pendingFacing;
+    model.updateMatrixWorld(true);
+    modelBounds = new THREE.Box3().setFromObject(model);
+    fitCameraToModel();
+    return true;
+  }
+
   function destroy() {
     destroyed = true;
     if (animationFrame) globalThis.cancelAnimationFrame(animationFrame);
@@ -247,12 +280,7 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
     resizeObserver?.disconnect();
     resizeObserver = null;
     mixer?.stopAllAction();
-    model?.traverse((object) => {
-      if (!object.isMesh) return;
-      object.geometry?.dispose();
-      const materials = Array.isArray(object.material) ? object.material : [object.material];
-      materials.filter(Boolean).forEach(disposeMaterial);
-    });
+    disposeObjectTree(model);
     renderer?.dispose();
     renderer?.forceContextLoss();
     renderer?.domElement.remove();
@@ -262,5 +290,5 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
     diagnostics.framing = null;
   }
 
-  return { mount, play, destroy };
+  return { mount, play, setFacing, destroy };
 }

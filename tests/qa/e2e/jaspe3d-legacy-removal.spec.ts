@@ -48,7 +48,7 @@ test.describe("JASPE 3D — retrait de la présentation 2D", () => {
     expect(missingAssets).toEqual([]);
   });
 
-  test("nomme toujours l’assistant visible Jaspe, y compris pendant l’onboarding", async ({ page }) => {
+  test("nomme toujours l’assistant visible Jaspe sans relancer un onboarding Workspace", async ({ page }) => {
     await page.addInitScript(() => localStorage.removeItem("safe_onboarding_done"));
     await page.route("**/assistant-name-fixture", (route) => {
       return route.fulfill({
@@ -61,11 +61,8 @@ test.describe("JASPE 3D — retrait de la présentation 2D", () => {
 
     const assistant = page.locator(".safe-assistant");
     await expect(assistant).toHaveAttribute("aria-label", "Assistant Jaspe");
-    await expect(page.locator(".safe-bubble-header strong")).toHaveText("Jaspe");
-    await expect(page.locator(".safe-bubble-body p")).toContainText("Je suis Jaspe");
-
-    await page.getByRole("button", { name: "Plus tard" }).click();
     await page.locator('[data-open-jaspe="fixture"]').click();
+    await expect(page.locator(".safe-bubble-header strong")).toHaveText("Jaspe");
     await expect(page.locator(".safe-bubble-body p")).toContainText("Je suis Jaspe");
 
     await enterDemoWorkspace(page, "admin");

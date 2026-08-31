@@ -23,6 +23,8 @@
   var latestHost = null;
   var pendingAction = "Idle";
   var pendingOptions = {};
+  var pendingFacing = 0;
+  var lifecycleGeneration = 0;
 
   global.__SCHOOLSAFE_JASPE3D__ = diagnostics;
 
@@ -40,8 +42,10 @@
 
   function loadModule() {
     if (!modulePromise) {
+      var generation = lifecycleGeneration;
       var moduleUrl = new URL("./modules/jaspe3d/jaspe3d-runtime.js", global.document.baseURI).href;
       modulePromise = import(moduleUrl).then(function (runtime) {
+        if (generation !== lifecycleGeneration) return null;
         controller = runtime.createJaspe3DController({
           diagnostics: diagnostics,
           expectedActions: EXPECTED_ACTIONS,
@@ -55,11 +59,14 @@
 
   function mount(host) {
     if (!host) return Promise.resolve(null);
+    var generation = lifecycleGeneration;
     latestHost = host;
     host.classList.add("is-loading");
     return loadModule().then(function (runtime) {
-      if (!runtime || latestHost !== host) return runtime;
-      return runtime.mount(host).then(function () {
+      if (!runtime || generation !== lifecycleGeneration || latestHost !== host) return null;
+      return runtime.mount(host).then(function (mounted) {
+        if (!mounted || generation !== lifecycleGeneration || latestHost !== host) return null;
+        runtime.setFacing(pendingFacing);
         return runtime.play(pendingAction, pendingOptions);
       });
     }).catch(recordError);
@@ -73,17 +80,29 @@
     return Promise.resolve(controller.play(actionName, pendingOptions));
   }
 
+  function setFacing(yawRadians) {
+    pendingFacing = Number.isFinite(Number(yawRadians)) ? Number(yawRadians) : 0;
+    if (!controller || typeof controller.setFacing !== "function") return false;
+    return controller.setFacing(pendingFacing);
+  }
+
   function destroy() {
+    lifecycleGeneration += 1;
     latestHost = null;
-    if (controller) controller.destroy();
+    var staleController = controller;
     controller = null;
     modulePromise = null;
+    if (staleController) staleController.destroy();
+    diagnostics.loaded = false;
+    diagnostics.instanceCount = 0;
+    diagnostics.currentAction = null;
   }
 
   global.SchoolSafeJaspe3D = {
     EXPECTED_ACTIONS: EXPECTED_ACTIONS.slice(),
     mount: mount,
     play: play,
+    setFacing: setFacing,
     destroy: destroy,
     getDiagnostics: function () { return diagnostics; },
   };

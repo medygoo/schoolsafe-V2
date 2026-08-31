@@ -93,23 +93,99 @@
 
   var container = null;
   var floatingPosition = null;
+  var customPosition = false;
   var layoutFrame = 0;
   var viewportListenersBound = false;
   var suppressAvatarClickUntil = 0;
+  var initialized = false;
+  var currentSurface = "";
+  var dashboardVisible = true;
+  var authGreetingStarted = false;
+  var authGreetingCompleted = false;
+  var authGreetingTimers = [];
 
   function init() {
-    if (container) return;
-    if (!isAllowed()) return; // session réelle sans safe.assistant.use : Jaspe ne s’initialise pas
+    if (initialized) return;
+    initialized = true;
+    listenToAppEvents();
+    listenToLaunchers();
+    listenToViewport();
+    setSurface(detectSurface());
+  }
+
+  function detectSurface() {
+    var names = ["splash", "guardian", "auth", "setup", "workspace"];
+    for (var index = 0; index < names.length; index += 1) {
+      var name = names[index];
+      if (document.body.classList.contains("screen-" + name)) return name;
+      var screen = document.getElementById(name);
+      if (screen && screen.classList.contains("active")) return name;
+    }
+    return "splash";
+  }
+
+  function surfaceSupportsJaspe(name) {
+    return name === "auth" || name === "workspace";
+  }
+
+  function ensureContainer() {
+    if (container) return container;
     container = document.createElement("div");
     container.className = "safe-assistant";
     container.setAttribute("aria-label", "Assistant Jaspe");
     document.body.appendChild(container);
-    floatingPosition = readStoredPosition();
+    return container;
+  }
+
+  function clearAuthGreetingTimers() {
+    authGreetingTimers.forEach(function (timer) { global.clearTimeout(timer); });
+    authGreetingTimers = [];
+    if (authGreetingStarted && !authGreetingCompleted) authGreetingStarted = false;
+    if (container) container.classList.remove("is-auth-entering");
+  }
+
+  function removeVisualSurface(destroyRuntime) {
+    clearAuthGreetingTimers();
+    if (container) {
+      container.remove();
+      container = null;
+    }
+    if (destroyRuntime && global.SchoolSafeJaspe3D && typeof global.SchoolSafeJaspe3D.destroy === "function") {
+      global.SchoolSafeJaspe3D.destroy();
+    }
+  }
+
+  function setSurface(name) {
+    var nextSurface = name || detectSurface();
+    if (nextSurface !== currentSurface) {
+      clearAuthGreetingTimers();
+      currentSurface = nextSurface;
+      floatingPosition = currentSurface === "workspace" ? readStoredPosition() : null;
+      customPosition = !!floatingPosition;
+      if (currentSurface === "auth") {
+        dashboardVisible = true;
+        state.minimized = false;
+      }
+    }
+    if (!surfaceSupportsJaspe(currentSurface)) {
+      removeVisualSurface(true);
+      return false;
+    }
+    if (!isAllowed()) {
+      removeVisualSurface(true);
+      return false;
+    }
+    ensureContainer();
+    container.hidden = false;
+    container.dataset.surface = currentSurface;
+    if (currentSurface !== "auth") {
+      clearAuthGreetingTimers();
+      state.open = false;
+      state.onboardingIndex = -1;
+      state.animation = "Idle";
+    }
     render();
-    maybeStartOnboarding();
-    listenToAppEvents();
-    listenToLaunchers();
-    listenToViewport();
+    return true;
   }
 
   function readStoredPosition() {
@@ -123,13 +199,22 @@
   }
 
   function storePosition() {
-    if (!floatingPosition) return;
+    if (!floatingPosition || currentSurface !== "workspace") return;
     try {
       global.localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify({
         left: Math.round(floatingPosition.left * 100) / 100,
         top: Math.round(floatingPosition.top * 100) / 100,
       }));
     } catch (e) { /* Jaspe reste déplaçable sans stockage persistant */ }
+  }
+
+  function clearStoredPosition() {
+    if (currentSurface === "workspace") {
+      try { global.localStorage.removeItem(POSITION_STORAGE_KEY); } catch (e) { /* reset visuel sans stockage */ }
+    }
+    customPosition = false;
+    floatingPosition = null;
+    scheduleLayout(false);
   }
 
   function visibleBottomLimit() {
@@ -155,16 +240,30 @@
   }
 
   function defaultPosition() {
+    var selector = currentSurface === "auth"
+      ? "#authJaspeAnchor"
+      : (dashboardVisible ? ".dashboard-hero:not([hidden]) .hero-jaspe-anchor" : "");
+    var anchors = selector ? document.querySelectorAll(selector) : [];
+    var avatar = container && container.querySelector(".safe-avatar");
+    for (var index = 0; index < anchors.length; index += 1) {
+      var rect = anchors[index].getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      return clampPosition(
+        rect.left + (rect.width - (avatar ? avatar.offsetWidth : 0)) / 2,
+        rect.top + (rect.height - (avatar ? avatar.offsetHeight : 0)) / 2
+      );
+    }
     return clampPosition(global.innerWidth, visibleBottomLimit());
   }
 
-  function applyFloatingPosition(left, top, persist) {
+  function applyFloatingPosition(left, top, persist, rememberPosition) {
     if (!container || !container.querySelector(".safe-avatar")) return;
-    floatingPosition = clampPosition(left, top);
-    container.style.left = floatingPosition.left + "px";
-    container.style.top = floatingPosition.top + "px";
+    var nextPosition = clampPosition(left, top);
+    if (rememberPosition !== false) floatingPosition = nextPosition;
+    container.style.left = nextPosition.left + "px";
+    container.style.top = nextPosition.top + "px";
     container.dataset.positioned = "true";
-    if (persist) storePosition();
+    if (persist && rememberPosition !== false) storePosition();
     layoutBubble();
   }
 
@@ -213,8 +312,10 @@
     if (layoutFrame && typeof global.cancelAnimationFrame === "function") global.cancelAnimationFrame(layoutFrame);
     var run = function () {
       layoutFrame = 0;
-      var target = floatingPosition || defaultPosition();
-      applyFloatingPosition(target.left, target.top, !!persistClamp);
+      var mayUseCustomPosition = currentSurface === "workspace" && dashboardVisible && customPosition && floatingPosition;
+      var target = mayUseCustomPosition ? floatingPosition : defaultPosition();
+      var transientDock = currentSurface === "workspace" && !dashboardVisible;
+      applyFloatingPosition(target.left, target.top, !!persistClamp && customPosition, !transientDock);
     };
     layoutFrame = typeof global.requestAnimationFrame === "function" ? global.requestAnimationFrame(run) : global.setTimeout(run, 0);
   }
@@ -228,19 +329,16 @@
   }
 
   function refreshAccess() {
-    if (!container) {
-      init();
-      return !!container;
-    }
-    if (!isAllowed()) {
-      container.innerHTML = "";
-      container.hidden = true;
-      if (global.SchoolSafeJaspe3D && typeof global.SchoolSafeJaspe3D.destroy === "function") global.SchoolSafeJaspe3D.destroy();
+    if (!initialized) init();
+    if (!surfaceSupportsJaspe(currentSurface || detectSurface())) {
+      removeVisualSurface(true);
       return false;
     }
-    container.hidden = false;
-    render();
-    return true;
+    if (!isAllowed()) {
+      removeVisualSurface(true);
+      return false;
+    }
+    return setSurface(currentSurface || detectSurface());
   }
 
   function hasCompletedOnboarding() {
@@ -282,7 +380,7 @@
   }
 
   function render() {
-    if (!container) return;
+    if (!container || !surfaceSupportsJaspe(currentSurface)) return;
     if (!isAllowed()) { // session devenue réelle sans safe.assistant.use : masquer Jaspe
       container.innerHTML = "";
       container.hidden = true;
@@ -292,7 +390,7 @@
     var html = "";
     if (state.open) {
       html += '<div class="safe-bubble" id="safeJaspeBubble" role="dialog" aria-label="Dialogue Jaspe">';
-      html += '<div class="safe-bubble-header"><strong>Jaspe</strong><button class="safe-bubble-close" aria-label="Fermer">✕</button></div>';
+      html += '<div class="safe-bubble-header"><strong>Jaspe</strong><span class="safe-bubble-tools"><button class="safe-position-reset" type="button" aria-label="Réinitialiser la position de Jaspe" title="Réinitialiser la position de Jaspe">↺</button><button class="safe-bubble-close" aria-label="Fermer">✕</button></span></div>';
       html += '<div class="safe-bubble-body"><p>' + escape(state.currentMessage) + '</p>';
       if (state.suggestions.length) {
         html += '<div class="safe-suggestions">';
@@ -316,9 +414,62 @@
   function mountJaspe3D() {
     var stage = container && container.querySelector(".safe-3d-stage");
     if (!stage || !global.SchoolSafeJaspe3D || typeof global.SchoolSafeJaspe3D.mount !== "function") return;
-    global.SchoolSafeJaspe3D.mount(stage).then(function () {
-      playVisual(state.animation, { once: state.animation !== "Idle" && state.animation !== "Listening" });
+    if (typeof global.SchoolSafeJaspe3D.setFacing === "function") {
+      global.SchoolSafeJaspe3D.setFacing(currentSurface === "auth" ? -0.16 : 0);
+    }
+    global.SchoolSafeJaspe3D.mount(stage).then(function (mounted) {
+      if (!stage.isConnected) return;
+      if (!mounted) {
+        showJaspeFallback(stage);
+        return;
+      }
+      if (container) container.classList.remove("has-3d-fallback");
+      if (currentSurface === "auth") startAuthGreeting();
+      else playVisual(state.animation, { once: state.animation !== "Idle" && state.animation !== "Listening" });
     });
+  }
+
+  function showJaspeFallback(stage) {
+    stage.classList.remove("is-loading", "is-ready");
+    stage.classList.add("is-fallback");
+    stage.innerHTML = '<span class="safe-3d-fallback-label">Jaspe</span>';
+    if (container) container.classList.add("has-3d-fallback");
+    scheduleLayout(false);
+  }
+
+  function startAuthGreeting() {
+    if (authGreetingStarted || authGreetingCompleted || currentSurface !== "auth") return;
+    authGreetingStarted = true;
+    var diagnostics = global.SchoolSafeJaspe3D && global.SchoolSafeJaspe3D.getDiagnostics
+      ? global.SchoolSafeJaspe3D.getDiagnostics()
+      : null;
+    if (diagnostics && diagnostics.reducedMotion) {
+      playVisual("Idle", { once: false });
+      authGreetingCompleted = true;
+      return;
+    }
+    if (container) container.classList.add("is-auth-entering");
+    playVisual("Wave", { once: true, fadeSeconds: 0.12, durationSeconds: 1.08, returnToIdle: false });
+    authGreetingTimers.push(global.setTimeout(function () {
+      if (currentSurface === "auth") playVisual("FormalBow", { once: true, fadeSeconds: 0.14, durationSeconds: 1.12, returnToIdle: false });
+    }, 1150));
+    authGreetingTimers.push(global.setTimeout(function () {
+      if (currentSurface === "auth") playVisual("TalkHandsOpen", { once: true, fadeSeconds: 0.14, durationSeconds: 1.28, returnToIdle: false });
+    }, 2350));
+    authGreetingTimers.push(global.setTimeout(function () {
+      if (currentSurface !== "auth") return;
+      playVisual("Idle", { once: false, fadeSeconds: 0.18 });
+      authGreetingCompleted = true;
+      if (container) container.classList.remove("is-auth-entering");
+    }, 3800));
+  }
+
+  function setDashboardVisible(visible) {
+    dashboardVisible = visible !== false;
+    if (currentSurface !== "workspace" || !container) return;
+    state.minimized = !dashboardVisible;
+    if (!dashboardVisible) state.open = false;
+    render();
   }
 
   function playVisual(animation, options) {
@@ -347,6 +498,8 @@
 
     var closeBtn = container.querySelector(".safe-bubble-close");
     if (closeBtn) closeBtn.addEventListener("click", function (e) { e.stopPropagation(); closeBubble(); });
+    var resetBtn = container.querySelector(".safe-position-reset");
+    if (resetBtn) resetBtn.addEventListener("click", function (e) { e.stopPropagation(); clearStoredPosition(); });
 
     var suggestions = container.querySelectorAll("[data-suggestion]");
     suggestions.forEach(function (btn) {
@@ -393,6 +546,7 @@
       if (!drag || event.pointerId !== drag.pointerId) return;
       if (drag.moved) {
         suppressAvatarClickUntil = Date.now() + 300;
+        customPosition = true;
         storePosition();
       }
       container.classList.remove("is-dragging");
@@ -717,7 +871,7 @@
     });
   }
 
-  global.SafeAssistant = { init: init, isAllowed: isAllowed, openWithQuery: openWithQuery, refreshAccess: refreshAccess };
+  global.SafeAssistant = { init: init, isAllowed: isAllowed, openWithQuery: openWithQuery, refreshAccess: refreshAccess, setSurface: setSurface, setDashboardVisible: setDashboardVisible };
   if (global.document && (global.document.readyState === "complete" || global.document.readyState === "interactive")) {
     init();
   } else if (global.addEventListener) {

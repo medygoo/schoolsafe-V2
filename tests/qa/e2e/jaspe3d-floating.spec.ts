@@ -42,8 +42,23 @@ test.describe("JASPE 3D — personnage flottant et déplaçable", () => {
     await enterWorkspaceWithoutOnboarding(page);
 
     const before = await avatarLayout(page);
-    expect(before.viewportWidth - before.right).toBeCloseTo(12, 0);
-    expect(before.bottomNavTop - before.bottom).toBeCloseTo(12, 0);
+    const guidedDefault = await page.evaluate(() => {
+      const avatar = document.querySelector(".safe-avatar")!.getBoundingClientRect();
+      const anchor = Array.from(document.querySelectorAll(".hero-jaspe-anchor"))
+        .find((element) => element.getBoundingClientRect().width > 0)!.getBoundingClientRect();
+      return {
+        centerX: avatar.left + avatar.width / 2,
+        centerY: avatar.top + avatar.height / 2,
+        anchorLeft: anchor.left,
+        anchorRight: anchor.right,
+        anchorTop: anchor.top,
+        anchorBottom: anchor.bottom,
+      };
+    });
+    expect(guidedDefault.centerX).toBeGreaterThanOrEqual(guidedDefault.anchorLeft);
+    expect(guidedDefault.centerX).toBeLessThanOrEqual(guidedDefault.anchorRight);
+    expect(guidedDefault.centerY).toBeGreaterThanOrEqual(guidedDefault.anchorTop);
+    expect(guidedDefault.centerY).toBeLessThanOrEqual(guidedDefault.anchorBottom);
     await page.mouse.move(before.left + before.width / 2, before.top + before.height / 2);
     await page.mouse.down();
     await page.mouse.move(180, 220, { steps: 8 });
@@ -64,6 +79,8 @@ test.describe("JASPE 3D — personnage flottant et déplaçable", () => {
     expect(rerendered.top).toBeCloseTo(moved.top, 0);
 
     await page.reload({ waitUntil: "load" });
+    await expect(page.locator(".safe-avatar")).toHaveCount(0);
+    await enterDemoWorkspace(page, "admin");
     await expect(page.locator(".safe-avatar")).toBeVisible();
     const reloaded = await avatarLayout(page);
     expect(reloaded.left).toBeCloseTo(moved.left, 0);

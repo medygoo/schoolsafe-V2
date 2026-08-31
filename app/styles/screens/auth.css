@@ -138,13 +138,20 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  gap: var(--ss-space-12);
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 250px) 420px;
+  gap: var(--ss-space-6);
   align-items: center;
-  width: min(1180px, calc(100% - var(--ss-space-12)));
+  width: min(1320px, calc(100% - var(--ss-space-12)));
   height: 100%;
   margin: 0 auto;
   padding: var(--ss-space-8) 0;
+}
+
+.auth-jaspe-anchor {
+  align-self: center;
+  width: 100%;
+  min-height: min(430px, 56svh);
+  pointer-events: none;
 }
 
 /* --------------------------------------------------------------------------
@@ -524,10 +531,10 @@
    -------------------------------------------------------------------------- */
 @media (max-width: 1024px) {
   .auth-layout {
-    grid-template-columns: 1fr;
-    width: min(520px, calc(100% - var(--ss-space-8)));
+    grid-template-columns: minmax(150px, 180px) minmax(0, 1fr);
+    width: min(780px, calc(100% - var(--ss-space-8)));
     align-content: center;
-    gap: var(--ss-space-6);
+    gap: var(--ss-space-5);
   }
 
   .auth-message {
@@ -540,6 +547,10 @@
 
   .auth-screen .login-panel {
     margin-top: var(--ss-space-10);
+  }
+
+  .auth-jaspe-anchor {
+    min-height: 300px;
   }
 }
 
@@ -554,15 +565,28 @@
   }
 
   .auth-layout {
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: var(--ss-space-2);
     width: calc(100% - var(--ss-space-5));
     align-items: end;
-    padding-bottom: 120px;
+    padding-bottom: 88px;
   }
 
   .auth-screen .login-panel {
     margin: 0;
     padding: var(--ss-space-4);
     background: linear-gradient(180deg, color-mix(in srgb, var(--ss-navy-950) 44%, transparent), color-mix(in srgb, var(--ss-navy-950) 30%, transparent));
+  }
+
+  .auth-screen .label-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .auth-jaspe-anchor {
+    min-height: 188px;
+    align-self: center;
   }
 
   .auth-footer {
