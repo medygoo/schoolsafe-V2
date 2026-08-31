@@ -34,7 +34,7 @@
         averages: [{ subject: "Mathématiques", value: "14 / 20" }, { subject: "Français", value: "12 / 20" }],
         overall: "13 / 20",
         bulletin: "Aperçu disponible · document officiel BACKEND_LATER",
-        ranking: "7e position · aperçu autorisé",
+        ranking: "7e position · APERÇU DE DÉMONSTRATION · NON OFFICIEL",
         difficulty: "Lecture des consignes longues",
         remediation: "Fiche d’exercices guidés · information de démonstration"
       },
@@ -325,7 +325,7 @@
       '<section class="pedagogy-panel parent-readonly-panel"><h2>Évaluations</h2>' + evaluations + '</section>' +
       '<section class="pedagogy-panel parent-readonly-panel"><h2>Moyennes</h2>' + (gradesAllowed ? '<p class="parent-overall">Moyenne générale <strong>' + escapeMarkup(data.overall) + '</strong></p>' : '') + averages + '</section>' +
       (reportsAllowed ? '<section class="pedagogy-panel parent-readonly-panel"><h2>Bulletin</h2><p>' + escapeMarkup(data.bulletin) + '</p><span class="parent-feature-source">FEATURE_LATER / BACKEND_LATER</span></section>' : unavailablePanel("Bulletin", "Rapport pédagogique non autorisé")) +
-      (rankingAllowed ? '<section class="pedagogy-panel parent-readonly-panel"><h2>Palmarès</h2><p>' + escapeMarkup(data.ranking) + '</p><span class="parent-feature-source">Visible uniquement si autorisé</span></section>' : unavailablePanel("Palmarès", "Palmarès non autorisé")) +
+      (rankingAllowed ? '<section class="pedagogy-panel parent-readonly-panel"><h2>Palmarès</h2><p>' + escapeMarkup(data.ranking) + '</p><span class="parent-feature-source">CALCUL_BACKEND_LATER · enfant lié uniquement</span></section>' : unavailablePanel("Palmarès", "Palmarès non autorisé")) +
       (reportsAllowed ? '<section class="pedagogy-panel parent-readonly-panel"><h2>Difficultés et suivi</h2><p>' + escapeMarkup(data.difficulty) + '</p><span class="parent-feature-source">Aperçu de démonstration</span></section>' : unavailablePanel("Difficultés et suivi", "Rapport pédagogique non autorisé")) +
       (reportsAllowed ? '<section class="pedagogy-panel parent-readonly-panel"><h2>Rattrapage</h2><p>' + escapeMarkup(data.remediation) + '</p><span class="parent-feature-source">Information uniquement</span></section>' : unavailablePanel("Rattrapage", "Rapport pédagogique non autorisé")) +
       '</div><aside class="parent-readonly-boundary">' + icon("eye") + '<p>Consultation seule : aucune cote, moyenne, difficulté ou décision pédagogique ne peut être modifiée ici.</p></aside></div>';
@@ -341,6 +341,37 @@
       size: "full",
       className: "parent-pedagogy-modal",
       content: pedagogyMarkup(child, user || {}),
+      actions: [{ label: "Fermer", variant: "secondary" }]
+    });
+    if (root.lucide) root.lucide.createIcons();
+    return true;
+  }
+
+  function palmaresMarkup(child, user) {
+    if (!scopeAllowsChild(user, "palmarques.read", child)) return "";
+    var header = '<header class="parent-feature-header"><div><p class="parent-eyebrow">Palmarès Parent · own_children</p><h1>' +
+      escapeMarkup(childName(child)) + '</h1><p>Lecture limitée à l’enfant lié sélectionné · aucun autre élève détaillé.</p></div><span>APERÇU NON OFFICIEL</span></header>';
+    if (child.lifecycle_status !== "active" || !child.pedagogy) {
+      return '<div class="parent-palmares">' + header + '<aside class="parent-pedagogy-draft"><strong>EN PRÉPARATION</strong><p>Aucun classement officiel n’est disponible pour ce dossier non opérationnel.</p></aside></div>';
+    }
+    return '<div class="parent-palmares">' + header + '<div class="parent-pedagogy-grid">' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Position de l’enfant</h2><p class="parent-overall">' + escapeMarkup(child.pedagogy.ranking) + '</p><span class="parent-feature-source">Vue classe / école publiée future · enfant lié uniquement</span></section>' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Podium et Top 10</h2><p>La publication serveur pourra fournir le contexte du classement. Les données détaillées des autres élèves restent masquées au Parent.</p><span class="parent-feature-source">PUBLICATION_BACKEND_LATER</span></section>' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Critères futurs</h2><p>Résultats validés · progression · effort / régularité.</p><span class="parent-feature-source">Aucune formule figée dans le frontend</span></section>' +
+      '<section class="pedagogy-panel parent-readonly-panel"><h2>Mentions / distinctions</h2><p>Préparation d’affichage uniquement après calcul et publication officiels.</p><span class="parent-feature-source">BACKEND_LATER</span></section>' +
+      '</div><aside class="parent-readonly-boundary">' + icon("calculator") + '<p><strong>CALCUL_BACKEND_LATER</strong> · cet aperçu local n’est pas un résultat officiel et n’exécute aucune formule de classement.</p></aside></div>';
+  }
+
+  function openPalmares(childId, user) {
+    var linked = getLinkedChildren(user || {});
+    var child = linked.find(function (item) { return item.id === childId; });
+    if (!child || !scopeAllowsChild(user || {}, "palmarques.read", child) || !root.ssModal) return false;
+    root.ssModal({
+      title: "Palmarès Parent",
+      subtitle: "Lecture filtrée sur own_children",
+      size: "full",
+      className: "parent-palmares-modal",
+      content: palmaresMarkup(child, user || {}),
       actions: [{ label: "Fermer", variant: "secondary" }]
     });
     if (root.lucide) root.lucide.createIcons();
@@ -526,7 +557,7 @@
     if (/palmares|classement/.test(text)) {
       if (!scopeAllowsChild(user, "palmarques.read", child)) return jaspeRefusal("le palmarès n’est pas visible.");
       if (!child.pedagogy) return { message: childName(child) + " est EN PRÉPARATION : aucune donnée pédagogique officielle n’est disponible." };
-      return { message: childName(child) + " · " + child.pedagogy.ranking + " · consultation seule." };
+      return { message: childName(child) + " · " + child.pedagogy.ranking + " · consultation seule · CALCUL_BACKEND_LATER." };
     }
 
     if (/recu/.test(text)) {
@@ -611,6 +642,7 @@
     return [
       ["Dossier", "folder-user", scopeAllowsChild(user, "school.student.read", child)],
       ["Pédagogie", "book-open-check", someScopeAllowsChild(user, PEDAGOGY_PERMISSIONS, child)],
+      ["Palmarès", "trophy", scopeAllowsChild(user, "palmarques.read", child)],
       ["Communications", "messages-square", scopeAllowsChild(user, "communication.message.send", child)],
       ["Finance", "receipt-text", someScopeAllowsChild(user, FINANCE_PERMISSIONS, child)],
       ["Sécurité", "shield-check", someScopeAllowsChild(user, SECURITY_PERMISSIONS, child)],
@@ -740,6 +772,10 @@
           openPedagogy(selectedChildId, activeUser);
           return;
         }
+        if (button.getAttribute("data-parent-shortcut") === "palmarès") {
+          openPalmares(selectedChildId, activeUser);
+          return;
+        }
         if (button.getAttribute("data-parent-shortcut") === "finance") {
           openFinance(selectedChildId, activeUser);
           return;
@@ -783,6 +819,7 @@
     openChildDossier: openChildDossier,
     openCommunications: openCommunications,
     openPedagogy: openPedagogy,
+    openPalmares: openPalmares,
     openFinance: openFinance,
     openSecurity: openSecurity,
     openCanteen: openCanteen,

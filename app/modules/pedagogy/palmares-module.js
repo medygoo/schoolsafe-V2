@@ -16,6 +16,7 @@
 
   var container = null;
   var demoState = null;
+  var activeSession = null;
 
   function currentYearMonth() {
     var now = new Date();
@@ -52,21 +53,43 @@
     return isLocalhost && !hasValidSessionToken();
   }
 
-  function getSession() {
-    try {
-      var raw = global.localStorage.getItem("schoolsafe-v2-session");
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
+  function isParent(session) {
+    return !!(session && (session.role === "parent" || (Array.isArray(session.roles) && session.roles.indexOf("parent") >= 0)));
   }
 
-  function isParent(session) {
-    return session && Array.isArray(session.roles) && session.roles.indexOf("parent") >= 0;
+  function explicitDeny(session, permission) {
+    if (Array.isArray(session && session.deniedPermissions) && session.deniedPermissions.indexOf(permission) >= 0) return true;
+    return Array.isArray(session && session.permissionExceptions) && session.permissionExceptions.some(function (item) {
+      return item && item.permission === permission && String(item.effect || "").toLowerCase() === "deny";
+    });
+  }
+
+  function hasPermission(session, permission) {
+    if (explicitDeny(session, permission)) return false;
+    if (global.SchoolSafeAccess && typeof global.SchoolSafeAccess.canAccess === "function") return global.SchoolSafeAccess.canAccess(session || {}, permission);
+    return !!(session && Array.isArray(session.permissions) && session.permissions.indexOf(permission) >= 0);
+  }
+
+  function scopeFor(session, permission) {
+    var scopes = Array.isArray(session && session.scopes) ? session.scopes : [];
+    return scopes.find(function (scope) { return scope && scope.permission === permission; }) || null;
+  }
+
+  function allowsScope(session, permission, type) {
+    var scope = scopeFor(session, permission);
+    return hasPermission(session, permission) && !!scope && scope.type === type;
+  }
+
+  function canReadClass() {
+    return allowsScope(activeSession, "palmarques.read", "assigned_classes") || allowsScope(activeSession, "palmarques.read", "school") || (isParent(activeSession) && allowsScope(activeSession, "palmarques.read", "own_children"));
+  }
+
+  function canReadSchool() {
+    return allowsScope(activeSession, "palmarques.read", "school");
   }
 
   function canManage() {
-    var session = getSession();
-    if (!session || !Array.isArray(session.permissions)) return false;
-    return session.permissions.indexOf("palmarques.manage") >= 0;
+    return allowsScope(activeSession, "palmarques.manage", "school");
   }
 
   function createDemoState() {
@@ -75,8 +98,8 @@
       selectedMonth: currentYearMonth(),
       selectedClassId: "demo-c1",
       rankings: [
-        { id: "demo-r-class", school_id: "demo-school", class_id: "demo-c1", month: currentYearMonth(), status: "published", computed_at: new Date().toISOString() },
-        { id: "demo-r-school", school_id: "demo-school", class_id: null, month: currentYearMonth(), status: "published", computed_at: new Date().toISOString() },
+        { id: "demo-r-class", school_id: "demo-school", class_id: "demo-c1", month: currentYearMonth(), status: "preview", computed_at: new Date().toISOString() },
+        { id: "demo-r-school", school_id: "demo-school", class_id: null, month: currentYearMonth(), status: "preview", computed_at: new Date().toISOString() },
       ],
       currentRanking: null,
       stars: [{ ranking_id: "demo-r-class", student_id: "demo-s1", parent_profile_id: "demo-parent" }],
@@ -108,6 +131,7 @@
 
   async function init(parentContainer, session) {
     container = parentContainer;
+    activeSession = session || {};
     demoState = isDemoMode() ? createDemoState() : null;
     if (demoState) {
       Object.assign(state, demoState);
@@ -140,6 +164,7 @@
   }
 
   async function loadRankingsList() {
+    if (state.activeView === "school" && !canReadSchool()) state.activeView = "class";
     var options = { month: state.selectedMonth };
     if (state.activeView === "class" && state.selectedClassId) options.class_id = state.selectedClassId;
     if (state.activeView === "school") options.class_id = "null";
@@ -209,8 +234,9 @@
 
   async function toggleStar(studentId) {
     if (!state.currentRanking) return;
-    var session = getSession();
+    var session = activeSession;
     if (!session || !isParent(session)) return;
+    if (!allowsScope(session, "palmarques.read", "own_children") || !isParentChild(studentId)) return;
     var existing = state.stars.find(function (s) { return s.student_id === studentId; });
     try {
       if (existing) {
@@ -238,16 +264,21 @@
   }
 
   function hasStarred(studentId) {
-    var session = getSession();
+    var session = activeSession;
     if (!session) return false;
-    return state.stars.some(function (s) { return s.student_id === studentId && s.parent_profile_id === session.profile.id; });
+    var profileId = session.profile && session.profile.id;
+    return state.stars.some(function (s) { return s.student_id === studentId && s.parent_profile_id === profileId; });
   }
 
   function render() {
     if (!container) return;
-    var session = getSession();
+    var session = activeSession;
     var isParentUser = session && isParent(session);
     var html = '<div class="palmares-module">';
+    if (!canReadClass()) {
+      container.innerHTML = global.ssState({ type: "denied", title: "Palmarès non autorisé", message: "palmarques.read avec une portée compatible est requis. Le DENY explicite reste prioritaire." });
+      return;
+    }
     html += renderHeader(isParentUser);
     html += renderControls(isParentUser);
     if (state.loading) html += global.ssState({ type: "loading", title: "Chargement du palmarès", message: "Veuillez patienter pendant le chargement des classements." });
@@ -260,7 +291,7 @@
   }
 
   function renderHeader(isParentUser) {
-    return '<div class="palmares-header"><h2><i data-lucide="trophy"></i> Palmarès</h2><p>' + (isParentUser ? "Top 10 de la classe de votre enfant et de toute l’école" : "Classements mensuels par classe et par école") + '</p></div>';
+    return '<div class="palmares-header"><h2><i data-lucide="trophy"></i> Palmarès</h2><p>' + (isParentUser ? "Position de l’enfant lié uniquement ; aucun autre élève détaillé" : "Vue classe, vue école, podium et Top 10 selon la portée accordée") + '</p><aside class="palmares-draft-badge"><strong>CALCUL_BACKEND_LATER</strong> · aperçu de démonstration non officiel · Aucune formule officielle n\'est exécutée dans le frontend.</aside></div>';
   }
 
   function renderControls(isParentUser) {
@@ -268,7 +299,7 @@
     html += '<label>Mois <input type="month" id="palmaresMonth" value="' + escapeMarkup(state.selectedMonth) + '"></label>';
     html += '<div class="palmares-view-toggle">' +
       '<button type="button" data-view="class" class="' + (state.activeView === "class" ? "active" : "") + '">Par classe</button>' +
-      '<button type="button" data-view="school" class="' + (state.activeView === "school" ? "active" : "") + '">Toute l’école</button>' +
+      (canReadSchool() ? '<button type="button" data-view="school" class="' + (state.activeView === "school" ? "active" : "") + '">Toute l’école</button>' : '') +
       '</div>';
     if (!isParentUser && state.activeView === "class") {
       html += '<label>Classe <select id="palmaresClass">';
@@ -298,8 +329,9 @@
 
   function renderRanking() {
     var entries = (state.currentRanking.entries || []).slice(0, 10);
+    if (isParent(activeSession)) entries = entries.filter(function (entry) { return isParentChild(entry.student_id); });
     var html = '<div class="palmares-ranking">';
-    if (state.currentRanking.status === "draft") html += '<div class="palmares-draft-badge">Brouillon</div>';
+    html += '<div class="palmares-draft-badge">' + (demoState ? "APERÇU LOCAL · NON OFFICIEL" : escapeMarkup(state.currentRanking.status || "ÉTAT À CONFIRMER")) + '</div>';
     html += '<div class="palmares-podium">';
     entries.slice(0, 3).forEach(function (entry, index) {
       html += renderPodiumCard(entry, index);
@@ -312,6 +344,7 @@
       });
       html += '</ol>';
     }
+    html += '<aside class="palmares-draft-badge">Critères futurs : résultats validés · progression · effort / régularité · mentions / distinctions BACKEND_LATER.</aside>';
     html += '</div>';
     return html;
   }
@@ -355,8 +388,9 @@
   }
 
   function renderStarButton(studentId, starred) {
-    var session = getSession();
+    var session = activeSession;
     if (!session || !Array.isArray(session.roles) || session.roles.indexOf("parent") < 0) return '';
+    if (!allowsScope(session, "palmarques.read", "own_children")) return '';
     if (!isParentChild(studentId)) return '';
     return '<button type="button" class="palmares-star-btn' + (starred ? " starred" : "") + '" data-star-student="' + escapeMarkup(studentId) + '">' +
       (starred ? "⭐ Retirer" : "⭐ Encourager") +
@@ -379,7 +413,7 @@
     var computeEmptyBtn = container.querySelector("#palmaresComputeEmpty");
     if (computeEmptyBtn) computeEmptyBtn.addEventListener("click", computeRanking);
     var retryBtn = container.querySelector("#retryPalmares");
-    if (retryBtn) retryBtn.addEventListener("click", function () { init(container, getSession()); });
+    if (retryBtn) retryBtn.addEventListener("click", function () { init(container, activeSession); });
 
     var publishBtn = container.querySelector("#palmaresPublish");
     if (publishBtn) publishBtn.addEventListener("click", publishRanking);
@@ -394,7 +428,7 @@
   }
 
   global.renderPalmaresModule = function (parentContainer, session) {
-    init(parentContainer, session);
+    return init(parentContainer, session);
   };
 
   global.refreshPalmaresModule = function () {

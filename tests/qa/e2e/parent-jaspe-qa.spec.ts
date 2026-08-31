@@ -96,7 +96,7 @@ test.describe("C7-FE — Jaspe Parent et QA finale", () => {
         await expect(page.locator("#parentPortal")).toBeVisible();
         expect(await visibleOverflow(page, "#parentPortal"), `${theme} ${width} dashboard`).toEqual([]);
 
-        const targets = ["dossier", "communications", "pédagogie", "finance", "sécurité", "cantine"];
+        const targets = ["dossier", "communications", "pédagogie", "palmarès", "finance", "sécurité", "cantine"];
         for (const target of targets) {
           await page.locator(`[data-parent-shortcut="${target}"]`).click();
           const dialog = page.getByRole("dialog").last();

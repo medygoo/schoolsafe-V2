@@ -1022,7 +1022,7 @@
     setWorkspaceDashboardVisible(false);
     document.getElementById("cardsProtected").hidden = true;
     if (window.renderPalmaresModule) {
-      window.renderPalmaresModule(document.getElementById("palmaresContent"), currentSession);
+      window.renderPalmaresModule(document.getElementById("palmaresContent"), getCurrentUser());
     }
     document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
   }

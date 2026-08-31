@@ -25,7 +25,7 @@ test.describe("C1-FE — dashboard Parent", () => {
     await expect(page.locator(".parent-dashboard-summary")).toContainText("Devoirs");
     await expect(page.locator(".parent-dashboard-summary")).toContainText("Notification");
     await expect(page.locator(".parent-dashboard-summary")).toContainText("Situation financière");
-    await expect(page.locator("[data-parent-shortcut]")).toHaveCount(6);
+    await expect(page.locator("[data-parent-shortcut]")).toHaveCount(7);
   });
 
   test("change d’enfant sans sortir de own_children", async ({ page }) => {
