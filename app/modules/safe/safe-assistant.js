@@ -2,19 +2,19 @@
   "use strict";
 
   var ASSET_BASE = "./safe2d/";
-  var DEFAULT_POSE = "sourire";
+  var DEFAULT_ANIMATION = "Idle";
 
   // Branche de navigation associée à chaque entrée FAQ qui pointe vers une
   // fonctionnalité (null = sujet général, toujours disponible).
   var faq = [
-    { keywords: ["ajouter", "élève"], question: "Comment ajouter un élève ?", answer: "Va dans Élèves, clique sur « + Ajouter », remplis les informations puis enregistre.", pose: "pointe", branch: "school" },
-    { keywords: ["présence", "appel"], question: "Comment faire l’appel ?", answer: "Va dans Présences, choisis ta classe et la date, marque les absents/retards, puis valide.", pose: "pointe", branch: "pedagogy" },
-    { keywords: ["paiement", "caisse"], question: "Comment enregistrer un paiement ?", answer: "Dans Caisse, clique « + Nouveau paiement », choisis l’élève, le type de frais et le montant.", pose: "pointe", branch: "finance" },
-    { keywords: ["rapport"], question: "Comment générer un rapport ?", answer: "Va dans Rapports, choisis le type et la période, puis clique « Générer ».", pose: "pointe", branch: "reports" },
-    { keywords: ["palmarès", "classement"], question: "C’est quoi le Palmarès ?", answer: "Le Palmarès montre le Top 10 de chaque classe et de toute l’école, basé sur les cotes publiées du mois.", pose: "trophy", branch: "pedagogy" },
-    { keywords: ["qui", "safe"], question: "Qui es-tu ?", answer: "Je suis Safe, ton assistante SchoolSafe ! Pose-moi tes questions.", pose: "clin", branch: null },
-    { keywords: ["bonjour", "salut"], question: "Bonjour !", answer: "Bonjour ! Que veux-tu faire aujourd’hui dans SchoolSafe ?", pose: "salue", branch: null },
-    { keywords: ["aide"], question: "J’ai besoin d’aide", answer: "Je suis là ! Choisis un sujet ci-dessous ou pose ta question.", pose: "accueil", branch: null },
+    { keywords: ["ajouter", "élève"], question: "Comment ajouter un élève ?", answer: "Va dans Élèves, clique sur « + Ajouter », remplis les informations puis enregistre.", animation: "TalkHandsOpen", branch: "school" },
+    { keywords: ["présence", "appel"], question: "Comment faire l’appel ?", answer: "Va dans Présences, choisis ta classe et la date, marque les absents/retards, puis valide.", animation: "TalkHandsOpen", branch: "pedagogy" },
+    { keywords: ["paiement", "caisse"], question: "Comment enregistrer un paiement ?", answer: "Dans Caisse, clique « + Nouveau paiement », choisis l’élève, le type de frais et le montant.", animation: "TalkHandsOpen", branch: "finance" },
+    { keywords: ["rapport"], question: "Comment générer un rapport ?", answer: "Va dans Rapports, choisis le type et la période, puis clique « Générer ».", animation: "TalkHandsOpen", branch: "reports" },
+    { keywords: ["palmarès", "classement"], question: "C’est quoi le Palmarès ?", answer: "Le Palmarès montre le Top 10 de chaque classe et de toute l’école, basé sur les cotes publiées du mois.", animation: "TalkPassionately", branch: "pedagogy" },
+    { keywords: ["qui", "safe"], question: "Qui es-tu ?", answer: "Je suis Safe, ton assistante SchoolSafe ! Pose-moi tes questions.", animation: "TalkHandsOpen", branch: null },
+    { keywords: ["bonjour", "salut"], question: "Bonjour !", answer: "Bonjour ! Que veux-tu faire aujourd’hui dans SchoolSafe ?", animation: "FormalBow", branch: null },
+    { keywords: ["aide"], question: "J’ai besoin d’aide", answer: "Je suis là ! Choisis un sujet ci-dessous ou pose ta question.", animation: "TalkHandsOpen", branch: null },
   ];
 
   // Suggestions par défaut, chacune rattachée à sa branche de navigation.
@@ -25,9 +25,9 @@
   ];
 
   var onboardingSteps = [
-    { pose: "accueil", message: "Bonjour ! Je suis Safe, ton assistante SchoolSafe. Je te fais découvrir l’application en 2 minutes ?" },
-    { pose: "pointe", message: "Le menu à gauche te donne accès à toutes les fonctions : élèves, classes, présences, caisse, rapports…" },
-    { pose: "saute", message: "Tu connais les bases ! Clique sur moi quand tu as une question. 🎉" },
+    { animation: "Wave", message: "Bonjour ! Je suis Safe, ton assistante SchoolSafe. Je te fais découvrir l’application en 2 minutes ?" },
+    { animation: "TalkHandsOpen", message: "Le menu à gauche te donne accès à toutes les fonctions : élèves, classes, présences, caisse, rapports…" },
+    { animation: "TalkPassionately", message: "Tu connais les bases ! Clique sur moi quand tu as une question. 🎉" },
   ];
 
   // Session réelle = token présent (window.currentSession exposé par app.js,
@@ -82,7 +82,7 @@
   var state = {
     open: false,
     minimized: false,
-    pose: DEFAULT_POSE,
+    animation: DEFAULT_ANIMATION,
     currentMessage: "",
     suggestions: defaultSuggestions(),
     onboardingIndex: -1,
@@ -124,11 +124,11 @@
     if (!step) {
       state.onboardingIndex = -1;
       state.currentMessage = "Tu peux me poser tes questions quand tu veux !";
-      state.pose = "sourire";
+      state.animation = "Idle";
       render();
       return;
     }
-    state.pose = step.pose;
+    state.animation = step.animation;
     state.currentMessage = step.message;
     state.suggestions = state.onboardingIndex < onboardingSteps.length - 1
       ? ["Continuer", "Plus tard"]
@@ -136,8 +136,8 @@
     render();
   }
 
-  function assetUrl(pose) {
-    return ASSET_BASE + "safe_" + pose + ".png";
+  function legacyFallbackUrl() {
+    return ASSET_BASE + "safe_sourire.png";
   }
 
   function escape(text) {
@@ -168,7 +168,7 @@
       html += '</div></div>';
     }
     html += '<div class="safe-avatar' + (state.minimized ? " safe-minimized" : "") + '" role="button" tabindex="0" aria-label="Ouvrir Jaspe">';
-    html += '<div class="safe-3d-stage" aria-hidden="true"><span class="safe-3d-fallback"><img src="' + assetUrl(state.pose) + '" alt=""><span>Jaspe</span></span></div>';
+    html += '<div class="safe-3d-stage" aria-hidden="true"><span class="safe-3d-fallback"><img src="' + legacyFallbackUrl() + '" alt=""><span>Jaspe</span></span></div>';
     html += '</div>';
     container.innerHTML = html;
     bindEvents();
@@ -178,7 +178,15 @@
   function mountJaspe3D() {
     var stage = container && container.querySelector(".safe-3d-stage");
     if (!stage || !global.SchoolSafeJaspe3D || typeof global.SchoolSafeJaspe3D.mount !== "function") return;
-    global.SchoolSafeJaspe3D.mount(stage);
+    global.SchoolSafeJaspe3D.mount(stage).then(function () {
+      playVisual(state.animation, { once: state.animation !== "Idle" && state.animation !== "Listening" });
+    });
+  }
+
+  function playVisual(animation, options) {
+    state.animation = animation;
+    if (!global.SchoolSafeJaspe3D || typeof global.SchoolSafeJaspe3D.play !== "function") return;
+    global.SchoolSafeJaspe3D.play(animation, options || { once: animation !== "Idle" && animation !== "Listening" });
   }
 
   function bindEvents() {
@@ -196,6 +204,7 @@
     var input = container.querySelector("#safeInput");
     var sendBtn = container.querySelector("#safeSend");
     if (sendBtn) sendBtn.addEventListener("click", function () { if (input) handleUserInput(input.value); });
+    if (input) input.addEventListener("input", function () { playVisual("Listening", { once: false }); });
     if (input) input.addEventListener("keydown", function (e) { if (e.key === "Enter") handleUserInput(input.value); });
   }
 
@@ -204,7 +213,7 @@
     state.open = !state.open;
     if (state.open && !state.currentMessage) {
       state.currentMessage = "Bonjour ! Je suis Safe, ton assistante SchoolSafe. 😊";
-      state.pose = "salue";
+      state.animation = "Wave";
       state.suggestions = defaultSuggestions();
     }
     render();
@@ -212,6 +221,7 @@
 
   function closeBubble() {
     state.open = false;
+    state.animation = "Idle";
     render();
   }
 
@@ -223,7 +233,7 @@
       handleUserInput(query);
     } else {
       state.currentMessage = "Bonjour ! Je suis Safe, ton assistante SchoolSafe. 😊";
-      state.pose = "salue";
+      state.animation = "Wave";
       state.suggestions = defaultSuggestions();
       render();
     }
@@ -242,7 +252,7 @@
         state.onboardingIndex = -1;
         markOnboardingDone();
         state.currentMessage = "Tu peux me poser tes questions quand tu veux !";
-        state.pose = "sourire";
+        state.animation = "Agree";
         state.suggestions = [];
         render();
       }
@@ -254,13 +264,14 @@
   function handleUserInput(raw) {
     var text = String(raw || "").toLowerCase();
     if (!text) return;
+    playVisual("Listening", { once: false });
 
     var routingContext = global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getAssistantContext === "function"
       ? global.SchoolSafeAppContext.getAssistantContext()
       : { user: assistantUser() };
     if (!global.SchoolSafeJaspeCapabilityRouter || typeof global.SchoolSafeJaspeCapabilityRouter.route !== "function") {
       state.currentMessage = "Jaspe refuse cette demande : le routeur central de capacités est indisponible.";
-      state.pose = "reflechie";
+      state.animation = "Shrug";
       state.suggestions = [];
       render();
       return;
@@ -268,7 +279,7 @@
     var routingDecision = global.SchoolSafeJaspeCapabilityRouter.route(raw, routingContext);
     if (routingDecision && routingDecision.matched && !routingDecision.allowed) {
       state.currentMessage = routingDecision.message;
-      state.pose = "reflechie";
+      state.animation = "Shrug";
       state.suggestions = [];
       render();
       return;
@@ -285,7 +296,7 @@
       var documentAnswer = global.SchoolSafeDocumentAssistant.answer(raw, documentContext);
       if (documentAnswer) {
         state.currentMessage = documentAnswer.message;
-        state.pose = documentAnswer.refusal ? "reflechie" : "sourire";
+        state.animation = documentAnswer.refusal ? "Shrug" : "TalkHandsOpen";
         state.suggestions = [];
         if (!documentAnswer.refusal && documentAnswer.action === "documents" && global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.openDocuments === "function") {
           global.SchoolSafeAppContext.openDocuments();
@@ -304,7 +315,7 @@
         : null;
       if (communicationAnswer) {
         state.currentMessage = communicationAnswer.message;
-        state.pose = communicationAnswer.refusal ? "reflechie" : "sourire";
+        state.animation = communicationAnswer.refusal ? "Shrug" : "TalkHandsOpen";
         state.suggestions = [];
         if (!communicationAnswer.refusal && communicationAnswer.action && global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.openCommunication === "function") {
           global.SchoolSafeAppContext.openCommunication(communicationAnswer.action);
@@ -323,7 +334,7 @@
         : null;
       if (parentAnswer) {
         state.currentMessage = parentAnswer.message;
-        state.pose = parentAnswer.refusal ? "reflechie" : "sourire";
+        state.animation = parentAnswer.refusal ? "Shrug" : "TalkHandsOpen";
         state.suggestions = [];
         render();
         return;
@@ -339,7 +350,7 @@
         : null;
       if (pedagogyAnswer) {
         state.currentMessage = pedagogyAnswer.message;
-        state.pose = pedagogyAnswer.refusal ? "reflechie" : "sourire";
+        state.animation = pedagogyAnswer.refusal ? "Shrug" : "TalkHandsOpen";
         state.suggestions = [];
         render();
         return;
@@ -355,7 +366,7 @@
         : null;
       if (securityAnswer) {
         state.currentMessage = securityAnswer.message;
-        state.pose = securityAnswer.refusal ? "reflechie" : "sourire";
+        state.animation = securityAnswer.refusal ? "Shrug" : "TalkHandsOpen";
         state.suggestions = [];
         render();
         return;
@@ -371,7 +382,7 @@
         : null;
       if (hrAnswer) {
         state.currentMessage = hrAnswer.message;
-        state.pose = hrAnswer.refusal ? "reflechie" : "sourire";
+        state.animation = hrAnswer.refusal ? "Shrug" : "TalkHandsOpen";
         state.suggestions = [];
         if (hrAnswer.action && global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.openHr === "function") {
           global.SchoolSafeAppContext.openHr(hrAnswer.action);
@@ -390,7 +401,7 @@
         : null;
       if (inventoryAnswer) {
         state.currentMessage = inventoryAnswer.message;
-        state.pose = inventoryAnswer.refusal ? "reflechie" : "sourire";
+        state.animation = inventoryAnswer.refusal ? "Shrug" : "TalkHandsOpen";
         state.suggestions = [];
         if (!inventoryAnswer.refusal && inventoryAnswer.action && global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.openInventory === "function") {
           global.SchoolSafeAppContext.openInventory(inventoryAnswer.action);
@@ -409,7 +420,7 @@
         : null;
       if (accountingAnswer) {
         state.currentMessage = accountingAnswer.message;
-        state.pose = accountingAnswer.refusal ? "reflechie" : "sourire";
+        state.animation = accountingAnswer.refusal ? "Shrug" : "TalkHandsOpen";
         state.suggestions = [];
         if (accountingAnswer.action && global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.openAccounting === "function") {
           global.SchoolSafeAppContext.openAccounting(accountingAnswer.action);
@@ -429,7 +440,7 @@
         : null;
       if (financeAnswer) {
         state.currentMessage = financeAnswer.message;
-        state.pose = financeAnswer.refusal ? "reflechie" : "sourire";
+        state.animation = financeAnswer.refusal ? "Shrug" : "TalkHandsOpen";
         state.suggestions = [];
         if (financeAnswer.action && financeAnswer.action !== "fee-control" && typeof global.SchoolSafeFinanceModule.render === "function") {
           global.SchoolSafeFinanceModule.render("financeModule", { tab: financeAnswer.action });
@@ -441,7 +452,7 @@
 
     if (/autorise|autoriser|valide|valider/.test(text) && /sortie|remise|récup|recup/.test(text)) {
       state.currentMessage = "Je ne peux pas autoriser une sortie, valider une remise, suspendre ou rétablir une personne. Ces actions exigent les droits utilisateur correspondants et restent sous contrôle humain.";
-      state.pose = "reflechie";
+      state.animation = "Shrug";
       state.suggestions = defaultSuggestions();
       render();
       return;
@@ -449,7 +460,7 @@
 
     if (/activ/.test(text) && /dossier|élève|eleve/.test(text)) {
       state.currentMessage = "Je ne peux pas exécuter une activation. Ouvrez le dossier élève : l’action exige school.student.activate et reste BACKEND_LATER.";
-      state.pose = "reflechie";
+      state.animation = "Shrug";
       state.suggestions = defaultSuggestions();
       render();
       return;
@@ -457,7 +468,7 @@
 
     if (/valid|change|transf|départ|depart|inactif|archiv/.test(text) && /réinscri|reinscri|classe|élève|eleve|dossier|départ|depart|archiv/.test(text)) {
       state.currentMessage = "Je peux expliquer le parcours, préparer un résumé, une demande ou un brouillon. Je ne peux pas valider une réinscription, changer une classe, transférer un élève, enregistrer un départ, rendre un dossier inactif ou l’archiver.";
-      state.pose = "reflechie";
+      state.animation = "Shrug";
       state.suggestions = defaultSuggestions();
       render();
       return;
@@ -481,10 +492,10 @@
 
     if (best && bestScore >= 1) {
       state.currentMessage = best.answer;
-      state.pose = best.pose;
+      state.animation = best.animation;
     } else {
       state.currentMessage = "Hmm, je ne suis pas sûre de comprendre. Essaie avec d’autres mots, ou choisis un sujet.";
-      state.pose = "pense";
+      state.animation = "Shrug";
     }
     state.suggestions = defaultSuggestions();
     render();
@@ -493,11 +504,11 @@
   function listenToAppEvents() {
     global.addEventListener("safe:event", function (e) {
       var detail = e.detail || {};
-      if (detail.type === "action:success") { state.pose = "pouce"; state.currentMessage = "Parfait, c’est enregistré ! 👍"; }
-      else if (detail.type === "action:big_success") { state.pose = "saute"; state.currentMessage = "Félicitations ! 🎉"; }
-      else if (detail.type === "action:error") { state.pose = "reflechie"; state.currentMessage = "Oups ! " + (detail.message || "Quelque chose n’a pas marché.") + " On réessaie ?"; }
-      else if (detail.type === "loading:start") { state.pose = "pense"; }
-      else if (detail.type === "loading:stop") { state.pose = "sourire"; }
+      if (detail.type === "action:success") { state.animation = "Agree"; state.currentMessage = "Parfait, c’est enregistré ! 👍"; }
+      else if (detail.type === "action:big_success") { state.animation = "TalkPassionately"; state.currentMessage = "Félicitations ! 🎉"; }
+      else if (detail.type === "action:error") { state.animation = "Shrug"; state.currentMessage = "Oups ! " + (detail.message || "Quelque chose n’a pas marché.") + " On réessaie ?"; }
+      else if (detail.type === "loading:start") { state.animation = "Listening"; }
+      else if (detail.type === "loading:stop") { state.animation = "Idle"; }
       if (state.open) render();
     });
   }

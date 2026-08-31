@@ -1466,21 +1466,6 @@ body.screen-workspace {
 }
 
 /* --------------------------------------------------------------------------
-   Safe Assistant repositionné
-   -------------------------------------------------------------------------- */
-.screen-workspace .safe-assistant {
-  display: none;
-}
-
-.screen-workspace[data-active-role="guard"] .safe-assistant,
-.screen-workspace[data-active-role="hr"] .safe-assistant,
-.screen-workspace[data-active-role="finance"] .safe-assistant,
-.screen-workspace[data-active-role="cashier"] .safe-assistant,
-.screen-workspace[data-active-role="accountant"] .safe-assistant {
-  display: block;
-}
-
-/* --------------------------------------------------------------------------
    Responsive
    -------------------------------------------------------------------------- */
 @media (max-width: 1280px) {
