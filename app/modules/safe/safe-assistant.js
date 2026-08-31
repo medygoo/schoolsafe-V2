@@ -103,6 +103,8 @@
   var authGreetingStarted = false;
   var authGreetingCompleted = false;
   var authGreetingTimers = [];
+  var authInputMode = false;
+  var authFocusListenerBound = false;
 
   function init() {
     if (initialized) return;
@@ -110,6 +112,7 @@
     listenToAppEvents();
     listenToLaunchers();
     listenToViewport();
+    listenToAuthFocus();
     setSurface(detectSurface());
   }
 
@@ -159,6 +162,7 @@
     var nextSurface = name || detectSurface();
     if (nextSurface !== currentSurface) {
       clearAuthGreetingTimers();
+      setAuthInputMode(false);
       currentSurface = nextSurface;
       floatingPosition = currentSurface === "workspace" ? readStoredPosition() : null;
       customPosition = !!floatingPosition;
@@ -178,6 +182,7 @@
     ensureContainer();
     container.hidden = false;
     container.dataset.surface = currentSurface;
+    container.classList.toggle("is-auth-suspended", currentSurface === "auth" && authInputMode);
     if (currentSurface !== "auth") {
       clearAuthGreetingTimers();
       state.open = false;
@@ -449,19 +454,41 @@
       return;
     }
     if (container) container.classList.add("is-auth-entering");
-    playVisual("Wave", { once: true, fadeSeconds: 0.12, durationSeconds: 1.08, returnToIdle: false });
+    playVisual("Wave", { once: true, fadeSeconds: 0.14, durationSeconds: 1.45, returnToIdle: false });
     authGreetingTimers.push(global.setTimeout(function () {
-      if (currentSurface === "auth") playVisual("FormalBow", { once: true, fadeSeconds: 0.14, durationSeconds: 1.12, returnToIdle: false });
-    }, 1150));
+      if (currentSurface === "auth") playVisual("FormalBow", { once: true, fadeSeconds: 0.16, durationSeconds: 1.45, returnToIdle: false });
+    }, 1650));
     authGreetingTimers.push(global.setTimeout(function () {
-      if (currentSurface === "auth") playVisual("TalkHandsOpen", { once: true, fadeSeconds: 0.14, durationSeconds: 1.28, returnToIdle: false });
-    }, 2350));
+      if (currentSurface === "auth") playVisual("TalkHandsOpen", { once: true, fadeSeconds: 0.16, durationSeconds: 1.65, returnToIdle: false });
+    }, 3350));
     authGreetingTimers.push(global.setTimeout(function () {
       if (currentSurface !== "auth") return;
       playVisual("Idle", { once: false, fadeSeconds: 0.18 });
       authGreetingCompleted = true;
       if (container) container.classList.remove("is-auth-entering");
-    }, 3800));
+    }, 5300));
+  }
+
+  function setAuthInputMode(active) {
+    authInputMode = active === true;
+    var authScreen = document.getElementById("auth");
+    if (authScreen) authScreen.classList.toggle("auth-is-typing", authInputMode);
+    if (container) container.classList.toggle("is-auth-suspended", currentSurface === "auth" && authInputMode);
+    if (!authInputMode) return;
+    clearAuthGreetingTimers();
+    state.open = false;
+    playVisual("Idle", { once: false, fadeSeconds: 0.16 });
+  }
+
+  function listenToAuthFocus() {
+    if (authFocusListenerBound || !document || typeof document.addEventListener !== "function") return;
+    authFocusListenerBound = true;
+    document.addEventListener("focusin", function (event) {
+      if (currentSurface !== "auth" || authInputMode) return;
+      var target = event.target;
+      if (!target || typeof target.matches !== "function") return;
+      if (target.matches("#emailIdentifier, #phoneIdentifier, #password, #otpIdentifier")) setAuthInputMode(true);
+    });
   }
 
   function setDashboardVisible(visible) {

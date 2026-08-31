@@ -134,7 +134,7 @@ test.describe("JASPE 3D — placement guidé final", () => {
     expect(guidedEntries.every((entry: any) => entry.options?.once === true && entry.options?.durationSeconds > 0 && entry.options?.returnToIdle === false)).toBe(true);
     const wave = result.sequence.find((entry: any) => entry.name === "Wave");
     const finalIdle = [...result.sequence].reverse().find((entry: any) => entry.name === "Idle");
-    expect(finalIdle.at - wave.at).toBeGreaterThanOrEqual(3_000);
+    expect(finalIdle.at - wave.at).toBeGreaterThanOrEqual(5_000);
     expect(finalIdle.at - wave.at).toBeLessThanOrEqual(6_000);
     expect(result.overlapArea).toBe(0);
     expect(result.formEnabled).toBe(true);
@@ -197,6 +197,90 @@ test.describe("JASPE 3D — placement guidé final", () => {
     expect(actions).not.toContain("Wave");
     expect(actions).not.toContain("FormalBow");
     expect(actions).not.toContain("TalkHandsOpen");
+  });
+
+  for (const viewport of [
+    { width: 1440, height: 900, label: "desktop", minimumPanelRatio: 0.72, minimumWidth: 400 },
+    { width: 834, height: 1112, label: "tablette", minimumPanelRatio: 0.68, minimumWidth: 280 },
+    { width: 768, height: 1024, label: "tablette étroite", minimumPanelRatio: 0.62, minimumWidth: 160 },
+    { width: 700, height: 900, label: "intermédiaire", minimumPanelRatio: 0.62, minimumWidth: 160 },
+    { width: 390, height: 844, label: "mobile", minimumPanelRatio: 0.62, minimumWidth: 160 },
+  ]) {
+    test(`donne à Jaspe une présence proche de la hauteur du panneau ${viewport.label}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto("/", { waitUntil: "load" });
+      await domClick(page, "#enterSplash");
+      await domClick(page, "#continueGuardian");
+      await page.waitForFunction(() => (window as any).__SCHOOLSAFE_JASPE3D__?.loaded === true);
+
+      const layout = await page.evaluate(() => {
+        const avatar = document.querySelector(".safe-avatar")!.getBoundingClientRect();
+        const panel = document.querySelector("#loginForm")!.getBoundingClientRect();
+        const overlap = Math.max(0, Math.min(avatar.right, panel.right) - Math.max(avatar.left, panel.left))
+          * Math.max(0, Math.min(avatar.bottom, panel.bottom) - Math.max(avatar.top, panel.top));
+        return {
+          width: avatar.width,
+          heightRatio: avatar.height / panel.height,
+          overlap,
+          avatarInside: avatar.left >= 0 && avatar.right <= innerWidth && avatar.top >= 0 && avatar.bottom <= innerHeight,
+          overflow: document.documentElement.scrollWidth > innerWidth + 1,
+          avatar: { left: avatar.left, right: avatar.right, top: avatar.top, bottom: avatar.bottom },
+          viewport: { width: innerWidth, height: innerHeight },
+        };
+      });
+      expect(layout.width).toBeGreaterThanOrEqual(viewport.minimumWidth);
+      expect(layout.heightRatio).toBeGreaterThanOrEqual(viewport.minimumPanelRatio);
+      expect(layout.overlap).toBe(0);
+      expect(layout.avatarInside, JSON.stringify(layout)).toBe(true);
+      expect(layout.overflow).toBe(false);
+    });
+  }
+
+  test("masque Jaspe et élargit le panneau dès la première saisie", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/", { waitUntil: "load" });
+    await domClick(page, "#enterSplash");
+    await domClick(page, "#continueGuardian");
+    await page.waitForFunction(() => (window as any).__SCHOOLSAFE_JASPE3D__?.loaded === true);
+    const before = await page.locator("#loginForm").boundingBox();
+
+    await page.locator("#emailIdentifier").click();
+    await expect(page.locator("#auth")).toHaveClass(/auth-is-typing/);
+    await page.waitForTimeout(380);
+    await expect(page.locator(".safe-assistant")).toBeHidden();
+    const after = await page.locator("#loginForm").boundingBox();
+    expect(after!.width).toBeGreaterThan(before!.width + 40);
+    expect(after!.x).toBeGreaterThanOrEqual(0);
+    expect(after!.x + after!.width).toBeLessThanOrEqual(390);
+
+    await domClick(page, "#backToSplash");
+    await domClick(page, "#enterSplash");
+    await domClick(page, "#continueGuardian");
+    await expect(page.locator("#auth")).not.toHaveClass(/auth-is-typing/);
+    await expect(page.locator(".safe-assistant")).toBeVisible();
+  });
+
+  test("masque Jaspe sans transition si les mouvements sont réduits", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/", { waitUntil: "load" });
+    await domClick(page, "#enterSplash");
+    await domClick(page, "#continueGuardian");
+    await page.waitForFunction(() => (window as any).__SCHOOLSAFE_JASPE3D__?.loaded === true);
+
+    await page.locator("#emailIdentifier").click();
+    const transitionDuration = await page.locator(".safe-assistant").evaluate((element) => getComputedStyle(element).transitionDuration);
+    expect(transitionDuration).toBe("0s");
+    await expect(page.locator(".safe-assistant")).toBeHidden();
+  });
+
+  test("applique le même flou à toutes les images du diaporama Auth", async ({ page }) => {
+    await page.goto("/", { waitUntil: "load" });
+    await domClick(page, "#enterSplash");
+    await domClick(page, "#continueGuardian");
+    const filters = await page.locator(".auth-image").evaluateAll((images) => images.map((image) => getComputedStyle(image).filter));
+    expect(filters).toHaveLength(2);
+    expect(filters[0]).not.toBe("none");
+    expect(filters[1]).toBe(filters[0]);
   });
 
   for (const viewport of [

@@ -35,13 +35,14 @@
 
 .auth-image {
   position: absolute;
-  inset: -2%;
-  width: 104%;
-  height: 104%;
+  inset: -3%;
+  width: 106%;
+  height: 106%;
   object-fit: cover;
   object-position: 40% 18%;
   opacity: 0;
-  transform: scale(1.02);
+  filter: blur(7px);
+  transform: scale(1.03);
   transition: opacity 1.25s ease;
 }
 
@@ -138,13 +139,22 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 250px) 420px;
+  grid-template-columns: minmax(0, 1fr) minmax(400px, 420px) 420px;
   gap: var(--ss-space-6);
   align-items: center;
   width: min(1320px, calc(100% - var(--ss-space-12)));
   height: 100%;
   margin: 0 auto;
   padding: var(--ss-space-8) 0;
+  transition: grid-template-columns 320ms ease, gap 320ms ease;
+}
+
+.auth-screen.auth-is-typing .auth-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(460px, 540px);
+}
+
+.auth-screen.auth-is-typing .auth-jaspe-anchor {
+  display: none;
 }
 
 .auth-jaspe-anchor {
@@ -531,7 +541,7 @@
    -------------------------------------------------------------------------- */
 @media (max-width: 1024px) {
   .auth-layout {
-    grid-template-columns: minmax(150px, 180px) minmax(0, 1fr);
+    grid-template-columns: 280px minmax(0, 1fr);
     width: min(780px, calc(100% - var(--ss-space-8)));
     align-content: center;
     gap: var(--ss-space-5);
@@ -550,7 +560,12 @@
   }
 
   .auth-jaspe-anchor {
-    min-height: 300px;
+    min-height: 500px;
+  }
+
+  .auth-screen.auth-is-typing .auth-layout {
+    grid-template-columns: minmax(0, 560px);
+    justify-content: center;
   }
 }
 
@@ -565,7 +580,7 @@
   }
 
   .auth-layout {
-    grid-template-columns: 104px minmax(0, 1fr);
+    grid-template-columns: 160px minmax(0, 1fr);
     gap: var(--ss-space-2);
     width: calc(100% - var(--ss-space-5));
     align-items: end;
@@ -578,6 +593,26 @@
     background: linear-gradient(180deg, color-mix(in srgb, var(--ss-navy-950) 44%, transparent), color-mix(in srgb, var(--ss-navy-950) 30%, transparent));
   }
 
+  .auth-screen:not(.auth-is-typing) .login-panel {
+    padding-inline: var(--ss-space-3);
+  }
+
+  .auth-screen:not(.auth-is-typing) .login-method button {
+    gap: 2px;
+    font-size: var(--ss-text-xs);
+  }
+
+  .auth-screen:not(.auth-is-typing) .login-method button svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .auth-screen:not(.auth-is-typing) .ss-select,
+  .auth-screen:not(.auth-is-typing) .first-install,
+  .auth-screen:not(.auth-is-typing) .preview-profile-button {
+    font-size: var(--ss-text-xs);
+  }
+
   .auth-screen .label-row {
     align-items: flex-start;
     flex-direction: column;
@@ -585,8 +620,13 @@
   }
 
   .auth-jaspe-anchor {
-    min-height: 188px;
+    min-height: 520px;
     align-self: center;
+  }
+
+  .auth-screen.auth-is-typing .auth-layout {
+    grid-template-columns: minmax(0, 1fr);
+    width: calc(100% - var(--ss-space-5));
   }
 
   .auth-footer {
@@ -600,6 +640,6 @@
    Animations
    -------------------------------------------------------------------------- */
 @keyframes imageDrift {
-  from { transform: scale(1.02); }
-  to { transform: scale(1.075); }
+  from { transform: scale(1.03); }
+  to { transform: scale(1.085); }
 }

@@ -22,6 +22,7 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
   let destroyed = false;
   const actions = new Map();
   const MODEL_FRAME_FILL = 0.78;
+  const AUTH_MODEL_FRAME_FILL = 0.88;
   const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
 
   diagnostics.threeVersion = THREE.REVISION;
@@ -88,10 +89,11 @@ export function createJaspe3DController({ diagnostics, expectedActions, modelUrl
     if (!modelBounds || !camera) return;
     const center = modelBounds.getCenter(new THREE.Vector3());
     const size = modelBounds.getSize(new THREE.Vector3());
+    const frameFill = host?.closest('.safe-assistant[data-surface="auth"]') ? AUTH_MODEL_FRAME_FILL : MODEL_FRAME_FILL;
     const verticalFov = THREE.MathUtils.degToRad(camera.fov);
     const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * Math.max(camera.aspect, 0.01));
-    const distanceForHeight = (size.y / 2) / (Math.tan(verticalFov / 2) * MODEL_FRAME_FILL);
-    const distanceForWidth = (size.x / 2) / (Math.tan(horizontalFov / 2) * MODEL_FRAME_FILL);
+    const distanceForHeight = (size.y / 2) / (Math.tan(verticalFov / 2) * frameFill);
+    const distanceForWidth = (size.x / 2) / (Math.tan(horizontalFov / 2) * frameFill);
     const distance = Math.max(distanceForHeight, distanceForWidth) + (size.z / 2);
     camera.position.set(center.x, center.y, center.z + distance);
     camera.lookAt(center);
