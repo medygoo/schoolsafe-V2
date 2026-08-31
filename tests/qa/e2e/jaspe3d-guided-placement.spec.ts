@@ -249,7 +249,8 @@ test.describe("JASPE 3D — placement guidé final", () => {
     await page.waitForTimeout(380);
     await expect(page.locator(".safe-assistant")).toBeHidden();
     const after = await page.locator("#loginForm").boundingBox();
-    expect(after!.width).toBeGreaterThan(before!.width + 40);
+    expect(after!.width).toBeGreaterThanOrEqual(before!.width);
+    expect(after!.width).toBeGreaterThanOrEqual(350);
     expect(after!.x).toBeGreaterThanOrEqual(0);
     expect(after!.x + after!.width).toBeLessThanOrEqual(390);
 
@@ -258,6 +259,30 @@ test.describe("JASPE 3D — placement guidé final", () => {
     await domClick(page, "#continueGuardian");
     await expect(page.locator("#auth")).not.toHaveClass(/auth-is-typing/);
     await expect(page.locator(".safe-assistant")).toBeVisible();
+  });
+
+  test("empile Jaspe et le panneau de connexion sans comprimer le formulaire sur mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/", { waitUntil: "load" });
+    await domClick(page, "#enterSplash");
+    await domClick(page, "#continueGuardian");
+    await page.waitForFunction(() => (window as any).__SCHOOLSAFE_JASPE3D__?.loaded === true);
+
+    const layout = await page.evaluate(() => {
+      const avatar = document.querySelector(".safe-avatar")!.getBoundingClientRect();
+      const panel = document.querySelector("#loginForm")!.getBoundingClientRect();
+      return {
+        stacked: avatar.bottom <= panel.top || panel.bottom <= avatar.top,
+        avatarWidth: avatar.width,
+        panelWidth: panel.width,
+        overflowX: document.documentElement.scrollWidth > innerWidth + 1,
+      };
+    });
+
+    expect(layout.stacked).toBe(true);
+    expect(layout.avatarWidth).toBeGreaterThanOrEqual(240);
+    expect(layout.panelWidth).toBeGreaterThanOrEqual(350);
+    expect(layout.overflowX).toBe(false);
   });
 
   test("masque Jaspe sans transition si les mouvements sont réduits", async ({ page }) => {
@@ -353,22 +378,22 @@ test.describe("JASPE 3D — placement guidé final", () => {
     expect(overlap).toBe(0);
   });
 
-  test("se réduit hors du Dashboard et retrouve le point zéro au retour", async ({ page }) => {
+  test("reste grande dans les fonctionnalités et retrouve le point zéro au retour", async ({ page }) => {
     await enterWorkspaceAt(page, { width: 1440, height: 900 });
     for (const viewport of [
-      { width: 1440, height: 900 },
-      { width: 834, height: 1112 },
-      { width: 390, height: 844 },
+      { width: 1440, height: 900, minimumWidth: 220, minimumHeight: 310 },
+      { width: 834, height: 1112, minimumWidth: 168, minimumHeight: 238 },
+      { width: 390, height: 844, minimumWidth: 118, minimumHeight: 176 },
     ]) {
       await page.setViewportSize(viewport);
       await page.waitForTimeout(100);
       const before = await page.locator(".safe-avatar").boundingBox();
       await openAction(page, "Élèves");
       await expect(page.locator("#schoolModule")).toBeVisible();
-      await expect(page.locator(".safe-avatar")).toHaveClass(/safe-minimized/);
+      await expect(page.locator(".safe-avatar")).not.toHaveClass(/safe-minimized/);
       const docked = await page.locator(".safe-avatar").boundingBox();
-      expect(docked!.width).toBeLessThanOrEqual(64);
-      expect(docked!.height).toBeLessThanOrEqual(64);
+      expect(docked!.width).toBeGreaterThanOrEqual(viewport.minimumWidth);
+      expect(docked!.height).toBeGreaterThanOrEqual(viewport.minimumHeight);
       expect(docked!.x).toBeGreaterThanOrEqual(0);
       expect(docked!.y).toBeGreaterThanOrEqual(0);
       expect(docked!.x + docked!.width).toBeLessThanOrEqual(viewport.width);
@@ -383,5 +408,26 @@ test.describe("JASPE 3D — placement guidé final", () => {
       expect(after!.x).toBeCloseTo(before!.x, 0);
       expect(after!.y).toBeCloseTo(before!.y, 0);
     }
+  });
+
+  test("utilise le même bouton pour masquer puis rappeler Jaspe sans dupliquer le canvas", async ({ page }) => {
+    await enterWorkspaceAt(page, { width: 1440, height: 900 });
+    await openAction(page, "Élèves");
+    const toggle = page.locator(".safe-companion-toggle");
+
+    await expect(toggle).toHaveAccessibleName("Masquer Jaspe");
+    await toggle.click();
+    await expect(page.locator(".safe-avatar")).toHaveCount(0);
+    await expect(page.locator(".safe-3d-stage canvas")).toHaveCount(0);
+    await expect(toggle).toHaveAccessibleName("Afficher Jaspe");
+    await expect.poll(async () => {
+      const rect = await toggle.boundingBox();
+      return rect ? { right: Math.round(rect.x + rect.width), bottom: Math.round(rect.y + rect.height) } : null;
+    }).toEqual({ right: 1428, bottom: 888 });
+
+    await toggle.click();
+    await expect(page.locator(".safe-avatar")).toBeVisible();
+    await expect(page.locator(".safe-3d-stage canvas")).toHaveCount(1);
+    await expect(toggle).toHaveAccessibleName("Masquer Jaspe");
   });
 });

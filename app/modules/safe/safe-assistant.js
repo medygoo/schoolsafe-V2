@@ -85,6 +85,7 @@
   var state = {
     open: false,
     minimized: false,
+    userHidden: false,
     animation: DEFAULT_ANIMATION,
     currentMessage: "",
     suggestions: defaultSuggestions(),
@@ -169,6 +170,7 @@
       if (currentSurface === "auth") {
         dashboardVisible = true;
         state.minimized = false;
+        state.userHidden = false;
       }
     }
     if (!surfaceSupportsJaspe(currentSurface)) {
@@ -233,9 +235,9 @@
   }
 
   function clampPosition(left, top) {
-    var avatar = container && container.querySelector(".safe-avatar");
-    var width = avatar ? avatar.offsetWidth : 0;
-    var height = avatar ? avatar.offsetHeight : 0;
+    var visual = container && (container.querySelector(".safe-avatar") || container.querySelector(".safe-companion-toggle"));
+    var width = visual ? visual.offsetWidth : 0;
+    var height = visual ? visual.offsetHeight : 0;
     var maxLeft = Math.max(VIEWPORT_MARGIN, global.innerWidth - VIEWPORT_MARGIN - width);
     var maxTop = Math.max(VIEWPORT_MARGIN, visibleBottomLimit() - height);
     return {
@@ -245,6 +247,7 @@
   }
 
   function defaultPosition() {
+    if (state.userHidden) return clampPosition(global.innerWidth, visibleBottomLimit());
     var selector = currentSurface === "auth"
       ? "#authJaspeAnchor"
       : (dashboardVisible ? ".dashboard-hero:not([hidden]) .hero-jaspe-anchor" : "");
@@ -262,7 +265,7 @@
   }
 
   function applyFloatingPosition(left, top, persist, rememberPosition) {
-    if (!container || !container.querySelector(".safe-avatar")) return;
+    if (!container || !(container.querySelector(".safe-avatar") || container.querySelector(".safe-companion-toggle"))) return;
     var nextPosition = clampPosition(left, top);
     if (rememberPosition !== false) floatingPosition = nextPosition;
     container.style.left = nextPosition.left + "px";
@@ -317,10 +320,10 @@
     if (layoutFrame && typeof global.cancelAnimationFrame === "function") global.cancelAnimationFrame(layoutFrame);
     var run = function () {
       layoutFrame = 0;
-      var mayUseCustomPosition = currentSurface === "workspace" && dashboardVisible && customPosition && floatingPosition;
+      var mayUseCustomPosition = currentSurface === "workspace" && !state.userHidden && customPosition && floatingPosition;
       var target = mayUseCustomPosition ? floatingPosition : defaultPosition();
-      var transientDock = currentSurface === "workspace" && !dashboardVisible;
-      applyFloatingPosition(target.left, target.top, !!persistClamp && customPosition, !transientDock);
+      var transientDock = currentSurface === "workspace" && !dashboardVisible && !mayUseCustomPosition;
+      applyFloatingPosition(target.left, target.top, !!persistClamp && customPosition && !state.userHidden, !transientDock && !state.userHidden);
     };
     layoutFrame = typeof global.requestAnimationFrame === "function" ? global.requestAnimationFrame(run) : global.setTimeout(run, 0);
   }
@@ -392,8 +395,9 @@
       return;
     }
     container.hidden = false;
+    container.classList.toggle("is-user-hidden", currentSurface === "workspace" && state.userHidden);
     var html = "";
-    if (state.open) {
+    if (state.open && !state.userHidden) {
       html += '<div class="safe-bubble" id="safeJaspeBubble" role="dialog" aria-label="Dialogue Jaspe">';
       html += '<div class="safe-bubble-header"><strong>Jaspe</strong><span class="safe-bubble-tools"><button class="safe-position-reset" type="button" aria-label="Réinitialiser la position de Jaspe" title="Réinitialiser la position de Jaspe">↺</button><button class="safe-bubble-close" aria-label="Fermer">✕</button></span></div>';
       html += '<div class="safe-bubble-body"><p>' + escape(state.currentMessage) + '</p>';
@@ -407,9 +411,14 @@
       html += '<div class="safe-input-row"><input type="text" id="safeInput" placeholder="Pose ta question…"><button type="button" id="safeSend">Envoyer</button></div>';
       html += '</div></div>';
     }
-    html += '<div class="safe-avatar' + (state.minimized ? " safe-minimized" : "") + '" role="button" tabindex="0" aria-label="' + (state.open ? "Fermer Jaspe" : "Ouvrir Jaspe") + '" aria-expanded="' + (state.open ? "true" : "false") + '" aria-controls="safeJaspeBubble">';
-    html += '<div class="safe-3d-stage" aria-hidden="true"></div>';
-    html += '</div>';
+    if (!state.userHidden) {
+      html += '<div class="safe-avatar' + (state.minimized ? " safe-minimized" : "") + '" role="button" tabindex="0" aria-label="' + (state.open ? "Fermer Jaspe" : "Ouvrir Jaspe") + '" aria-expanded="' + (state.open ? "true" : "false") + '" aria-controls="safeJaspeBubble">';
+      html += '<div class="safe-3d-stage" aria-hidden="true"></div>';
+      html += '</div>';
+    }
+    if (currentSurface === "workspace") {
+      html += '<button class="safe-companion-toggle" type="button" aria-label="' + (state.userHidden ? "Afficher Jaspe" : "Masquer Jaspe") + '" title="' + (state.userHidden ? "Afficher Jaspe" : "Masquer Jaspe") + '"><span aria-hidden="true">' + (state.userHidden ? "✦" : "✕") + '</span></button>';
+    }
     container.innerHTML = html;
     bindEvents();
     mountJaspe3D();
@@ -494,7 +503,7 @@
   function setDashboardVisible(visible) {
     dashboardVisible = visible !== false;
     if (currentSurface !== "workspace" || !container) return;
-    state.minimized = !dashboardVisible;
+    state.minimized = false;
     if (!dashboardVisible) state.open = false;
     render();
   }
@@ -522,6 +531,15 @@
       });
       bindDrag(avatar);
     }
+
+    var companionToggle = container.querySelector(".safe-companion-toggle");
+    if (companionToggle) companionToggle.addEventListener("click", function (event) {
+      event.stopPropagation();
+      state.userHidden = !state.userHidden;
+      state.open = false;
+      state.animation = "Idle";
+      render();
+    });
 
     var closeBtn = container.querySelector(".safe-bubble-close");
     if (closeBtn) closeBtn.addEventListener("click", function (e) { e.stopPropagation(); closeBubble(); });
@@ -612,6 +630,7 @@
 
   function openWithQuery(query) {
     if (!isAllowed()) { render(); return; }
+    if (currentSurface === "workspace") state.userHidden = false;
     state.open = true;
     state.currentMessage = "";
     if (query) {

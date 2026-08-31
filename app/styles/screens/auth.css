@@ -636,6 +636,39 @@
   }
 }
 
+@media (max-width: 600px) {
+  .auth-screen {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .auth-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 440px auto;
+    align-items: start;
+    align-content: start;
+    width: calc(100% - var(--ss-space-5));
+    height: auto;
+    min-height: 100svh;
+    gap: var(--ss-space-3);
+    padding-top: 76px;
+    padding-bottom: 88px;
+  }
+
+  .auth-jaspe-anchor {
+    min-height: 440px;
+    align-self: start;
+  }
+
+  .auth-screen:not(.auth-is-typing) .login-panel {
+    width: 100%;
+  }
+
+  .auth-screen.auth-is-typing .auth-layout {
+    grid-template-rows: auto;
+  }
+}
+
 /* --------------------------------------------------------------------------
    Animations
    -------------------------------------------------------------------------- */

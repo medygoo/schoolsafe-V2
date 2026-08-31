@@ -9,7 +9,8 @@
 }
 
 .safe-assistant .safe-avatar,
-.safe-assistant .safe-bubble {
+.safe-assistant .safe-bubble,
+.safe-assistant .safe-companion-toggle {
   pointer-events: auto;
 }
 
@@ -60,6 +61,46 @@
   border-radius: var(--ss-radius-lg);
 }
 .safe-assistant.is-dragging .safe-avatar { cursor: grabbing; }
+
+.safe-companion-toggle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ss-border-strong) 76%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ss-bg-primary) 88%, transparent);
+  color: var(--ss-text-primary);
+  box-shadow: var(--ss-shadow-md);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ss-text-lg);
+  font-weight: var(--ss-font-bold);
+  backdrop-filter: blur(10px);
+}
+
+.safe-companion-toggle:hover {
+  color: var(--ss-violet-700);
+  background: var(--ss-bg-primary);
+}
+
+.safe-companion-toggle:focus-visible {
+  outline: 3px solid var(--ss-blue-400);
+  outline-offset: 3px;
+}
+
+.safe-assistant.is-user-hidden .safe-companion-toggle {
+  position: relative;
+  inset: auto;
+  width: 52px;
+  height: 52px;
+  color: var(--ss-text-inverse);
+  background: var(--ss-violet-700);
+  border-color: color-mix(in srgb, var(--ss-violet-300) 70%, transparent);
+}
 .safe-assistant.is-auth-entering .safe-avatar {
   animation: jaspe-auth-arrival 1250ms cubic-bezier(0.2, 0.85, 0.3, 1) both;
 }
@@ -195,7 +236,15 @@
 }
 
 @media (max-width: 600px) {
-  .safe-avatar { width: 112px; height: 168px; }
+  .safe-avatar { width: 128px; height: 192px; }
+  .safe-assistant[data-surface="auth"] .safe-avatar {
+    width: min(300px, calc(100vw - 32px));
+    height: 440px;
+  }
+  .safe-assistant[data-surface="auth"] .safe-3d-stage {
+    left: 0;
+    width: 100%;
+  }
   .safe-bubble { width: 266px; }
 }
 

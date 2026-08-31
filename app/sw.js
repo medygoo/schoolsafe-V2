@@ -1,5 +1,5 @@
 var CACHE_PREFIX = "schoolsafe-v2-";
-var CACHE_NAME = CACHE_PREFIX + "frontend-m6";
+var CACHE_NAME = CACHE_PREFIX + "frontend-m7";
 var CORE_PATHS = ["./", "./index.html", "./manifest.webmanifest", "./schoolsafe-logo.png"];
 
 function scopeUrl(relativePath) {
