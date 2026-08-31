@@ -1,19 +1,24 @@
 import { test, expect, Page } from "@playwright/test";
 import { enterDemoWorkspace } from "./helpers";
 
-async function prepareTeacherRemediation(page: Page) {
+async function seedValidatedTeacherRemediation(page: Page) {
   await enterDemoWorkspace(page, "teacher");
-  await page.locator('[data-teacher-open="remediation"]').click();
-  const form = page.locator("#teacherRemediationForm");
-  await form.locator('[name="classId"]').selectOption("demo-class-1");
-  await form.locator('[name="subjectId"]').selectOption("demo-subject-math");
-  await form.locator('[name="studentId"]').selectOption("demo-student-lucas");
-  await form.locator('[name="difficulty"]').fill("Fractions à consolider.");
-  await form.locator('[name="objective"]').fill("Comparer les fractions.");
-  await form.locator('[name="plannedSessions"]').fill("3");
-  await form.locator('[name="calendar"]').fill("2026-09-15, 2026-09-18");
-  await form.locator('[name="status"]').selectOption("PLANIFIÉ");
-  await form.locator('button[type="submit"]').click();
+  await page.evaluate(() => localStorage.setItem("schoolsafe-v2-teacher-remediation-drafts", JSON.stringify([{
+    id: "validated-remediation-lucas",
+    studentId: "demo-student-lucas",
+    classId: "demo-class-1",
+    subjectId: "demo-subject-math",
+    difficulty: "Fractions à consolider.",
+    objective: "Comparer les fractions.",
+    plannedSessions: 3,
+    calendar: "2026-09-15, 2026-09-18",
+    progress: 0,
+    observations: "Plan pédagogique validé en démonstration.",
+    result: "Non évalué.",
+    status: "PLANIFIÉ",
+    local: true,
+    proposal: false,
+  }])));
 }
 
 async function renderRemediationFinance(page: Page, permissions = ["finance.fee.manage"], deniedPermissions: string[] = []) {
@@ -33,7 +38,7 @@ async function renderRemediationFinance(page: Page, permissions = ["finance.fee.
 
 test.describe("F7-FE — liaison financière du rattrapage D6", () => {
   test("lit la projection D6 sans modifier la pédagogie", async ({ page }) => {
-    await prepareTeacherRemediation(page);
+    await seedValidatedTeacherRemediation(page);
     const before = await page.evaluate(() => localStorage.getItem("schoolsafe-v2-teacher-remediation-drafts"));
     await renderRemediationFinance(page);
     const view = page.locator("[data-remediation-finance]");
@@ -46,7 +51,7 @@ test.describe("F7-FE — liaison financière du rattrapage D6", () => {
   });
 
   test("exclut toujours l’élève draft de la projection financière", async ({ page }) => {
-    await prepareTeacherRemediation(page);
+    await seedValidatedTeacherRemediation(page);
     await page.evaluate(() => {
       const key = "schoolsafe-v2-teacher-remediation-drafts";
       const rows = JSON.parse(localStorage.getItem(key) || "[]");
@@ -59,7 +64,7 @@ test.describe("F7-FE — liaison financière du rattrapage D6", () => {
   });
 
   test("exige une répartition exactement égale à 100 sans valeur imposée", async ({ page }) => {
-    await prepareTeacherRemediation(page);
+    await seedValidatedTeacherRemediation(page);
     await renderRemediationFinance(page);
     const view = page.locator("[data-remediation-finance]");
     await expect(view).not.toContainText("40 %");
@@ -78,7 +83,7 @@ test.describe("F7-FE — liaison financière du rattrapage D6", () => {
     page.on("request", (request) => {
       if (request.method() !== "GET" && request.url().includes("/finance/")) writes.push(`${request.method()} ${request.url()}`);
     });
-    await prepareTeacherRemediation(page);
+    await seedValidatedTeacherRemediation(page);
     const pedagogyBefore = await page.evaluate(() => localStorage.getItem("schoolsafe-v2-teacher-remediation-drafts"));
     await renderRemediationFinance(page);
     const before = await page.evaluate(() => {
@@ -110,12 +115,25 @@ test.describe("F7-FE — liaison financière du rattrapage D6", () => {
   });
 
   test("reste gardé par finance.fee.manage avec DENY prioritaire", async ({ page }) => {
-    await prepareTeacherRemediation(page);
+    await seedValidatedTeacherRemediation(page);
     await renderRemediationFinance(page, ["finance.fee.read"]);
     await expect(page.locator('#financeTabs [data-finance-tab="remediation-finance"]')).toBeHidden();
     await expect(page.locator("[data-remediation-finance]")).toHaveCount(0);
     await renderRemediationFinance(page, ["finance.fee.manage"], ["finance.fee.manage"]);
     await expect(page.locator('#financeTabs [data-finance-tab="remediation-finance"]')).toBeHidden();
     await expect(page.locator("#financeContent")).toContainText("non autorisé");
+  });
+
+  test("n'expose jamais une simple proposition pédagogique à la liaison financière", async ({ page }) => {
+    await enterDemoWorkspace(page, "teacher");
+    await page.locator('[data-teacher-open="remediation"]').click();
+    const form = page.locator("#teacherRemediationForm");
+    await form.locator('[name="studentId"]').selectOption("demo-student-lucas");
+    await form.locator('[name="objective"]').fill("Proposition pédagogique sans inscription.");
+    await form.locator('[name="observations"]').fill("Validation direction BACKEND_LATER.");
+    await form.locator('button[type="submit"]').click();
+    await renderRemediationFinance(page);
+    await expect(page.locator("[data-remediation-finance]")).not.toContainText("Lucas Martin");
+    await expect(page.locator("#financeRemediationLinkForm")).toHaveCount(0);
   });
 });

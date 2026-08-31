@@ -2,35 +2,37 @@ import { test, expect } from "@playwright/test";
 import { enterDemoWorkspace } from "./helpers";
 
 test.describe("Phase D6 — rattrapage pédagogique", () => {
-  test("prépare et conserve un parcours de rattrapage pour un élève affecté", async ({ page }) => {
+  test("prépare et conserve une proposition issue d'une difficulté D5, sans inscription officielle", async ({ page }) => {
     await enterDemoWorkspace(page, "teacher");
     await page.locator('[data-teacher-open="remediation"]').click();
 
     const form = page.locator("#teacherRemediationForm");
     await expect(form).toBeVisible();
-    await expect(form.locator('[name="classId"] option')).toHaveText(["6e A", "5e A"]);
-    await expect(form).not.toContainText("3e Maternelle");
+    await expect(form).toContainText("DÉTECTION / PROPOSITION");
+    await expect(form).toContainText("VALIDATION PÉDAGOGIQUE");
+    await expect(form).toContainText("BACKEND_LATER");
+    await expect(form.locator('[name="sourceId"] option')).toHaveText([
+      "Août 2026 · 6e A · Mathématiques · difficulté collective",
+    ]);
     await expect(form.locator('[name="studentId"] option')).toHaveText(["Lucas Martin", "Chloé Bernard"]);
     await expect(form).not.toContainText("Amina Mbuyi");
     await expect(form).not.toContainText("Noah Kasongo");
+    await expect(form.locator('[name="classId"], [name="subjectId"], [name="status"], [name="plannedSessions"], [name="calendar"], [name="progress"], [name="result"]')).toHaveCount(0);
+    await expect(form.locator('[data-remediation-source-summary]')).toContainText("Alignement des décimales");
+    await expect(form.locator('[data-remediation-source-summary]')).toContainText("Atelier de correction guidée");
 
-    await form.locator('[name="classId"]').selectOption("demo-class-1");
-    await form.locator('[name="subjectId"]').selectOption("demo-subject-math");
     await form.locator('[name="studentId"]').selectOption("demo-student-lucas");
-    await form.locator('[name="difficulty"]').fill("Comparer des fractions de dénominateurs différents.");
-    await form.locator('[name="objective"]').fill("Choisir une stratégie de comparaison adaptée.");
-    await form.locator('[name="plannedSessions"]').fill("3");
-    await form.locator('[name="calendar"]').fill("2026-09-15, 2026-09-18, 2026-09-22");
-    await form.locator('[name="progress"]').fill("25");
-    await form.locator('[name="observations"]').fill("Plan individualisé préparé avec exercices gradués.");
-    await form.locator('[name="result"]').fill("À observer après la première séance.");
-    await form.locator('[name="status"]').selectOption("PLANIFIÉ");
+    await form.locator('[name="objective"]').fill("Proposer des exercices gradués sur l'alignement des décimales.");
+    await form.locator('[name="observations"]').fill("Proposition à examiner par la direction pédagogique.");
     await form.locator('button[type="submit"]').click();
 
-    const prepared = page.locator('[data-remediation-list] article').filter({ hasText: "Comparer des fractions" });
+    const prepared = page.locator('[data-remediation-list] article').filter({ hasText: "Proposer des exercices gradués" });
     await expect(prepared).toContainText("Lucas Martin");
-    await expect(prepared).toContainText("PLANIFIÉ");
+    await expect(prepared).toContainText("Alignement des décimales");
+    await expect(prepared).toContainText("Atelier de correction guidée");
+    await expect(prepared).toContainText("PROPOSITION À VALIDER");
     await expect(prepared).toContainText("BROUILLON LOCAL");
+    await expect(prepared).toContainText("AUCUNE INSCRIPTION OFFICIELLE");
     await expect(page.locator("#teacherPedagogyPortal")).toContainText("BACKEND_LATER");
     await expect(page.locator("#teacherPedagogyPortal")).toContainText("PÉDAGOGIE UNIQUEMENT");
 
@@ -39,18 +41,26 @@ test.describe("Phase D6 — rattrapage pédagogique", () => {
       api.render("teacherPedagogyPortal", (window as any).SchoolSafeAppContext.getCurrentUser());
       api.open("remediation");
     });
-    await expect(page.locator('[data-remediation-list]')).toContainText("Plan individualisé préparé");
+    await expect(page.locator('[data-remediation-list]')).toContainText("Proposition à examiner par la direction pédagogique");
+    const drafts = await page.evaluate(() => (window as any).SchoolSafeTeacherPedagogy.readRemediationProposals());
+    expect(drafts[0]).toMatchObject({
+      proposal: true,
+      officialEnrollment: false,
+      sourceId: "demo-tracking-august",
+      validationStatus: "BACKEND_LATER",
+      plannedSessions: 0,
+      progress: 0,
+      result: "NON ÉVALUÉ",
+    });
   });
 
-  test("reste sans finance et limite dynamiquement élèves et matières à la classe", async ({ page }) => {
+  test("reste strictement pédagogique et réserve plan, calendrier et résultat à la validation future", async ({ page }) => {
     await enterDemoWorkspace(page, "teacher");
     await page.locator('[data-teacher-open="remediation"]').click();
 
     const form = page.locator("#teacherRemediationForm");
-    await form.locator('[name="classId"]').selectOption("demo-class-2");
-    await expect(form.locator('[name="studentId"] option')).toHaveText(["Ethan Leroy"]);
-    await expect(form.locator('[name="subjectId"] option')).toHaveText(["Français"]);
-    await expect(form.locator('[name="status"] option')).toHaveText(["À ÉVALUER", "PROPOSÉ", "PLANIFIÉ", "EN COURS", "TERMINÉ", "ANNULÉ"]);
+    await expect(form).toContainText("Le plan, les séances, le calendrier, la progression et le résultat seront ouverts après validation pédagogique");
+    await expect(form).toContainText("aucune inscription officielle locale");
 
     const portal = page.locator("#teacherPedagogyPortal");
     await expect(portal).not.toContainText("40 %");

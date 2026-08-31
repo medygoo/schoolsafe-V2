@@ -264,9 +264,17 @@
     storageSet(TRACKING_STORAGE_KEY, JSON.stringify(items));
   }
 
-  function readRemediationDrafts() {
+  function readRemediationRecords() {
     var items = readJson(REMEDIATION_STORAGE_KEY, []);
     return Array.isArray(items) ? items : [];
+  }
+
+  function readRemediationDrafts() {
+    return readRemediationRecords().filter(function (item) { return item.proposal !== true; });
+  }
+
+  function readRemediationProposals() {
+    return readRemediationRecords().filter(function (item) { return item.proposal === true && item.officialEnrollment === false; });
   }
 
   function saveRemediationDrafts(items) {
@@ -723,24 +731,60 @@
 
   function remediationCard(item) {
     var student = STUDENTS.find(function (entry) { return entry.id === item.studentId; });
+    if (item.proposal) {
+      return '<article class="teacher-record-card teacher-remediation-card"><header><div><p class="teacher-eyebrow">' + escapeMarkup(labelFor(CLASSES, item.classId) + " · " + labelFor(SUBJECTS, item.subjectId)) + '</p><h3>' + escapeMarkup(student ? student.name : "Élève indisponible") + '</h3></div><span class="teacher-status">PROPOSITION À VALIDER</span></header>' +
+        '<p><strong>Cause / difficulté détectée :</strong> ' + escapeMarkup(item.difficulty) + '</p><p><strong>Éléments sources D5 :</strong> ' + escapeMarkup(item.sourceElements) + '</p><p><strong>Objectif proposé :</strong> ' + escapeMarkup(item.objective) + '</p>' +
+        '<p><strong>Observation :</strong> ' + escapeMarkup(item.observations) + '</p><dl><div><dt>Validation pédagogique</dt><dd>BACKEND_LATER</dd></div><div><dt>Inscription officielle</dt><dd>AUCUNE INSCRIPTION OFFICIELLE</dd></div><div><dt>Suivi</dt><dd>APRÈS VALIDATION</dd></div></dl>' +
+        '<footer><b>BROUILLON LOCAL</b><span>BACKEND_LATER · PÉDAGOGIE UNIQUEMENT</span></footer></article>';
+    }
     return '<article class="teacher-record-card teacher-remediation-card"><header><div><p class="teacher-eyebrow">' + escapeMarkup(labelFor(CLASSES, item.classId) + " · " + labelFor(SUBJECTS, item.subjectId)) + '</p><h3>' + escapeMarkup(student ? student.name : "Élève indisponible") + '</h3></div><span class="teacher-status">' + escapeMarkup(item.status) + '</span></header>' +
       '<p><strong>Difficulté :</strong> ' + escapeMarkup(item.difficulty) + '</p><p><strong>Objectif :</strong> ' + escapeMarkup(item.objective) + '</p><dl><div><dt>Séances prévues</dt><dd>' + escapeMarkup(item.plannedSessions) + '</dd></div><div><dt>Calendrier</dt><dd>' + escapeMarkup(item.calendar) + '</dd></div><div><dt>Progression</dt><dd>' + escapeMarkup(item.progress) + ' %</dd></div></dl>' +
       '<p><strong>Observations :</strong> ' + escapeMarkup(item.observations) + '</p><p><strong>Résultat pédagogique :</strong> ' + escapeMarkup(item.result) + '</p><footer><b>' + (item.local ? "BROUILLON LOCAL" : "DÉMONSTRATION") + '</b><span>BACKEND_LATER · PÉDAGOGIE UNIQUEMENT</span></footer></article>';
   }
 
-  function remediationForm(projection) {
-    var classOptions = projection.classes.map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
-    var firstClass = projection.classes[0] && projection.classes[0].id;
-    var subjectOptions = projection.subjects.filter(function (item) { return item.classIds.indexOf(firstClass) >= 0; }).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
-    var studentOptions = projection.students.filter(function (item) { return item.classId === firstClass; }).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
-    return '<form class="teacher-form" id="teacherRemediationForm"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Proposition locale</p><h2>Nouveau rattrapage pédagogique</h2></div><span>BROUILLON LOCAL</span></div><div class="teacher-form-grid">' +
-      '<label><span>Classe</span><select name="classId">' + classOptions + '</select></label><label><span>Matière</span><select name="subjectId">' + subjectOptions + '</select></label><label><span>Élève actif</span><select name="studentId">' + studentOptions + '</select></label>' +
-      '<label><span>Statut</span><select name="status"><option>À ÉVALUER</option><option>PROPOSÉ</option><option>PLANIFIÉ</option><option>EN COURS</option><option>TERMINÉ</option><option>ANNULÉ</option></select></label>' +
-      '<label class="teacher-form-wide"><span>Difficulté constatée</span><textarea name="difficulty" rows="2" required></textarea></label><label class="teacher-form-wide"><span>Objectif</span><textarea name="objective" rows="2" required></textarea></label>' +
-      '<label><span>Séances prévues</span><input name="plannedSessions" type="number" min="1" max="30" value="1" required></label><label><span>Progression (%)</span><input name="progress" type="number" min="0" max="100" value="0"></label>' +
-      '<label class="teacher-form-wide"><span>Calendrier</span><input name="calendar" placeholder="Dates prévues" required></label><label class="teacher-form-wide"><span>Observations</span><textarea name="observations" rows="2"></textarea></label>' +
-      '<label class="teacher-form-wide"><span>Résultat pédagogique</span><textarea name="result" rows="2"></textarea></label></div>' +
-      '<aside class="teacher-access-note"><strong>BACKEND_LATER · PÉDAGOGIE UNIQUEMENT</strong><p>Aucune inscription financière. Les frais, paiements et répartitions appartiennent à une phase financière ultérieure.</p></aside><button class="ss-button" type="submit">' + icon("save") + ' Préparer le parcours</button></form>';
+  function remediationSources(projection) {
+    var classIds = projection.classes.map(function (item) { return item.id; });
+    var subjectIds = projection.subjects.map(function (item) { return item.id; });
+    return MONTHLY_TRACKING.concat(readTrackingDrafts()).filter(function (item) {
+      var hasDifficulty = !!String(item.individualDifficulty || item.collectiveDifficulty || "").trim();
+      var studentAllowed = !item.studentId || projection.students.some(function (student) { return student.id === item.studentId && student.lifecycleStatus === "active"; });
+      return hasDifficulty && studentAllowed && classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0;
+    });
+  }
+
+  function remediationSourceLabel(item) {
+    var date = new Date(String(item.month || "") + "-01T00:00:00");
+    var month = Number.isNaN(date.getTime()) ? String(item.month || "Période") : date.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    month = month.charAt(0).toUpperCase() + month.slice(1);
+    return month + " · " + labelFor(CLASSES, item.classId) + " · " + labelFor(SUBJECTS, item.subjectId) + " · " + (item.individualDifficulty ? "difficulté individuelle" : "difficulté collective");
+  }
+
+  function remediationSourceElements(item) {
+    return [
+      item.objectives ? "Objectifs : " + item.objectives : "",
+      item.skills ? "Compétences : " + item.skills : "",
+      item.actions ? "Action D5 : " + item.actions : "",
+      item.observation ? "Observation : " + item.observation : ""
+    ].filter(Boolean).join(" · ");
+  }
+
+  function remediationStudentsForSource(projection, source) {
+    return projection.students.filter(function (student) {
+      return student.lifecycleStatus === "active" && student.classId === source.classId && (!source.studentId || source.studentId === student.id);
+    });
+  }
+
+  function remediationForm(projection, sources) {
+    if (!sources.length) return '<aside class="teacher-access-note"><strong>Aucune difficulté source</strong><p>Une difficulté doit d’abord être consignée dans le suivi D5 avant de pouvoir préparer une proposition de rattrapage.</p></aside>';
+    var firstSource = sources[0];
+    var sourceOptions = sources.map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(remediationSourceLabel(item)) + '</option>'; }).join("");
+    var studentOptions = remediationStudentsForSource(projection, firstSource).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    return '<form class="teacher-form" id="teacherRemediationForm"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">DÉTECTION / PROPOSITION</p><h2>Proposer un rattrapage à valider</h2></div><span>BROUILLON LOCAL</span></div>' +
+      '<aside class="teacher-access-note"><strong>RÉSULTATS / DIFFICULTÉS → DÉTECTION / PROPOSITION → VALIDATION PÉDAGOGIQUE → PLAN → SÉANCES / CALENDRIER → PROGRESSION → OBSERVATIONS → RÉSULTAT</strong><p>La Direction pédagogique assurera la VALIDATION PÉDAGOGIQUE · BACKEND_LATER.</p></aside><div class="teacher-form-grid">' +
+      '<label class="teacher-form-wide"><span>Difficulté source D5</span><select name="sourceId" required>' + sourceOptions + '</select></label><label><span>Élève concerné dans la portée source</span><select name="studentId" required>' + studentOptions + '</select></label>' +
+      '<aside class="teacher-access-note teacher-form-wide" data-remediation-source-summary><strong>Cause / difficulté : ' + escapeMarkup(firstSource.individualDifficulty || firstSource.collectiveDifficulty) + '</strong><p>Éléments sources : ' + escapeMarkup(remediationSourceElements(firstSource)) + '</p></aside>' +
+      '<label class="teacher-form-wide"><span>Objectif proposé</span><textarea name="objective" rows="2" required></textarea></label><label class="teacher-form-wide"><span>Observation pour validation pédagogique</span><textarea name="observations" rows="2" required></textarea></label></div>' +
+      '<aside class="teacher-access-note"><strong>BACKEND_LATER · PÉDAGOGIE UNIQUEMENT</strong><p>Le plan, les séances, le calendrier, la progression et le résultat seront ouverts après validation pédagogique. Aucune inscription financière et aucune inscription officielle locale.</p></aside><button class="ss-button" type="submit">' + icon("save") + ' Enregistrer la proposition</button></form>';
   }
 
   function renderRemediation(container, projection) {
@@ -752,35 +796,38 @@
     var classIds = projection.classes.map(function (item) { return item.id; });
     var subjectIds = projection.subjects.map(function (item) { return item.id; });
     var studentIds = projection.students.map(function (item) { return item.id; });
-    var items = REMEDIATIONS.concat(readRemediationDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0 && studentIds.indexOf(item.studentId) >= 0; });
+    var items = REMEDIATIONS.concat(readRemediationRecords()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0 && studentIds.indexOf(item.studentId) >= 0; });
+    var sources = remediationSources(projection);
     var canManage = canPrepareRemediation(activeUser);
-    var composer = canManage ? '<section class="teacher-panel">' + remediationForm(projection) + '</section>' : '<aside class="teacher-access-note teacher-access-note--denied"><strong>Préparation du rattrapage refusée</strong><p>pedagogy.lesson-plan.manage avec assigned_classes est nécessaire.</p></aside>';
-    container.innerHTML = '<div class="teacher-pedagogy-shell"><header class="teacher-workspace-header"><button class="ss-button ss-button--secondary" type="button" data-teacher-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="teacher-eyebrow">D6 · Rattrapage pédagogique</p><h1>Accompagnement des élèves affectés</h1><p>Pédagogie uniquement · aucune inscription financière.</p></div><span class="teacher-boundary">assigned_classes</span></header><div class="teacher-workspace-grid">' + composer + '<section class="teacher-panel"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Parcours autorisés</p><h2>Rattrapages préparés</h2></div><span>' + items.length + ' parcours</span></div><div class="teacher-record-list" data-remediation-list>' + (items.length ? items.map(remediationCard).join("") : '<p class="teacher-empty">Aucun parcours préparé.</p>') + '</div></section></div></div>';
+    var composer = canManage ? '<section class="teacher-panel">' + remediationForm(projection, sources) + '</section>' : '<aside class="teacher-access-note teacher-access-note--denied"><strong>Préparation du rattrapage refusée</strong><p>pedagogy.lesson-plan.manage avec assigned_classes est nécessaire.</p></aside>';
+    container.innerHTML = '<div class="teacher-pedagogy-shell"><header class="teacher-workspace-header"><button class="ss-button ss-button--secondary" type="button" data-teacher-back>' + icon("arrow-left") + ' Tableau de bord</button><div><p class="teacher-eyebrow">D6 · Rattrapage pédagogique</p><h1>Propositions issues des difficultés détectées</h1><p>Suivi pédagogique uniquement · aucune inscription officielle ou financière.</p></div><span class="teacher-boundary">assigned_classes</span></header><div class="teacher-workspace-grid">' + composer + '<section class="teacher-panel"><div class="teacher-section-heading"><div><p class="teacher-eyebrow">Données D5 / D6 conservées</p><h2>Propositions et suivis pédagogiques</h2></div><span>' + items.length + ' élément(s)</span></div><div class="teacher-record-list" data-remediation-list>' + (items.length ? items.map(remediationCard).join("") : '<p class="teacher-empty">Aucune proposition préparée.</p>') + '</div></section></div></div>';
     var back = container.querySelector("[data-teacher-back]");
     if (back) back.addEventListener("click", function () { render(activeContainerId, activeUser); });
     var form = container.querySelector("#teacherRemediationForm");
     if (!form) return;
-    var classSelect = form.querySelector('[name="classId"]');
-    var subjectSelect = form.querySelector('[name="subjectId"]');
+    var sourceSelect = form.querySelector('[name="sourceId"]');
     var studentSelect = form.querySelector('[name="studentId"]');
-    function syncOptions() {
-      var classId = classSelect.value;
-      subjectSelect.innerHTML = projection.subjects.filter(function (item) { return item.classIds.indexOf(classId) >= 0; }).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
-      studentSelect.innerHTML = projection.students.filter(function (item) { return item.classId === classId && item.lifecycleStatus === "active"; }).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+    var sourceSummary = form.querySelector("[data-remediation-source-summary]");
+    function selectedSource() {
+      return sources.find(function (item) { return item.id === sourceSelect.value; });
     }
-    classSelect.addEventListener("change", syncOptions);
+    function syncSource() {
+      var source = selectedSource();
+      if (!source) return;
+      studentSelect.innerHTML = remediationStudentsForSource(projection, source).map(function (item) { return '<option value="' + escapeMarkup(item.id) + '">' + escapeMarkup(item.name) + '</option>'; }).join("");
+      sourceSummary.innerHTML = '<strong>Cause / difficulté : ' + escapeMarkup(source.individualDifficulty || source.collectiveDifficulty) + '</strong><p>Éléments sources : ' + escapeMarkup(remediationSourceElements(source)) + '</p>';
+    }
+    sourceSelect.addEventListener("change", syncSource);
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       if (!form.reportValidity()) return;
       var data = new FormData(form);
-      var classId = String(data.get("classId") || "");
-      var subjectId = String(data.get("subjectId") || "");
       var studentId = String(data.get("studentId") || "");
-      var subject = projection.subjects.find(function (item) { return item.id === subjectId && item.classIds.indexOf(classId) >= 0; });
-      var student = projection.students.find(function (item) { return item.id === studentId && item.classId === classId && item.lifecycleStatus === "active"; });
-      if (!subject || !student) return;
-      var drafts = readRemediationDrafts();
-      drafts.unshift({ id: "teacher-remediation-" + Date.now(), studentId: studentId, classId: classId, subjectId: subjectId, difficulty: String(data.get("difficulty") || ""), objective: String(data.get("objective") || ""), plannedSessions: Number(data.get("plannedSessions") || 1), calendar: String(data.get("calendar") || ""), progress: Number(data.get("progress") || 0), observations: String(data.get("observations") || ""), result: String(data.get("result") || ""), status: String(data.get("status") || "À ÉVALUER"), local: true });
+      var source = sources.find(function (item) { return item.id === String(data.get("sourceId") || ""); });
+      var student = source && remediationStudentsForSource(projection, source).find(function (item) { return item.id === studentId; });
+      if (!source || !student) return;
+      var drafts = readRemediationRecords();
+      drafts.unshift({ id: "teacher-remediation-proposal-" + Date.now(), studentId: studentId, classId: source.classId, subjectId: source.subjectId, difficulty: String(source.individualDifficulty || source.collectiveDifficulty || ""), objective: String(data.get("objective") || ""), plannedSessions: 0, calendar: "APRÈS VALIDATION BACKEND_LATER", progress: 0, observations: String(data.get("observations") || ""), result: "NON ÉVALUÉ", status: "PROPOSITION À VALIDER", local: true, proposal: true, officialEnrollment: false, sourceId: source.id, sourceElements: remediationSourceElements(source), validationStatus: "BACKEND_LATER" });
       saveRemediationDrafts(drafts);
       renderRemediation(container, projection);
     });
@@ -814,7 +861,7 @@
     var assignments = ASSIGNMENTS.concat(readAssignmentDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; });
     var evaluations = EVALUATIONS.concat(readEvaluationDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; });
     var tracking = MONTHLY_TRACKING.concat(readTrackingDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; });
-    var remediation = REMEDIATIONS.concat(readRemediationDrafts()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; });
+    var remediation = REMEDIATIONS.concat(readRemediationRecords()).filter(function (item) { return classIds.indexOf(item.classId) >= 0 && subjectIds.indexOf(item.subjectId) >= 0; });
     var teachers = projection.subjects.map(function (item) { return item.id === "demo-subject-math" ? "Mme Y" : "M. Ilunga"; }).filter(function (name, index, items) { return items.indexOf(name) === index; });
     var reviews = readDirectionReviews().filter(function (item) { return reviewMatchesProjection(item, projection); });
     var reviewRows = reviews.map(function (item) { return '<li><strong>' + escapeMarkup(item.subject) + '</strong><span>' + escapeMarkup(item.observation) + '</span><small>' + escapeMarkup(item.status) + ' · BROUILLON LOCAL</small></li>'; }).join("");
@@ -922,6 +969,7 @@
     readAppreciationDrafts: readAppreciationDrafts,
     readTrackingDrafts: readTrackingDrafts,
     readRemediationDrafts: readRemediationDrafts,
+    readRemediationProposals: readRemediationProposals,
     readDirectionReviews: readDirectionReviews,
     canPrepareRemediation: canPrepareRemediation,
     canOpenDirection: canOpenDirection,
