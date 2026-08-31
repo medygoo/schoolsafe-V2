@@ -11,7 +11,7 @@
     { keywords: ["paiement", "caisse"], question: "Comment enregistrer un paiement ?", answer: "Dans Caisse, clique « + Nouveau paiement », choisis l’élève, le type de frais et le montant.", animation: "TalkHandsOpen", branch: "finance" },
     { keywords: ["rapport"], question: "Comment générer un rapport ?", answer: "Va dans Rapports, choisis le type et la période, puis clique « Générer ».", animation: "TalkHandsOpen", branch: "reports" },
     { keywords: ["palmarès", "classement"], question: "C’est quoi le Palmarès ?", answer: "Le Palmarès montre le Top 10 de chaque classe et de toute l’école, basé sur les cotes publiées du mois.", animation: "TalkPassionately", branch: "pedagogy" },
-    { keywords: ["qui", "safe"], question: "Qui es-tu ?", answer: "Je suis Safe, ton assistante SchoolSafe ! Pose-moi tes questions.", animation: "TalkHandsOpen", branch: null },
+    { keywords: ["qui", "safe"], question: "Qui es-tu ?", answer: "Je suis Jaspe, ton assistante SchoolSafe ! Pose-moi tes questions.", animation: "TalkHandsOpen", branch: null },
     { keywords: ["bonjour", "salut"], question: "Bonjour !", answer: "Bonjour ! Que veux-tu faire aujourd’hui dans SchoolSafe ?", animation: "FormalBow", branch: null },
     { keywords: ["aide"], question: "J’ai besoin d’aide", answer: "Je suis là ! Choisis un sujet ci-dessous ou pose ta question.", animation: "TalkHandsOpen", branch: null },
   ];
@@ -24,7 +24,7 @@
   ];
 
   var onboardingSteps = [
-    { animation: "Wave", message: "Bonjour ! Je suis Safe, ton assistante SchoolSafe. Je te fais découvrir l’application en 2 minutes ?" },
+    { animation: "Wave", message: "Bonjour ! Je suis Jaspe, ton assistante SchoolSafe. Je te fais découvrir l’application en 2 minutes ?" },
     { animation: "TalkHandsOpen", message: "Le menu à gauche te donne accès à toutes les fonctions : élèves, classes, présences, caisse, rapports…" },
     { animation: "TalkPassionately", message: "Tu connais les bases ! Clique sur moi quand tu as une question. 🎉" },
   ];
@@ -94,7 +94,7 @@
     if (!isAllowed()) return; // session réelle sans safe.assistant.use : Jaspe ne s’initialise pas
     container = document.createElement("div");
     container.className = "safe-assistant";
-    container.setAttribute("aria-label", "Assistant Safe");
+    container.setAttribute("aria-label", "Assistant Jaspe");
     document.body.appendChild(container);
     render();
     maybeStartOnboarding();
@@ -167,7 +167,7 @@
     var html = "";
     if (state.open) {
       html += '<div class="safe-bubble">';
-      html += '<div class="safe-bubble-header"><strong>Safe</strong><button class="safe-bubble-close" aria-label="Fermer">✕</button></div>';
+      html += '<div class="safe-bubble-header"><strong>Jaspe</strong><button class="safe-bubble-close" aria-label="Fermer">✕</button></div>';
       html += '<div class="safe-bubble-body"><p>' + escape(state.currentMessage) + '</p>';
       if (state.suggestions.length) {
         html += '<div class="safe-suggestions">';
@@ -233,7 +233,7 @@
     if (!isAllowed()) { render(); return; }
     state.open = !state.open;
     if (state.open && !state.currentMessage) {
-      state.currentMessage = "Bonjour ! Je suis Safe, ton assistante SchoolSafe. 😊";
+      state.currentMessage = "Bonjour ! Je suis Jaspe, ton assistante SchoolSafe. 😊";
       state.animation = "Wave";
       state.suggestions = defaultSuggestions();
     }
@@ -253,7 +253,7 @@
     if (query) {
       handleUserInput(query);
     } else {
-      state.currentMessage = "Bonjour ! Je suis Safe, ton assistante SchoolSafe. 😊";
+      state.currentMessage = "Bonjour ! Je suis Jaspe, ton assistante SchoolSafe. 😊";
       state.animation = "Wave";
       state.suggestions = defaultSuggestions();
       render();

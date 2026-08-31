@@ -44,6 +44,33 @@ test.describe("JASPE 3D — retrait de la présentation 2D", () => {
     expect(missingAssets).toEqual([]);
   });
 
+  test("nomme toujours l’assistant visible Jaspe, y compris pendant l’onboarding", async ({ page }) => {
+    await page.addInitScript(() => localStorage.removeItem("safe_onboarding_done"));
+    await page.route("**/assistant-name-fixture", (route) => {
+      return route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: '<!doctype html><html lang="fr"><body class="screen-workspace"><button type="button" data-open-jaspe="fixture">Ouvrir Jaspe</button><script src="/modules/safe/safe-assistant.js"></script></body></html>',
+      });
+    });
+    await page.goto("/assistant-name-fixture", { waitUntil: "load" });
+
+    const assistant = page.locator(".safe-assistant");
+    await expect(assistant).toHaveAttribute("aria-label", "Assistant Jaspe");
+    await expect(page.locator(".safe-bubble-header strong")).toHaveText("Jaspe");
+    await expect(page.locator(".safe-bubble-body p")).toContainText("Je suis Jaspe");
+
+    await page.getByRole("button", { name: "Plus tard" }).click();
+    await page.locator('[data-open-jaspe="fixture"]').click();
+    await expect(page.locator(".safe-bubble-body p")).toContainText("Je suis Jaspe");
+
+    await enterDemoWorkspace(page, "admin");
+    await page.locator('[data-open-jaspe="dashboard"]:visible').click();
+    await page.locator("#safeInput").fill("Qui es-tu ?");
+    await page.locator("#safeSend").click();
+    await expect(page.locator(".safe-bubble-body p")).toContainText("Je suis Jaspe");
+  });
+
   for (const surface of [
     { role: "parent", launcher: '[data-open-jaspe="parent"]' },
     { role: "teacher", launcher: '[data-open-jaspe="teacher"]' },
