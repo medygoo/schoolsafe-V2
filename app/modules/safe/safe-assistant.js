@@ -1,7 +1,6 @@
 (function (global) {
   "use strict";
 
-  var ASSET_BASE = "./safe2d/";
   var DEFAULT_ANIMATION = "Idle";
 
   // Branche de navigation associée à chaque entrée FAQ qui pointe vers une
@@ -100,6 +99,7 @@
     render();
     maybeStartOnboarding();
     listenToAppEvents();
+    listenToLaunchers();
   }
 
   function refreshAccess() {
@@ -152,10 +152,6 @@
     render();
   }
 
-  function legacyFallbackUrl() {
-    return ASSET_BASE + "safe_sourire.png";
-  }
-
   function escape(text) {
     return String(text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
@@ -184,7 +180,7 @@
       html += '</div></div>';
     }
     html += '<div class="safe-avatar' + (state.minimized ? " safe-minimized" : "") + '" role="button" tabindex="0" aria-label="Ouvrir Jaspe">';
-    html += '<div class="safe-3d-stage" aria-hidden="true"><span class="safe-3d-fallback"><img src="' + legacyFallbackUrl() + '" alt=""><span>Jaspe</span></span></div>';
+    html += '<div class="safe-3d-stage" aria-hidden="true"><span class="safe-3d-fallback"><span class="safe-3d-fallback__mark">J</span><span>Jaspe reste disponible</span></span></div>';
     html += '</div>';
     container.innerHTML = html;
     bindEvents();
@@ -222,6 +218,15 @@
     if (sendBtn) sendBtn.addEventListener("click", function () { if (input) handleUserInput(input.value); });
     if (input) input.addEventListener("input", function () { playVisual("Listening", { once: false }); });
     if (input) input.addEventListener("keydown", function (e) { if (e.key === "Enter") handleUserInput(input.value); });
+  }
+
+  function listenToLaunchers() {
+    if (!document || typeof document.addEventListener !== "function") return;
+    document.addEventListener("click", function (event) {
+      var launcher = event.target && event.target.closest ? event.target.closest("[data-open-jaspe]") : null;
+      if (!launcher) return;
+      openWithQuery("");
+    });
   }
 
   function toggleOpen() {

@@ -564,7 +564,7 @@
   }
 
   function jaspeMarkup(child) {
-    return '<section class="parent-jaspe-card" aria-labelledby="parentJaspeTitle"><div class="parent-jaspe-avatar"><img src="./safe2d/safe_sourire.png" alt="Jaspe"></div>' +
+    return '<section class="parent-jaspe-card" aria-labelledby="parentJaspeTitle"><button class="parent-jaspe-launcher" type="button" data-open-jaspe="parent" aria-label="Ouvrir Jaspe 3D"><span aria-hidden="true">J3D</span><small>Ouvrir Jaspe</small></button>' +
       '<div class="parent-jaspe-content"><p class="parent-eyebrow">Jaspe Parent · périmètre contrôlé</p><h2 id="parentJaspeTitle">Comment puis-je vous aider pour ' + escapeMarkup(child.first_name) + ' ?</h2>' +
       '<p>Je peux résumer, expliquer et préparer un message autorisé. Je ne peux modifier aucune donnée.</p><div class="parent-jaspe-suggestions">' +
       '<button type="button" data-parent-jaspe-query="Résume la situation de mon enfant">Résumer la situation</button>' +

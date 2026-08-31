@@ -62,13 +62,24 @@
   width: 100%;
   height: 100%;
   place-items: center;
+  align-content: center;
+  gap: var(--ss-space-1);
   color: var(--ss-text-accent);
   font-size: var(--ss-text-xs);
   font-weight: var(--ss-font-bold);
+  text-align: center;
 }
 
-.safe-3d-fallback img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.safe-3d-fallback span { position: relative; align-self: end; margin-bottom: var(--ss-space-1); }
+.safe-3d-fallback__mark {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ss-text-accent) 30%, transparent);
+  border-radius: var(--ss-radius-full);
+  background: color-mix(in srgb, var(--ss-bg-primary) 82%, transparent);
+  font-size: var(--ss-text-lg);
+}
 .safe-3d-stage.is-ready .safe-3d-fallback { opacity: 0; }
 
 .safe-bubble {

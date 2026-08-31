@@ -227,8 +227,9 @@
 .teacher-direction-metric em { overflow-wrap: anywhere; color: var(--ss-text-secondary); font-style: normal; }
 .teacher-direction-metric strong { font-size: 1.2rem; }
 .teacher-jaspe { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 1rem; padding: 1.2rem; border: 1px solid var(--ss-border-default); border-radius: 1rem; background: var(--ss-bg-primary); box-shadow: var(--ss-shadow-sm); }
-.teacher-jaspe-avatar { display: grid; place-items: center; border-radius: .9rem; background: var(--ss-info-bg); }
-.teacher-jaspe-avatar img { width: 5.5rem; height: 5.5rem; object-fit: contain; }
+.teacher-jaspe-launcher { display: grid; min-height: 6rem; place-items: center; align-content: center; gap: .3rem; border: 1px solid var(--ss-border-default); border-radius: .9rem; background: var(--ss-info-bg); color: var(--ss-info-text); cursor: pointer; }
+.teacher-jaspe-launcher span { font-size: 1.35rem; font-weight: 900; }
+.teacher-jaspe-launcher small { color: inherit; font-weight: 800; }
 .teacher-jaspe-content { min-width: 0; }
 .teacher-jaspe-content h2,
 .teacher-jaspe-content > p { margin: 0; }
@@ -272,5 +273,5 @@
   .teacher-timeline-item dl { grid-template-columns: 1fr; }
   .teacher-direction-grid { grid-template-columns: 1fr; }
   .teacher-jaspe { grid-template-columns: 1fr; }
-  .teacher-jaspe-avatar { min-height: 6rem; }
+  .teacher-jaspe-launcher { min-height: 6rem; }
 }

@@ -119,8 +119,8 @@
     .teacher-direction-metric > span,
     .student-card-photo,
     .academic-jaspe > i,
-    .parent-jaspe-avatar,
-    .teacher-jaspe-avatar
+    .parent-jaspe-launcher,
+    .teacher-jaspe-launcher
   ) {
   color: var(--harmony-accent);
   background: linear-gradient(145deg, var(--harmony-soft), color-mix(in srgb, var(--harmony-accent-2) 14%, transparent));

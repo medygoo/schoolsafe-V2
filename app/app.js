@@ -2240,7 +2240,7 @@
     var topbarAvatar = document.getElementById("topbarAvatar");
     var mobileTopbarAvatar = document.getElementById("mobileTopbarAvatar");
     var sidebarAvatar = document.getElementById("sidebarAvatar");
-    var avatarUrl = (currentSession && currentSession.avatar) || "./safe2d/safe_sourire.png";
+    var avatarUrl = (currentSession && currentSession.avatar) || "./schoolsafe-logo.png";
     if (topbarAvatar) topbarAvatar.src = avatarUrl;
     if (mobileTopbarAvatar) mobileTopbarAvatar.src = avatarUrl;
     if (sidebarAvatar) sidebarAvatar.src = avatarUrl;

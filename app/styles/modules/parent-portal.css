@@ -1034,21 +1034,22 @@
   box-shadow: var(--ss-shadow-sm);
 }
 
-.parent-jaspe-avatar {
+.parent-jaspe-launcher {
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: var(--ss-space-1);
   width: 88px;
   height: 88px;
-  overflow: hidden;
-  border-radius: 50%;
+  border: 1px solid var(--ss-border-default);
+  border-radius: var(--ss-radius-xl);
   background: var(--ss-info-bg);
+  color: var(--ss-info-text);
+  cursor: pointer;
 }
 
-.parent-jaspe-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
+.parent-jaspe-launcher span { font-size: var(--ss-text-xl); font-weight: var(--ss-font-extrabold); }
+.parent-jaspe-launcher small { color: inherit; font-weight: var(--ss-font-semibold); }
 
 .parent-jaspe-content {
   min-width: 0;
@@ -1218,7 +1219,7 @@
     grid-template-columns: 1fr;
   }
 
-  .parent-jaspe-avatar {
+  .parent-jaspe-launcher {
     width: 68px;
     height: 68px;
   }
