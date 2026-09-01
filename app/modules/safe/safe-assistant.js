@@ -6,6 +6,9 @@
   var VIEWPORT_MARGIN = 12;
   var BUBBLE_GAP = 12;
   var DRAG_THRESHOLD = 5;
+  var WORKSPACE_MOTION_FIRST_DELAY = 8000;
+  var WORKSPACE_MOTION_REPEAT_DELAY = 12000;
+  var WORKSPACE_MOTION_SEQUENCE = ["Wave", "Listening", "Agree", "Shrug", "TalkHandsOpen", "TalkPassionately"];
 
   // Branche de navigation associée à chaque entrée FAQ qui pointe vers une
   // fonctionnalité (null = sujet général, toujours disponible).
@@ -106,6 +109,8 @@
   var authGreetingTimers = [];
   var authInputMode = false;
   var authFocusListenerBound = false;
+  var workspaceMotionTimer = 0;
+  var workspaceMotionIndex = 0;
 
   function init() {
     if (initialized) return;
@@ -148,8 +153,43 @@
     if (container) container.classList.remove("is-auth-entering");
   }
 
+  function clearWorkspaceMotionTimer() {
+    if (workspaceMotionTimer) global.clearTimeout(workspaceMotionTimer);
+    workspaceMotionTimer = 0;
+  }
+
+  function workspaceMotionAllowed() {
+    var reduced = global.matchMedia && global.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    return currentSurface === "workspace"
+      && !!container
+      && !state.userHidden
+      && !state.open
+      && !reduced;
+  }
+
+  function scheduleWorkspaceMotion(delay) {
+    clearWorkspaceMotionTimer();
+    if (!workspaceMotionAllowed()) return;
+    workspaceMotionTimer = global.setTimeout(function () {
+      workspaceMotionTimer = 0;
+      if (!workspaceMotionAllowed()) return;
+      var animation = WORKSPACE_MOTION_SEQUENCE[workspaceMotionIndex % WORKSPACE_MOTION_SEQUENCE.length];
+      workspaceMotionIndex += 1;
+      if (global.SchoolSafeJaspe3D && typeof global.SchoolSafeJaspe3D.play === "function") {
+        global.SchoolSafeJaspe3D.play(animation, {
+          once: true,
+          fadeSeconds: 0.2,
+          durationSeconds: 2.6,
+          returnToIdle: true,
+        });
+      }
+      scheduleWorkspaceMotion(WORKSPACE_MOTION_REPEAT_DELAY);
+    }, delay);
+  }
+
   function removeVisualSurface(destroyRuntime) {
     clearAuthGreetingTimers();
+    clearWorkspaceMotionTimer();
     if (container) {
       container.remove();
       container = null;
@@ -163,6 +203,7 @@
     var nextSurface = name || detectSurface();
     if (nextSurface !== currentSurface) {
       clearAuthGreetingTimers();
+      clearWorkspaceMotionTimer();
       setAuthInputMode(false);
       currentSurface = nextSurface;
       floatingPosition = currentSurface === "workspace" ? readStoredPosition() : null;
@@ -423,6 +464,7 @@
     bindEvents();
     mountJaspe3D();
     scheduleLayout(false);
+    scheduleWorkspaceMotion(WORKSPACE_MOTION_FIRST_DELAY);
   }
 
   function mountJaspe3D() {
@@ -563,6 +605,7 @@
 
     avatar.addEventListener("pointerdown", function (event) {
       if (typeof event.button === "number" && event.button !== 0) return;
+      clearWorkspaceMotionTimer();
       var rect = container.getBoundingClientRect();
       drag = {
         pointerId: event.pointerId,
@@ -597,6 +640,7 @@
       container.classList.remove("is-dragging");
       try { avatar.releasePointerCapture(event.pointerId); } catch (e) { /* capture optionnelle */ }
       drag = null;
+      scheduleWorkspaceMotion(WORKSPACE_MOTION_FIRST_DELAY);
     };
     avatar.addEventListener("pointerup", finishDrag);
     avatar.addEventListener("pointercancel", finishDrag);

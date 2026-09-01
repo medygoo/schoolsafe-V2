@@ -201,10 +201,10 @@ test.describe("JASPE 3D — personnage flottant et déplaçable", () => {
     await enterWorkspaceWithoutOnboarding(page);
 
     for (const expected of [
-      { viewport: { width: 1440, height: 900 }, minWidth: 180, minHeight: 250 },
-      { viewport: { width: 834, height: 1112 }, minWidth: 140, minHeight: 205 },
-      { viewport: { width: 390, height: 844 }, minWidth: 96, minHeight: 145 },
-      { viewport: { width: 844, height: 390 }, minWidth: 80, minHeight: 120 },
+      { viewport: { width: 1440, height: 900 }, minWidth: 270, minHeight: 385 },
+      { viewport: { width: 834, height: 1112 }, minWidth: 200, minHeight: 285 },
+      { viewport: { width: 390, height: 844 }, minWidth: 140, minHeight: 210 },
+      { viewport: { width: 844, height: 390 }, minWidth: 110, minHeight: 165 },
     ]) {
       await page.setViewportSize(expected.viewport);
       await page.waitForTimeout(80);

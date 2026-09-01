@@ -6,6 +6,74 @@ async function waitForAction(page: Page, action: string) {
 }
 
 test.describe("JASPE 3D — états visuels du logiciel", () => {
+  test("alterne plusieurs gestes calmes lorsqu'elle attend dans l'application", async ({ page }) => {
+    await page.clock.install();
+    await enterDemoWorkspace(page, "admin", async (target) => {
+      await target.addInitScript(() => localStorage.setItem("safe_onboarding_done", "1"));
+    });
+    await page.waitForFunction(() => (window as any).__SCHOOLSAFE_JASPE3D__?.loaded === true);
+    await waitForAction(page, "Idle");
+
+    await page.evaluate(() => {
+      const runtime = (window as any).SchoolSafeJaspe3D;
+      const nativePlay = runtime.play.bind(runtime);
+      (window as any).__jaspeAmbientActions = [];
+      runtime.play = (name: string, options?: object) => {
+        if (name !== "Idle") (window as any).__jaspeAmbientActions.push(name);
+        return nativePlay(name, options);
+      };
+    });
+
+    await page.clock.runFor(36_000);
+    const actions = await page.evaluate(() => (window as any).__jaspeAmbientActions);
+    expect(actions.slice(0, 3)).toEqual(["Wave", "Listening", "Agree"]);
+    expect(new Set(actions).size).toBeGreaterThanOrEqual(3);
+  });
+
+  test("suspend les gestes automatiques lorsque Jaspe est masquée", async ({ page }) => {
+    await page.clock.install();
+    await enterDemoWorkspace(page, "admin", async (target) => {
+      await target.addInitScript(() => localStorage.setItem("safe_onboarding_done", "1"));
+    });
+    await page.waitForFunction(() => (window as any).__SCHOOLSAFE_JASPE3D__?.loaded === true);
+    await page.getByRole("button", { name: "Masquer Jaspe" }).click();
+
+    await page.evaluate(() => {
+      const runtime = (window as any).SchoolSafeJaspe3D;
+      const nativePlay = runtime.play.bind(runtime);
+      (window as any).__jaspeHiddenActions = [];
+      runtime.play = (name: string, options?: object) => {
+        if (name !== "Idle") (window as any).__jaspeHiddenActions.push(name);
+        return nativePlay(name, options);
+      };
+    });
+
+    await page.clock.runFor(36_000);
+    expect(await page.evaluate(() => (window as any).__jaspeHiddenActions)).toEqual([]);
+  });
+
+  test("ne lance aucun geste automatique lorsque les mouvements sont réduits", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.clock.install();
+    await enterDemoWorkspace(page, "admin", async (target) => {
+      await target.addInitScript(() => localStorage.setItem("safe_onboarding_done", "1"));
+    });
+    await page.waitForFunction(() => (window as any).__SCHOOLSAFE_JASPE3D__?.loaded === true);
+
+    await page.evaluate(() => {
+      const runtime = (window as any).SchoolSafeJaspe3D;
+      const nativePlay = runtime.play.bind(runtime);
+      (window as any).__jaspeReducedAmbientActions = [];
+      runtime.play = (name: string, options?: object) => {
+        if (name !== "Idle") (window as any).__jaspeReducedAmbientActions.push(name);
+        return nativePlay(name, options);
+      };
+    });
+
+    await page.clock.runFor(36_000);
+    expect(await page.evaluate(() => (window as any).__jaspeReducedAmbientActions)).toEqual([]);
+  });
+
   test("enchaîne ouverture, écoute, réponse et confirmation puis revient à Idle", async ({ page }) => {
     await enterDemoWorkspace(page, "admin");
     await page.waitForFunction(() => (window as any).__SCHOOLSAFE_JASPE3D__?.loaded === true);
