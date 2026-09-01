@@ -1,9 +1,31 @@
 import { expect, test } from "@playwright/test";
-import { enterDemoWorkspace } from "./helpers";
+import { domClick, enterDemoWorkspace } from "./helpers";
 
 const liveToken = "phase-m-live-session";
 
 test.describe("M3 — séparation stricte live, démonstration et indisponible", () => {
+  test("un backend indisponible ne bascule jamais silencieusement en démonstration", async ({ page }) => {
+    await page.route("http://127.0.0.1:8787/**", (route) => route.abort("failed"));
+    await page.goto("/", { waitUntil: "load" });
+    await domClick(page, "#enterSplash");
+    await expect(page.locator("#guardian.active")).toBeVisible();
+    await domClick(page, "#continueGuardian");
+    await expect(page.locator("#auth.active")).toBeVisible();
+
+    await page.locator("#emailIdentifier").fill("direction@example.test");
+    await page.locator("#password").fill("mot-de-passe-test");
+    await page.locator('#loginForm button[type="submit"]').click();
+
+    await expect(page.locator("#auth.active")).toBeVisible();
+    await expect(page.locator("#workspace.active")).toHaveCount(0);
+    await expect(page.locator("#demoEntry")).toBeVisible();
+
+    await page.locator("#demoRole").selectOption("admin");
+    await domClick(page, "#demoEntry");
+    await expect(page.locator("#workspace.active")).toBeVisible();
+    await expect(page.locator("#workspaceDemoBanner:not([hidden])")).toBeVisible();
+  });
+
   test("conserve des fixtures explicitement marquées en démonstration", async ({ page }) => {
     await enterDemoWorkspace(page, "admin");
 

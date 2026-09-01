@@ -40,7 +40,7 @@
     var live = global.currentSession;
     if (live && live.token) return live;
     try {
-      var raw = global.localStorage && global.localStorage.getItem("schoolsafe-v2-session");
+      var raw = global.sessionStorage && global.sessionStorage.getItem("schoolsafe-v2-session");
       if (raw) {
         var saved = JSON.parse(raw);
         if (saved && saved.token) return saved;

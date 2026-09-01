@@ -1,10 +1,11 @@
 (function () {
   "use strict";
 
-  var apiBase = window.schoolSafeBackendConfig ? null : "http://127.0.0.1:8787";
+  var apiBase = window.schoolSafeApiBase || (window.schoolSafeBackendConfig ? null : "http://127.0.0.1:8787");
 
   function getApiBase() {
     if (apiBase) return apiBase;
+    if (window.schoolSafeApiBase) return window.schoolSafeApiBase;
     return window.schoolSafeBackendConfig && window.schoolSafeBackendConfig.api_base
       ? window.schoolSafeBackendConfig.api_base
       : "http://127.0.0.1:8787";
@@ -12,7 +13,7 @@
 
   function currentToken() {
     try {
-      var raw = window.localStorage.getItem("schoolsafe-v2-session");
+      var raw = window.sessionStorage.getItem("schoolsafe-v2-session");
       if (!raw) return null;
       var session = JSON.parse(raw);
       return session && session.token ? session.token : null;

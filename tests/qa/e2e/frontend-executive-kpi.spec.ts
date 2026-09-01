@@ -100,7 +100,7 @@ test.describe("Dashboard Executive KPI", () => {
       contentType: "application/json",
       body: JSON.stringify({ data: { kpis: [{ code: "students", value: 7, trend: "Source live" }] } }),
     }));
-    await page.addInitScript(() => localStorage.setItem("schoolsafe-v2-session", JSON.stringify({ token: "live-token" })));
+    await page.addInitScript(() => sessionStorage.setItem("schoolsafe-v2-session", JSON.stringify({ token: "live-token" })));
     await page.goto("/", { waitUntil: "load" });
     await page.waitForFunction(() => Boolean((window as any).schoolSafeShow));
     await page.evaluate(() => (window as any).schoolSafeShow("workspace"));

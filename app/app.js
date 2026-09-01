@@ -31,17 +31,29 @@
     { src: "login-kid-6.jpg", alt: "Élève SchoolSafe", desktop: [52,28], mobile: [52,27], active: true, order: 6 }
   ];
 
-  var apiBase = "http://127.0.0.1:8787";
+  var apiBaseMeta = document.querySelector('meta[name="schoolsafe-api-base"]');
+  var apiBase = window.SCHOOLSAFE_API_BASE
+    || (apiBaseMeta && apiBaseMeta.content)
+    || "http://127.0.0.1:8787";
+  window.schoolSafeApiBase = apiBase;
   var supabaseClient = null;
   var currentSession = null;
   var backendConfig = null;
   var pendingPhone = null;
   var setupToken = null;
 
+  var SESSION_STORAGE_KEY = "schoolsafe-v2-session";
   function tryLocalStorage() { try { return window.localStorage; } catch (e) { return null; } }
-  function storageGet(key) { var s = tryLocalStorage(); return s ? s.getItem(key) : null; }
-  function storageSet(key, value) { var s = tryLocalStorage(); if (s) s.setItem(key, value); }
-  function storageRemove(key) { var s = tryLocalStorage(); if (s) s.removeItem(key); }
+  function trySessionStorage() { try { return window.sessionStorage; } catch (e) { return null; } }
+  function storageFor(key) { return key === SESSION_STORAGE_KEY ? trySessionStorage() : tryLocalStorage(); }
+  function storageGet(key) { var s = storageFor(key); return s ? s.getItem(key) : null; }
+  function storageSet(key, value) { var s = storageFor(key); if (s) s.setItem(key, value); }
+  function storageRemove(key) { var s = storageFor(key); if (s) s.removeItem(key); }
+
+  // Une ancienne session persistante ne doit pas survivre à la migration vers
+  // une session limitée à l'onglet. Les autres préférences restent locales.
+  var legacySessionStorage = tryLocalStorage();
+  if (legacySessionStorage) legacySessionStorage.removeItem(SESSION_STORAGE_KEY);
 
   function normalizePhone(raw) {
     var digits = String(raw || "").replace(/\D/g, "");
@@ -225,7 +237,7 @@
    * Elle ne crée aucun droit backend et permet aux modules de passer par Access_Law sans bypass de rôle.
    */
   var DEMO_PERMISSIONS_BY_ROLE = {
-    admin: ["school.manage", "staff.read", "staff.manage", "roles.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "finance.status.read", "finance.report.read", "reports.financial.read", "finance.cash_register.close", "safe.assistant.use", "canteen.manage", "communication.message.send"],
+    admin: ["school.manage", "staff.read", "staff.manage", "roles.manage", "school.student.read", "school.student.create", "school.student.activate", "school.guardian.read", "security.pickup.read", "school.enrollment.manage", "school.student.transfer", "school.student.archive", "school.class.read", "school.structure.manage", "security.events.read", "security.card.create", "pedagogy.grade.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "finance.status.read", "finance.report.read", "reports.financial.read", "finance.cash_register.close", "safe.assistant.use", "canteen.manage", "communication.message.send"],
     admissions: ["school.student.read", "school.student.create"],
     parent: ["school.student.read", "school.guardian.read", "security.pickup.read", "security.events.read", "pedagogy.assignment.read", "pedagogy.grade.read", "pedagogy.report.read", "palmarques.read", "finance.status.read", "finance.fee.read", "finance.receipt.read", "communication.message.send", "safe.assistant.use"],
     teacher: ["school.student.read", "school.class.read", "pedagogy.subject.read", "pedagogy.assignment.read", "pedagogy.assignment.manage", "pedagogy.grade.read", "pedagogy.grade.manage", "pedagogy.lesson-plan.read", "pedagogy.lesson-plan.manage", "safe.assistant.use"],
@@ -250,6 +262,8 @@
         { permission: "school.student.read", type: "school" },
         { permission: "school.class.read", type: "school" },
         { permission: "security.card.create", type: "school" },
+        { permission: "pedagogy.assignment.read", type: "school" },
+        { permission: "pedagogy.assignment.manage", type: "school" },
         { permission: "finance.status.read", type: "school" },
         { permission: "finance.report.read", type: "school" },
         { permission: "reports.financial.read", type: "school" },
@@ -949,17 +963,28 @@
   }
 
   function openSyncPanel() {
-    document.getElementById("syncPanel").hidden = false;
-    document.getElementById("syncPanelBackdrop").hidden = false;
-    document.getElementById("syncStatusButton").setAttribute("aria-expanded", "true");
-    document.getElementById("closeSyncPanel").focus();
+    var panel = document.getElementById("syncPanel");
+    var backdrop = document.getElementById("syncPanelBackdrop");
+    if (!panel || !backdrop) return;
+    panel.hidden = false;
+    backdrop.hidden = false;
+    var button = document.getElementById("syncStatusButton");
+    if (button) button.setAttribute("aria-expanded", "true");
+    var closeButton = document.getElementById("closeSyncPanel");
+    if (closeButton) closeButton.focus();
   }
 
   function closeSyncPanel() {
-    document.getElementById("syncPanel").hidden = true;
-    document.getElementById("syncPanelBackdrop").hidden = true;
-    document.getElementById("syncStatusButton").setAttribute("aria-expanded", "false");
-    document.getElementById("syncStatusButton").focus();
+    var panel = document.getElementById("syncPanel");
+    var backdrop = document.getElementById("syncPanelBackdrop");
+    if (!panel || !backdrop) return;
+    panel.hidden = true;
+    backdrop.hidden = true;
+    var button = document.getElementById("syncStatusButton");
+    if (button) {
+      button.setAttribute("aria-expanded", "false");
+      button.focus();
+    }
   }
 
   function finalizeLocallyConfirmedOperation(operation) {
@@ -2285,7 +2310,7 @@
       var userRoles = (currentSession && currentSession.roles) || [currentDemoRole];
       roleSwitch.innerHTML = userRoles.map(function (role) {
         var label = roleCatalog[role] ? roleCatalog[role].label : role;
-        return '<option value="' + role + '"' + (role === currentDemoRole ? " selected" : "") + ">" + label + "</option>";
+        return '<option value="' + escapeMarkup(role) + '"' + (role === currentDemoRole ? " selected" : "") + ">" + escapeMarkup(label) + "</option>";
       }).join("");
       roleSwitch.hidden = userRoles.length <= 1;
       roleSwitch.disabled = userRoles.length <= 1;
@@ -2883,7 +2908,7 @@
 
   function populateRoleSelect(select, value) {
     select.innerHTML = Array.prototype.map.call(document.getElementById("demoRole").options, function (option) {
-      return '<option value="' + option.value + '"' + (option.value === value ? " selected" : "") + ">" + option.textContent + "</option>";
+      return '<option value="' + escapeMarkup(option.value) + '"' + (option.value === value ? " selected" : "") + ">" + escapeMarkup(option.textContent) + "</option>";
     }).join("");
   }
 
@@ -2924,7 +2949,7 @@
 
   function renderStaffList() {
     document.getElementById("staffList").innerHTML = staffSamples.map(function (person, index) {
-      return '<button class="staff-item' + (index === selectedStaffIndex ? " active" : "") + '" type="button" data-staff-index="' + index + '"><span>' + person.initials + '</span><div><b>' + person.name + "</b><small>" + roleCatalog[person.role].short + "</small></div></button>";
+      return '<button class="staff-item' + (index === selectedStaffIndex ? " active" : "") + '" type="button" data-staff-index="' + index + '"><span>' + escapeMarkup(person.initials) + '</span><div><b>' + escapeMarkup(person.name) + "</b><small>" + escapeMarkup(roleCatalog[person.role].short) + "</small></div></button>";
     }).join("");
     document.querySelectorAll("[data-staff-index]").forEach(function (button) {
       button.addEventListener("click", function () {
@@ -2945,7 +2970,7 @@
     var policy = document.getElementById("accessDataPolicy");
     policy.hidden = person.role !== "pedagogy";
     if (person.role === "pedagogy") {
-      policy.innerHTML = '<div><span><i data-lucide="shield-check"></i></span><div><b>Attribution financière limitée</b><p>Régularité scolaire · statut uniquement · périmètre ' + person.scope + '</p></div></div><ul><li>Visible : identité scolaire, classe, En ordre / À régulariser / Indisponible</li><li>Masqué : montants, soldes, paiements, reçus, caisse et trésorerie</li></ul>';
+      policy.innerHTML = '<div><span><i data-lucide="shield-check"></i></span><div><b>Attribution financière limitée</b><p>Régularité scolaire · statut uniquement · périmètre ' + escapeMarkup(person.scope) + '</p></div></div><ul><li>Visible : identité scolaire, classe, En ordre / À régulariser / Indisponible</li><li>Masqué : montants, soldes, paiements, reçus, caisse et trésorerie</li></ul>';
     }
     renderStaffList();
     renderPermissionTree(person.role);
@@ -3269,6 +3294,10 @@
     notify("Brouillon d’accès enregistré localement. Aucun serveur n’a été modifié.");
   });
 
+  bindIfExists("demoEntry", "click", function () {
+    enterDemo();
+  });
+
   document.getElementById("loginForm").addEventListener("submit", async function (event) {
     event.preventDefault();
     var mode = document.querySelector("[data-login-mode].selected")?.getAttribute("data-login-mode") || "email";
@@ -3276,8 +3305,7 @@
     if (!client) {
       var config = await loadBackendConfig();
       if (!config || !config.supabase_url) {
-        notify("Backend local non disponible — passage en démonstration.");
-        enterDemo();
+        notify("Serveur SchoolSafe indisponible. Vérifiez la connexion ou utilisez l’accès de démonstration ci-dessous.");
         return;
       }
       client = getSupabaseClient();

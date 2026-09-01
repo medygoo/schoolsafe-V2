@@ -70,6 +70,87 @@ test.describe("M7 — contrats globaux de non-régression", () => {
     expect(result.denyBlocksScope, "un DENY supprime la portée").toBeNull();
   });
 
+  test("SESSION : les adaptateurs API utilisent le jeton d'onglet et ignorent le jeton local hérité", async ({ page }) => {
+    await page.goto("/", { waitUntil: "load" });
+    const result = await page.evaluate(async () => {
+      const legacyToken = "legacy-local-token";
+      const tabToken = "tab-session-token";
+      localStorage.setItem("schoolsafe-v2-session", JSON.stringify({ token: legacyToken }));
+      sessionStorage.setItem("schoolsafe-v2-session", JSON.stringify({ token: tabToken }));
+
+      const calls: Array<{ url: string; authorization: string | null }> = [];
+      const originalFetch = window.fetch;
+      window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({
+          url: String(input),
+          authorization: new Headers(init?.headers).get("Authorization"),
+        });
+        return new Response(JSON.stringify({ data: [], count: 0 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+
+      try {
+        await Promise.all([
+          (window as any).SchoolSafePedagogyAPI.listClasses(),
+          (window as any).SchoolSafePalmaresAPI.listRankings({ month: "2026-09" }),
+          (window as any).SchoolSafeSchoolAPI.listAcademicYears(),
+          (window as any).SchoolSafeSecurityAPI.listEvents({ limit: 1 }),
+          (window as any).SchoolSafePilotageAPI.dashboard(),
+        ]);
+        return {
+          financeToken: (window as any).SchoolSafeFinanceAPI.getSessionToken(),
+          authorizations: calls.map((call) => call.authorization),
+        };
+      } finally {
+        window.fetch = originalFetch;
+        localStorage.removeItem("schoolsafe-v2-session");
+        sessionStorage.removeItem("schoolsafe-v2-session");
+      }
+    });
+
+    expect(result.financeToken).toBe("tab-session-token");
+    expect(result.authorizations).toHaveLength(5);
+    expect(result.authorizations.every((value) => value === "Bearer tab-session-token")).toBe(true);
+  });
+
+  test("PÉDAGOGIE : un document de devoir exige permission, portée et classe assignée", async ({ page }) => {
+    await page.goto("/", { waitUntil: "load" });
+    const result = await page.evaluate(() => {
+      const gate = (window as any).SchoolSafePedagogyModule?.canUseAssignmentDocument;
+      if (typeof gate !== "function") return { available: false };
+      const assignment = { id: "assignment-1", class_id: "class-a" };
+      const teacher = {
+        userId: "teacher-1",
+        role: "teacher",
+        permissions: ["pedagogy.assignment.read"],
+        scopes: [{ permission: "pedagogy.assignment.read", type: "assigned_classes" }],
+        assignedClassIds: ["class-a"],
+      };
+      return {
+        available: true,
+        assigned: gate(teacher, assignment),
+        outsideAssignment: gate({ ...teacher, assignedClassIds: ["class-b"] }, assignment),
+        missingScope: gate({ ...teacher, scopes: [] }, assignment),
+        explicitDeny: gate({ ...teacher, deniedPermissions: ["pedagogy.assignment.read"] }, assignment),
+        schoolScope: gate({
+          ...teacher,
+          role: "admin",
+          scopes: [{ permission: "pedagogy.assignment.read", type: "school" }],
+          assignedClassIds: [],
+        }, assignment),
+      };
+    });
+
+    expect(result.available).toBe(true);
+    expect(result.assigned).toBe(true);
+    expect(result.outsideAssignment).toBe(false);
+    expect(result.missingScope).toBe(false);
+    expect(result.explicitDeny).toBe(false);
+    expect(result.schoolScope).toBe(true);
+  });
+
   test("DOCUMENTS : permission + scope + contexte exigés, rien d'officiel n'est inventé", async ({ page }) => {
     await enterDemoWorkspace(page, "admin");
     const result = await page.evaluate(async () => {

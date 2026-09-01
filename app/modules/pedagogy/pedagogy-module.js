@@ -52,16 +52,20 @@
 
   function getCurrentUser() {
     try {
-      var session = JSON.parse(global.localStorage.getItem("schoolsafe-v2-session") || "{}");
-      return session.user || { id: "demo-user", role: "admin", schoolId: "demo-school" };
+      if (global.SchoolSafeAppContext && typeof global.SchoolSafeAppContext.getCurrentUser === "function") {
+        var canonical = global.SchoolSafeAppContext.getCurrentUser();
+        if (canonical) return canonical;
+      }
+      var session = JSON.parse(global.sessionStorage.getItem("schoolsafe-v2-session") || "{}");
+      if (session && session.user) return session.user;
+      return { id: "anonymous", role: "guest", permissions: [], scopes: [] };
     } catch (e) {
-      return { id: "demo-user", role: "admin", schoolId: "demo-school" };
+      return { id: "anonymous", role: "guest", permissions: [], scopes: [] };
     }
   }
 
   function getUserPermissions(user) {
-    if (user.role === "admin") return ["pedagogy.assignment.read", "pedagogy.assignment.manage"];
-    return user.permissions || [];
+    return user && Array.isArray(user.permissions) ? user.permissions : [];
   }
 
   async function getDocumentEngine() {
@@ -138,15 +142,39 @@
     return documentEnginePromise;
   }
 
-  function hasPdfPermission(user) {
-    if (user.role === "admin") return true;
-    var perms = getUserPermissions(user);
-    return perms.indexOf("pedagogy.assignment.read") >= 0 || perms.indexOf("pedagogy.assignment.manage") >= 0;
+  function classIdsFor(user, scope) {
+    var values = [];
+    if (Array.isArray(user && user.assignedClassIds)) values = values.concat(user.assignedClassIds);
+    if (scope && scope.id) values.push(scope.id);
+    if (scope && Array.isArray(scope.ids)) values = values.concat(scope.ids);
+    if (scope && Array.isArray(scope.classIds)) values = values.concat(scope.classIds);
+    return values.map(function (value) { return String(value); });
+  }
+
+  function permissionAllowsAssignment(user, permission, assignment) {
+    var access = global.SchoolSafeAccess;
+    if (!access || typeof access.canAccess !== "function" || typeof access.scopeFor !== "function") return false;
+    if (!access.canAccess(user || {}, permission)) return false;
+    if (typeof access.explicitDeny === "function" && access.explicitDeny(user || {}, permission)) return false;
+    if (typeof access.allowsScope === "function" && access.allowsScope(user || {}, permission, "school")) return true;
+    if (!assignment || assignment.class_id == null || typeof access.allowsScope !== "function") return false;
+    if (!access.allowsScope(user || {}, permission, "assigned_classes")) return false;
+    var scope = access.scopeFor(user || {}, permission);
+    return classIdsFor(user || {}, scope).indexOf(String(assignment.class_id)) >= 0;
+  }
+
+  function canUseAssignmentDocument(user, assignment) {
+    return permissionAllowsAssignment(user, "pedagogy.assignment.read", assignment)
+      || permissionAllowsAssignment(user, "pedagogy.assignment.manage", assignment);
+  }
+
+  function hasPdfPermission(user, assignment) {
+    return canUseAssignmentDocument(user, assignment);
   }
 
   function hasValidSessionToken() {
     try {
-      var raw = global.localStorage.getItem("schoolsafe-v2-session");
+      var raw = global.sessionStorage.getItem("schoolsafe-v2-session");
       if (!raw) return false;
       var session = JSON.parse(raw);
       return !!(session && session.token);
@@ -430,7 +458,7 @@
 
     var detail = "";
     if (selected) {
-      var pdfButtons = hasPdfPermission(getCurrentUser()) ?
+      var pdfButtons = hasPdfPermission(getCurrentUser(), selected) ?
         '<div class="pdf-actions">' + ssButton({ label: "Aperçu PDF", variant: "secondary", icon: "eye", attrs: { "data-preview-assignment": selected.id } }) +
         ssButton({ label: "Télécharger PDF", variant: "secondary", icon: "download", attrs: { "data-download-assignment": selected.id } }) +
         ssButton({ label: "Imprimer", variant: "secondary", icon: "printer", attrs: { "data-print-assignment": selected.id } }) +
@@ -927,6 +955,10 @@
       notify("Devoir introuvable.");
       return;
     }
+    if (!canUseAssignmentDocument(user, assignment)) {
+      notify("Document non autorisé pour cette classe et cette session.");
+      return;
+    }
 
     var subjectName = assignment.subjects ? assignment.subjects.name : assignment.subject_id;
     var className = assignment.classes ? assignment.classes.name : assignment.class_id;
@@ -1050,6 +1082,7 @@
   }
 
   global.SchoolSafePedagogyModule = {
+    canUseAssignmentDocument: canUseAssignmentDocument,
     render: function (containerId, options) {
       options = options || {};
       var container = document.getElementById(containerId || "pedagogyContent");

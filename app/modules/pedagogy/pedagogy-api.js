@@ -10,7 +10,7 @@
 
   function currentToken() {
     try {
-      var session = JSON.parse(localStorage.getItem("schoolsafe-v2-session") || "{}");
+      var session = JSON.parse(sessionStorage.getItem("schoolsafe-v2-session") || "{}");
       return session.token || null;
     } catch (e) {
       return null;

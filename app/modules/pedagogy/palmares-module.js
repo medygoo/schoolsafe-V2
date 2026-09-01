@@ -39,7 +39,7 @@
 
   function hasValidSessionToken() {
     try {
-      var raw = global.localStorage.getItem("schoolsafe-v2-session");
+      var raw = global.sessionStorage.getItem("schoolsafe-v2-session");
       if (!raw) return false;
       var session = JSON.parse(raw);
       return !!(session && session.token);

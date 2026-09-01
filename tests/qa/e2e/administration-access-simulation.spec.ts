@@ -64,15 +64,15 @@ test.describe("Phase L5 — simulation Access_Law", () => {
       await route.fallback();
     });
     await openSimulation(page);
-    const before = await page.evaluate(() => localStorage.getItem("schoolsafe-v2-session"));
+    const before = await page.evaluate(() => sessionStorage.getItem("schoolsafe-v2-session"));
     const simulation = page.locator("[data-access-simulation]");
     await simulation.getByLabel("Permission additionnelle").fill("roles.manage");
     await simulation.getByLabel("Portée").selectOption("school");
     await simulation.getByLabel("Effet").selectOption("deny");
     await simulation.getByLabel("Justification").fill("Vérification temporaire");
-    await simulation.getByRole("button", { name: "Simuler l’impact" }).click();
+    await simulation.getByRole("button", { name: "Simuler l’impact" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(simulation.getByText("DENY EXPLICITE", { exact: true }).last()).toBeVisible();
-    expect(await page.evaluate(() => localStorage.getItem("schoolsafe-v2-session"))).toBe(before);
+    expect(await page.evaluate(() => sessionStorage.getItem("schoolsafe-v2-session"))).toBe(before);
     expect(mutations).toBe(0);
   });
 });

@@ -8,7 +8,7 @@
 
   function getSessionToken() {
     try {
-      var raw = window.localStorage.getItem("schoolsafe-v2-session");
+      var raw = window.sessionStorage.getItem("schoolsafe-v2-session");
       if (!raw) return null;
       var session = JSON.parse(raw);
       return session && session.token ? session.token : null;

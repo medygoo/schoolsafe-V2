@@ -10,7 +10,7 @@ const state = {
   currentYear: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1),
   academicYearId: null,
   schoolInfo: null,
-  apiBase: 'http://127.0.0.1:8787'
+  apiBase: window.schoolSafeApiBase || window.SCHOOLSAFE_API_BASE || 'http://127.0.0.1:8787'
 };
 
 function $(id) { return document.getElementById(id); }
@@ -29,7 +29,7 @@ function setStatus(msg, type = 'ok') {
 
 function getToken() {
   try {
-    const session = JSON.parse(localStorage.getItem('schoolsafe-v2-session') || 'null');
+    const session = JSON.parse(sessionStorage.getItem('schoolsafe-v2-session') || 'null');
     return session?.token || null;
   } catch { return null; }
 }
