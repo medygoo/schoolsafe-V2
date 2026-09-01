@@ -40,6 +40,67 @@ test.describe("M7 — contrats globaux de non-régression", () => {
     expect(permissionOf("safe.assistant.use")?.scope).toBe("own");
   });
 
+  test("DISTRIBUTION : catalogue canonique, en-têtes de sécurité et assets locaux sont servis", async ({ page, request }) => {
+    const catalogueResponse = await request.get("/shared/permissions.json");
+    expect(catalogueResponse.status()).toBe(200);
+    expect(await catalogueResponse.json()).toEqual(CATALOGUE);
+
+    const shellResponse = await request.get("/");
+    expect(shellResponse.status()).toBe(200);
+    expect(shellResponse.headers()["content-security-policy"]).toContain("default-src 'self'");
+    expect(shellResponse.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+    expect(shellResponse.headers()["x-frame-options"]).toBe("DENY");
+    expect(shellResponse.headers()["x-content-type-options"]).toBe("nosniff");
+
+    await page.goto("/", { waitUntil: "load" });
+    const runtime = await page.evaluate(async () => {
+      const externalScripts = Array.from(document.scripts)
+        .map((script) => script.src)
+        .filter((src) => /^https?:/.test(src) && new URL(src).origin !== location.origin);
+      const manifest = await fetch("./manifest.webmanifest").then((response) => response.json());
+      return {
+        externalScripts,
+        qrCode: typeof (window as any).QRCode,
+        html2canvas: typeof (window as any).html2canvas,
+        icons: manifest.icons,
+      };
+    });
+    expect(runtime.externalScripts).toEqual([]);
+    expect(runtime.qrCode).toBe("function");
+    expect(runtime.html2canvas).toBe("function");
+
+    const cardPreviewResponse = await request.get("/modules/cards/test-card.html");
+    expect(cardPreviewResponse.status()).toBe(200);
+    expect(await cardPreviewResponse.text()).not.toMatch(/<script[^>]+src=["']https?:\/\//i);
+    expect(runtime.icons).toEqual(expect.arrayContaining([
+      expect.objectContaining({ src: "./icons/icon-192.png", sizes: "192x192" }),
+      expect.objectContaining({ src: "./icons/icon-512.png", sizes: "512x512" }),
+      expect.objectContaining({ src: "./icons/icon-512-maskable.png", sizes: "512x512", purpose: "maskable" }),
+    ]));
+    for (const icon of runtime.icons) {
+      const response = await request.get(icon.src);
+      expect(response.status(), icon.src).toBe(200);
+      expect(response.headers()["content-type"], icon.src).toBe("image/png");
+    }
+  });
+
+  test("ACCESS_LAW : le chargement du catalogue échoue de manière observable et fermée", async ({ page }) => {
+    await page.route("**/shared/permissions.json", (route) => route.fulfill({ status: 503, body: "indisponible" }));
+    await page.goto("/", { waitUntil: "load" });
+    const result = await page.evaluate(async () => {
+      const access = (window as any).SchoolSafeAccess;
+      const permissions = await access.loadPermissions();
+      return {
+        permissions,
+        failed: typeof access.isPermissionsLoadFailed === "function" && access.isPermissionsLoadFailed(),
+        scope: await access.getPermissionScope("school.manage"),
+      };
+    });
+    expect(result.permissions).toEqual([]);
+    expect(result.failed).toBe(true);
+    expect(result.scope).toBeNull();
+  });
+
   test("ACCESS_LAW : DENY explicite prioritaire, aucun bypass admin, portées reconnues", async ({ page }) => {
     await enterDemoWorkspace(page, "admin");
     const result = await page.evaluate(() => {

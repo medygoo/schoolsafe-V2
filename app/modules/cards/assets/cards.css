@@ -1,5 +1,5 @@
 /* SchoolSafe Card Studio CSS — adapté du moteur historique */
-@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito+Sans:opsz,wght@6..12,700;6..12,800;6..12,900&display=swap');
+@import url('../../../assets/fonts/fonts.css');
 
 .ss-card-studio,.ss-card-studio *{box-sizing:border-box}
 .ss-card-studio{--ss-navy:#2b3740;--ss-navy2:#3d4b57;--ss-gold:#e8a91d;--ss-gold2:#f6c94e;--ss-cc:#c09018;--ss-cc-soft:#e5e8eb;--ss-cc-dark:#1c242c;font-family:'Nunito Sans','Segoe UI',sans-serif}

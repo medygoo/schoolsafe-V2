@@ -1,6 +1,23 @@
 var CACHE_PREFIX = "schoolsafe-v2-";
-var CACHE_NAME = CACHE_PREFIX + "frontend-m7";
-var CORE_PATHS = ["./", "./index.html", "./manifest.webmanifest", "./schoolsafe-logo.png"];
+var CACHE_NAME = CACHE_PREFIX + "frontend-kimi-assets-1";
+var CORE_PATHS = [
+  "./",
+  "./index.html",
+  "./manifest.webmanifest",
+  "./schoolsafe-logo.png",
+  "./shared/permissions.json",
+  "./vendor/qrcode.min.js",
+  "./vendor/html2canvas.min.js",
+  "./assets/fonts/fonts.css",
+  "./assets/fonts/Baloo2-700.woff2",
+  "./assets/fonts/Baloo2-800.woff2",
+  "./assets/fonts/NunitoSans-700.woff2",
+  "./assets/fonts/NunitoSans-800.woff2",
+  "./assets/fonts/NunitoSans-900.woff2",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/icon-512-maskable.png"
+];
 
 function scopeUrl(relativePath) {
   return new URL(relativePath, self.registration.scope).href;

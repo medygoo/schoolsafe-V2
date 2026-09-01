@@ -8,6 +8,7 @@
 
   var ADMIN_ROLE = "admin";
   var permissionsCache = null;
+  var permissionsLoadFailed = false;
 
   // Permissions qui rendent une branche de navigation visible.
   // Une branche est visible si l’utilisateur possède AU MOINS UNE de ces permissions
@@ -218,11 +219,13 @@
         return res.json();
       })
       .then(function (data) {
+        permissionsLoadFailed = false;
         permissionsCache = data;
         return data;
       })
       .catch(function (err) {
-        console.warn("[SchoolSafeAccess] unable to load permissions.json", err);
+        console.error("[SchoolSafeAccess] catalogue canonique indisponible — accès par portée fermé", err);
+        permissionsLoadFailed = true;
         permissionsCache = [];
         return [];
       });
@@ -240,6 +243,7 @@
 
   window.SchoolSafeAccess = {
     ADMIN_ROLE: ADMIN_ROLE,
+    isPermissionsLoadFailed: function () { return permissionsLoadFailed; },
     isAdmin: isAdmin,
     explicitDeny: explicitDeny,
     canAccess: canAccess,
