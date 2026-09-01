@@ -28,6 +28,14 @@
   --ss-gold-300: #fcd34d;
   --ss-gold-100: #fef3c7;
 
+  /* Échelle amber utilisée par les états de la structure scolaire. */
+  --ss-amber-50: #fffbeb;
+  --ss-amber-100: #fef3c7;
+  --ss-amber-300: #fcd34d;
+  --ss-amber-400: #fbbf24;
+  --ss-amber-800: #92400e;
+  --ss-amber-900: #78350f;
+
   --ss-slate-950: #020617;
   --ss-slate-900: #0f172a;
   --ss-slate-800: #1e293b;
@@ -99,7 +107,7 @@
   --ss-text-primary: var(--ss-slate-900);
   --ss-text-secondary: var(--ss-slate-600);
   --ss-text-tertiary: var(--ss-slate-500);
-  --ss-text-muted: var(--ss-slate-400);
+  --ss-text-muted: var(--ss-slate-500);
   --ss-text-inverse: #ffffff;
   --ss-text-on-brand: #ffffff;
   --ss-text-on-brand-soft: var(--ss-blue-100);
@@ -119,6 +127,7 @@
   --ss-surface-raised: var(--ss-bg-secondary);
   --ss-border: var(--ss-border-default);
   --ss-text: var(--ss-text-primary);
+  --ss-primary: var(--ss-blue-600);
 
   /* États sémantiques */
   --ss-success-bg: var(--ss-emerald-50);
@@ -165,7 +174,7 @@
   --ss-text-primary: #f8fafc;
   --ss-text-secondary: var(--ss-slate-300);
   --ss-text-tertiary: var(--ss-slate-400);
-  --ss-text-muted: var(--ss-slate-500);
+  --ss-text-muted: var(--ss-slate-400);
   --ss-text-inverse: #ffffff;
   --ss-text-on-brand: #f8fafc;
   --ss-text-on-brand-soft: #dbeafe;
@@ -183,6 +192,14 @@
   --ss-surface-raised: var(--ss-bg-secondary);
   --ss-border: var(--ss-border-default);
   --ss-text: var(--ss-text-primary);
+  --ss-primary: var(--ss-blue-400);
+
+  /* Fonds et textes amber adaptés au bleu nuit. */
+  --ss-amber-50: rgba(251, 191, 36, 0.12);
+  --ss-amber-100: rgba(251, 191, 36, 0.2);
+  --ss-amber-300: #fbbf24;
+  --ss-amber-800: #fcd34d;
+  --ss-amber-900: #fde68a;
 
   --ss-success-bg: rgba(16, 185, 129, 0.12);
   --ss-success-text: #34d399;

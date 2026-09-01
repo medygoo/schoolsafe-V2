@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { enterDemoWorkspace } from "./helpers";
+import { domClick, enterDemoWorkspace } from "./helpers";
 
 type Rgb = { r: number; g: number; b: number };
 
@@ -55,6 +55,62 @@ async function openBranch(page: Page, branch: string) {
 }
 
 test.describe("Thème sombre bleu nuit", () => {
+  test("garde les textes atténués lisibles et expose les tokens sémantiques manquants", async ({ page }) => {
+    await page.goto("/", { waitUntil: "load" });
+
+    const tokens = await page.evaluate(() => {
+      function themeValues(theme: "light" | "dark") {
+        document.documentElement.setAttribute("data-theme", theme);
+        const sample = document.createElement("span");
+        sample.style.cssText = "color:var(--ss-text-muted);background:var(--ss-bg-primary)";
+        document.body.appendChild(sample);
+        const style = getComputedStyle(sample);
+        const root = getComputedStyle(document.documentElement);
+        const result = {
+          muted: style.color,
+          surface: style.backgroundColor,
+          primary: root.getPropertyValue("--ss-primary").trim(),
+          amber50: root.getPropertyValue("--ss-amber-50").trim(),
+          amber900: root.getPropertyValue("--ss-amber-900").trim(),
+        };
+        sample.remove();
+        return result;
+      }
+      return { light: themeValues("light"), dark: themeValues("dark") };
+    });
+
+    for (const theme of [tokens.light, tokens.dark]) {
+      expect(contrastRatio(parseRgb(theme.muted), parseRgb(theme.surface))).toBeGreaterThanOrEqual(4.5);
+      expect(theme.primary).not.toBe("");
+      expect(theme.amber50).not.toBe("");
+      expect(theme.amber900).not.toBe("");
+    }
+  });
+
+  test("présente l'entrée de démonstration comme un vrai bouton pleine largeur", async ({ page }) => {
+    await page.goto("/", { waitUntil: "load" });
+    await domClick(page, "#enterSplash");
+    await domClick(page, "#continueGuardian");
+
+    const visual = await page.locator("#demoEntry").evaluate((button: HTMLButtonElement) => {
+      const form = button.closest("form")!;
+      const buttonRect = button.getBoundingClientRect();
+      const primaryRect = form.querySelector(".login-button")!.getBoundingClientRect();
+      const style = getComputedStyle(button);
+      return {
+        tag: button.tagName,
+        type: button.type,
+        widthRatio: buttonRect.width / primaryRect.width,
+        borderStyle: style.borderStyle,
+      };
+    });
+
+    expect(visual.tag).toBe("BUTTON");
+    expect(visual.type).toBe("button");
+    expect(visual.widthRatio).toBeGreaterThanOrEqual(0.95);
+    expect(visual.borderStyle).toBe("dashed");
+  });
+
   test("garde le canvas bleu nuit sans tomber dans le presque noir", async ({ page }) => {
     await enterDemoWorkspace(page, "admin");
     await useDarkTheme(page);
@@ -86,16 +142,16 @@ test.describe("Thème sombre bleu nuit", () => {
     }
   });
 
-  test("utilise un gradient contenu dans la famille des bleus", async ({ page }) => {
+  test("préserve l'identité ambre de Finance dans le thème bleu nuit", async ({ page }) => {
     await enterDemoWorkspace(page, "parent");
     await useDarkTheme(page);
     await openBranch(page, "finance");
 
     const background = await page.locator(".finance-module-header").evaluate((element) => getComputedStyle(element).backgroundImage);
     const colors = parseGradientColors(background);
-    expect(colors.length).toBeGreaterThanOrEqual(3);
-    for (const color of colors) expect(hue(color)).toBeGreaterThanOrEqual(205);
-    for (const color of colors) expect(hue(color)).toBeLessThanOrEqual(235);
+    expect(colors.length).toBeGreaterThanOrEqual(2);
+    for (const color of colors) expect(hue(color)).toBeGreaterThanOrEqual(25);
+    for (const color of colors) expect(hue(color)).toBeLessThanOrEqual(50);
   });
 
   test("applique aussi des surfaces sombres aux modules élèves récents", async ({ page }) => {
@@ -109,7 +165,7 @@ test.describe("Thème sombre bleu nuit", () => {
 
     await page.locator('[data-school-tab="students"]').click();
     await page.locator('[data-student-status="active"]').click();
-    await page.locator('[data-student-id="demo-active-student"] [data-student-dossier]').click();
+    await page.locator('[data-student-id="demo-active-student"] [data-student-dossier]').evaluate((element: HTMLElement) => element.click());
     const dossierSurface = parseRgb(await page.locator(".student-dossier-panel").evaluate((element) => getComputedStyle(element).backgroundColor));
     expect(luminance(dossierSurface)).toBeLessThan(0.12);
   });

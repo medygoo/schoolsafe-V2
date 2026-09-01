@@ -435,6 +435,29 @@
   height: 16px;
 }
 
+.auth-screen .demo-access--button {
+  width: 100%;
+  padding: var(--ss-space-2) var(--ss-space-3);
+  background: color-mix(in srgb, var(--ss-slate-50) 10%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--ss-slate-50) 45%, transparent);
+  border-radius: var(--ss-radius-md);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.auth-screen .demo-access--button:hover,
+.auth-screen .demo-access--button:focus-visible {
+  background: color-mix(in srgb, var(--ss-slate-50) 18%, transparent);
+  border-color: color-mix(in srgb, var(--ss-slate-50) 70%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-screen .demo-access--button {
+    transition: none;
+  }
+}
+
 /* --------------------------------------------------------------------------
    Sélecteur de rôle démo
    -------------------------------------------------------------------------- */

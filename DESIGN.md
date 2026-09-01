@@ -6,7 +6,7 @@ Aura Blue est la direction visuelle de l'espace de travail SchoolSafe V2 : un ce
 
 ## Principles
 
-- **Pas de dégradé dans l'espace de travail** : toutes les surfaces de l'interface interne utilisent des couleurs unies.
+- **Couleurs unies dans l'espace de travail** ; exception documentée : les en-têtes de sept modules métier utilisent un dégradé d'identité de domaine, avec `--ss-gradient-module` comme base commune. Toute nouvelle surface reste unie par défaut.
 - **Le bleu porte l'autorité** : héros, sidebar, panneau de périmètre et en-têtes de modules en bleu marine.
 - **L'or est un accent de marque** : labels, icônes de validation et détails de statut uniquement.
 - **Les cartes blanches portent le contenu** : fond gris froid, cartes blanches, ombres douces, bords arrondis généreux.
@@ -29,8 +29,8 @@ Aura Blue est la direction visuelle de l'espace de travail SchoolSafe V2 : un ce
 
 - Stack système administratif : `"Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif`.
 - Titres : gras 800, interlignage serré.
-- Corps : 13-14 px, gris ardoise `#475569`.
-- Labels et micro-texte : 9-11 px, majuscules, espacement large.
+- Corps : 16 px (token `--ss-text-base`), gris ardoise `#475569`.
+- Labels et micro-texte : 11-12 px minimum, majuscules, espacement large.
 
 ## Components
 
@@ -74,6 +74,7 @@ Aura Blue est la direction visuelle de l'espace de travail SchoolSafe V2 : un ce
 - Desktop : sidebar fixe, grille 3 colonnes.
 - Tablette : grille 2 colonnes.
 - Mobile : sidebar repliée derrière le cube, colonne unique, hero en pleine largeur.
+- Paliers de référence : 480 / 640 / 768 / 1024 / 1280 px. Les modules historiques peuvent conserver temporairement des paliers intermédiaires jusqu'à leur harmonisation.
 
 ## Motion
 
@@ -81,3 +82,9 @@ Aura Blue est la direction visuelle de l'espace de travail SchoolSafe V2 : un ce
 - Soulèvement de 2-3 px au survol des cartes.
 - Focus anneau bleu clair de 3 px.
 - Aucune animation d'entrée agressive ; l'interface reste utilisable immédiatement.
+
+## Distribution locale
+
+- Le Card Studio utilise Baloo 2 et Nunito Sans depuis `app/assets/fonts/`, sans appel à Google Fonts.
+- Les dépendances QRCode.js et html2canvas sont distribuées localement avec leurs licences et empreintes dans `app/vendor/THIRD_PARTY_NOTICES.md`.
+- Les icônes PWA 192 px, 512 px et 512 px maskable sont déclarées dans le manifeste.
