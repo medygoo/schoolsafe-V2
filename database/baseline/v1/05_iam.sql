@@ -90,7 +90,6 @@ create table if not exists iam.role_permission_grants (
   role_id uuid not null,
   permission_id uuid not null,
   effect text not null,
-  scope_code text,
   reason text,
   granted_by uuid,
   is_active boolean not null default true,
@@ -118,7 +117,6 @@ create table if not exists iam.profile_permission_exceptions (
   profile_id uuid not null,
   permission_id uuid not null,
   effect text not null,
-  scope_code text,
   condition_code text,
   condition_params jsonb not null default '{}'::jsonb,
   reason text not null,
@@ -130,13 +128,26 @@ create table if not exists iam.profile_permission_exceptions (
   updated_at timestamptz not null default pg_catalog.now()
 );
 
-create table if not exists iam.scope_assignments (
+create table if not exists iam.grant_scopes (
   id uuid primary key default pg_catalog.gen_random_uuid(),
   school_id uuid not null,
-  profile_id uuid not null,
+  grant_id uuid not null,
   scope_code text not null,
   target_id uuid,
-  label text,
+  assigned_by uuid,
+  is_active boolean not null default true,
+  starts_at timestamptz not null default pg_catalog.now(),
+  ends_at timestamptz,
+  created_at timestamptz not null default pg_catalog.now(),
+  updated_at timestamptz not null default pg_catalog.now()
+);
+
+create table if not exists iam.exception_scopes (
+  id uuid primary key default pg_catalog.gen_random_uuid(),
+  school_id uuid not null,
+  exception_id uuid not null,
+  scope_code text not null,
+  target_id uuid,
   assigned_by uuid,
   is_active boolean not null default true,
   starts_at timestamptz not null default pg_catalog.now(),

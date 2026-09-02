@@ -3,10 +3,57 @@
 begin;
 set local role schoolsafe_owner;
 
+-- Transaction-local installer: every business table is FORCE RLS and receives one
+-- policy per permitted SQL operation. Missing operations remain default DENY.
+create or replace function iam.install_owner_policies(
+  p_table regclass,
+  p_read_predicate text,
+  p_write_predicate text,
+  p_allow_update boolean,
+  p_allow_delete boolean
+)
+returns void
+language plpgsql
+as $schoolsafe$
+declare
+  v_stem text := pg_catalog.replace(p_table::text, '.', '_');
+begin
+  execute pg_catalog.format('alter table %s enable row level security', p_table);
+  execute pg_catalog.format('alter table %s force row level security', p_table);
+
+  execute pg_catalog.format('drop policy if exists %I on %s', v_stem || '_owner_tenant', p_table);
+  execute pg_catalog.format('drop policy if exists %I on %s', v_stem || '_owner_select', p_table);
+  execute pg_catalog.format('drop policy if exists %I on %s', v_stem || '_owner_insert', p_table);
+  execute pg_catalog.format('drop policy if exists %I on %s', v_stem || '_owner_update', p_table);
+  execute pg_catalog.format('drop policy if exists %I on %s', v_stem || '_owner_delete', p_table);
+
+  execute pg_catalog.format(
+    'create policy %I on %s for select to schoolsafe_owner using (%s)',
+    v_stem || '_owner_select', p_table, p_read_predicate
+  );
+  execute pg_catalog.format(
+    'create policy %I on %s for insert to schoolsafe_owner with check (%s)',
+    v_stem || '_owner_insert', p_table, p_write_predicate
+  );
+  if p_allow_update then
+    execute pg_catalog.format(
+      'create policy %I on %s for update to schoolsafe_owner using (%s) with check (%s)',
+      v_stem || '_owner_update', p_table, p_write_predicate, p_write_predicate
+    );
+  end if;
+  if p_allow_delete then
+    execute pg_catalog.format(
+      'create policy %I on %s for delete to schoolsafe_owner using (%s)',
+      v_stem || '_owner_delete', p_table, p_write_predicate
+    );
+  end if;
+end
+$schoolsafe$;
+
 do $schoolsafe$
 declare
   v_table regclass;
-  v_policy_name text;
+  v_predicate text;
 begin
   foreach v_table in array array[
     'app.schools'::regclass,
@@ -18,13 +65,11 @@ begin
     'app.students'::regclass,
     'app.student_guardians'::regclass,
     'app.student_enrollments'::regclass,
-    'app.student_enrollment_events'::regclass,
     'app.parent_invitations'::regclass,
     'app.card_print_requests'::regclass,
     'app.locations'::regclass,
     'app.security_portals'::regclass,
     'app.student_cards'::regclass,
-    'app.security_events'::regclass,
     'app.alert_rules'::regclass,
     'app.alerts'::regclass,
     'app.alert_notifications'::regclass,
@@ -35,7 +80,6 @@ begin
     'app.cash_register_closures'::regclass,
     'app.fee_control_campaigns'::regclass,
     'app.fee_control_assignees'::regclass,
-    'app.fee_control_scans'::regclass,
     'app.subjects'::regclass,
     'app.teacher_assignments'::regclass,
     'app.assignments'::regclass,
@@ -48,33 +92,30 @@ begin
     'app.ranking_stars'::regclass
   ]
   loop
-    execute pg_catalog.format('alter table %s enable row level security', v_table);
-    execute pg_catalog.format('alter table %s force row level security', v_table);
-    v_policy_name := pg_catalog.replace(v_table::text, '.', '_') || '_owner_tenant';
-    execute pg_catalog.format('drop policy if exists %I on %s', v_policy_name, v_table);
-
-    if v_table = 'app.schools'::regclass then
-      execute pg_catalog.format(
-        'create policy %I on %s for all to schoolsafe_owner using (id = iam.current_school_id() and iam.context_is_valid()) with check (id = iam.current_school_id() and iam.context_is_valid())',
-        v_policy_name,
-        v_table
-      );
-    else
-      execute pg_catalog.format(
-        'create policy %I on %s for all to schoolsafe_owner using (school_id = iam.current_school_id() and iam.context_is_valid()) with check (school_id = iam.current_school_id() and iam.context_is_valid())',
-        v_policy_name,
-        v_table
-      );
-    end if;
+    v_predicate := case
+      when v_table = 'app.schools'::regclass
+        then 'id = iam.current_school_id() and iam.context_is_valid()'
+      else 'school_id = iam.current_school_id() and iam.context_is_valid()'
+    end;
+    perform iam.install_owner_policies(v_table, v_predicate, v_predicate, true, true);
   end loop;
-end
-$schoolsafe$;
 
-do $schoolsafe$
-declare
-  v_table regclass;
-  v_policy_name text;
-begin
+  -- Immutable append-only ledgers: SELECT and INSERT only.
+  foreach v_table in array array[
+    'app.student_enrollment_events'::regclass,
+    'app.security_events'::regclass,
+    'app.fee_control_scans'::regclass
+  ]
+  loop
+    perform iam.install_owner_policies(
+      v_table,
+      'school_id = iam.current_school_id() and iam.context_is_valid()',
+      'school_id = iam.current_school_id() and iam.context_is_valid()',
+      false,
+      false
+    );
+  end loop;
+
   foreach v_table in array array[
     'iam.profiles'::regclass,
     'iam.devices'::regclass,
@@ -83,124 +124,119 @@ begin
     'iam.role_permission_grants'::regclass,
     'iam.permission_conditions'::regclass,
     'iam.profile_permission_exceptions'::regclass,
-    'iam.scope_assignments'::regclass
+    'iam.grant_scopes'::regclass,
+    'iam.exception_scopes'::regclass
   ]
   loop
-    execute pg_catalog.format('alter table %s enable row level security', v_table);
-    execute pg_catalog.format('alter table %s force row level security', v_table);
-    v_policy_name := pg_catalog.replace(v_table::text, '.', '_') || '_owner_tenant';
-    execute pg_catalog.format('drop policy if exists %I on %s', v_policy_name, v_table);
-    execute pg_catalog.format(
-      'create policy %I on %s for all to schoolsafe_owner using (school_id = iam.current_school_id()) with check (school_id = iam.current_school_id())',
-      v_policy_name,
-      v_table
+    -- context_is_valid() reads iam.profiles; IAM policies therefore use only
+    -- the transaction school setting to avoid RLS recursion. No runtime role
+    -- has direct IAM table privileges, and every callable API validates the
+    -- complete user/profile/school/request context before business access.
+    perform iam.install_owner_policies(
+      v_table,
+      'school_id = iam.current_school_id()',
+      'school_id = iam.current_school_id()',
+      true,
+      true
+    );
+  end loop;
+
+  foreach v_table in array array[
+    'ops.system_events'::regclass,
+    'ops.notifications'::regclass
+  ]
+  loop
+    perform iam.install_owner_policies(
+      v_table,
+      'school_id = iam.current_school_id() and iam.context_is_valid()',
+      'school_id = iam.current_school_id() and iam.context_is_valid()',
+      true,
+      true
+    );
+  end loop;
+
+  -- Numbering state can be updated but never deleted through normal operation.
+  perform iam.install_owner_policies(
+    'ops.document_number_sequences'::regclass,
+    'school_id = iam.current_school_id() and iam.context_is_valid()',
+    'school_id = iam.current_school_id() and iam.context_is_valid()',
+    true,
+    false
+  );
+
+  -- Historical indicator snapshots are append-only.
+  perform iam.install_owner_policies(
+    'ops.indicator_snapshots'::regclass,
+    'school_id = iam.current_school_id() and iam.context_is_valid()',
+    'school_id = iam.current_school_id() and iam.context_is_valid()',
+    false,
+    false
+  );
+
+  foreach v_table in array array[
+    'ops.notification_templates'::regclass,
+    'ops.data_retention_policies'::regclass
+  ]
+  loop
+    perform iam.install_owner_policies(
+      v_table,
+      'iam.context_is_valid() and (school_id is null or school_id = iam.current_school_id())',
+      'iam.context_is_valid() and school_id = iam.current_school_id()',
+      true,
+      true
     );
   end loop;
 end
 $schoolsafe$;
 
+-- The audit ledger is immutable. Owner can append/read; auditor can only read.
 alter table audit.events enable row level security;
 alter table audit.events force row level security;
 drop policy if exists audit_events_owner_tenant on audit.events;
-create policy audit_events_owner_tenant
-on audit.events
-for all
-to schoolsafe_owner
-using (school_id = iam.current_school_id() and iam.context_is_valid())
+drop policy if exists audit_events_owner_select on audit.events;
+drop policy if exists audit_events_owner_insert on audit.events;
+drop policy if exists audit_events_owner_update on audit.events;
+drop policy if exists audit_events_owner_delete on audit.events;
+create policy audit_events_owner_select on audit.events
+for select to schoolsafe_owner
+using (school_id = iam.current_school_id() and iam.context_is_valid());
+create policy audit_events_owner_insert on audit.events
+for insert to schoolsafe_owner
 with check (school_id = iam.current_school_id() and iam.context_is_valid());
-
 drop policy if exists audit_events_auditor_tenant on audit.events;
-create policy audit_events_auditor_tenant
-on audit.events
-for select
-to schoolsafe_auditor
+create policy audit_events_auditor_tenant on audit.events
+for select to schoolsafe_auditor
 using (school_id = iam.current_school_id() and iam.context_is_valid());
 
-do $schoolsafe$
-declare
-  v_table regclass;
-  v_policy_name text;
-begin
-  foreach v_table in array array[
-    'ops.system_events'::regclass,
-    'ops.notifications'::regclass,
-    'ops.document_number_sequences'::regclass,
-    'ops.indicator_snapshots'::regclass
-  ]
-  loop
-    execute pg_catalog.format('alter table %s enable row level security', v_table);
-    execute pg_catalog.format('alter table %s force row level security', v_table);
-    v_policy_name := pg_catalog.replace(v_table::text, '.', '_') || '_owner_tenant';
-    execute pg_catalog.format('drop policy if exists %I on %s', v_policy_name, v_table);
-    execute pg_catalog.format(
-      'create policy %I on %s for all to schoolsafe_owner using (school_id = iam.current_school_id() and iam.context_is_valid()) with check (school_id = iam.current_school_id() and iam.context_is_valid())',
-      v_policy_name,
-      v_table
-    );
-  end loop;
-end
-$schoolsafe$;
-
-alter table ops.notification_templates enable row level security;
-alter table ops.notification_templates force row level security;
-drop policy if exists notification_templates_owner_read on ops.notification_templates;
-create policy notification_templates_owner_read
-on ops.notification_templates
-for select
-to schoolsafe_owner
-using (iam.context_is_valid() and (school_id is null or school_id = iam.current_school_id()));
-drop policy if exists notification_templates_owner_write on ops.notification_templates;
-create policy notification_templates_owner_write
-on ops.notification_templates
-for all
-to schoolsafe_owner
-using (iam.context_is_valid() and school_id = iam.current_school_id())
-with check (iam.context_is_valid() and school_id = iam.current_school_id());
-
-alter table ops.data_retention_policies enable row level security;
-alter table ops.data_retention_policies force row level security;
-drop policy if exists retention_policies_owner_read on ops.data_retention_policies;
-create policy retention_policies_owner_read
-on ops.data_retention_policies
-for select
-to schoolsafe_owner
-using (iam.context_is_valid() and (school_id is null or school_id = iam.current_school_id()));
-drop policy if exists retention_policies_owner_write on ops.data_retention_policies;
-create policy retention_policies_owner_write
-on ops.data_retention_policies
-for all
-to schoolsafe_owner
-using (iam.context_is_valid() and school_id = iam.current_school_id())
-with check (iam.context_is_valid() and school_id = iam.current_school_id());
-
+-- Worker policies match its table ACL: read and update only.
 drop policy if exists system_events_worker_tenant on ops.system_events;
-create policy system_events_worker_tenant
-on ops.system_events
-for all
-to schoolsafe_worker
+drop policy if exists system_events_worker_select on ops.system_events;
+drop policy if exists system_events_worker_update on ops.system_events;
+create policy system_events_worker_select on ops.system_events
+for select to schoolsafe_worker
+using (school_id = iam.current_school_id() and iam.context_is_valid());
+create policy system_events_worker_update on ops.system_events
+for update to schoolsafe_worker
 using (school_id = iam.current_school_id() and iam.context_is_valid())
 with check (school_id = iam.current_school_id() and iam.context_is_valid());
 
 drop policy if exists notifications_worker_tenant on ops.notifications;
-create policy notifications_worker_tenant
-on ops.notifications
-for all
-to schoolsafe_worker
+drop policy if exists notifications_worker_select on ops.notifications;
+drop policy if exists notifications_worker_update on ops.notifications;
+create policy notifications_worker_select on ops.notifications
+for select to schoolsafe_worker
+using (school_id = iam.current_school_id() and iam.context_is_valid());
+create policy notifications_worker_update on ops.notifications
+for update to schoolsafe_worker
 using (school_id = iam.current_school_id() and iam.context_is_valid())
 with check (school_id = iam.current_school_id() and iam.context_is_valid());
 
 revoke all on all tables in schema app from public;
 revoke all on all tables in schema iam from public;
 revoke all on all tables in schema audit from public;
-revoke all on
-  ops.schema_versions,
-  ops.system_events,
-  ops.notification_templates,
-  ops.notifications,
-  ops.data_retention_policies,
-  ops.document_number_sequences,
-  ops.indicator_snapshots
-from public;
+revoke all on ops.schema_versions, ops.system_events, ops.notification_templates,
+  ops.notifications, ops.data_retention_policies, ops.document_number_sequences,
+  ops.indicator_snapshots from public;
 revoke all on all sequences in schema app from public;
 revoke all on all sequences in schema iam from public;
 revoke all on all sequences in schema audit from public;
@@ -209,15 +245,9 @@ revoke all on all sequences in schema ops from public;
 revoke all on all tables in schema app from schoolsafe_api;
 revoke all on all tables in schema iam from schoolsafe_api;
 revoke all on all tables in schema audit from schoolsafe_api;
-revoke all on
-  ops.schema_versions,
-  ops.system_events,
-  ops.notification_templates,
-  ops.notifications,
-  ops.data_retention_policies,
-  ops.document_number_sequences,
-  ops.indicator_snapshots
-from schoolsafe_api;
+revoke all on ops.schema_versions, ops.system_events, ops.notification_templates,
+  ops.notifications, ops.data_retention_policies, ops.document_number_sequences,
+  ops.indicator_snapshots from schoolsafe_api;
 revoke all on all sequences in schema app from schoolsafe_api;
 revoke all on all sequences in schema iam from schoolsafe_api;
 revoke all on all sequences in schema audit from schoolsafe_api;
@@ -228,10 +258,21 @@ revoke execute on all functions in schema iam from public, schoolsafe_api, schoo
 revoke execute on all functions in schema audit from public, schoolsafe_api, schoolsafe_worker, schoolsafe_auditor;
 revoke execute on function ops.record_schema_version(smallint, text, text, text, text)
   from public, schoolsafe_api, schoolsafe_worker, schoolsafe_auditor;
-revoke execute on all functions in schema api from public, schoolsafe_worker, schoolsafe_auditor;
+revoke execute on all functions in schema api from public, schoolsafe_api, schoolsafe_worker, schoolsafe_auditor;
 
+-- API execute privileges are signature-specific. New RPCs remain inaccessible
+-- until they are deliberately added to this allowlist.
 grant usage on schema api to schoolsafe_api, schoolsafe_worker, schoolsafe_auditor;
-grant execute on all functions in schema api to schoolsafe_api;
+grant execute on function api.set_request_context(uuid, uuid, uuid, uuid) to schoolsafe_api;
+grant execute on function api.check_access(text, uuid, uuid, uuid, uuid, uuid, jsonb) to schoolsafe_api;
+grant execute on function api.deactivate_other_academic_years(uuid) to schoolsafe_api;
+grant execute on function api.next_document_number(text, text) to schoolsafe_api;
+grant execute on function api.ensure_receipt_number(uuid) to schoolsafe_api;
+grant execute on function api.record_payment(uuid, numeric, text, timestamptz, text, text, jsonb) to schoolsafe_api;
+grant execute on function api.cancel_payment(uuid, text, integer) to schoolsafe_api;
+grant execute on function api.increment_card_print_count(uuid) to schoolsafe_api;
+grant execute on function api.create_student_draft(text, text, text, text, date, text, uuid, uuid, date, text, uuid, text, text, text, text, text) to schoolsafe_api;
+grant execute on function api.compensate_student_draft_creation(uuid) to schoolsafe_api;
 grant execute on function api.set_request_context(uuid, uuid, uuid, uuid) to schoolsafe_worker, schoolsafe_auditor;
 
 grant usage on schema iam to schoolsafe_worker, schoolsafe_auditor;
@@ -260,5 +301,7 @@ begin
   );
 end
 $schoolsafe$;
+
+drop function iam.install_owner_policies(regclass, text, text, boolean, boolean);
 
 commit;

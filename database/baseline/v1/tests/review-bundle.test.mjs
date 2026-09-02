@@ -13,8 +13,10 @@ const baselineDir = path.resolve(here, "..");
 const expectedFiles = [
   "01_roles.sql",
   "05_iam.sql",
+  "07_constraints_indexes.sql",
   "08_internal_functions.sql",
   "09_api_rpc.sql",
+  "10_triggers.sql",
   "11_rls_acl.sql",
   "12_seed_permissions.sql",
   "13_verification.sql",
@@ -22,10 +24,10 @@ const expectedFiles = [
   "scripts/run-from-zero-test.sh",
 ];
 
-test("review bundle reports exact hashes, line counts, objects and risks for nine files", async () => {
+test("review bundle reports exact hashes, line counts, objects and risks for eleven files", async () => {
   const bundle = await buildReviewBundle(baselineDir);
 
-  assert.equal(bundle.review, "DB-04B-R1");
+  assert.equal(bundle.review, "DB-04B-R2");
   assert.deepEqual(bundle.files.map(({ file }) => file), expectedFiles);
 
   for (const entry of bundle.files) {

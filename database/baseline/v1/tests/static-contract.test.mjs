@@ -151,7 +151,8 @@ test("tenant-aware tables are forced behind RLS and API gets functions only", as
   const rlsSql = await readFile(path.join(baselineDir, "11_rls_acl.sql"), "utf8");
   assert.match(rlsSql, /force row level security/i);
   assert.match(rlsSql, /revoke all on all tables in schema app from schoolsafe_api/i);
-  assert.match(rlsSql, /grant execute on all functions in schema api to schoolsafe_api/i);
+  assert.doesNotMatch(rlsSql, /grant execute on all functions in schema api to schoolsafe_api/i);
+  assert.match(rlsSql, /grant execute on function api\.check_access\s*\(/i);
   assert.doesNotMatch(rlsSql, /grant\s+(?:select|insert|update|delete|all)[^;]+to\s+schoolsafe_api/i);
 });
 

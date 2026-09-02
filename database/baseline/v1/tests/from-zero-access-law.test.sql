@@ -50,7 +50,7 @@ values
 -- Each school receives the same three logical permissions through a distinct
 -- tenant role: exact pedagogy, own_children and school administration.
 insert into iam.role_permission_grants (
-  id, school_id, role_id, permission_id, effect, scope_code, reason
+  id, school_id, role_id, permission_id, effect, reason
 )
 select
   grant_data.id,
@@ -58,21 +58,39 @@ select
   grant_data.role_id,
   p.id,
   grant_data.effect,
-  grant_data.scope_code,
-  'DB-04B-R1 three-school isolation test'
+  'DB-04B-R2 three-school isolation test'
 from (values
-  ('50000000-0000-4000-8000-000000000001'::uuid, '10000000-0000-4000-8000-000000000001'::uuid, '40000000-0000-4000-8000-000000000001'::uuid, 'pedagogy.grade.manage'::text, 'allow'::text, 'assigned_classes'::text),
-  ('50000000-0000-4000-8000-000000000002'::uuid, '10000000-0000-4000-8000-000000000001'::uuid, '40000000-0000-4000-8000-000000000001'::uuid, 'pedagogy.grade.read'::text, 'allow'::text, 'own_children'::text),
-  ('50000000-0000-4000-8000-000000000003'::uuid, '10000000-0000-4000-8000-000000000001'::uuid, '40000000-0000-4000-8000-000000000001'::uuid, 'school.manage'::text, 'allow'::text, 'school'::text),
-  ('50000000-0000-4000-8000-000000000004'::uuid, '10000000-0000-4000-8000-000000000002'::uuid, '40000000-0000-4000-8000-000000000002'::uuid, 'pedagogy.grade.manage'::text, 'allow'::text, 'assigned_classes'::text),
-  ('50000000-0000-4000-8000-000000000005'::uuid, '10000000-0000-4000-8000-000000000002'::uuid, '40000000-0000-4000-8000-000000000002'::uuid, 'pedagogy.grade.read'::text, 'allow'::text, 'own_children'::text),
-  ('50000000-0000-4000-8000-000000000006'::uuid, '10000000-0000-4000-8000-000000000002'::uuid, '40000000-0000-4000-8000-000000000002'::uuid, 'school.manage'::text, 'allow'::text, 'school'::text),
-  ('50000000-0000-4000-8000-000000000007'::uuid, '10000000-0000-4000-8000-000000000003'::uuid, '40000000-0000-4000-8000-000000000003'::uuid, 'pedagogy.grade.manage'::text, 'allow'::text, 'assigned_classes'::text),
-  ('50000000-0000-4000-8000-000000000008'::uuid, '10000000-0000-4000-8000-000000000003'::uuid, '40000000-0000-4000-8000-000000000003'::uuid, 'pedagogy.grade.read'::text, 'allow'::text, 'own_children'::text),
-  ('50000000-0000-4000-8000-000000000009'::uuid, '10000000-0000-4000-8000-000000000003'::uuid, '40000000-0000-4000-8000-000000000003'::uuid, 'school.manage'::text, 'allow'::text, 'school'::text),
-  ('50000000-0000-4000-8000-00000000000a'::uuid, '10000000-0000-4000-8000-000000000001'::uuid, '40000000-0000-4000-8000-000000000004'::uuid, 'pedagogy.grade.manage'::text, 'deny'::text, 'assigned_classes'::text)
-) as grant_data(id, school_id, role_id, permission_code, effect, scope_code)
+  ('50000000-0000-4000-8000-000000000001'::uuid, '10000000-0000-4000-8000-000000000001'::uuid, '40000000-0000-4000-8000-000000000001'::uuid, 'pedagogy.grade.manage'::text, 'allow'::text),
+  ('50000000-0000-4000-8000-000000000002'::uuid, '10000000-0000-4000-8000-000000000001'::uuid, '40000000-0000-4000-8000-000000000001'::uuid, 'pedagogy.grade.read'::text, 'allow'::text),
+  ('50000000-0000-4000-8000-000000000003'::uuid, '10000000-0000-4000-8000-000000000001'::uuid, '40000000-0000-4000-8000-000000000001'::uuid, 'school.manage'::text, 'allow'::text),
+  ('50000000-0000-4000-8000-000000000004'::uuid, '10000000-0000-4000-8000-000000000002'::uuid, '40000000-0000-4000-8000-000000000002'::uuid, 'pedagogy.grade.manage'::text, 'allow'::text),
+  ('50000000-0000-4000-8000-000000000005'::uuid, '10000000-0000-4000-8000-000000000002'::uuid, '40000000-0000-4000-8000-000000000002'::uuid, 'pedagogy.grade.read'::text, 'allow'::text),
+  ('50000000-0000-4000-8000-000000000006'::uuid, '10000000-0000-4000-8000-000000000002'::uuid, '40000000-0000-4000-8000-000000000002'::uuid, 'school.manage'::text, 'allow'::text),
+  ('50000000-0000-4000-8000-000000000007'::uuid, '10000000-0000-4000-8000-000000000003'::uuid, '40000000-0000-4000-8000-000000000003'::uuid, 'pedagogy.grade.manage'::text, 'allow'::text),
+  ('50000000-0000-4000-8000-000000000008'::uuid, '10000000-0000-4000-8000-000000000003'::uuid, '40000000-0000-4000-8000-000000000003'::uuid, 'pedagogy.grade.read'::text, 'allow'::text),
+  ('50000000-0000-4000-8000-000000000009'::uuid, '10000000-0000-4000-8000-000000000003'::uuid, '40000000-0000-4000-8000-000000000003'::uuid, 'school.manage'::text, 'allow'::text),
+  ('50000000-0000-4000-8000-00000000000a'::uuid, '10000000-0000-4000-8000-000000000001'::uuid, '40000000-0000-4000-8000-000000000004'::uuid, 'pedagogy.grade.manage'::text, 'deny'::text)
+) as grant_data(id, school_id, role_id, permission_code, effect)
 join iam.permissions p on p.code = grant_data.permission_code;
+
+-- Scope rows belong to one exact permission grant. The pedagogy grants carry
+-- both class and subject scopes; evaluation requires the pair (AND).
+insert into iam.grant_scopes (id, school_id, grant_id, scope_code, target_id)
+values
+  ('51000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-000000000001', 'assigned_classes', '70000000-0000-4000-8000-000000000001'),
+  ('51000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-000000000001', 'assigned_subjects', '80000000-0000-4000-8000-000000000001'),
+  ('51000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-000000000002', 'own_children', null),
+  ('51000000-0000-4000-8000-000000000004', '10000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-000000000003', 'school', null),
+  ('51000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000002', '50000000-0000-4000-8000-000000000004', 'assigned_classes', '70000000-0000-4000-8000-000000000002'),
+  ('51000000-0000-4000-8000-000000000006', '10000000-0000-4000-8000-000000000002', '50000000-0000-4000-8000-000000000004', 'assigned_subjects', '80000000-0000-4000-8000-000000000002'),
+  ('51000000-0000-4000-8000-000000000007', '10000000-0000-4000-8000-000000000002', '50000000-0000-4000-8000-000000000005', 'own_children', null),
+  ('51000000-0000-4000-8000-000000000008', '10000000-0000-4000-8000-000000000002', '50000000-0000-4000-8000-000000000006', 'school', null),
+  ('51000000-0000-4000-8000-000000000009', '10000000-0000-4000-8000-000000000003', '50000000-0000-4000-8000-000000000007', 'assigned_classes', '70000000-0000-4000-8000-000000000003'),
+  ('51000000-0000-4000-8000-00000000000a', '10000000-0000-4000-8000-000000000003', '50000000-0000-4000-8000-000000000007', 'assigned_subjects', '80000000-0000-4000-8000-000000000003'),
+  ('51000000-0000-4000-8000-00000000000b', '10000000-0000-4000-8000-000000000003', '50000000-0000-4000-8000-000000000008', 'own_children', null),
+  ('51000000-0000-4000-8000-00000000000c', '10000000-0000-4000-8000-000000000003', '50000000-0000-4000-8000-000000000009', 'school', null),
+  ('51000000-0000-4000-8000-00000000000d', '10000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-00000000000a', 'assigned_classes', '70000000-0000-4000-8000-000000000001'),
+  ('51000000-0000-4000-8000-00000000000e', '10000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-00000000000a', 'assigned_subjects', '80000000-0000-4000-8000-000000000001');
 
 insert into app.academic_years (id, school_id, label, starts_on, ends_on, periods, is_active)
 values
@@ -120,6 +138,139 @@ values
   ('c0000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', '30000000-0000-4000-8000-000000000001', 'tuteur', 'Guardian A'),
   ('c0000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000002', '30000000-0000-4000-8000-000000000002', 'tuteur', 'Guardian B'),
   ('c0000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000003', 'a0000000-0000-4000-8000-000000000003', '30000000-0000-4000-8000-000000000003', 'tuteur', 'Guardian C');
+
+insert into app.fee_structures (
+  id, school_id, academic_year_id, label, amount, currency
+)
+values (
+  'e0000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000002',
+  '60000000-0000-4000-8000-000000000002',
+  'School B test fee',
+  100,
+  'USD'
+);
+
+insert into app.student_fees (
+  id, school_id, student_id, fee_structure_id, amount_expected, amount_paid, amount_remaining
+)
+values (
+  'e1000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000002',
+  'a0000000-0000-4000-8000-000000000002',
+  'e0000000-0000-4000-8000-000000000001',
+  100,
+  0,
+  100
+);
+
+-- Physical tenant isolation is independent from Access_Law and RLS. These
+-- writes run with baseline setup authority and must still fail at the FK layer.
+-- The redundant tenant guard triggers are disabled only inside this transaction
+-- so the expected foreign_key_violation can come only from the composite FK.
+set local role schoolsafe_owner;
+alter table app.students disable trigger app_students_class_id_tenant_guard;
+alter table app.student_guardians disable trigger app_student_guardians_student_id_tenant_guard;
+alter table app.teacher_assignments disable trigger app_teacher_assignments_subject_id_tenant_guard;
+alter table app.fee_payments disable trigger app_fee_payments_student_fee_id_tenant_guard;
+reset role;
+
+do $schoolsafe$
+declare
+  v_denied boolean := false;
+begin
+  begin
+    insert into app.students (
+      id, school_id, class_id, matricule, first_name, last_name, lifecycle_status
+    ) values (
+      'e2000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+      '70000000-0000-4000-8000-000000000002',
+      'DB04B-CROSS-CLASS',
+      'Cross',
+      'Class',
+      'active'
+    );
+  exception when foreign_key_violation then
+    v_denied := true;
+  end;
+  perform pg_temp.assert_true(v_denied, 'School A student to School B class FK must be rejected');
+end
+$schoolsafe$;
+
+do $schoolsafe$
+declare
+  v_denied boolean := false;
+begin
+  begin
+    insert into app.student_guardians (
+      id, school_id, student_id, profile_id, guardian_type, full_name
+    ) values (
+      'e3000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+      'a0000000-0000-4000-8000-000000000002',
+      '30000000-0000-4000-8000-000000000001',
+      'tuteur',
+      'Cross-school guardian'
+    );
+  exception when foreign_key_violation then
+    v_denied := true;
+  end;
+  perform pg_temp.assert_true(v_denied, 'School A guardian to School B student FK must be rejected');
+end
+$schoolsafe$;
+
+do $schoolsafe$
+declare
+  v_denied boolean := false;
+begin
+  begin
+    insert into app.teacher_assignments (
+      id, school_id, academic_year_id, class_id, subject_id, teacher_profile_id, starts_on
+    ) values (
+      'e4000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+      '60000000-0000-4000-8000-000000000001',
+      '70000000-0000-4000-8000-000000000001',
+      '80000000-0000-4000-8000-000000000002',
+      '30000000-0000-4000-8000-000000000001',
+      date '2026-09-01'
+    );
+  exception when foreign_key_violation then
+    v_denied := true;
+  end;
+  perform pg_temp.assert_true(v_denied, 'School A teacher assignment to School B subject FK must be rejected');
+end
+$schoolsafe$;
+
+do $schoolsafe$
+declare
+  v_denied boolean := false;
+begin
+  begin
+    insert into app.fee_payments (
+      id, school_id, student_fee_id, amount, currency, received_by
+    ) values (
+      'e5000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+      'e1000000-0000-4000-8000-000000000001',
+      10,
+      'USD',
+      '30000000-0000-4000-8000-000000000001'
+    );
+  exception when foreign_key_violation then
+    v_denied := true;
+  end;
+  perform pg_temp.assert_true(v_denied, 'School A payment to School B fee FK must be rejected');
+end
+$schoolsafe$;
+
+set local role schoolsafe_owner;
+alter table app.students enable trigger app_students_class_id_tenant_guard;
+alter table app.student_guardians enable trigger app_student_guardians_student_id_tenant_guard;
+alter table app.teacher_assignments enable trigger app_teacher_assignments_subject_id_tenant_guard;
+alter table app.fee_payments enable trigger app_fee_payments_student_fee_id_tenant_guard;
+reset role;
 
 set local role schoolsafe_api;
 
@@ -297,4 +448,4 @@ select pg_temp.assert_true(
 reset role;
 rollback;
 
-\echo 'DB-04B-R1 three-school Access_Law semantic tests: PASS'
+\echo 'DB-04B-R2 tenant-safe Access_Law semantic tests: PASS'

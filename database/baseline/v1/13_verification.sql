@@ -91,6 +91,67 @@ begin
     raise exception 'Non-canonical scope detected';
   end if;
 
+  if pg_catalog.to_regclass('iam.scope_assignments') is not null
+     or pg_catalog.to_regclass('iam.grant_scopes') is null
+     or pg_catalog.to_regclass('iam.exception_scopes') is null then
+    raise exception 'Permission-bound grant/exception scope schema mismatch';
+  end if;
+
+  if exists (
+    select 1
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    join pg_catalog.pg_attribute school_column
+      on school_column.attrelid = c.oid
+     and school_column.attname = 'school_id'
+     and school_column.attnum > 0
+     and not school_column.attisdropped
+    join pg_catalog.pg_attribute id_column
+      on id_column.attrelid = c.oid
+     and id_column.attname = 'id'
+     and id_column.attnum > 0
+     and not id_column.attisdropped
+    where n.nspname in ('app', 'iam', 'audit', 'ops')
+      and c.relkind in ('r', 'p')
+      and not exists (
+        select 1
+        from pg_catalog.pg_constraint candidate
+        where candidate.conrelid = c.oid
+          and candidate.contype in ('p', 'u')
+          and candidate.conkey @> array[school_column.attnum, id_column.attnum]::smallint[]
+      )
+  ) then
+    raise exception 'Tenant table is missing UNIQUE (school_id, id) candidate key';
+  end if;
+
+  if exists (
+    select 1
+    from pg_catalog.pg_constraint fk
+    join pg_catalog.pg_class child on child.oid = fk.conrelid
+    join pg_catalog.pg_namespace child_namespace on child_namespace.oid = child.relnamespace
+    join pg_catalog.pg_attribute child_school
+      on child_school.attrelid = child.oid
+     and child_school.attname = 'school_id'
+     and child_school.attnum > 0
+     and not child_school.attisdropped
+    join pg_catalog.pg_class parent on parent.oid = fk.confrelid
+    join pg_catalog.pg_namespace parent_namespace on parent_namespace.oid = parent.relnamespace
+    join pg_catalog.pg_attribute parent_school
+      on parent_school.attrelid = parent.oid
+     and parent_school.attname = 'school_id'
+     and parent_school.attnum > 0
+     and not parent_school.attisdropped
+    where fk.contype = 'f'
+      and child_namespace.nspname in ('app', 'iam', 'audit', 'ops')
+      and parent_namespace.nspname in ('app', 'iam', 'audit', 'ops')
+      and (
+        not child_school.attnum = any(fk.conkey)
+        or not parent_school.attnum = any(fk.confkey)
+      )
+  ) then
+    raise exception 'Simple cross-tenant foreign key detected';
+  end if;
+
   if iam.current_user_id() is not null
      or iam.current_profile_id() is not null
      or iam.current_school_id() is not null
@@ -167,6 +228,78 @@ begin
       and acl.privilege_type = 'EXECUTE'
   ) then
     raise exception 'PUBLIC execute privilege detected on SchoolSafe function';
+  end if;
+
+  if exists (
+    select 1
+    from pg_catalog.pg_policy policy
+    join pg_catalog.pg_class table_class on table_class.oid = policy.polrelid
+    join pg_catalog.pg_namespace table_namespace on table_namespace.oid = table_class.relnamespace
+    where table_namespace.nspname in ('app', 'iam', 'audit', 'ops')
+      and policy.polcmd = '*'
+  ) then
+    raise exception 'Unapproved business FOR ALL policy detected';
+  end if;
+
+  if exists (
+    select 1
+    from pg_catalog.pg_policy policy
+    where policy.polrelid = any(array[
+      'app.student_enrollment_events'::regclass,
+      'app.security_events'::regclass,
+      'app.fee_control_scans'::regclass,
+      'audit.events'::regclass,
+      'ops.indicator_snapshots'::regclass
+    ]::oid[])
+      and policy.polcmd in ('w', 'd')
+  ) then
+    raise exception 'Append-only business table has UPDATE or DELETE policy';
+  end if;
+
+  select pg_catalog.array_agg(signature order by signature)
+  into v_missing
+  from pg_catalog.unnest(array[
+    'api.set_request_context(uuid,uuid,uuid,uuid)',
+    'api.check_access(text,uuid,uuid,uuid,uuid,uuid,jsonb)',
+    'api.deactivate_other_academic_years(uuid)',
+    'api.next_document_number(text,text)',
+    'api.ensure_receipt_number(uuid)',
+    'api.record_payment(uuid,numeric,text,timestamptz,text,text,jsonb)',
+    'api.cancel_payment(uuid,text,integer)',
+    'api.increment_card_print_count(uuid)',
+    'api.create_student_draft(text,text,text,text,date,text,uuid,uuid,date,text,uuid,text,text,text,text,text)',
+    'api.compensate_student_draft_creation(uuid)'
+  ]) signature
+  where pg_catalog.to_regprocedure(signature) is null
+     or not pg_catalog.has_function_privilege(
+       'schoolsafe_api',
+       pg_catalog.to_regprocedure(signature),
+       'EXECUTE'
+     );
+  if v_missing is not null then
+    raise exception 'Missing API execute allowlist entries: %', v_missing;
+  end if;
+
+  if exists (
+    select 1
+    from pg_catalog.pg_proc proc
+    join pg_catalog.pg_namespace procedure_namespace on procedure_namespace.oid = proc.pronamespace
+    where procedure_namespace.nspname = 'api'
+      and pg_catalog.has_function_privilege('schoolsafe_api', proc.oid, 'EXECUTE')
+      and proc.oid <> all(array[
+        pg_catalog.to_regprocedure('api.set_request_context(uuid,uuid,uuid,uuid)'),
+        pg_catalog.to_regprocedure('api.check_access(text,uuid,uuid,uuid,uuid,uuid,jsonb)'),
+        pg_catalog.to_regprocedure('api.deactivate_other_academic_years(uuid)'),
+        pg_catalog.to_regprocedure('api.next_document_number(text,text)'),
+        pg_catalog.to_regprocedure('api.ensure_receipt_number(uuid)'),
+        pg_catalog.to_regprocedure('api.record_payment(uuid,numeric,text,timestamptz,text,text,jsonb)'),
+        pg_catalog.to_regprocedure('api.cancel_payment(uuid,text,integer)'),
+        pg_catalog.to_regprocedure('api.increment_card_print_count(uuid)'),
+        pg_catalog.to_regprocedure('api.create_student_draft(text,text,text,text,date,text,uuid,uuid,date,text,uuid,text,text,text,text,text)'),
+        pg_catalog.to_regprocedure('api.compensate_student_draft_creation(uuid)')
+      ]::oid[])
+  ) then
+    raise exception 'Non-allowlisted API execute privilege detected';
   end if;
 
   if exists (

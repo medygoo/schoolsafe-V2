@@ -9,8 +9,10 @@ const defaultBaselineDir = path.resolve(scriptsDir, "..");
 const reviewFiles = [
   "01_roles.sql",
   "05_iam.sql",
+  "07_constraints_indexes.sql",
   "08_internal_functions.sql",
   "09_api_rpc.sql",
+  "10_triggers.sql",
   "11_rls_acl.sql",
   "12_seed_permissions.sql",
   "13_verification.sql",
@@ -48,7 +50,11 @@ const metadata = {
   },
   "05_iam.sql": {
     dependencies: ["01_roles.sql", "02_schemas.sql", "04_app_tables.sql for app.schools"],
-    risks: ["cross-school foreign-key coherence depends on unit 07 constraints and unit 10 guards"],
+    risks: ["every scope must remain attached to its exact grant or exception"],
+  },
+  "07_constraints_indexes.sql": {
+    dependencies: ["all table definitions from units 04-06"],
+    risks: ["a missing composite school_id foreign key could make a cross-school relation representable"],
   },
   "08_internal_functions.sql": {
     dependencies: ["04_app_tables.sql", "05_iam.sql", "06_audit_ops.sql", "07_constraints_indexes.sql"],
@@ -58,6 +64,10 @@ const metadata = {
     dependencies: ["08_internal_functions.sql", "canonical permissions later seeded by unit 12"],
     risks: ["eight mutating P0 RPCs require semantic execution tests before any production use"],
   },
+  "10_triggers.sql": {
+    dependencies: ["tenant composite constraints from unit 07", "audit.write_event from unit 08"],
+    risks: ["access configuration changes must remain fully audited"],
+  },
   "11_rls_acl.sql": {
     dependencies: ["all tables from units 04-06", "functions from units 08-10", "03_extensions.sql ACL lockdown"],
     risks: ["a missed tenant-aware table or runtime grant would create a data-isolation failure"],
@@ -66,7 +76,8 @@ const metadata = {
       "ENABLE + FORCE RLS on tenant-aware iam tables",
       "ENABLE + FORCE RLS on audit.events",
       "ENABLE + FORCE RLS on tenant-aware ops tables",
-      "separate read/write policies for nullable-school operational templates",
+      "operation-specific SELECT/INSERT/UPDATE/DELETE policies",
+      "no UPDATE/DELETE policies for append-only ledgers",
     ],
   },
   "12_seed_permissions.sql": {
@@ -143,6 +154,28 @@ function staticControl(name, passed, evidence) {
   return { name, status: passed ? "PASS" : "FAIL", evidence };
 }
 
+function extractTenantTables(source) {
+  const tables = new Set();
+  for (const match of source.matchAll(
+    /create table if not exists\s+([a-z_]+\.[a-z_]+)\s*\(([\s\S]*?)\n\);/gi,
+  )) {
+    if (/^\s*school_id\s+uuid\b/im.test(match[2])) tables.add(match[1].toLowerCase());
+  }
+  return tables;
+}
+
+function tenantForeignKeysAreComposite(tableSql, constraintsSql) {
+  const tenants = extractTenantTables(tableSql);
+  const foreignKeys = [...constraintsSql.matchAll(
+    /\('([a-z_]+\.[a-z_]+)',\s*'[^']+',\s*'foreign key \(([^)]+)\) references ([a-z_]+\.[a-z_]+)\(([^)]+)\)/gi,
+  )];
+  return foreignKeys.length > 0 && foreignKeys.every(([, child, childColumns, parent, parentColumns]) => {
+    if (!tenants.has(child.toLowerCase()) || !tenants.has(parent.toLowerCase())) return true;
+    return childColumns.split(",")[0].trim().toLowerCase() === "school_id"
+      && parentColumns.split(",")[0].trim().toLowerCase() === "school_id";
+  });
+}
+
 export async function buildReviewBundle(baselineDir = defaultBaselineDir) {
   const sources = new Map();
   for (const file of new Set([...allUnits, ...reviewFiles])) {
@@ -173,6 +206,8 @@ export async function buildReviewBundle(baselineDir = defaultBaselineDir) {
   const allSql = allUnits.map((file) => sources.get(file)).join("\n");
   const rolesSql = sources.get("01_roles.sql");
   const internalSql = sources.get("08_internal_functions.sql");
+  const iamSql = sources.get("05_iam.sql");
+  const constraintsSql = sources.get("07_constraints_indexes.sql");
   const rpcSql = sources.get("09_api_rpc.sql");
   const rlsSql = sources.get("11_rls_acl.sql");
   const seedSql = sources.get("12_seed_permissions.sql");
@@ -190,15 +225,20 @@ export async function buildReviewBundle(baselineDir = defaultBaselineDir) {
     staticControl("P0 actor/school authority", !/\bp_(?:actor_profile_id|school_id)\b/i.test(rpcSql), "P0 RPCs derive actor and school from iam.current_* context"),
     staticControl("canonical permissions", permissions === 60, `${permissions} permissions in unit 12`),
     staticControl("canonical scopes", scopes === 7, `${scopes} scopes in unit 12`),
+    staticControl("permission-bound scopes", /create table if not exists iam\.grant_scopes/i.test(iamSql) && /create table if not exists iam\.exception_scopes/i.test(iamSql) && !/create table if not exists iam\.scope_assignments/i.test(iamSql), "grant_scopes and exception_scopes replace global profile scopes"),
+    staticControl("tenant composite foreign keys", tenantForeignKeysAreComposite([sources.get("04_app_tables.sql"), iamSql, sources.get("06_audit_ops.sql")].join("\n"), constraintsSql), "every declared tenant-to-tenant FK includes school_id on both sides"),
     staticControl("assigned_classes AND assigned_subjects", /ta\.class_id\s*=\s*p_class_id/i.test(internalSql) && /ta\.subject_id\s*=\s*p_subject_id/i.test(internalSql), "one active exact class-subject assignment"),
     staticControl("no pedagogical class/subject OR", !/ta\.class_id\s*=\s*p_class_id\s+or\s+ta\.subject_id/i.test(internalSql), "no OR in exact teacher assignment"),
     staticControl("explicit DENY priority", internalSql.indexOf("not iam.has_explicit_deny") < internalSql.indexOf("e.effect = 'allow'"), "DENY guard precedes both ALLOW paths"),
     staticControl("no Supabase dependency", !/\bservice_role\b|\bsupabase_[a-z][a-z0-9_]*\b/i.test(allSql), "pure PostgreSQL baseline"),
-    staticControl("no browser direct table access", /revoke all on all tables in schema app from schoolsafe_api/i.test(rlsSql) && /grant execute on all functions in schema api to schoolsafe_api/i.test(rlsSql) && !/grant\s+(?:select|insert|update|delete|all)[^;]+to\s+schoolsafe_api/i.test(rlsSql), "schoolsafe_api executes api functions only"),
+    staticControl("operation-specific RLS", !/create policy[\s\S]{0,240}\bfor all\b/i.test(rlsSql), "no business FOR ALL policy is created"),
+    staticControl("non-recursive IAM RLS", /context_is_valid\(\) reads iam\.profiles/i.test(rlsSql), "IAM policies use the school setting while API entry points validate the full context"),
+    staticControl("explicit API execute allowlist", !/grant execute on all functions in schema api to schoolsafe_api/i.test(rlsSql) && /grant execute on function api\.check_access\s*\(/i.test(rlsSql), "every API function grant is signature-specific"),
+    staticControl("no browser direct table access", /revoke all on all tables in schema app from schoolsafe_api/i.test(rlsSql) && !/grant\s+(?:select|insert|update|delete|all)[^;]+to\s+schoolsafe_api/i.test(rlsSql), "schoolsafe_api executes allowlisted API functions only"),
   ];
 
   return {
-    review: "DB-04B-R1",
+    review: "DB-04B-R2",
     status: staticControls.every(({ status }) => status === "PASS") ? "READY FOR FINAL REVIEW" : "STATIC CONTROL FAILURE",
     generated_from: "repository files only; no database, Docker, Cloud or VPS access",
     catalog: { permissions, scopes },
@@ -254,7 +294,7 @@ function renderMarkdown(bundle) {
   });
 
   return [
-    "# DB-04B-R1 — Review bundle SQL critique",
+    "# DB-04B-R2 — Review bundle SQL critique",
     "",
     `Statut : **${bundle.status}**`,
     "",
@@ -277,12 +317,12 @@ async function main() {
   const reviewDir = path.join(defaultBaselineDir, "review");
   await mkdir(reviewDir, { recursive: true });
   await writeFile(
-    path.join(reviewDir, "DB-04B-R1-REVIEW-BUNDLE.json"),
+    path.join(reviewDir, "DB-04B-R2-REVIEW-BUNDLE.json"),
     `${JSON.stringify(bundle, null, 2)}\n`,
     "utf8",
   );
   await writeFile(
-    path.join(reviewDir, "DB-04B-R1-REVIEW-BUNDLE.md"),
+    path.join(reviewDir, "DB-04B-R2-REVIEW-BUNDLE.md"),
     renderMarkdown(bundle).replace(/\n*$/, "\n"),
     "utf8",
   );

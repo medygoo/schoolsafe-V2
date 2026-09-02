@@ -59,7 +59,8 @@ begin
     'iam.role_permission_grants'::regclass,
     'iam.permission_conditions'::regclass,
     'iam.profile_permission_exceptions'::regclass,
-    'iam.scope_assignments'::regclass,
+    'iam.grant_scopes'::regclass,
+    'iam.exception_scopes'::regclass,
     'ops.system_events'::regclass,
     'ops.notification_templates'::regclass,
     'ops.notifications'::regclass,
@@ -212,8 +213,10 @@ begin
       ('iam.permission_conditions', 'created_by', 'iam.profiles'),
       ('iam.profile_permission_exceptions', 'profile_id', 'iam.profiles'),
       ('iam.profile_permission_exceptions', 'granted_by', 'iam.profiles'),
-      ('iam.scope_assignments', 'profile_id', 'iam.profiles'),
-      ('iam.scope_assignments', 'assigned_by', 'iam.profiles'),
+      ('iam.grant_scopes', 'grant_id', 'iam.role_permission_grants'),
+      ('iam.grant_scopes', 'assigned_by', 'iam.profiles'),
+      ('iam.exception_scopes', 'exception_id', 'iam.profile_permission_exceptions'),
+      ('iam.exception_scopes', 'assigned_by', 'iam.profiles'),
       ('audit.events', 'actor_profile_id', 'iam.profiles'),
       ('ops.system_events', 'actor_profile_id', 'iam.profiles'),
       ('ops.notifications', 'profile_id', 'iam.profiles')
@@ -376,8 +379,10 @@ begin
       case tg_op when 'DELETE' then 'user.exception.removed' else 'user.exception.added' end
     when 'profile_roles' then
       case tg_op when 'DELETE' then 'profile.role.removed' else 'profile.role.assigned' end
-    when 'scope_assignments' then
-      case tg_op when 'DELETE' then 'profile.scope.removed' else 'profile.scope.assigned' end
+    when 'grant_scopes' then
+      case tg_op when 'DELETE' then 'grant.scope.removed' else 'grant.scope.changed' end
+    when 'exception_scopes' then
+      case tg_op when 'DELETE' then 'exception.scope.removed' else 'exception.scope.changed' end
     when 'permission_conditions' then
       case tg_op when 'DELETE' then 'permission.condition.removed' else 'permission.condition.changed' end
     when 'roles' then
@@ -410,7 +415,8 @@ begin
     'iam.role_permission_grants'::regclass,
     'iam.permission_conditions'::regclass,
     'iam.profile_permission_exceptions'::regclass,
-    'iam.scope_assignments'::regclass
+    'iam.grant_scopes'::regclass,
+    'iam.exception_scopes'::regclass
   ]
   loop
     v_trigger_name := pg_catalog.replace(v_table::text, '.', '_') || '_audit';

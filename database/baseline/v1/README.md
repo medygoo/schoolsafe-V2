@@ -1,6 +1,6 @@
 # SchoolSafe PostgreSQL VPS baseline v1
 
-Status: **DB-04B review only — not applied**.
+Status: **DB-04B-R2 review only — not applied**.
 
 This directory defines a new PostgreSQL 17.11 baseline for an empty
 `schoolsafe_test` database. It is not a replay of the historical Supabase
@@ -13,13 +13,13 @@ empty and reserved for a separately approved authentication migration.
 2. `02_schemas.sql` — `app`, `iam`, `audit`, `ops`, `api`, quarantine and reserved auth schemas.
 3. `03_extensions.sql` — PostgreSQL 17.11 contract and protected `pg_stat_statements` installation, blocked unless it is preloaded.
 4. `04_app_tables.sql` — from-zero tenant business model.
-5. `05_iam.sql` — users, profiles, roles, grants, scopes, conditions and exceptions.
+5. `05_iam.sql` — users, profiles, roles, grants/exceptions and permission-bound scope rows.
 6. `06_audit_ops.sql` — append-only audit and operational metadata.
-7. `07_constraints_indexes.sql` — cross-school integrity, lifecycle constraints and lookup indexes.
+7. `07_constraints_indexes.sql` — tenant-qualified candidate keys, composite cross-school integrity and lookup indexes.
 8. `08_internal_functions.sql` — transaction context and Access_Law evaluation.
 9. `09_api_rpc.sql` — backend-only API surface and eight hardened P0 RPCs.
 10. `10_triggers.sql` — invariants, timestamps and access-change audit.
-11. `11_rls_acl.sql` — forced RLS and least-privilege SQL ACLs.
+11. `11_rls_acl.sql` — forced per-operation RLS and explicit API function ACL allowlist.
 12. `12_seed_permissions.sql` — exactly 60 canonical permissions and seven scopes.
 13. `13_verification.sql` — fail-closed structural verification.
 
@@ -35,7 +35,7 @@ node database/baseline/v1/scripts/generate-manifest.mjs
 These checks read repository files only:
 
 ```powershell
-node --test database/baseline/v1/tests/static-contract.test.mjs
+node --test database/baseline/v1/tests/*.test.mjs
 git diff --no-index -- NUL database/baseline/v1
 ```
 
@@ -43,7 +43,15 @@ The SQL semantic test is intentionally not executed during DB-04B. It creates
 synthetic `.invalid` identities for School A, School B and School C inside one
 transaction and ends with `ROLLBACK`. It verifies default DENY, explicit DENY
 priority, exact active teacher class-and-subject assignment, `own_children`,
-RLS reads, incoherent contexts and cross-school RPC refusal.
+RLS reads, incoherent contexts, cross-school RPC refusal and four independent
+physical FK refusals (student/class, guardian/student, assignment/subject and
+payment/fee).
+
+Access_Law scopes are never profile-global. `iam.grant_scopes` binds scope rows
+to one exact role-permission grant and `iam.exception_scopes` binds them to one
+exact individual exception. `assigned_classes` and `assigned_subjects` must both
+match the same active class-subject assignment. `assigned_portal` evaluates only
+the portal target attached to the grant/exception currently being checked.
 
 ## Candidate manual TEST execution (later approval only)
 

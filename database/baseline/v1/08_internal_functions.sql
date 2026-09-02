@@ -265,6 +265,7 @@ $schoolsafe$;
 
 create or replace function iam.scope_matches(
   p_scope_code text,
+  p_scope_target_id uuid default null,
   p_target_profile_id uuid default null,
   p_student_id uuid default null,
   p_class_id uuid default null,
@@ -292,18 +293,20 @@ begin
     when 'own_children' then
       return iam.is_guardian_of(iam.current_profile_id(), p_student_id);
     when 'assigned_portal' then
-      return p_portal_id is not null and exists (
-        select 1 from iam.scope_assignments sa
-        where sa.school_id = iam.current_school_id()
-          and sa.profile_id = iam.current_profile_id()
-          and sa.scope_code = 'assigned_portal'
-          and sa.target_id = p_portal_id
-          and sa.is_active = true
-          and sa.starts_at <= pg_catalog.now()
-          and (sa.ends_at is null or sa.ends_at >= pg_catalog.now())
-      );
+      return p_portal_id is not null
+        and p_scope_target_id = p_portal_id
+        and exists (
+          select 1
+          from app.security_portals portal
+          where portal.school_id = iam.current_school_id()
+            and portal.id = p_portal_id
+            and portal.is_active = true
+        );
     when 'assigned_classes' then
       if p_class_id is null then
+        return false;
+      end if;
+      if p_scope_target_id is not null and p_scope_target_id <> p_class_id then
         return false;
       end if;
       if p_subject_id is not null then
@@ -320,6 +323,9 @@ begin
       );
     when 'assigned_subjects' then
       if p_subject_id is null then
+        return false;
+      end if;
+      if p_scope_target_id is not null and p_scope_target_id <> p_subject_id then
         return false;
       end if;
       if p_class_id is not null then
@@ -340,7 +346,207 @@ begin
 end
 $schoolsafe$;
 
-create or replace function iam.has_explicit_deny(p_permission_code text)
+create or replace function iam.grant_scopes_match(
+  p_grant_id uuid,
+  p_target_profile_id uuid default null,
+  p_student_id uuid default null,
+  p_class_id uuid default null,
+  p_subject_id uuid default null,
+  p_portal_id uuid default null
+)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog
+as $schoolsafe$
+declare
+  v_has_teacher_scope boolean;
+begin
+  if not iam.context_is_valid() then
+    return false;
+  end if;
+
+  select exists (
+    select 1
+    from iam.grant_scopes gs
+    where gs.school_id = iam.current_school_id()
+      and gs.grant_id = p_grant_id
+      and gs.scope_code in ('assigned_classes', 'assigned_subjects')
+      and gs.is_active = true
+      and gs.starts_at <= pg_catalog.now()
+      and (gs.ends_at is null or gs.ends_at >= pg_catalog.now())
+  ) into v_has_teacher_scope;
+
+  if v_has_teacher_scope then
+    return p_class_id is not null
+      and p_subject_id is not null
+      and exists (
+        select 1
+        from iam.grant_scopes gs
+        where gs.school_id = iam.current_school_id()
+          and gs.grant_id = p_grant_id
+          and gs.scope_code = 'assigned_classes'
+          and gs.is_active = true
+          and gs.starts_at <= pg_catalog.now()
+          and (gs.ends_at is null or gs.ends_at >= pg_catalog.now())
+          and iam.scope_matches(
+            gs.scope_code,
+            gs.target_id,
+            p_target_profile_id,
+            p_student_id,
+            p_class_id,
+            p_subject_id,
+            p_portal_id
+          )
+      )
+      and exists (
+        select 1
+        from iam.grant_scopes gs
+        where gs.school_id = iam.current_school_id()
+          and gs.grant_id = p_grant_id
+          and gs.scope_code = 'assigned_subjects'
+          and gs.is_active = true
+          and gs.starts_at <= pg_catalog.now()
+          and (gs.ends_at is null or gs.ends_at >= pg_catalog.now())
+          and iam.scope_matches(
+            gs.scope_code,
+            gs.target_id,
+            p_target_profile_id,
+            p_student_id,
+            p_class_id,
+            p_subject_id,
+            p_portal_id
+          )
+      );
+  end if;
+
+  return exists (
+    select 1
+    from iam.grant_scopes gs
+    where gs.school_id = iam.current_school_id()
+      and gs.grant_id = p_grant_id
+      and gs.is_active = true
+      and gs.starts_at <= pg_catalog.now()
+      and (gs.ends_at is null or gs.ends_at >= pg_catalog.now())
+      and iam.scope_matches(
+        gs.scope_code,
+        gs.target_id,
+        p_target_profile_id,
+        p_student_id,
+        p_class_id,
+        p_subject_id,
+        p_portal_id
+      )
+  );
+end
+$schoolsafe$;
+
+create or replace function iam.exception_scopes_match(
+  p_exception_id uuid,
+  p_target_profile_id uuid default null,
+  p_student_id uuid default null,
+  p_class_id uuid default null,
+  p_subject_id uuid default null,
+  p_portal_id uuid default null
+)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog
+as $schoolsafe$
+declare
+  v_has_teacher_scope boolean;
+begin
+  if not iam.context_is_valid() then
+    return false;
+  end if;
+
+  select exists (
+    select 1
+    from iam.exception_scopes es
+    where es.school_id = iam.current_school_id()
+      and es.exception_id = p_exception_id
+      and es.scope_code in ('assigned_classes', 'assigned_subjects')
+      and es.is_active = true
+      and es.starts_at <= pg_catalog.now()
+      and (es.ends_at is null or es.ends_at >= pg_catalog.now())
+  ) into v_has_teacher_scope;
+
+  if v_has_teacher_scope then
+    return p_class_id is not null
+      and p_subject_id is not null
+      and exists (
+        select 1
+        from iam.exception_scopes es
+        where es.school_id = iam.current_school_id()
+          and es.exception_id = p_exception_id
+          and es.scope_code = 'assigned_classes'
+          and es.is_active = true
+          and es.starts_at <= pg_catalog.now()
+          and (es.ends_at is null or es.ends_at >= pg_catalog.now())
+          and iam.scope_matches(
+            es.scope_code,
+            es.target_id,
+            p_target_profile_id,
+            p_student_id,
+            p_class_id,
+            p_subject_id,
+            p_portal_id
+          )
+      )
+      and exists (
+        select 1
+        from iam.exception_scopes es
+        where es.school_id = iam.current_school_id()
+          and es.exception_id = p_exception_id
+          and es.scope_code = 'assigned_subjects'
+          and es.is_active = true
+          and es.starts_at <= pg_catalog.now()
+          and (es.ends_at is null or es.ends_at >= pg_catalog.now())
+          and iam.scope_matches(
+            es.scope_code,
+            es.target_id,
+            p_target_profile_id,
+            p_student_id,
+            p_class_id,
+            p_subject_id,
+            p_portal_id
+          )
+      );
+  end if;
+
+  return exists (
+    select 1
+    from iam.exception_scopes es
+    where es.school_id = iam.current_school_id()
+      and es.exception_id = p_exception_id
+      and es.is_active = true
+      and es.starts_at <= pg_catalog.now()
+      and (es.ends_at is null or es.ends_at >= pg_catalog.now())
+      and iam.scope_matches(
+        es.scope_code,
+        es.target_id,
+        p_target_profile_id,
+        p_student_id,
+        p_class_id,
+        p_subject_id,
+        p_portal_id
+      )
+  );
+end
+$schoolsafe$;
+
+create or replace function iam.has_explicit_deny(
+  p_permission_code text,
+  p_target_profile_id uuid default null,
+  p_student_id uuid default null,
+  p_class_id uuid default null,
+  p_subject_id uuid default null,
+  p_portal_id uuid default null,
+  p_runtime_context jsonb default '{}'::jsonb
+)
 returns boolean
 language sql
 stable
@@ -366,6 +572,22 @@ as $schoolsafe$
         and (g.ends_at is null or g.ends_at >= pg_catalog.now())
         and p.code = p_permission_code
         and p.is_active = true
+        and iam.grant_scopes_match(
+          g.id,
+          p_target_profile_id,
+          p_student_id,
+          p_class_id,
+          p_subject_id,
+          p_portal_id
+        )
+        and not exists (
+          select 1
+          from iam.permission_conditions c
+          where c.school_id = g.school_id
+            and c.grant_id = g.id
+            and c.is_active = true
+            and not iam.condition_matches(c.condition_code, c.condition_params, p_runtime_context)
+        )
     )
     or exists (
       select 1
@@ -379,6 +601,18 @@ as $schoolsafe$
         and (e.expires_at is null or e.expires_at >= pg_catalog.now())
         and p.code = p_permission_code
         and p.is_active = true
+        and iam.exception_scopes_match(
+          e.id,
+          p_target_profile_id,
+          p_student_id,
+          p_class_id,
+          p_subject_id,
+          p_portal_id
+        )
+        and (
+          e.condition_code is null
+          or iam.condition_matches(e.condition_code, e.condition_params, p_runtime_context)
+        )
     )
 $schoolsafe$;
 
@@ -399,7 +633,15 @@ set search_path = pg_catalog
 as $schoolsafe$
   select
     iam.context_is_valid()
-    and not iam.has_explicit_deny(p_permission_code)
+    and not iam.has_explicit_deny(
+      p_permission_code,
+      p_target_profile_id,
+      p_student_id,
+      p_class_id,
+      p_subject_id,
+      p_portal_id,
+      p_runtime_context
+    )
     and (
       p_permission_code not in (
         'pedagogy.subject.read',
@@ -424,8 +666,8 @@ as $schoolsafe$
           and (e.expires_at is null or e.expires_at >= pg_catalog.now())
           and p.code = p_permission_code
           and p.is_active = true
-          and iam.scope_matches(
-            coalesce(e.scope_code, p.default_scope_code),
+          and iam.exception_scopes_match(
+            e.id,
             p_target_profile_id,
             p_student_id,
             p_class_id,
@@ -455,8 +697,8 @@ as $schoolsafe$
           and (g.ends_at is null or g.ends_at >= pg_catalog.now())
           and p.code = p_permission_code
           and p.is_active = true
-          and iam.scope_matches(
-            coalesce(g.scope_code, p.default_scope_code),
+          and iam.grant_scopes_match(
+            g.id,
             p_target_profile_id,
             p_student_id,
             p_class_id,
