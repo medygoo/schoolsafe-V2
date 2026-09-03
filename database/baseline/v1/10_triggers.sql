@@ -220,7 +220,7 @@ begin
       ('audit.events', 'actor_profile_id', 'iam.profiles'),
       ('ops.system_events', 'actor_profile_id', 'iam.profiles'),
       ('ops.notifications', 'profile_id', 'iam.profiles')
-    ) as references(table_name, column_name, reference_table)
+    ) as tenant_refs(table_name, column_name, reference_table)
   loop
     v_trigger_name := pg_catalog.replace(v_reference.table_name, '.', '_') || '_' || v_reference.column_name || '_tenant_guard';
     execute pg_catalog.format('drop trigger if exists %I on %s', v_trigger_name, v_reference.table_name);

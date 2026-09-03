@@ -24,11 +24,10 @@ readonly BASELINE_DIR='/opt/schoolsafe/database/baseline/v1'
 readonly SELF_PATH='/usr/local/sbin/schoolsafe-db-test-apply-baseline'
 readonly SECRET_HOST_PATH='/etc/schoolsafe-db/test/secrets/postgres_bootstrap_password'
 readonly BASELINE_VERSION='schoolsafe-vps-v1'
-readonly BASELINE_SOURCE_GIT_SHA='5575192bb548b35637e26f2dc3a9fdb2f5af49d1'
 readonly EXPECTED_IMAGE_REPO_DIGEST='postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0'
 readonly CONFIRMATION='APPLY_SCHOOLSAFE_TEST_FROM_ZERO'
-readonly EXPECTED_MANIFEST_SHA256='24cbcfd9b35691dce66749c79bec712901966dd0a8d63d3ac604558d5493ddc1'
-readonly EXPECTED_MANIFEST_JSON_SHA256='e803eac6c9978309ae009a74fe445e42110e1e9281e598dc07347f3d49302cb2'
+readonly EXPECTED_MANIFEST_SHA256='35cb3baeb2c0806e967063ad885155dca50fdecb660a4f057f06c74968ef75f4'
+readonly EXPECTED_MANIFEST_JSON_SHA256='81638862eca21cef137d23ae2b1c0b3a594f56e252e95e46deec0fed8d05b39c'
 readonly EXPECTED_ACCESS_TEST_SHA256='f53b98a1379ad5391324d14ada4eb1ac840b1b1988bb5c3dabd7112ff433c28c'
 readonly BACKUP_DIR='/var/backups/schoolsafe/test/pre-baseline'
 readonly LOCK_FILE='/run/schoolsafe-db-test-apply-baseline.lock'
@@ -73,6 +72,8 @@ CURRENT_STEP='startup'
 CURRENT_UNIT='none'
 BACKUP_FILE='not-created'
 BACKUP_SHA256='not-created'
+PREAPPLY_STATE=''
+FIRST_PASS_START_INDEX=0
 
 fail() {
   printf 'SCHOOLSAFE DB-04C TEST BASELINE: FAIL\n' >&2
@@ -344,6 +345,37 @@ assert_scalar() {
   [[ "$actual" == "$expected" ]] || fail "$label: expected $expected, got $actual"
 }
 
+assert_exact_schoolsafe_roles() {
+  local schoolsafe_membership_signature
+
+  assert_scalar '5' 'expected SchoolSafe role name count' \
+    "select pg_catalog.count(*) from pg_catalog.pg_roles where rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor')"
+  assert_scalar '0' 'unsafe SchoolSafe role attribute count' \
+    "select pg_catalog.count(*) from pg_catalog.pg_roles where rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor') and (rolsuper or rolcreatedb or rolcreaterole or rolreplication or rolbypassrls)"
+  assert_scalar '0' 'SchoolSafe INHERIT role count' \
+    "select pg_catalog.count(*) from pg_catalog.pg_roles where rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor') and rolinherit"
+  assert_scalar '0' 'SchoolSafe LOGIN attribute mismatch count' \
+    "select pg_catalog.count(*) from pg_catalog.pg_roles where (rolname in ('schoolsafe_owner','schoolsafe_auditor') and rolcanlogin) or (rolname in ('schoolsafe_migrator','schoolsafe_api','schoolsafe_worker') and not rolcanlogin)"
+
+  schoolsafe_membership_signature="$(scalar_query \
+    "select coalesce(pg_catalog.string_agg(member_role.rolname || '>' || granted_role.rolname, ',' order by member_role.rolname, granted_role.rolname), '') from pg_catalog.pg_auth_members membership join pg_catalog.pg_roles granted_role on granted_role.oid = membership.roleid join pg_catalog.pg_roles member_role on member_role.oid = membership.member where granted_role.rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor') or member_role.rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor')")"
+  [[ "$schoolsafe_membership_signature" == 'schoolsafe_bootstrap>schoolsafe_migrator,schoolsafe_bootstrap>schoolsafe_owner,schoolsafe_migrator>schoolsafe_owner' ]] \
+    || fail "unexpected SchoolSafe membership"
+}
+
+assert_empty_pre_unit02_state() {
+  [[ "$pg_stat_statements_extension_count" == '0' ]] \
+    || fail "pre-existing pg_stat_statements extension"
+  [[ "$non_system_schema_count" == '0' ]] \
+    || fail "database is not from-zero: non-system schemas exist"
+  [[ "$public_relation_count" == '0' ]] \
+    || fail "public schema relation count: expected 0, got $public_relation_count"
+  [[ "$custom_schema_count" == '0' ]] \
+    || fail "database is not from-zero: SchoolSafe schemas exist"
+  [[ "$schema_versions_relation_count" == '0' ]] \
+    || fail "schema_versions relation count: expected 0, got $schema_versions_relation_count"
+}
+
 assert_scalar '170011' 'PostgreSQL version' 'show server_version_num'
 assert_scalar "$DATABASE" 'database name' 'select pg_catalog.current_database()'
 assert_scalar "$BOOTSTRAP_ROLE" 'bootstrap role' 'select current_user'
@@ -360,48 +392,83 @@ compute_query_id="$(scalar_query 'show compute_query_id')"
 
 assert_scalar '1' 'pg_stat_statements availability' \
   "select pg_catalog.count(*) from pg_catalog.pg_available_extensions where name = 'pg_stat_statements'"
-assert_scalar '0' 'pre-existing pg_stat_statements extension' \
-  "select pg_catalog.count(*) from pg_catalog.pg_extension where extname = 'pg_stat_statements'"
 
 non_system_schema_count="$(scalar_query \
   "select pg_catalog.count(*) from pg_catalog.pg_namespace where nspname !~ '^pg_' and nspname not in ('information_schema','public')")"
-[[ "$non_system_schema_count" == '0' ]] \
-  || fail "database is not from-zero: non-system schemas exist"
-
-assert_scalar '0' 'public schema relation count' \
-  "select pg_catalog.count(*) from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public'"
-
+public_relation_count="$(scalar_query \
+  "select pg_catalog.count(*) from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public'")"
 custom_schema_count="$(scalar_query \
   "select pg_catalog.count(*) from pg_catalog.pg_namespace where nspname in ('app','iam','audit','ops','api','legacy_cloud','auth')")"
-[[ "$custom_schema_count" == '0' ]] \
-  || fail "database is not from-zero: SchoolSafe schemas exist"
-
-assert_scalar '0' 'schema_versions relation count' \
-  "select pg_catalog.count(*) from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'ops' and c.relname = 'schema_versions' and c.relkind in ('r','p')"
+schema_versions_relation_count="$(scalar_query \
+  "select pg_catalog.count(*) from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'ops' and c.relname = 'schema_versions' and c.relkind in ('r','p')")"
+pg_stat_statements_extension_count="$(scalar_query \
+  "select pg_catalog.count(*) from pg_catalog.pg_extension where extname = 'pg_stat_statements'")"
 
 schoolsafe_application_role_count="$(scalar_query \
   "select pg_catalog.count(*) from pg_catalog.pg_roles where pg_catalog.left(rolname, 11) = 'schoolsafe_' and rolname <> 'schoolsafe_bootstrap'")"
 
 case "$schoolsafe_application_role_count" in
   0)
+    assert_empty_pre_unit02_state
+    PREAPPLY_STATE='FROM_ZERO'
     printf 'preapply_state=FROM_ZERO\n'
     ;;
   5)
-    assert_scalar '5' 'expected SchoolSafe role name count' \
-      "select pg_catalog.count(*) from pg_catalog.pg_roles where rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor')"
-    assert_scalar '0' 'unsafe SchoolSafe role attribute count' \
-      "select pg_catalog.count(*) from pg_catalog.pg_roles where rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor') and (rolsuper or rolcreatedb or rolcreaterole or rolreplication or rolbypassrls)"
-    assert_scalar '0' 'SchoolSafe INHERIT role count' \
-      "select pg_catalog.count(*) from pg_catalog.pg_roles where rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor') and rolinherit"
-    assert_scalar '0' 'SchoolSafe LOGIN attribute mismatch count' \
-      "select pg_catalog.count(*) from pg_catalog.pg_roles where (rolname in ('schoolsafe_owner','schoolsafe_auditor') and rolcanlogin) or (rolname in ('schoolsafe_migrator','schoolsafe_api','schoolsafe_worker') and not rolcanlogin)"
-
-    schoolsafe_membership_signature="$(scalar_query \
-      "select coalesce(pg_catalog.string_agg(member_role.rolname || '>' || granted_role.rolname, ',' order by member_role.rolname, granted_role.rolname), '') from pg_catalog.pg_auth_members membership join pg_catalog.pg_roles granted_role on granted_role.oid = membership.roleid join pg_catalog.pg_roles member_role on member_role.oid = membership.member where granted_role.rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor') or member_role.rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor')")"
-    [[ "$schoolsafe_membership_signature" == 'schoolsafe_bootstrap>schoolsafe_migrator,schoolsafe_bootstrap>schoolsafe_owner,schoolsafe_migrator>schoolsafe_owner' ]] \
-      || fail "unexpected SchoolSafe membership"
-
-    printf 'preapply_state=SAFE_PARTIAL_UNIT01\n'
+    assert_exact_schoolsafe_roles
+    if [[ "$non_system_schema_count" == '0' \
+       && "$public_relation_count" == '0' \
+       && "$custom_schema_count" == '0' \
+       && "$schema_versions_relation_count" == '0' \
+       && "$pg_stat_statements_extension_count" == '0' ]]; then
+      assert_empty_pre_unit02_state
+      PREAPPLY_STATE='SAFE_PARTIAL_UNIT01'
+      printf 'preapply_state=SAFE_PARTIAL_UNIT01\n'
+    elif [[ "$non_system_schema_count" == '7' \
+         && "$public_relation_count" == '0' \
+         && "$custom_schema_count" == '7' \
+         && "$schema_versions_relation_count" == '1' \
+         && "$pg_stat_statements_extension_count" == '1' ]]; then
+      assert_scalar '1' 'pg_stat_statements installation in ops' \
+        "select pg_catalog.count(*) from pg_catalog.pg_extension e join pg_catalog.pg_namespace n on n.oid = e.extnamespace where e.extname = 'pg_stat_statements' and n.nspname = 'ops'"
+      assert_scalar '0' 'SchoolSafe schema owner mismatch count' \
+        "select pg_catalog.count(*) from pg_catalog.pg_namespace where nspname in ('app','iam','audit','ops','api','legacy_cloud','auth') and pg_catalog.pg_get_userbyid(nspowner) <> 'schoolsafe_owner'"
+      assert_scalar '9' 'schema version row count' \
+        "select pg_catalog.count(*) from ops.schema_versions"
+      assert_scalar '9' 'exact recovered schema versions 1 through 9' \
+        "select pg_catalog.count(*) from ops.schema_versions sv join (values
+          (1::smallint,'schoolsafe-vps-v1','roles','01_roles.sql','10448f25fb7925391c66d872a11d13d2876667dddeaaa39e8ec785868c72e5fe'),
+          (2::smallint,'schoolsafe-vps-v1','schemas','02_schemas.sql','d588efaaa03f385db9f50db873e3b05321647cf39254f8ea822040c863d7ae40'),
+          (3::smallint,'schoolsafe-vps-v1','extensions','03_extensions.sql','d5614193bee6785294eaf2febae32480f41b53cc50b20406a2142222cc865528'),
+          (4::smallint,'schoolsafe-vps-v1','app_tables','04_app_tables.sql','e03e05a26f196bfa657c62971740af6d52522a3885fe3ec184abc60122fe8465'),
+          (5::smallint,'schoolsafe-vps-v1','iam','05_iam.sql','87fc9522b8b530e2c09858de46deaaf43570893472c2810b062f1ff044edf7d5'),
+          (6::smallint,'schoolsafe-vps-v1','audit_ops','06_audit_ops.sql','b21c242218945cfea044a5ae8c75694df930eca42b6ded3bea7520e9d3c2e661'),
+          (7::smallint,'schoolsafe-vps-v1','constraints_indexes','07_constraints_indexes.sql','7ffde1d41c06cbce867ea2f287fcb9223c0ecd76815c3f2afa8226672fc8ec89'),
+          (8::smallint,'schoolsafe-vps-v1','internal_functions','08_internal_functions.sql','3d973f644a6a6de5eb59436f56b6f3a245b39499e306dafd9d877c79337bb0ef'),
+          (9::smallint,'schoolsafe-vps-v1','api_rpc','09_api_rpc.sql','97bf44e8a68c3961ffe4ca12488a797c9e883a5e7a8bdabc9f04c17f1112212b')
+        ) expected(unit_order, baseline_version, unit_name, file_name, sha256)
+          on expected.unit_order = sv.unit_order
+         and expected.baseline_version = sv.baseline_version
+         and expected.unit_name = sv.unit_name
+         and expected.file_name = sv.file_name
+         and expected.sha256 = sv.sha256"
+      assert_scalar '0' 'unit 10 function residue' \
+        "select pg_catalog.count(*) from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace where (n.nspname, p.proname) in (('ops','set_updated_at'),('app','guard_same_school_reference'),('app','validate_student_enrollment'),('app','project_active_enrollment_class'),('app','require_operational_student'),('audit','capture_access_change'),('audit','prevent_event_mutation'))"
+      assert_scalar '0' 'unit 10 trigger residue' \
+        "select pg_catalog.count(*) from pg_catalog.pg_trigger t join pg_catalog.pg_class c on c.oid = t.tgrelid join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname in ('app','iam','audit','ops') and not t.tgisinternal"
+      assert_scalar '0' 'unit 11 policy residue' \
+        "select pg_catalog.count(*) from pg_catalog.pg_policy policy join pg_catalog.pg_class c on c.oid = policy.polrelid join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname in ('app','iam','audit','ops')"
+      assert_scalar '0' 'permission seed residue' \
+        "select pg_catalog.count(*) from iam.permissions"
+      assert_scalar '0' 'scope seed residue' \
+        "select pg_catalog.count(*) from iam.scopes"
+      assert_scalar '9' 'unit 09 SECURITY DEFINER RPC count' \
+        "select pg_catalog.count(distinct p.proname) from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace where n.nspname = 'api' and p.proname in ('check_access','deactivate_other_academic_years','next_document_number','ensure_receipt_number','record_payment','cancel_payment','increment_card_print_count','create_student_draft','compensate_student_draft_creation') and p.prosecdef"
+      PREAPPLY_STATE='SAFE_PARTIAL_UNIT09'
+      FIRST_PASS_START_INDEX=9
+      printf 'preapply_state=SAFE_PARTIAL_UNIT09\n'
+    else
+      fail "invalid SchoolSafe role recovery state: partial baseline does not exactly match unit 01 or unit 09"
+    fi
     ;;
   *)
     fail "invalid SchoolSafe role recovery state: unexpected SchoolSafe role count"
@@ -504,18 +571,25 @@ SQL
   CURRENT_UNIT='none'
 }
 
-CURRENT_STEP="apply-01-08"
-for index in {0..7}; do
-  apply_unit "${UNITS[$index]}"
-done
+if [[ "$PREAPPLY_STATE" != 'SAFE_PARTIAL_UNIT09' ]]; then
+  CURRENT_STEP="apply-01-08"
+  for index in {0..7}; do
+    apply_unit "${UNITS[$index]}"
+  done
 
-CURRENT_STEP='record-01-08'
-for index in {0..7}; do
-  record_unit "$((index + 1))" "${UNITS[$index]}"
-done
+  CURRENT_STEP='record-01-08'
+  for index in {0..7}; do
+    record_unit "$((index + 1))" "${UNITS[$index]}"
+  done
+  FIRST_PASS_START_INDEX=8
+fi
 
-CURRENT_STEP='apply-09-12'
-for index in {8..11}; do
+if [[ "$FIRST_PASS_START_INDEX" -eq 9 ]]; then
+  CURRENT_STEP='apply-10-12'
+else
+  CURRENT_STEP='apply-09-12'
+fi
+for ((index = FIRST_PASS_START_INDEX; index <= 11; index++)); do
   apply_unit "${UNITS[$index]}"
   record_unit "$((index + 1))" "${UNITS[$index]}"
 done

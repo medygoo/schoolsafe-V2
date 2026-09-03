@@ -64,7 +64,7 @@
       "order": 10,
       "name": "triggers",
       "file": "10_triggers.sql",
-      "sha256": "fe6f06833f25d51401dfef3328f060ee934b734b0b11562827e6ad97c192f2dd"
+      "sha256": "5c0de408c2429c380f92851a370b0f2c2d89d976ecf4c71c00c0aa14510d03ba"
     },
     {
       "order": 11,
