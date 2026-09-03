@@ -463,6 +463,34 @@ case "$schoolsafe_application_role_count" in
         "select pg_catalog.count(*) from iam.scopes"
       assert_scalar '9' 'unit 09 SECURITY DEFINER RPC count' \
         "select pg_catalog.count(distinct p.proname) from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace where n.nspname = 'api' and p.proname in ('check_access','deactivate_other_academic_years','next_document_number','ensure_receipt_number','record_payment','cancel_payment','increment_card_print_count','create_student_draft','compensate_student_draft_creation') and p.prosecdef"
+      assert_scalar '0' 'pre-existing ENABLE or FORCE RLS flag count' \
+        "select pg_catalog.count(*) from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname in ('app','iam','audit','ops') and c.relkind in ('r','p') and (c.relrowsecurity or c.relforcerowsecurity)"
+      if ! run_psql <<'SQL'
+do $contamination_check$
+declare
+  candidate record;
+  table_has_rows boolean;
+begin
+  for candidate in
+    select n.nspname as schema_name, c.relname as table_name
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname in ('app','iam','audit','ops')
+      and c.relkind in ('r','p')
+      and (n.nspname, c.relname) <> ('ops','schema_versions')
+  loop
+    execute pg_catalog.format('select exists (select 1 from %I.%I)', candidate.schema_name, candidate.table_name)
+      into table_has_rows;
+    if table_has_rows then
+      raise exception 'SAFE_PARTIAL_UNIT09 rejected: table %.% already contains data', candidate.schema_name, candidate.table_name;
+    end if;
+  end loop;
+end
+$contamination_check$;
+SQL
+      then
+        fail "pre-existing SchoolSafe data outside ops.schema_versions"
+      fi
       PREAPPLY_STATE='SAFE_PARTIAL_UNIT09'
       FIRST_PASS_START_INDEX=9
       printf 'preapply_state=SAFE_PARTIAL_UNIT09\n'

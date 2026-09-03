@@ -149,3 +149,46 @@ test("recovery remains fail-closed before backup and performs no cleanup", async
   assert.doesNotMatch(wrapper, /drop\s+(?:role|schema|extension)/i);
   assert.doesNotMatch(wrapper, /delete\s+from\s+ops\.schema_versions/i);
 });
+
+test("SAFE_PARTIAL_UNIT09 rejects pre-existing data and residual RLS flags", async () => {
+  const wrapper = await readFile(wrapperPath, "utf8");
+
+  // Residual ENABLE or FORCE RLS flags on the four schemas are rejected.
+  assert.match(wrapper, /pre-existing ENABLE or FORCE RLS flag count/);
+  assert.match(
+    wrapper,
+    /c\.relkind in \('r','p'\) and \(c\.relrowsecurity or c\.relforcerowsecurity\)/,
+  );
+
+  // The data check examines every ordinary or partitioned table of app, iam,
+  // audit and ops through exact per-table existence probes built with escaped
+  // identifiers, and refuses any table holding at least one row.
+  assert.match(wrapper, /do \$/i);
+  assert.match(
+    wrapper,
+    /pg_catalog\.format\('select exists \(select 1 from %I\.%I\)'/,
+  );
+  assert.match(wrapper, /raise exception/i);
+  assert.match(wrapper, /already contains data/i);
+
+  // ops.schema_versions is the only table allowed to contain rows.
+  assert.match(wrapper, /<> \('ops','schema_versions'\)/);
+
+  // RLS flags are checked before data counting so residual RLS cannot hide
+  // rows, and the whole gate runs before the backup step.
+  const rlsFlagCheck = wrapper.indexOf(
+    "pre-existing ENABLE or FORCE RLS flag count",
+  );
+  const dataCheck = wrapper.indexOf("raise exception");
+  const unit09Assignment = wrapper.indexOf(
+    "PREAPPLY_STATE='SAFE_PARTIAL_UNIT09'",
+  );
+  const backupStep = wrapper.indexOf('CURRENT_STEP="backup"');
+  assert.ok(rlsFlagCheck > -1 && rlsFlagCheck < dataCheck);
+  assert.ok(dataCheck > -1 && dataCheck < unit09Assignment);
+  assert.ok(unit09Assignment > -1 && unit09Assignment < backupStep);
+
+  // Recovery never deletes or truncates data automatically.
+  assert.doesNotMatch(wrapper, /\bdelete\s+from\b/i);
+  assert.doesNotMatch(wrapper, /\btruncate\b/i);
+});
