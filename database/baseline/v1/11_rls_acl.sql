@@ -289,6 +289,11 @@ grant usage on schema ops to schoolsafe_migrator;
 grant select, insert on ops.schema_versions to schoolsafe_migrator;
 grant execute on function ops.record_schema_version(smallint, text, text, text, text) to schoolsafe_migrator;
 
+drop function iam.install_owner_policies(regclass, text, text, boolean, boolean);
+
+-- Database ACL belongs to the bootstrap/database owner, not to the object owner.
+reset role;
+
 do $schoolsafe$
 declare
   v_database name := pg_catalog.current_database();
@@ -301,7 +306,5 @@ begin
   );
 end
 $schoolsafe$;
-
-drop function iam.install_owner_policies(regclass, text, text, boolean, boolean);
 
 commit;

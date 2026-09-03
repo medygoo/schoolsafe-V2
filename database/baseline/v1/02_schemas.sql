@@ -1,7 +1,6 @@
 \set ON_ERROR_STOP on
 
 begin;
-set local role schoolsafe_owner;
 
 create schema if not exists app authorization schoolsafe_owner;
 create schema if not exists iam authorization schoolsafe_owner;

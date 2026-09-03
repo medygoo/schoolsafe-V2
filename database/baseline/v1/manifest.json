@@ -16,7 +16,7 @@
       "order": 2,
       "name": "schemas",
       "file": "02_schemas.sql",
-      "sha256": "9f052b712d39cabfa3991233179cf42b41865edfc1f58cf837943aaa7fcca36b"
+      "sha256": "d588efaaa03f385db9f50db873e3b05321647cf39254f8ea822040c863d7ae40"
     },
     {
       "order": 3,
@@ -70,7 +70,7 @@
       "order": 11,
       "name": "rls_acl",
       "file": "11_rls_acl.sql",
-      "sha256": "59aba8c2ba98dc5480d0de048968896baf3bd93b5c0036a7640c25e09c7f7a05"
+      "sha256": "484e65146d0c43009c8261f52dea6a005c9fd2c521d835478206d0f9b79e9e04"
     },
     {
       "order": 12,
