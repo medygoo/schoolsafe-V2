@@ -1,0 +1,19 @@
+{
+  "auth_version": "schoolsafe-auth-v1",
+  "requires_baseline": "schoolsafe-vps-v1",
+  "target": "per-school database; TEST first; no Cloud import",
+  "units": [
+    {
+      "order": 1,
+      "name": "auth_tables",
+      "file": "01_auth_tables.sql",
+      "sha256": "f81441cd7add31e167a1c590d4a120526c60369620d51ccf5c8b3c3cab8ef26b"
+    },
+    {
+      "order": 2,
+      "name": "auth_api",
+      "file": "02_auth_api.sql",
+      "sha256": "fd7cae413e32893ed9e4a78bca5ba9af4e8f682bb0ff7d609778bff7c586664d"
+    }
+  ]
+}

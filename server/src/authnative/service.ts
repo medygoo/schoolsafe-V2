@@ -1,0 +1,135 @@
+// SchoolSafe Auth v1 — service d'authentification.
+// La base de données est injectée via une interface minimale (testable sans serveur),
+// en attendant le pool pg réel du lot DB-LAYER (3.1).
+import { verifyPassword, DUMMY_ARGON2ID_HASH_PROMISE } from "./passwords.js";
+import { generateSessionToken, hashSessionToken } from "./tokens.js";
+
+export interface AuthDatabase {
+  query<T>(sql: string, params: unknown[]): Promise<{ rows: T[] }>;
+}
+
+export interface AuthSessionInfo {
+  sessionId: string;
+  identityId: string;
+  userId: string;
+  profileId: string;
+  schoolId: string;
+  mustChange: boolean;
+  expiresAt: string;
+}
+
+export type LoginResult =
+  | { ok: true; token: string; session: AuthSessionInfo }
+  | { ok: false; reason: "invalid_credentials" | "locked" | "disabled" };
+
+type IdentityRow = {
+  identity_id: string;
+  user_id: string;
+  password_hash: string | null;
+  status: string;
+  must_change: boolean;
+};
+
+type SessionRow = {
+  session_id: string;
+  identity_id: string;
+  user_id: string;
+  profile_id: string;
+  school_id: string;
+  must_change: boolean;
+};
+
+const SESSION_TTL_SECONDS = 43200; // 12 h glissantes
+
+export function createAuthNativeService(db: AuthDatabase) {
+  return {
+    async loginWithPassword(
+      login: string,
+      password: string,
+      ip?: string,
+      userAgent?: string,
+    ): Promise<LoginResult> {
+      const normalized = login.trim();
+      if (!normalized || !password) {
+        return { ok: false, reason: "invalid_credentials" };
+      }
+
+      const locked = await db.query<{ auth_is_locked: boolean }>(
+        "select * from api.auth_is_locked($1)",
+        [normalized],
+      );
+      if (locked.rows[0]?.auth_is_locked === true) {
+        return { ok: false, reason: "locked" };
+      }
+
+      const resolved = await db.query<IdentityRow>(
+        "select * from api.auth_resolve_identity($1)",
+        [normalized],
+      );
+      const identity = resolved.rows[0];
+
+      // Anti-énumération : vérification argon2 factice si l'identité est absente.
+      const hash = identity?.password_hash ?? (await DUMMY_ARGON2ID_HASH_PROMISE);
+      const valid = await verifyPassword(hash, password);
+
+      const succeeded = Boolean(identity && valid && identity.status === "active");
+      await db.query("select * from api.auth_record_attempt($1, $2)", [normalized, succeeded]);
+
+      if (!identity || !valid) {
+        return { ok: false, reason: "invalid_credentials" };
+      }
+      if (identity.status !== "active") {
+        return { ok: false, reason: "disabled" };
+      }
+
+      const token = generateSessionToken();
+      const created = await db.query<{ session_id: string; expires_at: string }>(
+        "select * from api.auth_create_session($1, $2, $3, $4, $5)",
+        [identity.identity_id, hashSessionToken(token), SESSION_TTL_SECONDS, ip ?? null, userAgent ?? null],
+      );
+      const row = created.rows[0];
+
+      return {
+        ok: true,
+        token,
+        session: {
+          sessionId: row.session_id,
+          identityId: identity.identity_id,
+          userId: identity.user_id,
+          profileId: "",
+          schoolId: "",
+          mustChange: identity.must_change,
+          expiresAt: row.expires_at,
+        },
+      };
+    },
+
+    async resolveSession(token: string): Promise<AuthSessionInfo | null> {
+      const resolved = await db.query<SessionRow & { expires_at?: never }>(
+        "select * from api.auth_resolve_session($1)",
+        [hashSessionToken(token)],
+      );
+      const row = resolved.rows[0];
+      if (!row) return null;
+      return {
+        sessionId: row.session_id,
+        identityId: row.identity_id,
+        userId: row.user_id,
+        profileId: row.profile_id,
+        schoolId: row.school_id,
+        mustChange: row.must_change,
+        expiresAt: "",
+      };
+    },
+
+    async logout(token: string): Promise<boolean> {
+      const result = await db.query<{ auth_revoke_session: boolean }>(
+        "select * from api.auth_revoke_session($1)",
+        [hashSessionToken(token)],
+      );
+      return result.rows[0]?.auth_revoke_session === true;
+    },
+  };
+}
+
+export type AuthNativeService = ReturnType<typeof createAuthNativeService>;
