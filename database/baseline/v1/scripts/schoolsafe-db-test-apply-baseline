@@ -368,7 +368,7 @@ assert_exact_schoolsafe_roles() {
 
   schoolsafe_membership_signature="$(scalar_query \
     "select coalesce(pg_catalog.string_agg(member_role.rolname || '>' || granted_role.rolname, ',' order by member_role.rolname, granted_role.rolname), '') from pg_catalog.pg_auth_members membership join pg_catalog.pg_roles granted_role on granted_role.oid = membership.roleid join pg_catalog.pg_roles member_role on member_role.oid = membership.member where granted_role.rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor') or member_role.rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor')")"
-  [[ "$schoolsafe_membership_signature" == 'schoolsafe_bootstrap>pg_read_all_settings,schoolsafe_bootstrap>schoolsafe_migrator,schoolsafe_bootstrap>schoolsafe_owner,schoolsafe_migrator>schoolsafe_owner' ]] \
+  [[ "$schoolsafe_membership_signature" == 'schoolsafe_bootstrap>schoolsafe_migrator,schoolsafe_bootstrap>schoolsafe_owner,schoolsafe_migrator>schoolsafe_owner' ]] \
     || fail "unexpected SchoolSafe membership"
 }
 
