@@ -52,7 +52,7 @@ test("unit 10 trigger definitions remain idempotent", async () => {
   assert.match(sql, /drop trigger if exists %I on %s/i);
 });
 
-test("wrapper exposes only the four reviewed recovery states", async () => {
+test("wrapper exposes only the five reviewed recovery states", async () => {
   const wrapper = await readFile(wrapperPath, "utf8");
   const states = [...wrapper.matchAll(/preapply_state=([A-Z0-9_]+)/g)].map(
     (match) => match[1],
@@ -63,8 +63,22 @@ test("wrapper exposes only the four reviewed recovery states", async () => {
     "SAFE_PARTIAL_UNIT01",
     "SAFE_PARTIAL_UNIT09",
     "SAFE_PARTIAL_UNIT12",
+    "SAFE_PARTIAL_UNIT13",
   ]);
   assert.doesNotMatch(wrapper, /BASELINE_SOURCE_GIT_SHA/);
+});
+
+test("SAFE_PARTIAL_UNIT13 requires exact versions 1 through 13 and re-verifies only", async () => {
+  const wrapper = await readFile(wrapperPath, "utf8");
+  const manifest = JSON.parse(await readBaseline("manifest.json"));
+
+  assert.match(wrapper, /preapply_state=SAFE_PARTIAL_UNIT13/);
+  assert.match(wrapper, /exact recovered schema versions 1 through 13/);
+  assert.match(wrapper, /FIRST_PASS_START_INDEX=13/);
+  assert.match(wrapper, /verify-13-only/);
+  for (const unit of manifest.units) {
+    assert.match(wrapper, new RegExp(unit.sha256));
+  }
 });
 
 test("SAFE_PARTIAL_UNIT12 requires exact versions 1 through 12 and applies only unit 13", async () => {

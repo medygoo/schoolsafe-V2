@@ -565,8 +565,65 @@ SQL
       PREAPPLY_STATE='SAFE_PARTIAL_UNIT09'
       FIRST_PASS_START_INDEX=9
       printf 'preapply_state=SAFE_PARTIAL_UNIT09\n'
+      elif [[ "$schema_version_count" == '13' ]]; then
+        assert_scalar '13' 'exact recovered schema versions 1 through 13' \
+          "select pg_catalog.count(*) from ops.schema_versions sv join (values
+            (1::smallint,'schoolsafe-vps-v1','roles','01_roles.sql','10448f25fb7925391c66d872a11d13d2876667dddeaaa39e8ec785868c72e5fe'),
+            (2::smallint,'schoolsafe-vps-v1','schemas','02_schemas.sql','d588efaaa03f385db9f50db873e3b05321647cf39254f8ea822040c863d7ae40'),
+            (3::smallint,'schoolsafe-vps-v1','extensions','03_extensions.sql','d5614193bee6785294eaf2febae32480f41b53cc50b20406a2142222cc865528'),
+            (4::smallint,'schoolsafe-vps-v1','app_tables','04_app_tables.sql','e03e05a26f196bfa657c62971740af6d52522a3885fe3ec184abc60122fe8465'),
+            (5::smallint,'schoolsafe-vps-v1','iam','05_iam.sql','87fc9522b8b530e2c09858de46deaaf43570893472c2810b062f1ff044edf7d5'),
+            (6::smallint,'schoolsafe-vps-v1','audit_ops','06_audit_ops.sql','b21c242218945cfea044a5ae8c75694df930eca42b6ded3bea7520e9d3c2e661'),
+            (7::smallint,'schoolsafe-vps-v1','constraints_indexes','07_constraints_indexes.sql','7ffde1d41c06cbce867ea2f287fcb9223c0ecd76815c3f2afa8226672fc8ec89'),
+            (8::smallint,'schoolsafe-vps-v1','internal_functions','08_internal_functions.sql','3d973f644a6a6de5eb59436f56b6f3a245b39499e306dafd9d877c79337bb0ef'),
+            (9::smallint,'schoolsafe-vps-v1','api_rpc','09_api_rpc.sql','97bf44e8a68c3961ffe4ca12488a797c9e883a5e7a8bdabc9f04c17f1112212b'),
+            (10::smallint,'schoolsafe-vps-v1','triggers','10_triggers.sql','5c0de408c2429c380f92851a370b0f2c2d89d976ecf4c71c00c0aa14510d03ba'),
+            (11::smallint,'schoolsafe-vps-v1','rls_acl','11_rls_acl.sql','484e65146d0c43009c8261f52dea6a005c9fd2c521d835478206d0f9b79e9e04'),
+            (12::smallint,'schoolsafe-vps-v1','seed_permissions','12_seed_permissions.sql','8a347abde67b8efb91625346f0177be36445dd331f3c5450b40c945c252c79d2'),
+            (13::smallint,'schoolsafe-vps-v1','verification','13_verification.sql','7f4c20c7e7530d3bd27d2a45a75d342cf5fb662a9d100f7c62fb97ba6dae0d95')
+          ) expected(unit_order, baseline_version, unit_name, file_name, sha256)
+            on expected.unit_order = sv.unit_order
+           and expected.baseline_version = sv.baseline_version
+           and expected.unit_name = sv.unit_name
+           and expected.file_name = sv.file_name
+           and expected.sha256 = sv.sha256"
+        assert_scalar '60' 'permission seed presence' \
+          "select pg_catalog.count(*) from iam.permissions"
+        assert_scalar '7' 'scope seed presence' \
+          "select pg_catalog.count(*) from iam.scopes"
+        assert_scalar '9' 'unit 09 SECURITY DEFINER RPC count' \
+          "select pg_catalog.count(distinct p.proname) from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace where n.nspname = 'api' and p.proname in ('check_access','deactivate_other_academic_years','next_document_number','ensure_receipt_number','record_payment','cancel_payment','increment_card_print_count','create_student_draft','compensate_student_draft_creation') and p.prosecdef"
+        if ! run_psql <<'SQL'
+do $contamination_check$
+declare
+  candidate record;
+  table_has_rows boolean;
+begin
+  for candidate in
+    select n.nspname as schema_name, c.relname as table_name
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname in ('app','iam','audit','ops')
+      and c.relkind in ('r','p')
+      and (n.nspname, c.relname) not in (('ops','schema_versions'),('iam','permissions'),('iam','scopes'))
+  loop
+    execute pg_catalog.format('select exists (select 1 from %I.%I)', candidate.schema_name, candidate.table_name)
+      into table_has_rows;
+    if table_has_rows then
+      RAISE EXCEPTION 'SAFE_PARTIAL_UNIT13 rejected: table %.% already contains data', candidate.schema_name, candidate.table_name;
+    end if;
+  end loop;
+end
+$contamination_check$;
+SQL
+        then
+          fail "pre-existing SchoolSafe data outside ops.schema_versions and canonical seeds"
+        fi
+        PREAPPLY_STATE='SAFE_PARTIAL_UNIT13'
+        FIRST_PASS_START_INDEX=13
+        printf 'preapply_state=SAFE_PARTIAL_UNIT13\n'
       else
-        fail "schema version row count: expected 9 or 12, got $schema_version_count"
+        fail "schema version row count: expected 9, 12 or 13, got $schema_version_count"
       fi
     else
       fail "invalid SchoolSafe role recovery state: partial baseline does not exactly match unit 01, unit 09 or unit 12"
@@ -673,7 +730,7 @@ SQL
   CURRENT_UNIT='none'
 }
 
-if [[ "$PREAPPLY_STATE" != 'SAFE_PARTIAL_UNIT09' && "$PREAPPLY_STATE" != 'SAFE_PARTIAL_UNIT12' ]]; then
+if [[ "$PREAPPLY_STATE" != 'SAFE_PARTIAL_UNIT09' && "$PREAPPLY_STATE" != 'SAFE_PARTIAL_UNIT12' && "$PREAPPLY_STATE" != 'SAFE_PARTIAL_UNIT13' ]]; then
   CURRENT_STEP="apply-01-08"
   for index in {0..7}; do
     apply_unit "${UNITS[$index]}"
@@ -690,6 +747,8 @@ if [[ "$FIRST_PASS_START_INDEX" -eq 9 ]]; then
   CURRENT_STEP='apply-10-12'
 elif [[ "$FIRST_PASS_START_INDEX" -eq 12 ]]; then
   CURRENT_STEP='apply-13-only'
+elif [[ "$FIRST_PASS_START_INDEX" -eq 13 ]]; then
+  CURRENT_STEP='verify-13-only'
 else
   CURRENT_STEP='apply-09-12'
 fi
