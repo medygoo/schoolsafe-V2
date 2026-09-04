@@ -52,7 +52,7 @@ test("unit 10 trigger definitions remain idempotent", async () => {
   assert.match(sql, /drop trigger if exists %I on %s/i);
 });
 
-test("wrapper exposes only the three reviewed recovery states", async () => {
+test("wrapper exposes only the four reviewed recovery states", async () => {
   const wrapper = await readFile(wrapperPath, "utf8");
   const states = [...wrapper.matchAll(/preapply_state=([A-Z0-9_]+)/g)].map(
     (match) => match[1],
@@ -62,8 +62,26 @@ test("wrapper exposes only the three reviewed recovery states", async () => {
     "FROM_ZERO",
     "SAFE_PARTIAL_UNIT01",
     "SAFE_PARTIAL_UNIT09",
+    "SAFE_PARTIAL_UNIT12",
   ]);
   assert.doesNotMatch(wrapper, /BASELINE_SOURCE_GIT_SHA/);
+});
+
+test("SAFE_PARTIAL_UNIT12 requires exact versions 1 through 12 and applies only unit 13", async () => {
+  const wrapper = await readFile(wrapperPath, "utf8");
+  const manifest = JSON.parse(await readBaseline("manifest.json"));
+  const firstTwelve = manifest.units.slice(0, 12);
+
+  assert.match(wrapper, /preapply_state=SAFE_PARTIAL_UNIT12/);
+  assert.match(wrapper, /exact recovered schema versions 1 through 12/);
+  assert.match(wrapper, /FIRST_PASS_START_INDEX=12/);
+  assert.match(wrapper, /apply-13-only/);
+  for (const unit of firstTwelve) {
+    assert.match(wrapper, new RegExp(unit.file.replace(".", "\\.")));
+    assert.match(wrapper, new RegExp(unit.sha256));
+  }
+  assert.match(wrapper, /permission seed presence[\s\S]*?'60'/i);
+  assert.match(wrapper, /scope seed presence[\s\S]*?'7'/i);
 });
 
 test("SAFE_PARTIAL_UNIT09 requires exact versions 1 through 9 from the manifest", async () => {
