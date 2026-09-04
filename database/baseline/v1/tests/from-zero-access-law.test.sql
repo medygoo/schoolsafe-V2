@@ -151,6 +151,11 @@ values (
   'USD'
 );
 
+-- Le trigger require_operational_student exige l'école du contexte
+-- transactionnel : fixée localement pour ce seed (l'élève appartient à
+-- School B), puis retirée pour garder la suite du test sans contexte.
+set local schoolsafe.school_id = '10000000-0000-4000-8000-000000000002';
+
 insert into app.student_fees (
   id, school_id, student_id, fee_structure_id, amount_expected, amount_paid, amount_remaining
 )
@@ -163,6 +168,8 @@ values (
   0,
   100
 );
+
+reset schoolsafe.school_id;
 
 -- Physical tenant isolation is independent from Access_Law and RLS. These
 -- writes run with baseline setup authority and must still fail at the FK layer.
