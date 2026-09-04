@@ -336,6 +336,15 @@ scalar_query() {
   run_psql --tuples-only --no-align --command "$1" | tr -d '[:space:]'
 }
 
+# Précondition explicite : la vérification de l'unité 13 lit
+# shared_preload_libraries, réservé aux rôles privilégiés ; le contrôle
+# s'évalue au niveau de l'utilisateur de session (bootstrap). Grant
+# idempotent exécuté avant les préchecks, et couvert par la signature
+# des appartenances qu'ils vérifient.
+CURRENT_STEP='grant-pg-read-all-settings'
+CURRENT_UNIT='none'
+run_psql --command "grant pg_read_all_settings to $BOOTSTRAP_ROLE;"
+
 assert_scalar() {
   local expected="$1"
   local label="$2"
@@ -359,7 +368,7 @@ assert_exact_schoolsafe_roles() {
 
   schoolsafe_membership_signature="$(scalar_query \
     "select coalesce(pg_catalog.string_agg(member_role.rolname || '>' || granted_role.rolname, ',' order by member_role.rolname, granted_role.rolname), '') from pg_catalog.pg_auth_members membership join pg_catalog.pg_roles granted_role on granted_role.oid = membership.roleid join pg_catalog.pg_roles member_role on member_role.oid = membership.member where granted_role.rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor') or member_role.rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor')")"
-  [[ "$schoolsafe_membership_signature" == 'schoolsafe_bootstrap>schoolsafe_migrator,schoolsafe_bootstrap>schoolsafe_owner,schoolsafe_migrator>schoolsafe_owner' ]] \
+  [[ "$schoolsafe_membership_signature" == 'schoolsafe_bootstrap>pg_read_all_settings,schoolsafe_bootstrap>schoolsafe_migrator,schoolsafe_bootstrap>schoolsafe_owner,schoolsafe_migrator>schoolsafe_owner' ]] \
     || fail "unexpected SchoolSafe membership"
 }
 
