@@ -344,6 +344,7 @@ scalar_query() {
 CURRENT_STEP='grant-pg-read-all-settings'
 CURRENT_UNIT='none'
 run_psql --command "grant pg_read_all_settings to $BOOTSTRAP_ROLE;"
+run_psql --command "do \$\$ begin if exists (select 1 from pg_catalog.pg_roles where rolname = 'schoolsafe_owner') then grant pg_read_all_settings to schoolsafe_owner; end if; end \$\$;"
 
 assert_scalar() {
   local expected="$1"
@@ -368,7 +369,7 @@ assert_exact_schoolsafe_roles() {
 
   schoolsafe_membership_signature="$(scalar_query \
     "select coalesce(pg_catalog.string_agg(member_role.rolname || '>' || granted_role.rolname, ',' order by member_role.rolname, granted_role.rolname), '') from pg_catalog.pg_auth_members membership join pg_catalog.pg_roles granted_role on granted_role.oid = membership.roleid join pg_catalog.pg_roles member_role on member_role.oid = membership.member where granted_role.rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor') or member_role.rolname in ('schoolsafe_owner','schoolsafe_migrator','schoolsafe_api','schoolsafe_worker','schoolsafe_auditor')")"
-  [[ "$schoolsafe_membership_signature" == 'schoolsafe_bootstrap>schoolsafe_migrator,schoolsafe_bootstrap>schoolsafe_owner,schoolsafe_migrator>schoolsafe_owner' ]] \
+  [[ "$schoolsafe_membership_signature" == 'schoolsafe_bootstrap>schoolsafe_migrator,schoolsafe_bootstrap>schoolsafe_owner,schoolsafe_migrator>schoolsafe_owner,schoolsafe_owner>pg_read_all_settings' ]] \
     || fail "unexpected SchoolSafe membership"
 }
 
