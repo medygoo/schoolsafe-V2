@@ -1,12 +1,10 @@
 # Simple workflow for deploying static content to GitHub Pages
 name: Deploy static content to Pages
 
+# Publication volontairement découplée de main (décision projet 2026-09-04) :
+# plus aucun push ne publie — seul un déclenchement manuel autorisé publiera,
+# quand PAGES-01 sera livré et validé.
 on:
-  # Runs on pushes targeting the default branch
-  push:
-    branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages

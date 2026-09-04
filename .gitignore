@@ -33,3 +33,7 @@ repomix-output.*
 NUL
 
 .kimi-code/
+
+# External contributions and heavy 3D source archives (kept on disk, never in Git)
+schoolsafekimi/
+Meshy_*.zip
