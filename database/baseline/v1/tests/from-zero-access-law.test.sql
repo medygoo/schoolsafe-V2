@@ -151,10 +151,17 @@ values (
   'USD'
 );
 
--- Le trigger require_operational_student exige l'école du contexte
--- transactionnel : fixée localement pour ce seed (l'élève appartient à
--- School B), puis retirée pour garder la suite du test sans contexte.
-set local schoolsafe.school_id = '10000000-0000-4000-8000-000000000002';
+-- Le trigger require_operational_student lit app.students sous RLS, dont le
+-- prédicat exige un contexte COMPLET et valide (school_id + context_is_valid,
+-- cf. 11_rls_acl.sql). On établit l'identité de School B le temps de ce seed,
+-- puis on retire le contexte : la suite du test gère les siens via
+-- api.set_request_context et compte sur un contexte absent par défaut.
+select api.set_request_context(
+  '20000000-0000-4000-8000-000000000002',
+  '30000000-0000-4000-8000-000000000002',
+  '10000000-0000-4000-8000-000000000002',
+  'f0000000-0000-4000-8000-00000000000f'
+);
 
 insert into app.student_fees (
   id, school_id, student_id, fee_structure_id, amount_expected, amount_paid, amount_remaining
@@ -169,7 +176,10 @@ values (
   100
 );
 
-reset schoolsafe.school_id;
+select pg_catalog.set_config('schoolsafe.user_id', '', true);
+select pg_catalog.set_config('schoolsafe.profile_id', '', true);
+select pg_catalog.set_config('schoolsafe.school_id', '', true);
+select pg_catalog.set_config('schoolsafe.request_id', '', true);
 
 -- Physical tenant isolation is independent from Access_Law and RLS. These
 -- writes run with baseline setup authority and must still fail at the FK layer.
