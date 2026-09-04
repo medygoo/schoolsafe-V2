@@ -1,12 +1,12 @@
 \set ON_ERROR_STOP on
 
 begin;
-set local role schoolsafe_owner;
 
+-- Les paramètres réservés (shared_preload_libraries) ne sont lisibles que par
+-- l'utilisateur de session directement doté de pg_read_all_settings ; ni
+-- SET ROLE ni un grant sur le rôle cible ne suffisent (prouvé en DB-04C).
+-- Ces trois gardes s'exécutent donc avant le changement de rôle.
 do $schoolsafe$
-declare
-  v_missing text[];
-  v_count integer;
 begin
   if pg_catalog.current_setting('server_version_num')::integer <> 170011 then
     raise exception 'Verification requires PostgreSQL 17.11';
@@ -26,6 +26,16 @@ begin
   if pg_catalog.current_setting('compute_query_id') not in ('auto', 'on') then
     raise exception 'compute_query_id must be auto or on';
   end if;
+end
+$schoolsafe$;
+
+set local role schoolsafe_owner;
+
+do $schoolsafe$
+declare
+  v_missing text[];
+  v_count integer;
+begin
 
   if not exists (
     select 1
