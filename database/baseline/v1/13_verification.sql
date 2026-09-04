@@ -176,7 +176,10 @@ begin
     from pg_catalog.pg_proc p
     join pg_catalog.pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app', 'iam', 'audit', 'ops', 'api')
-      and pg_catalog.lower(pg_catalog.pg_get_functiondef(p.oid)) like ('%auth.' || 'uid(%')
+      and p.prokind = 'f'
+      and pg_catalog.lower(
+        case when p.prokind = 'f' then pg_catalog.pg_get_functiondef(p.oid) else '' end
+      ) like ('%auth.' || 'uid(%')
   ) then
     raise exception 'Forbidden Supabase identity-function dependency detected';
   end if;
