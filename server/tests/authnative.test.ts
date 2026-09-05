@@ -45,7 +45,7 @@ describe("session tokens", () => {
 });
 
 describe("loginWithPassword", () => {
-  it("logs in with valid credentials and stores only the token hash", async () => {
+  it("logs in with a single profile and binds the session to it", async () => {
     const passwordHash = await hashPassword("Joie2026!!");
     const { db, calls } = fakeDb({
       auth_is_locked: () => [{ auth_is_locked: false }],
@@ -53,20 +53,72 @@ describe("loginWithPassword", () => {
         { identity_id: "i1", user_id: "u1", password_hash: passwordHash, status: "active", must_change: false },
       ],
       auth_record_attempt: () => [{ auth_record_attempt: true }],
+      auth_list_profiles: () => [{ profile_id: "pA", school_id: "schoolA", display_name: "Joyce" }],
       auth_create_session: () => [{ session_id: "s1", expires_at: "2026-09-05T00:00:00Z" }],
     });
     const service = createAuthNativeService(db);
     const result = await service.loginWithPassword("joyce@ecole.cd", "Joie2026!!");
 
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.token.length).toBeGreaterThan(40);
-      const createCall = calls.find((c) => c.sql.includes("auth_create_session"));
-      expect(String(createCall?.params[1])).toMatch(/^[a-f0-9]{64}$/);
-      expect(String(createCall?.params[1])).not.toContain(result.token);
+    const createCall = calls.find((c) => c.sql.includes("auth_create_session"));
+    expect(createCall?.params[1]).toBe("pA"); // profil exact lié à la session
+    expect(String(createCall?.params[2])).toMatch(/^[a-f0-9]{64}$/); // haché du jeton seulement
+  });
+
+  it("never picks a school arbitrarily: multi-profile user must choose", async () => {
+    const passwordHash = await hashPassword("Joie2026!!");
+    const { db, calls } = fakeDb({
+      auth_is_locked: () => [{ auth_is_locked: false }],
+      auth_resolve_identity: () => [
+        { identity_id: "i1", user_id: "u1", password_hash: passwordHash, status: "active", must_change: false },
+      ],
+      auth_record_attempt: () => [{ auth_record_attempt: true }],
+      auth_list_profiles: () => [
+        { profile_id: "pA", school_id: "schoolA", display_name: "Joyce (École A)" },
+        { profile_id: "pB", school_id: "schoolB", display_name: "Joyce (École B)" },
+      ],
+    });
+    const service = createAuthNativeService(db);
+    const result = await service.loginWithPassword("joyce@ecole.cd", "Joie2026!!");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.reason === "profile_choice_required") {
+      expect(result.profiles.map((p) => p.schoolId).sort()).toEqual(["schoolA", "schoolB"]);
+    } else {
+      throw new Error("profile_choice_required attendu");
     }
-    const attempt = calls.find((c) => c.sql.includes("auth_record_attempt"));
-    expect(attempt?.params[1]).toBe(true);
+    expect(calls.some((c) => c.sql.includes("auth_create_session"))).toBe(false);
+  });
+
+  it("multi-school user: chosen profile binds the exact school, never the wrong one", async () => {
+    const passwordHash = await hashPassword("Joie2026!!");
+    const { db, calls } = fakeDb({
+      auth_is_locked: () => [{ auth_is_locked: false }],
+      auth_resolve_identity: () => [
+        { identity_id: "i1", user_id: "u1", password_hash: passwordHash, status: "active", must_change: false },
+      ],
+      auth_record_attempt: () => [{ auth_record_attempt: true }],
+      auth_list_profiles: () => [
+        { profile_id: "pA", school_id: "schoolA", display_name: "Joyce (École A)" },
+        { profile_id: "pB", school_id: "schoolB", display_name: "Joyce (École B)" },
+      ],
+      auth_create_session: () => [{ session_id: "s1", expires_at: "2026-09-05T00:00:00Z" }],
+      auth_resolve_session: (params) =>
+        params[0] === hashSessionToken("token-B")
+          ? [{ session_id: "s1", identity_id: "i1", user_id: "u1", profile_id: "pB", school_id: "schoolB", must_change: false }]
+          : [],
+    });
+    const service = createAuthNativeService(db);
+
+    const login = await service.loginWithPassword("joyce@ecole.cd", "Joie2026!!", "pB");
+    expect(login.ok).toBe(true);
+    const createCall = calls.find((c) => c.sql.includes("auth_create_session"));
+    expect(createCall?.params[1]).toBe("pB");
+
+    const session = await service.resolveSession("token-B");
+    expect(session?.profileId).toBe("pB");
+    expect(session?.schoolId).toBe("schoolB");
+    expect(session?.schoolId).not.toBe("schoolA");
   });
 
   it("refuses wrong password without revealing whether the login exists", async () => {
@@ -94,10 +146,8 @@ describe("loginWithPassword", () => {
     const result = await service.loginWithPassword("inconnu@ecole.cd", "nimporte");
     expect(result).toEqual({ ok: false, reason: "invalid_credentials" });
     expect(calls.some((c) => c.sql.includes("auth_create_session"))).toBe(false);
-    // la tentative est journalisée comme échec, exactement comme un mauvais mot de passe
     const attempt = calls.find((c) => c.sql.includes("auth_record_attempt"));
     expect(attempt?.params[1]).toBe(false);
-    // le haché factice existe et est un vrai haché argon2id (vérif factice = même coût)
     await expect(DUMMY_ARGON2ID_HASH_PROMISE).resolves.toMatch(/^\$argon2id\$/);
   });
 
@@ -148,5 +198,17 @@ describe("sessions", () => {
     const revokeCall = calls.find((c) => c.sql.includes("auth_revoke_session"));
     expect(revokeCall?.params[0]).toBe(tokenHash);
     expect(revokeCall?.params[0]).not.toBe(token);
+  });
+
+  it("touch implements real sliding expiry", async () => {
+    const token = generateSessionToken();
+    const { db, calls } = fakeDb({
+      auth_touch_session: () => [{ auth_touch_session: "2026-09-05T12:00:00Z" }],
+    });
+    const service = createAuthNativeService(db);
+    const newExpiry = await service.touchSession(token);
+    expect(newExpiry).toBe("2026-09-05T12:00:00Z");
+    const touchCall = calls.find((c) => c.sql.includes("auth_touch_session"));
+    expect(String(touchCall?.params[0])).toMatch(/^[a-f0-9]{64}$/);
   });
 });

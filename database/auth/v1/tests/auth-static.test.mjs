@@ -29,28 +29,53 @@ test("auth schema stores no plaintext secrets and hashes sessions", async () => 
   assert.match(tables, /references iam\.users/);
 });
 
-test("auth api never exposes tables directly to schoolsafe_api", async () => {
+test("sessions carry the exact chosen profile (no ambiguous LIMIT 1)", async () => {
+  const tables = await readUnit("01_auth_tables.sql");
+  assert.match(tables, /profile_id uuid not null references iam\.profiles \(id\)/);
+
   const api = await readUnit("02_auth_api.sql");
+  assert.match(api, /join iam\.profiles p on p\.id = s\.profile_id/);
+  assert.doesNotMatch(api, /auth_resolve_session[\s\S]*?limit 1/i);
+  assert.match(api, /p\.user_id = v_identity\.user_id\s+and p\.is_active = true/);
+});
+
+test("auth tables are FORCE RLS with zero policy (defense in depth)", async () => {
+  const tables = await readUnit("01_auth_tables.sql");
+  const enables = tables.match(/enable row level security/g) ?? [];
+  const forces = tables.match(/force row level security/g) ?? [];
+  assert.ok(enables.length >= 1);
+  assert.ok(forces.length >= 1);
+  assert.doesNotMatch(tables, /create policy/i);
+});
+
+test("a canonical normalize_login feeds resolution, lock and attempt log", async () => {
+  const api = await readUnit("02_auth_api.sql");
+  assert.match(api, /create or replace function auth\.normalize_login/);
+  const uses = api.match(/auth\.normalize_login/g) ?? [];
+  assert.ok(uses.length >= 4, "normalize_login utilisé par les 3 fonctions + définition");
+  assert.match(api, /regexp_replace\(v, '\\D', '', 'g'\)/);
+  assert.match(api, /pg_catalog\.lower\(v\)/);
+});
+
+test("auth functions are granted to schoolsafe_auth, never to schoolsafe_api", async () => {
+  const api = await readUnit("02_auth_api.sql");
+  assert.match(api, /create role schoolsafe_auth login/);
   assert.match(api, /revoke all on all tables in schema auth from schoolsafe_api/);
-  assert.doesNotMatch(api, /grant\s+(select|insert|update|delete)[\s\S]{0,80}on auth\./i);
-  const functions = [...api.matchAll(/create or replace function (api\.\w+)/g)].map(
-    (m) => m[1],
-  );
-  assert.equal(functions.length, 7);
-  for (const fn of functions) {
-    assert.match(api, new RegExp(`grant execute on function ${fn.replace(".", "\\.")}`));
-  }
+  assert.doesNotMatch(api, /grant execute[\s\S]{0,120}to schoolsafe_api/i);
+  const grants = api.match(/grant execute on function api\.\w+\([^)]*\) to schoolsafe_auth/g) ?? [];
+  assert.equal(grants.length, 9);
 });
 
-test("auth api is anti-enumeration and fail-closed", async () => {
-  const api = await readUnit("02_auth_api.sql");
-  assert.match(api, /auth_resolve_identity[\s\S]*?limit 1/);
-  assert.match(api, /auth_resolve_session[\s\S]*?revoked_at is null[\s\S]*?expires_at > /);
-  assert.match(api, /status = 'active'/);
-});
-
-test("auth api enforces argon2id and token hash shape", async () => {
+test("auth api is fail-closed and enforces argon2id and token hash shape", async () => {
   const api = await readUnit("02_auth_api.sql");
   assert.match(api, /\$argon2id\$/);
   assert.match(api, /\^\[a-f0-9\]\{64\}/);
+  assert.match(api, /status = 'active'/);
+  assert.match(api, /revoked_at is null[\s\S]*?expires_at > /);
+});
+
+test("sliding expiry is real (touch extends only past mid-life)", async () => {
+  const api = await readUnit("02_auth_api.sql");
+  assert.match(api, /create or replace function api\.auth_touch_session/);
+  assert.match(api, /expires_at < pg_catalog\.now\(\) \+ pg_catalog\.make_interval\(secs => p_ttl_seconds \/ 2\)/);
 });

@@ -1,16 +1,58 @@
 \set ON_ERROR_STOP on
 
 -- SchoolSafe Auth v1 — unité 02 : surface API d'authentification.
--- La vérification argon2id se fait dans le backend (Fastify) ; la base stocke
--- les hachés et gère sessions, tentatives et récupération. Aucune donnée ne
--- sort sans passer par ces fonctions.
+-- Rôle dédié schoolsafe_auth : la fonction ne fabrique jamais une session sans
+-- preuve, et schoolsafe_api (rôle métier générique) n'a AUCUN droit ici.
+-- AUTH = identité · ACCESS_LAW = autorisation · fail-closed partout.
 
 begin;
 set local role schoolsafe_owner;
 
--- Résolution pré-auth : trouve l'identité par e-mail OU téléphone.
--- Sortie volontairement identique qu'elle trouve ou non (anti-énumération :
--- le backend fait une vérification argon2 factice si l'identité est absente).
+-- Rôle dédié minimal (créé ici car la baseline réserve le schéma auth vide ;
+-- même discipline d'attributs que les rôles applicatifs de la baseline).
+do $schoolsafe$
+begin
+  if not exists (select 1 from pg_catalog.pg_roles where rolname = 'schoolsafe_auth') then
+    create role schoolsafe_auth login;
+  end if;
+end
+$schoolsafe$;
+
+alter role schoolsafe_auth with login nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
+alter role schoolsafe_auth set search_path = pg_catalog;
+
+-- Normalisation canonique UNIQUE du login (e-mail insensible à la casse ;
+-- téléphone au format +243… — même logique que le frontend).
+-- Utilisée par résolution, verrouillage et journalisation : impossible de
+-- contourner le verrou par une variation de casse ou de format.
+create or replace function auth.normalize_login(p_login text)
+returns text
+language plpgsql
+immutable
+security definer
+set search_path = pg_catalog
+as $schoolsafe$
+declare
+  v text := pg_catalog.btrim(coalesce(p_login, ''));
+  v_digits text;
+begin
+  if v = '' then
+    return '';
+  end if;
+
+  if pg_catalog.position('@' in v) > 0 then
+    return pg_catalog.lower(v);
+  end if;
+
+  v_digits := pg_catalog.regexp_replace(v, '\D', '', 'g');
+  if v_digits like '243%' and pg_catalog.length(v_digits) > 9 then
+    v_digits := pg_catalog.substring(v_digits from 4);
+  end if;
+  return '+243' || v_digits;
+end
+$schoolsafe$;
+
+-- Résolution pré-auth : trouve l'identité par e-mail OU téléphone normalisé.
 create or replace function api.auth_resolve_identity(p_login text)
 returns table (
   identity_id uuid,
@@ -24,8 +66,10 @@ stable
 security definer
 set search_path = pg_catalog
 as $schoolsafe$
+declare
+  v_login text := auth.normalize_login(p_login);
 begin
-  if p_login is null or pg_catalog.btrim(p_login) = '' then
+  if v_login = '' then
     return;
   end if;
 
@@ -33,14 +77,34 @@ begin
   select i.id, i.user_id, c.password_hash, i.status, coalesce(c.must_change, false)
   from auth.identities i
   left join auth.credentials c on c.identity_id = i.id
-  where i.email = p_login or i.phone = p_login
+  where i.email::text = v_login or i.phone = v_login
   limit 1;
 end
 $schoolsafe$;
 
--- Création de session après vérification du mot de passe par le backend.
+-- Profils actifs de l'identité (choix d'école à la connexion).
+create or replace function api.auth_list_profiles(p_identity_id uuid)
+returns table (profile_id uuid, school_id uuid, display_name text)
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog
+as $schoolsafe$
+begin
+  return query
+  select p.id, p.school_id, p.display_name
+  from auth.identities i
+  join iam.profiles p on p.user_id = i.user_id and p.is_active = true
+  where i.id = p_identity_id
+  order by p.created_at;
+end
+$schoolsafe$;
+
+-- Création de session : EXIGE le profil exact, validé comme appartenant à
+-- l'utilisateur de l'identité, actif, et identité active. Fail-closed.
 create or replace function api.auth_create_session(
   p_identity_id uuid,
+  p_profile_id uuid,
   p_token_hash text,
   p_ttl_seconds integer default 43200,
   p_ip inet default null,
@@ -70,10 +134,22 @@ begin
     raise insufficient_privilege using message = 'Identity is disabled';
   end if;
 
+  -- Le profil doit appartenir à l'utilisateur de l'identité et être actif.
+  if not exists (
+    select 1
+    from iam.profiles p
+    where p.id = p_profile_id
+      and p.user_id = v_identity.user_id
+      and p.is_active = true
+  ) then
+    raise insufficient_privilege using message = 'Profile does not belong to identity or is inactive';
+  end if;
+
   return query
-  insert into auth.sessions (identity_id, token_hash, expires_at, ip, user_agent)
+  insert into auth.sessions (identity_id, profile_id, token_hash, expires_at, ip, user_agent)
   values (
     p_identity_id,
+    p_profile_id,
     p_token_hash,
     pg_catalog.now() + pg_catalog.make_interval(secs => p_ttl_seconds),
     p_ip,
@@ -83,7 +159,7 @@ begin
 end
 $schoolsafe$;
 
--- Résolution de session à chaque requête : identité complète si valide.
+-- Résolution déterministe : la session connaît SON profil, donc SON école.
 create or replace function api.auth_resolve_session(p_token_hash text)
 returns table (
   session_id uuid,
@@ -107,17 +183,48 @@ begin
   select s.id, i.id, i.user_id, p.id, p.school_id, coalesce(c.must_change, false)
   from auth.sessions s
   join auth.identities i on i.id = s.identity_id
-  join iam.profiles p on p.user_id = i.user_id and p.is_active = true
+  join iam.profiles p on p.id = s.profile_id and p.is_active = true
   left join auth.credentials c on c.identity_id = i.id
   where s.token_hash = p_token_hash
     and s.revoked_at is null
     and s.expires_at > pg_catalog.now()
-    and i.status = 'active'
-  limit 1;
+    and i.status = 'active';
 end
 $schoolsafe$;
 
--- Révocation (déconnexion ou action admin).
+-- Expiration glissante RÉELLE : passée la mi-vie, la session est prolongée.
+create or replace function api.auth_touch_session(
+  p_token_hash text,
+  p_ttl_seconds integer default 43200
+)
+returns timestamptz
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog
+as $schoolsafe$
+declare
+  v_new_expiry timestamptz;
+begin
+  if p_token_hash is null or p_token_hash !~ '^[a-f0-9]{64}$' then
+    return null;
+  end if;
+  if p_ttl_seconds is null or p_ttl_seconds < 300 or p_ttl_seconds > 604800 then
+    return null;
+  end if;
+
+  update auth.sessions s
+  set expires_at = pg_catalog.now() + pg_catalog.make_interval(secs => p_ttl_seconds)
+  where s.token_hash = p_token_hash
+    and s.revoked_at is null
+    and s.expires_at > pg_catalog.now()
+    and s.expires_at < pg_catalog.now() + pg_catalog.make_interval(secs => p_ttl_seconds / 2)
+  returning s.expires_at into v_new_expiry;
+
+  return v_new_expiry;
+end
+$schoolsafe$;
+
 create or replace function api.auth_revoke_session(p_token_hash text)
 returns boolean
 language plpgsql
@@ -140,7 +247,6 @@ begin
 end
 $schoolsafe$;
 
--- Journalisation des tentatives (verrouillage : 5 échecs / 15 min).
 create or replace function api.auth_record_attempt(p_login text, p_succeeded boolean)
 returns boolean
 language plpgsql
@@ -149,17 +255,18 @@ security definer
 set search_path = pg_catalog
 as $schoolsafe$
 declare
+  v_login text := auth.normalize_login(p_login);
   v_failures integer;
 begin
-  if p_login is null or pg_catalog.btrim(p_login) = '' then
+  if v_login = '' then
     return false;
   end if;
 
-  insert into auth.login_attempts (login, succeeded) values (p_login, p_succeeded);
+  insert into auth.login_attempts (login, succeeded) values (v_login, p_succeeded);
 
   select pg_catalog.count(*) into v_failures
   from auth.login_attempts a
-  where a.login = p_login
+  where a.login = v_login
     and a.succeeded = false
     and a.attempted_at > pg_catalog.now() - pg_catalog.make_interval(mins => 15);
 
@@ -167,7 +274,6 @@ begin
 end
 $schoolsafe$;
 
--- Verrou actuel ? (lecture seule, appelée avant toute tentative)
 create or replace function api.auth_is_locked(p_login text)
 returns boolean
 language sql
@@ -177,12 +283,11 @@ set search_path = pg_catalog
 as $schoolsafe$
   select pg_catalog.count(*) >= 5
   from auth.login_attempts a
-  where a.login = p_login
+  where a.login = auth.normalize_login(p_login)
     and a.succeeded = false
     and a.attempted_at > pg_catalog.now() - pg_catalog.make_interval(mins => 15)
 $schoolsafe$;
 
--- Changement de mot de passe (le haché est produit par le backend).
 create or replace function api.auth_set_password(
   p_identity_id uuid,
   p_password_hash text,
@@ -212,14 +317,17 @@ begin
 end
 $schoolsafe$;
 
--- ACL : le rôle API n'a accès qu'à ces fonctions (jamais aux tables auth).
+-- ACL : le rôle métier générique n'a RIEN ici ; seul le rôle auth dédié passe.
 revoke all on all tables in schema auth from schoolsafe_api;
-grant execute on function api.auth_resolve_identity(text) to schoolsafe_api;
-grant execute on function api.auth_create_session(uuid, text, integer, inet, text) to schoolsafe_api;
-grant execute on function api.auth_resolve_session(text) to schoolsafe_api;
-grant execute on function api.auth_revoke_session(text) to schoolsafe_api;
-grant execute on function api.auth_record_attempt(text, boolean) to schoolsafe_api;
-grant execute on function api.auth_is_locked(text) to schoolsafe_api;
-grant execute on function api.auth_set_password(uuid, text, boolean) to schoolsafe_api;
+revoke all on all tables in schema auth from schoolsafe_auth;
+grant execute on function api.auth_resolve_identity(text) to schoolsafe_auth;
+grant execute on function api.auth_list_profiles(uuid) to schoolsafe_auth;
+grant execute on function api.auth_create_session(uuid, uuid, text, integer, inet, text) to schoolsafe_auth;
+grant execute on function api.auth_resolve_session(text) to schoolsafe_auth;
+grant execute on function api.auth_touch_session(text, integer) to schoolsafe_auth;
+grant execute on function api.auth_revoke_session(text) to schoolsafe_auth;
+grant execute on function api.auth_record_attempt(text, boolean) to schoolsafe_auth;
+grant execute on function api.auth_is_locked(text) to schoolsafe_auth;
+grant execute on function api.auth_set_password(uuid, text, boolean) to schoolsafe_auth;
 
 commit;

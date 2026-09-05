@@ -1,6 +1,8 @@
 // SchoolSafe Auth v1 — service d'authentification.
 // La base de données est injectée via une interface minimale (testable sans serveur),
 // en attendant le pool pg réel du lot DB-LAYER (3.1).
+// Règles : la session porte le profil EXACT choisi (jamais de LIMIT 1 ambigu),
+// le login est normalisé par la base, l'expiration est glissante réelle.
 import { verifyPassword, DUMMY_ARGON2ID_HASH_PROMISE } from "./passwords.js";
 import { generateSessionToken, hashSessionToken } from "./tokens.js";
 
@@ -18,9 +20,16 @@ export interface AuthSessionInfo {
   expiresAt: string;
 }
 
+export interface ProfileChoice {
+  profileId: string;
+  schoolId: string;
+  displayName: string;
+}
+
 export type LoginResult =
   | { ok: true; token: string; session: AuthSessionInfo }
-  | { ok: false; reason: "invalid_credentials" | "locked" | "disabled" };
+  | { ok: false; reason: "invalid_credentials" | "locked" | "disabled" }
+  | { ok: false; reason: "profile_choice_required"; profiles: ProfileChoice[] };
 
 type IdentityRow = {
   identity_id: string;
@@ -39,13 +48,16 @@ type SessionRow = {
   must_change: boolean;
 };
 
-const SESSION_TTL_SECONDS = 43200; // 12 h glissantes
+type ProfileRow = { profile_id: string; school_id: string; display_name: string };
+
+const SESSION_TTL_SECONDS = 43200; // 12 h, glissantes (touch à mi-vie)
 
 export function createAuthNativeService(db: AuthDatabase) {
   return {
     async loginWithPassword(
       login: string,
       password: string,
+      profileId?: string,
       ip?: string,
       userAgent?: string,
     ): Promise<LoginResult> {
@@ -82,10 +94,41 @@ export function createAuthNativeService(db: AuthDatabase) {
         return { ok: false, reason: "disabled" };
       }
 
+      // Choix du profil : jamais de sélection arbitraire.
+      const profiles = await db.query<ProfileRow>(
+        "select * from api.auth_list_profiles($1)",
+        [identity.identity_id],
+      );
+      let chosenProfileId = profileId ?? "";
+      if (!chosenProfileId) {
+        if (profiles.rows.length === 0) {
+          return { ok: false, reason: "invalid_credentials" };
+        }
+        if (profiles.rows.length > 1) {
+          return {
+            ok: false,
+            reason: "profile_choice_required",
+            profiles: profiles.rows.map((row) => ({
+              profileId: row.profile_id,
+              schoolId: row.school_id,
+              displayName: row.display_name,
+            })),
+          };
+        }
+        chosenProfileId = profiles.rows[0].profile_id;
+      }
+
       const token = generateSessionToken();
       const created = await db.query<{ session_id: string; expires_at: string }>(
-        "select * from api.auth_create_session($1, $2, $3, $4, $5)",
-        [identity.identity_id, hashSessionToken(token), SESSION_TTL_SECONDS, ip ?? null, userAgent ?? null],
+        "select * from api.auth_create_session($1, $2, $3, $4, $5, $6)",
+        [
+          identity.identity_id,
+          chosenProfileId,
+          hashSessionToken(token),
+          SESSION_TTL_SECONDS,
+          ip ?? null,
+          userAgent ?? null,
+        ],
       );
       const row = created.rows[0];
 
@@ -96,7 +139,7 @@ export function createAuthNativeService(db: AuthDatabase) {
           sessionId: row.session_id,
           identityId: identity.identity_id,
           userId: identity.user_id,
-          profileId: "",
+          profileId: chosenProfileId,
           schoolId: "",
           mustChange: identity.must_change,
           expiresAt: row.expires_at,
@@ -105,7 +148,7 @@ export function createAuthNativeService(db: AuthDatabase) {
     },
 
     async resolveSession(token: string): Promise<AuthSessionInfo | null> {
-      const resolved = await db.query<SessionRow & { expires_at?: never }>(
+      const resolved = await db.query<SessionRow>(
         "select * from api.auth_resolve_session($1)",
         [hashSessionToken(token)],
       );
@@ -120,6 +163,14 @@ export function createAuthNativeService(db: AuthDatabase) {
         mustChange: row.must_change,
         expiresAt: "",
       };
+    },
+
+    async touchSession(token: string): Promise<string | null> {
+      const result = await db.query<{ auth_touch_session: string | null }>(
+        "select * from api.auth_touch_session($1, $2)",
+        [hashSessionToken(token), SESSION_TTL_SECONDS],
+      );
+      return result.rows[0]?.auth_touch_session ?? null;
     },
 
     async logout(token: string): Promise<boolean> {

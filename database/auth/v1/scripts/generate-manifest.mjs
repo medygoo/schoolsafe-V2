@@ -22,7 +22,7 @@ for (const [index, file] of units.entries()) {
 const manifest = {
   auth_version: "schoolsafe-auth-v1",
   requires_baseline: "schoolsafe-vps-v1",
-  target: "per-school database; TEST first; no Cloud import",
+  target: "one SchoolSafe database per environment (TEST/PROD); schools share it with mandatory school_id isolation",
   units: manifestUnits,
 };
 
