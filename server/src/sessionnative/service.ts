@@ -10,7 +10,7 @@ export type SessionBootstrap = {
   school: { id: string; code: string; name: string };
   roles: string[];
   permissions: string[];
-  scopes: { scope: string; target: string | null }[];
+  scopes: { permission: string; type: string; target: string | null }[];
   childIds: string[];
   assignedClassIds: string[];
   assignedSubjectIds: string[];

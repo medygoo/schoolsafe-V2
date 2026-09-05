@@ -145,9 +145,9 @@ export function createBootstrapService(
       ) ?? []) as Array<{ scope_type: string; scope_id: string | null; label: string | null }>;
 
       const school = assertQuery(
-        await client.from("school").select("id,name").eq("id", profile.school_id).maybeSingle(),
+        await client.from("school").select("id,name,logo_path").eq("id", profile.school_id).maybeSingle(),
         "school",
-      ) as { id: string; name: string } | null;
+      ) as { id: string; name: string; logo_path?: string | null } | null;
       if (!school) return null;
 
       const settings = assertQuery(
@@ -164,8 +164,12 @@ export function createBootstrapService(
         profile: { id: profile.id, display_name: profile.display_name },
         roles: roles.map((row) => row.code).sort(),
         permissions: [...effectivePermissionCodes].sort(),
-        scopes: scopes.map((row) => ({ type: row.scope_type, id: row.scope_id, label: row.label })),
-        school: { id: school.id, name: school.name },
+        // Contrat canonique transitoire {permission, type, target} : la table
+        // legacy scope_assignments n'a pas de lien permission — permission: null
+        // est explicite et le frontend les écarte (fail-closed, rien n'apparaît
+        // à tort). INC-1/INC-2 : harmonisation transitoire documentée.
+        scopes: scopes.map((row) => ({ permission: null, type: row.scope_type, target: row.scope_id, label: row.label })),
+        school: { id: school.id, name: school.name, logo_path: school.logo_path ?? null },
         academic_year: null,
         features: [],
         offline_policy: { max_offline_hours: settings?.max_offline_hours ?? 24 },

@@ -12,7 +12,10 @@ const BOOTSTRAP = {
   school: { id: "33333333-0000-4000-8000-000000000001", code: "TEST-1", name: "École Test" },
   roles: ["admin"],
   permissions: ["school.student.read", "roles.manage"],
-  scopes: [{ scope: "school", target: null }],
+  scopes: [
+    { permission: "school.student.read", type: "school", target: null },
+    { permission: "roles.manage", type: "school", target: null },
+  ],
   childIds: [],
   assignedClassIds: [],
   assignedSubjectIds: [],

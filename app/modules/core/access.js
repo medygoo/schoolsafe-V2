@@ -143,6 +143,27 @@
     return null;
   }
 
+  // Normaliseur unique (INC-1/INC-2) : tout ce que le frontend consomme passe
+  // ici. Format canonique : { permission, type, target }.
+  // - canonique/natif : { permission, type|scope, target } → conservé
+  // - legacy transitoire : { permission: null, type, target } → écarté
+  //   (une portée sans permission est interdite : fail-closed, rien n'apparaît
+  //   à tort)
+  function normalizeScopes(rawScopes) {
+    if (!Array.isArray(rawScopes)) return [];
+    var out = [];
+    for (var i = 0; i < rawScopes.length; i += 1) {
+      var s = rawScopes[i];
+      if (!s || typeof s !== "object") continue;
+      var permission = s.permission || null;
+      var type = s.type || s.scope || null;
+      var target = s.target !== undefined ? s.target : (s.id !== undefined ? s.id : null);
+      if (!permission || !type) continue;
+      out.push({ permission: permission, type: type, target: target });
+    }
+    return out;
+  }
+
   function scopeFor(user, permissionCode) {
     if (explicitDeny(user, permissionCode)) return null;
     var exception = permissionExceptions(user).find(function (item) {
@@ -150,7 +171,7 @@
     });
     var exceptionScope = exception && normalizeScope(permissionCode, exception.scope || exception.scopeType || exception.scope_type);
     if (exceptionScope) return exceptionScope;
-    var scopes = Array.isArray(user && user.scopes) ? user.scopes : [];
+    var scopes = normalizeScopes(user && user.scopes);
     return scopes.find(function (scope) { return scope && scope.permission === permissionCode; }) || null;
   }
 
@@ -248,6 +269,7 @@
     explicitDeny: explicitDeny,
     canAccess: canAccess,
     scopeFor: scopeFor,
+    normalizeScopes: normalizeScopes,
     allowsScope: allowsScope,
     canAccessAny: canAccessAny,
     isBranchVisible: isBranchVisible,

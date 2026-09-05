@@ -110,11 +110,13 @@ begin
         and (ex.expires_at is null or ex.expires_at >= pg_catalog.now())
     ), '[]'::jsonb),
 
-    -- Portées liées aux grants actifs.
+    -- Portées liées aux grants actifs — CONTRAT CANONIQUE {permission, type, target}.
+    -- Une portée sans permission est interdite : chaque ligne joint son code.
     'scopes', coalesce((
-      select jsonb_agg(jsonb_build_object('scope', gs.scope_code, 'target', gs.target_id))
+      select jsonb_agg(jsonb_build_object('permission', p.code, 'type', gs.scope_code, 'target', gs.target_id))
       from iam.grant_scopes gs
       join iam.role_permission_grants g on g.id = gs.grant_id and g.school_id = gs.school_id
+      join iam.permissions p on p.id = g.permission_id
       join iam.profile_roles pr on pr.role_id = g.role_id and pr.school_id = g.school_id
       where pr.school_id = v_school_id
         and pr.profile_id = v_profile_id
@@ -122,9 +124,33 @@ begin
         and g.effect = 'allow'
         and g.is_active = true
         and gs.is_active = true
+        -- DENY prioritaire : une permission niée (rôle ou exception) ne laisse
+        -- AUCUNE portée visible dans le paquet de session.
+        and not exists (
+          select 1
+          from iam.role_permission_grants dg
+          join iam.permissions dp on dp.id = dg.permission_id
+          join iam.profile_roles dpr
+            on dpr.role_id = dg.role_id and dpr.school_id = dg.school_id
+          where dpr.school_id = v_school_id
+            and dpr.profile_id = v_profile_id
+            and dpr.is_active = true
+            and dg.effect = 'deny'
+            and dg.is_active = true
+            and dp.code = p.code
+        )
+        and not exists (
+          select 1
+          from iam.profile_permission_exceptions ex
+          join iam.permissions xp on xp.id = ex.permission_id
+          where ex.school_id = v_school_id
+            and ex.profile_id = v_profile_id
+            and ex.is_active = true
+            and ex.effect = 'deny'
+            and (ex.expires_at is null or ex.expires_at >= pg_catalog.now())
+            and xp.code = p.code
+        )
     ), '[]'::jsonb),
-
-    -- Liens parentaux actifs.
     'childIds', coalesce((
       select jsonb_agg(sg.student_id)
       from app.student_guardians sg
