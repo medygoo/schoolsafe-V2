@@ -21,6 +21,8 @@ import { createSupabaseAccessService } from "./access/service.js";
 import { createStudentsNativeService } from "./studentsnative/service.js";
 import { createTrialNativeService } from "./trialnative/service.js";
 import { createSessionNativeService } from "./sessionnative/service.js";
+import { createLicenseNativeService } from "./licensenative/service.js";
+import { createControlLicenseClient } from "./licensenative/control-client.js";
 import { createSupabaseAuditService } from "./audit/service.js";
 import { createClient } from "@supabase/supabase-js";
 import fastifyStatic from "@fastify/static";
@@ -229,6 +231,16 @@ const app = buildApp({
     ? {
         authService: authNativeService,
         service: createSessionNativeService(verifiedPools.businessPool),
+      }
+    : undefined,
+  licenseNative: verifiedPools && authNativeService && env.CONTROL_LICENSE_PUBLIC_KEY
+    ? {
+        authService: authNativeService,
+        service: createLicenseNativeService(
+          verifiedPools.businessPool,
+          controlAppConfig ? createControlLicenseClient(controlAppConfig) : undefined,
+          env.CONTROL_LICENSE_PUBLIC_KEY,
+        ),
       }
     : undefined,
   bootstrap: {
