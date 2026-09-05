@@ -1,5 +1,5 @@
 var CACHE_PREFIX = "schoolsafe-v2-";
-var CACHE_NAME = CACHE_PREFIX + "frontend-kimi-assets-1";
+var CACHE_NAME = CACHE_PREFIX + "jaspe-presence-3";
 var CORE_PATHS = [
   "./",
   "./index.html",
@@ -96,6 +96,9 @@ self.addEventListener("fetch", function (event) {
   var request = event.request;
   var url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  // Jamais de cache sur l'API : auth, session, licence, essai, métier natif.
+  // Même origine en production : ces réponses sont personnelles et vivantes.
+  if (url.pathname.indexOf("/auth/") === 0 || url.pathname.indexOf("/native/") === 0 || url.pathname.indexOf("/api/") === 0) return;
   event.respondWith(request.mode === "navigate" ? networkFirst(request) : cacheFirst(request));
 });
 

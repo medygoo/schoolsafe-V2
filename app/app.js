@@ -3858,6 +3858,14 @@
           }
         }
       } catch (e) {
+        // Hors-ligne avec une session native déjà établie : restaurer le paquet
+        // local (déjà filtré par les permissions au moment du login) en mode
+        // lecture — le serveur revalidera au retour du réseau.
+        if (saved && saved.native && saved.profile) {
+          applyBootstrap(saved);
+          notify("Mode hors-ligne : données en lecture seule.");
+          return;
+        }
         // Pas de session native : le flux legacy décide ensuite.
       }
     }
