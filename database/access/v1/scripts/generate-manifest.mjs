@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const accessDir = path.resolve(scriptsDir, "..");
 
-const units = ["01_role_templates.sql"];
+const units = ["01_role_templates.sql", "02_provision_bridge.sql"];
 
 const manifestUnits = [];
 for (const [index, file] of units.entries()) {

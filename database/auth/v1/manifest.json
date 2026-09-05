@@ -13,7 +13,7 @@
       "order": 2,
       "name": "auth_api",
       "file": "02_auth_api.sql",
-      "sha256": "2a04150645d2dca59c5cc5cb64b8417569dbc725032901583baa3b174a4339f1"
+      "sha256": "f5c81bdd0ed40373872923de30a5648f655a9619608bfedef5211857a8d87e03"
     }
   ]
 }

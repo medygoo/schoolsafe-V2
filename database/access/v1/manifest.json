@@ -7,7 +7,13 @@
       "order": 1,
       "name": "role_templates",
       "file": "01_role_templates.sql",
-      "sha256": "8b33ea9962f3f987a58199c365a70914e28144b521d72f5a69e9a9c873ad44ba"
+      "sha256": "a90e3296fd296bc172f852f9c92a9e2e94617dfd357b52a4816e3b9bfa43c178"
+    },
+    {
+      "order": 2,
+      "name": "provision_bridge",
+      "file": "02_provision_bridge.sql",
+      "sha256": "2ec25982910743fffa9213957839c90a19b405723ead1b85a2361338b11898e9"
     }
   ]
 }

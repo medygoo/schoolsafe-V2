@@ -21,6 +21,17 @@ $schoolsafe$;
 alter role schoolsafe_auth with login nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
 alter role schoolsafe_auth set search_path = pg_catalog;
 
+-- CONNECT sur la base courante (nom dynamique : TEST et PROD diffèrent) —
+-- accordé par l'utilisateur de session, jamais par le rôle owner.
+do $schoolsafe$
+begin
+  execute pg_catalog.format(
+    'grant connect on database %I to schoolsafe_auth',
+    pg_catalog.current_database()
+  );
+end
+$schoolsafe$;
+
 set local role schoolsafe_owner;
 
 -- Normalisation canonique UNIQUE du login (e-mail insensible à la casse ;
@@ -322,6 +333,9 @@ $schoolsafe$;
 -- ACL : le rôle métier générique n'a RIEN ici ; seul le rôle auth dédié passe.
 revoke all on all tables in schema auth from schoolsafe_api;
 revoke all on all tables in schema auth from schoolsafe_auth;
+-- USAGE sur le schéma api est indispensable pour appeler les fonctions auth ;
+-- il n'ouvre AUCUNE table (les tables restent refusées ci-dessus).
+grant usage on schema api to schoolsafe_auth;
 grant execute on function api.auth_resolve_identity(text) to schoolsafe_auth;
 grant execute on function api.auth_list_profiles(uuid) to schoolsafe_auth;
 grant execute on function api.auth_create_session(uuid, uuid, text, integer, inet, text) to schoolsafe_auth;
