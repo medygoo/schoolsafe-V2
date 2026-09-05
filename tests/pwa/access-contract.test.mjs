@@ -95,3 +95,47 @@ test("legacy transitoire : portée sans permission = allowsScope faux (fail-clos
   assert.equal(access.canAccess(user, "pilotage.alerts.read"), true);
   assert.equal(access.allowsScope(user, "pilotage.alerts.read", "assigned_classes"), false);
 });
+
+test("INC-6 : exception ALLOW avec portée canonique → scopeFor la lit", () => {
+  const user = {
+    permissions: ["security.events.read"],
+    permissionExceptions: [
+      {
+        permission: "security.events.read",
+        effect: "allow",
+        reason: "Ouverture exceptionnelle",
+        expires_at: null,
+        scopes: [{ permission: "security.events.read", type: "school", target: null }],
+      },
+    ],
+    scopes: [],
+  };
+  const scope = access.scopeFor(user, "security.events.read");
+  assert.ok(scope);
+  assert.equal(scope.type, "school");
+  assert.equal(scope.permission, "security.events.read");
+});
+
+test("INC-6 : exception ALLOW SANS portée ne crée pas de portée inventée", () => {
+  const user = {
+    permissions: ["security.events.read"],
+    permissionExceptions: [
+      { permission: "security.events.read", effect: "allow", reason: "Sans portée", expires_at: null, scopes: [] },
+    ],
+    scopes: [],
+  };
+  assert.equal(access.scopeFor(user, "security.events.read"), null);
+});
+
+test("INC-6 : DENY d'exception prime même avec portée ALLOW présente", () => {
+  const user = {
+    permissions: ["security.events.read"],
+    deniedPermissions: ["security.events.read"],
+    permissionExceptions: [
+      { permission: "security.events.read", effect: "deny", reason: "Blocage", expires_at: null, scopes: [] },
+    ],
+    scopes: [{ permission: "security.events.read", type: "school", target: null }],
+  };
+  assert.equal(access.canAccess(user, "security.events.read"), false);
+  assert.equal(access.scopeFor(user, "security.events.read"), null);
+});

@@ -13,7 +13,7 @@
       "order": 2,
       "name": "session_bootstrap",
       "file": "02_session_bootstrap.sql",
-      "sha256": "245bb470e383ef53d111d05fd2baf7c1517c9cf9f7eb1edc7fe196e68a3be071"
+      "sha256": "d59d9684276b662273f443d36831ababf547437ec89ca853ca64ba88427b94c7"
     }
   ]
 }

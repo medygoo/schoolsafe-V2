@@ -16,6 +16,13 @@ export type SessionBootstrap = {
   assignedSubjectIds: string[];
   assignedPortalIds: string[];
   deniedPermissions: string[];
+  permissionExceptions: {
+    permission: string;
+    effect: "allow" | "deny";
+    reason: string;
+    expires_at: string | null;
+    scopes: { permission: string; type: string; target: string | null }[];
+  }[];
   offline_policy: { max_offline_hours: number };
 };
 

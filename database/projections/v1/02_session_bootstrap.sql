@@ -94,13 +94,23 @@ begin
       ) a
     ), '[]'::jsonb),
 
-    -- Exceptions individuelles actives (visibles pour l'interface).
+    -- Exceptions individuelles actives, AVEC leurs portées canoniques
+    -- (INC-6 : une exception ALLOW sans portée remontée est inutilisable).
     'permissionExceptions', coalesce((
       select jsonb_agg(jsonb_build_object(
         'permission', xp.code,
         'effect', ex.effect,
         'reason', ex.reason,
-        'expires_at', ex.expires_at
+        'expires_at', ex.expires_at,
+        'scopes', coalesce((
+          select jsonb_agg(jsonb_build_object('permission', xp.code, 'type', es.scope_code, 'target', es.target_id))
+          from iam.exception_scopes es
+          where es.school_id = v_school_id
+            and es.exception_id = ex.id
+            and es.is_active = true
+            and es.starts_at <= pg_catalog.now()
+            and (es.ends_at is null or es.ends_at >= pg_catalog.now())
+        ), '[]'::jsonb)
       ))
       from iam.profile_permission_exceptions ex
       join iam.permissions xp on xp.id = ex.permission_id

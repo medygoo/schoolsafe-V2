@@ -57,6 +57,9 @@ test("session_bootstrap: contexte valide exigé, DENY prioritaires, API seule", 
   assert.match(sql, /'assignedPortalIds'/);
   // Contrat canonique des portées : {permission, type, target} — jamais sans permission
   assert.match(sql, /jsonb_build_object\('permission', p\.code, 'type', gs\.scope_code, 'target', gs\.target_id\)/);
+  // INC-6 : les exceptions portent leurs portées canoniques (iam.exception_scopes)
+  assert.match(sql, /from iam\.exception_scopes es/);
+  assert.match(sql, /'scopes', coalesce/);
   assert.match(sql, /grant execute on function api\.session_bootstrap\(\) to schoolsafe_api/);
   assert.doesNotMatch(sql, /to public/i);
   assert.doesNotMatch(sql, /to schoolsafe_auth/i);

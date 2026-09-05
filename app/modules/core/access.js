@@ -169,8 +169,14 @@
     var exception = permissionExceptions(user).find(function (item) {
       return item && item.permission === permissionCode && String(item.effect || "").toLowerCase() === "allow";
     });
-    var exceptionScope = exception && normalizeScope(permissionCode, exception.scope || exception.scopeType || exception.scope_type);
-    if (exceptionScope) return exceptionScope;
+    if (exception) {
+      // Contrat canonique (INC-6) : les portées de l'exception remontent de la base.
+      var canonical = normalizeScopes(exception.scopes);
+      if (canonical.length) return canonical[0];
+      // Transitoire legacy : portée simple sur l'exception.
+      var exceptionScope = normalizeScope(permissionCode, exception.scope || exception.scopeType || exception.scope_type);
+      if (exceptionScope) return exceptionScope;
+    }
     var scopes = normalizeScopes(user && user.scopes);
     return scopes.find(function (scope) { return scope && scope.permission === permissionCode; }) || null;
   }
