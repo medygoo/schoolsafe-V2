@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const projDir = path.resolve(scriptsDir, "..");
 
-const units = ["01_student_read.sql"];
+const units = ["01_student_read.sql", "02_session_bootstrap.sql"];
 
 const manifestUnits = [];
 for (const [index, file] of units.entries()) {

@@ -26,6 +26,7 @@ import { registerStudentRoutes, type StudentRouteDependencies } from "./students
 import { registerAuthNativeRoutes, type AuthNativeRouteDependencies } from "./authnative/routes.js";
 import { registerStudentsNativeRoutes, type StudentsNativeRouteDependencies } from "./studentsnative/routes.js";
 import { registerTrialNativeRoutes, type TrialNativeRouteDependencies } from "./trialnative/routes.js";
+import { registerSessionNativeRoutes, type SessionNativeRouteDependencies } from "./sessionnative/routes.js";
 
 export type BuildAppOptions = {
   testRoutes?: boolean;
@@ -50,6 +51,7 @@ export type BuildAppOptions = {
   authNative?: AuthNativeRouteDependencies;
   studentsNative?: StudentsNativeRouteDependencies;
   trialNative?: TrialNativeRouteDependencies;
+  sessionNative?: SessionNativeRouteDependencies;
 };
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -113,6 +115,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.trialNative) {
     registerTrialNativeRoutes(app, options.trialNative);
+  }
+
+  if (options.sessionNative) {
+    registerSessionNativeRoutes(app, options.sessionNative);
   }
 
   if (options.setup) {

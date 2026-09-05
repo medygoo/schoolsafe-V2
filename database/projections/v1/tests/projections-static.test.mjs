@@ -46,3 +46,16 @@ test("execute is granted to schoolsafe_api only, never public", async () => {
   assert.doesNotMatch(sql, /to public/i);
   assert.doesNotMatch(sql, /to schoolsafe_auth/i);
 });
+
+test("session_bootstrap: contexte valide exigé, DENY prioritaires, API seule", async () => {
+  const sql = await readUnit("02_session_bootstrap.sql");
+  assert.match(sql, /\\set ON_ERROR_STOP on/);
+  assert.match(sql, /iam\.context_is_valid\(\)/);
+  assert.match(sql, /g\.effect = 'allow'/);
+  assert.match(sql, /dg\.effect = 'deny'/);
+  assert.match(sql, /'childIds'/);
+  assert.match(sql, /'assignedPortalIds'/);
+  assert.match(sql, /grant execute on function api\.session_bootstrap\(\) to schoolsafe_api/);
+  assert.doesNotMatch(sql, /to public/i);
+  assert.doesNotMatch(sql, /to schoolsafe_auth/i);
+});

@@ -70,6 +70,7 @@
   <script src="./vendor/supabase-sdk.js" defer></script>
   <script src="./i18n.js" defer></script>
   <script src="./offline-sync.js" defer></script>
+  <script src="./modules/authnative/auth-native.js" defer></script>
   <script src="./sw-register.js" defer></script>
   <script type="module" src="./modules/cards/cards-module.js"></script>
   <script src="./modules/finance/finance-api.js" defer></script>
@@ -125,37 +126,40 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 -->
   <main id="app">
     <section class="screen splash active" id="splash" aria-label="Accueil SchoolSafe">
-      <div id="particles" aria-hidden="true"></div>
-      <div class="splash-lines" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
       <div class="splash-center">
         <img class="brand-shield splash-shield" src="./schoolsafe-logo.png" alt="Logo SchoolSafe">
         <div class="wordmark" aria-label="SchoolSafe"><span>School</span><strong>Safe</strong></div>
-        <div class="splash-rainbow" aria-hidden="true"></div>
+        <h1 class="splash-slogan" tabindex="-1">Chaque enfant protégé.<br>Chaque parent informé.</h1>
+        <p class="splash-description">Présences, suivi scolaire et échanges avec les familles : votre école réunie dans un même espace.</p>
+        <button class="ss-button splash-tap" id="enterSplash" type="button">Commencer <i data-lucide="arrow-right"></i></button>
         <div class="splash-country">République démocratique du Congo</div>
-        <p class="splash-description">Gestion scolaire intelligente — Présence par QR code, sécurité des enfants, suivi des résultats et communication parents-école en temps réel</p>
-        <p class="splash-slogan">Chaque enfant protégé, chaque parent informé</p>
       </div>
-      <button class="splash-tap" id="enterSplash" type="button" onclick="window.schoolSafeShow && window.schoolSafeShow('guardian')">Appuyez pour continuer</button>
     </section>
 
     <section class="screen guardian" id="guardian" aria-label="Introduction SchoolSafe">
+      <div class="guardian-shell">
+      <header class="guardian-header">
+        <div class="overlay-brand">
+          <img src="./schoolsafe-logo.png" alt="">
+          <span>School<strong>Safe</strong></span>
+        </div>
+        <button class="ss-button ss-button--secondary" id="backGuardian" type="button"><i data-lucide="arrow-left"></i> Accueil</button>
+      </header>
+      <div class="guardian-layout">
+      <div class="guardian-copy">
+        <span class="eyebrow">Au rythme de votre école</span>
+        <h1 tabindex="-1">Chaque arrivée compte.<br>Chaque sortie est protégée.</h1>
+        <p>Retrouvez les présences, le suivi des élèves et les échanges entre l’école et les familles.</p>
+        <button class="ss-button" id="continueGuardian" type="button">Continuer vers la connexion <i data-lucide="arrow-right"></i></button>
+        <span class="guardian-hint">Un espace adapté à votre rôle dans l’école.</span>
+      </div>
       <div class="children-line" aria-hidden="true">
         <figure data-gallery-slot="0"><img src="login-kid-1.jpg" alt="" decoding="async"></figure>
         <figure data-gallery-slot="1"><img src="login-kid-2.jpg" alt="" decoding="async"></figure>
         <figure data-gallery-slot="2"><img src="login-kid-4.jpg" alt="" decoding="async"></figure>
         <figure data-gallery-slot="3"><img src="login-kid-6.jpg" alt="" decoding="async"></figure>
       </div>
-      <span class="gallery-source"><i data-lucide="images"></i> Bibliothèque média de l’école · rotation 5 s</span>
-      <header class="overlay-brand">
-        <img src="./schoolsafe-logo.png" alt="">
-        <span>School<strong>Safe</strong></span>
-      </header>
-      <div class="guardian-copy">
-        <span class="eyebrow">Sécurité scolaire</span>
-        <h1>Chaque arrivée compte.<br>Chaque sortie est protégée.</h1>
-        <button class="ss-button" id="continueGuardian" type="button">
-          Continuer <i data-lucide="arrow-right"></i>
-        </button>
+      </div>
       </div>
     </section>
 
@@ -295,7 +299,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <section class="screen workspace-screen" id="workspace" aria-label="Espace SchoolSafe">
       <!-- Sidebar desktop -->
       <aside class="workspace-sidebar" id="workspaceSidebar">
-        <div class="workspace-brand"><img src="./schoolsafe-logo.png" alt=""><span>School<strong>Safe</strong></span><button class="close-workspace-menu" id="closeWorkspaceMenu" type="button" aria-label="Fermer le menu"><i data-lucide="x"></i></button></div>
+        <div class="workspace-brand"><span class="school-brand-logos"><img src="./schoolsafe-logo.png" alt="Logo SchoolSafe"><img data-school-logo hidden alt="" referrerpolicy="no-referrer"></span><span class="workspace-wordmark">School<strong>Safe</strong></span><button class="close-workspace-menu" id="closeWorkspaceMenu" type="button" aria-label="Fermer le menu"><i data-lucide="x"></i></button></div>
         <nav class="workspace-nav" id="workspaceNav" aria-label="Navigation principale">
           <button class="active" type="button"><i data-lucide="layout-dashboard"></i><span>Tableau de bord</span></button>
           <div class="nav-section"><span>Résumé école</span></div>
@@ -357,6 +361,15 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <div class="workspace-content">
           <div class="workspace-demo-banner" id="workspaceDemoBanner" hidden><i data-lucide="info"></i><span>Mode démonstration · connectez-vous pour accéder aux données réelles.</span></div>
 
+          <header class="mobile-header workspace-mobile-header">
+            <div class="mobile-brand"><span class="school-brand-logos"><img src="./schoolsafe-logo.png" alt="Logo SchoolSafe"><img data-school-logo hidden alt="" referrerpolicy="no-referrer"></span><span>School<strong>Safe</strong></span></div>
+            <div class="mobile-tools">
+              <button class="topbar-icon" id="mobileNotifications" type="button" aria-label="Notifications" aria-haspopup="true" aria-expanded="false"><i data-lucide="bell"></i><span class="badge" id="mobileNotificationsBadge">3</span></button>
+              <button class="topbar-icon" id="mobileMessages" type="button" aria-label="Messages" aria-haspopup="true" aria-expanded="false"><i data-lucide="mail"></i><span class="badge" id="mobileMessagesBadge">2</span></button>
+              <button class="topbar-profile" id="mobileProfile" type="button" aria-label="Profil" aria-haspopup="true" aria-expanded="false"><img id="mobileTopbarAvatar" src="./schoolsafe-logo.png" alt=""></button>
+            </div>
+          </header>
+
           <nav class="workspace-breadcrumb" id="workspaceBreadcrumb" aria-label="Fil d’Ariane" hidden>
             <button class="workspace-breadcrumb__back" id="workspaceBreadcrumbBack" type="button"><i data-lucide="arrow-left"></i></button>
             <ol>
@@ -387,12 +400,12 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <div class="dashboard-hero">
               <div class="hero-copy">
                 <span class="hero-label">Vue d'ensemble</span>
-                <h1 id="desktopHeroTitle">Pilotez votre établissement avec clarté et confiance.</h1>
-                <p>SchoolSafe centralise la gestion de votre école pour des décisions plus justes et un impact durable.</p>
+                <h1 id="desktopHeroTitle">Votre école, en un regard.</h1>
+                <p>Retrouvez vos outils et les informations utiles à votre journée.</p>
                 <p class="hero-date" id="heroDate"></p>
                 <div class="hero-actions">
-                  <button class="hero-cta hero-cta--primary" type="button"><i data-lucide="bar-chart-3"></i> Vue exécutive</button>
-                  <button class="hero-cta hero-cta--secondary" type="button" id="desktopSetupBtn"><i data-lucide="settings"></i> Configurer mon école</button>
+                  <a class="hero-cta hero-cta--primary" href="#desktopModuleGrid"><i data-lucide="layout-grid" aria-hidden="true"></i> Mes outils</a>
+                  <button class="hero-cta hero-cta--secondary" type="button" data-open-jaspe="dashboard"><i data-lucide="message-circle" aria-hidden="true"></i> Demander à Jaspe</button>
                 </div>
               </div>
               <div class="hero-visual">
@@ -413,8 +426,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <div class="dashboard-body">
               <div class="dashboard-body-main">
                 <section class="dashboard-section">
-                  <header><h3>Modules principaux</h3></header>
-                  <div class="module-grid" id="desktopModuleGrid"></div>
+                  <header><h3 id="desktopToolsTitle">Mes outils</h3></header>
+                  <div class="module-grid" id="desktopModuleGrid" tabindex="-1" aria-labelledby="desktopToolsTitle"></div>
                 </section>
 
                 <div class="dashboard-bottom-grid">
@@ -451,7 +464,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                       <button type="button" data-query="État de la trésorerie">État de la trésorerie</button>
                       <button type="button" data-query="Aide à la communication">Aide à la communication</button>
                     </div>
-                    <div class="jaspe-input"><input type="text" placeholder="Posez votre question…"><button type="button" data-query><i data-lucide="send"></i></button></div>
+                    <div class="jaspe-input"><input type="text" aria-label="Votre question à Jaspe" placeholder="Posez votre question…"><button type="button" data-query aria-label="Envoyer à Jaspe"><i data-lucide="send" aria-hidden="true"></i></button></div>
                   </div>
                 </div>
                 <section class="dashboard-section">
@@ -466,15 +479,6 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
           <!-- ===== DASHBOARD MOBILE ===== -->
           <div class="ss-dashboard-mobile" id="dashboardMobile">
-            <header class="mobile-header">
-              <div class="mobile-brand"><img src="./schoolsafe-logo.png" alt=""><span>School<strong>Safe</strong></span></div>
-              <div class="mobile-tools">
-                <button class="topbar-icon" id="mobileNotifications" type="button" aria-label="Notifications" aria-haspopup="true" aria-expanded="false"><i data-lucide="bell"></i><span class="badge" id="mobileNotificationsBadge">3</span></button>
-                <button class="topbar-icon" id="mobileMessages" type="button" aria-label="Messages" aria-haspopup="true" aria-expanded="false"><i data-lucide="mail"></i><span class="badge" id="mobileMessagesBadge">2</span></button>
-                <button class="topbar-profile" id="mobileProfile" type="button" aria-label="Profil" aria-haspopup="true" aria-expanded="false"><img id="mobileTopbarAvatar" src="./schoolsafe-logo.png" alt=""></button>
-              </div>
-            </header>
-
             <div class="mobile-greeting-row">
               <div class="mobile-greeting">
                 <h2 id="mobileGreeting">Bonjour, Administrateur 👋</h2>
@@ -492,10 +496,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <div class="dashboard-hero dashboard-hero--mobile">
               <div class="hero-copy">
                 <span class="hero-label">Vue d'ensemble</span>
-                <h1>Pilotez votre établissement avec clarté.</h1>
-                <p>Vos priorités, vos raccourcis et Jaspe réunis dans une vue adaptée au mobile.</p>
+                <h1>Votre école, en un regard.</h1>
+                <p>Vos outils et les informations utiles à votre journée.</p>
                 <div class="hero-actions">
-                  <button class="hero-cta hero-cta--primary" type="button"><i data-lucide="bar-chart-3"></i> Vue exécutive</button>
+                  <a class="hero-cta hero-cta--primary" href="#mobileQuickAccess"><i data-lucide="layout-grid" aria-hidden="true"></i> Mes outils</a>
                 </div>
               </div>
               <div class="hero-visual">
@@ -504,17 +508,17 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               </div>
             </div>
 
+            <section class="mobile-section">
+              <header><h3 id="mobileToolsTitle">Mes outils</h3></header>
+              <div class="quick-access-grid" id="mobileQuickAccess" tabindex="-1" aria-labelledby="mobileToolsTitle"></div>
+            </section>
+
             <div class="mobile-kpi" id="mobileKpi">
               <article class="kpi-card"><span class="kpi-icon blue"><i data-lucide="users"></i></span><div><b id="mkpiStudents">—</b><span>Élèves</span><small id="mkpiStudentsTrend">—</small></div></article>
               <article class="kpi-card"><span class="kpi-icon purple"><i data-lucide="user-check"></i></span><div><b id="mkpiTeachers">—</b><span>Enseignants</span><small id="mkpiTeachersTrend">—</small></div></article>
               <article class="kpi-card"><span class="kpi-icon green"><i data-lucide="school"></i></span><div><b id="mkpiClasses">—</b><span>Classes</span><small id="mkpiClassesTrend">—</small></div></article>
               <article class="kpi-card"><span class="kpi-icon gold"><i data-lucide="activity"></i></span><div><b id="mkpiPresence">—</b><span>Taux de présence</span><small id="mkpiPresenceTrend">—</small></div></article>
             </div>
-
-            <section class="mobile-section">
-              <header><h3>Accès rapides</h3><button class="section-link" type="button">Voir tout <i data-lucide="chevron-right"></i></button></header>
-              <div class="quick-access-grid" id="mobileQuickAccess"></div>
-            </section>
 
             <section class="mobile-section">
               <header><h3>Alertes importantes</h3><button class="section-link" type="button">Tout voir <i data-lucide="chevron-right"></i></button></header>
@@ -592,7 +596,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <header class="pedagogy-module-header finance-module-header">
               <button class="ss-button ss-button--secondary" id="closeFinanceModule" type="button"><i data-lucide="arrow-left"></i> Tableau de bord</button>
               <div><span>Espace financier</span><h2 id="financeModuleTitle">Situation financière</h2><p>SchoolSafe enregistre les opérations reçues par l’école sans traiter de paiement en ligne.</p></div>
-              <span class="local-draft"><i data-lucide="shield-check"></i> Traçabilité locale</span>
+              <span class="local-draft"><i data-lucide="landmark"></i> Finance</span>
             </header>
             <nav class="pedagogy-tabs finance-tabs" id="financeTabs" aria-label="Fonctions financières">
               <button class="active" type="button" data-finance-tab="overview"><i data-lucide="chart-pie"></i><span>Vue financière</span></button>
@@ -714,8 +718,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <span class="local-draft"><i data-lucide="gauge"></i> Vue directrice</span>
             </header>
             <nav class="pedagogy-tabs pilotage-tabs" id="pilotageTabs" aria-label="Fonctions de pilotage">
-              <button class="active" type="button" data-pilotage-tab="dashboard"><i data-lucide="layout-dashboard"></i><span>Tableau de bord</span></button>
-              <button type="button" data-pilotage-tab="alerts"><i data-lucide="triangle-alert"></i><span>Alertes</span></button>
+              <button class="active" type="button" data-pilotage-tab="dashboard" aria-pressed="true"><i data-lucide="layout-dashboard"></i><span>Tableau de bord</span></button>
+              <button type="button" data-pilotage-tab="alerts" aria-pressed="false"><i data-lucide="triangle-alert"></i><span>Alertes</span></button>
             </nav>
             <div class="pedagogy-content pilotage-content" id="pilotageContent"></div>
           </section>

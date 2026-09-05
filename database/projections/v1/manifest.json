@@ -8,6 +8,12 @@
       "name": "student_read",
       "file": "01_student_read.sql",
       "sha256": "56af4a67429b647470bf29897308dd04890454509fccf652cee288451dec5237"
+    },
+    {
+      "order": 2,
+      "name": "session_bootstrap",
+      "file": "02_session_bootstrap.sql",
+      "sha256": "dbcc94960d2f4daed9761b2d7fb349de3151cf13a2872d89c7d67cb56221aecc"
     }
   ]
 }

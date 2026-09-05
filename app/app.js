@@ -10,8 +10,6 @@
   };
   var toastTimer = null;
   var rotationTimer = null;
-  var guardianGalleryTimer = null;
-  var guardianGalleryIndex = 0;
   var imageIndex = 0;
   var imageFront = "A";
   var loginImages = [
@@ -38,6 +36,9 @@
   window.schoolSafeApiBase = apiBase;
   var supabaseClient = null;
   var currentSession = null;
+  var schoolBrandingRevision = 0;
+  var schoolLogoRequest = null;
+  var schoolLogoObjectUrl = null;
   var backendConfig = null;
   var pendingPhone = null;
   var setupToken = null;
@@ -166,6 +167,7 @@
     currentSession = null;
     storageRemove("schoolsafe-v2-session");
     supabaseClient = null;
+    renderSchoolBranding();
   }
 
   async function callBootstrap(token) {
@@ -1471,6 +1473,7 @@
     document.getElementById("cardsProtected").hidden = true;
     document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (button) {
       button.classList.toggle("active", button.getAttribute("data-pilotage-tab") === requestedTab);
+      button.setAttribute("aria-pressed", String(button.getAttribute("data-pilotage-tab") === requestedTab));
     });
     renderPilotageTab(requestedTab);
     document.querySelector(".workspace-content").scrollTo({ top: 0, behavior: "smooth" });
@@ -2093,12 +2096,12 @@
     var financeCard = executiveKpiCard({
       domain: "finance", icon: "wallet", title: "Recettes (mois)", value: "—",
       caption: "Non disponible en démonstration",
-      subs: ["En règle · BACKEND_LATER", "Partiel / attente · BACKEND_LATER"]
+      subs: ["En règle · Non disponible", "Partiel / attente · Non disponible"]
     });
     var alertsCard = executiveKpiCard({
       domain: "securite", icon: "siren", title: "Alertes actives", value: "0",
       caption: "Aucune alerte fictive ajoutée", demo: true,
-      subs: ["0 incident simulé", "Données live non connectées"]
+      subs: ["0 incident simulé", "Données de démonstration"]
     });
     return [studentsCard, staffCard, classesCard, subjectsCard, financeCard, alertsCard].filter(Boolean);
   }
@@ -2220,6 +2223,74 @@
     return map[key] || "gauge";
   }
 
+  function schoolLogoUrl(value) {
+    if (typeof value !== "string" || !value.trim()) return null;
+    value = value.trim();
+    if (/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/\s]+=*$/i.test(value)) return value;
+    try {
+      // Les logos téléversés sont servis par l’API, pas par l’origine du frontend.
+      var url = new URL(value, apiBase.replace(/\/$/, "") + "/");
+      return /^(https?:)$/.test(url.protocol) && !url.username && !url.password ? url.href : null;
+    } catch (error) { return null; }
+  }
+
+  function renderSchoolBranding() {
+    var revision = ++schoolBrandingRevision;
+    if (schoolLogoRequest) schoolLogoRequest.abort();
+    schoolLogoRequest = null;
+    if (schoolLogoObjectUrl) URL.revokeObjectURL(schoolLogoObjectUrl);
+    schoolLogoObjectUrl = null;
+    var school = currentSession && currentSession.token && currentSession.school;
+    var sameSchool = school && school.id && (!currentSession.schoolId || currentSession.schoolId === school.id);
+    var source = sameSchool ? schoolLogoUrl(school.logo_path) : null;
+    var images = document.querySelectorAll("[data-school-logo]");
+    images.forEach(function (image) {
+      var brand = image.closest(".workspace-brand, .mobile-brand");
+      image.onload = null;
+      image.onerror = null;
+      image.hidden = true;
+      image.removeAttribute("src");
+      image.alt = "";
+      brand.classList.remove("has-school-logo");
+    });
+    if (!source) return;
+    function displayLogo(url) {
+      if (revision !== schoolBrandingRevision) return;
+      images.forEach(function (image) {
+        var brand = image.closest(".workspace-brand, .mobile-brand");
+        image.alt = "Logo " + (school.name || "de l’école");
+        image.onload = function () {
+          if (revision !== schoolBrandingRevision) return;
+          image.hidden = false;
+          brand.classList.add("has-school-logo");
+        };
+        image.onerror = function () {
+          if (revision !== schoolBrandingRevision) return;
+          image.hidden = true;
+          image.removeAttribute("src");
+          brand.classList.remove("has-school-logo");
+        };
+        image.src = url;
+      });
+    }
+    if (source.indexOf("data:") === 0 || new URL(source).origin === window.location.origin) {
+      displayLogo(source);
+      return;
+    }
+    // Charger les logos de l’API comme images locales conserve la CSP img-src restrictive.
+    var controller = new AbortController();
+    schoolLogoRequest = controller;
+    fetch(source, { signal: controller.signal, credentials: "omit", referrerPolicy: "no-referrer" })
+      .then(function (response) {
+        if (!response.ok || !/^image\/(png|jpeg|webp)(;|$)/i.test(response.headers.get("content-type") || "")) throw new Error("Logo indisponible");
+        return response.blob();
+      }).then(function (blob) {
+        if (revision !== schoolBrandingRevision) return;
+        schoolLogoObjectUrl = URL.createObjectURL(blob);
+        displayLogo(schoolLogoObjectUrl);
+      }).catch(function () { /* L’identité reste absente si l’image ne peut pas être chargée. */ });
+  }
+
   function renderWorkspace(roleKey) {
     var profile = roleCatalog[roleKey] || roleCatalog.admin;
     currentDemoRole = roleCatalog[roleKey] ? roleKey : "admin";
@@ -2292,6 +2363,7 @@
       var schoolName = (currentSession && currentSession.school && currentSession.school.name) || "Configuration en cours";
       workspaceSchoolName.textContent = schoolName;
     }
+    renderSchoolBranding();
 
     // Dropdown profil
     var profileDropdownAvatar = document.getElementById("profileDropdownAvatar");
@@ -2620,12 +2692,12 @@
   function renderModuleCard(branchItem) {
     var definition = branchDefinitions[branchItem.key];
     var desc = branchItem.description || "";
-    return '<article class="module-card module-card--' + branchItem.key + '" data-branch="' + branchItem.key + '">' +
-      '<div class="module-card__header"><span class="module-card__icon"><i data-lucide="' + definition.icon + '"></i></span></div>' +
-      '<h3 class="module-card__title">' + definition.label + '</h3>' +
-      '<p class="module-card__desc">' + desc + '</p>' +
-      '<span class="module-card__link">Accéder <i data-lucide="chevron-right"></i></span>' +
-      '</article>';
+    return '<button type="button" class="module-card module-card--' + branchItem.key + '" data-branch="' + branchItem.key + '" aria-label="' + escapeMarkup(definition.label) + '">' +
+      '<span class="module-card__header"><span class="module-card__icon" aria-hidden="true"><i data-lucide="' + definition.icon + '"></i></span></span>' +
+      '<span class="module-card__title">' + definition.label + '</span>' +
+      '<span class="module-card__desc">' + desc + '</span>' +
+      '<span class="module-card__link" aria-hidden="true"><i data-lucide="chevron-right"></i></span>' +
+      '</button>';
   }
 
   function renderQuickAccessItem(branchItem) {
@@ -3009,45 +3081,40 @@
     if (backdrop) backdrop.classList.remove("visible");
   }
 
-  function initParticles() {
-    var container = document.getElementById("particles");
-    if (!container || container.childElementCount) return;
-    var colors = ["#ef5b5b", "#ff7a4d", "#eab308", "#2fbf8f", "#2f7bd6", "#9b6fd4", "#ec4899"];
-    for (var index = 0; index < 25; index += 1) {
-      var particle = document.createElement("span");
-      var size = 2 + (index % 6);
-      particle.className = "particle";
-      particle.style.width = size + "px";
-      particle.style.height = size + "px";
-      particle.style.left = ((index * 37) % 100) + "%";
-      particle.style.color = colors[index % colors.length];
-      particle.style.background = colors[index % colors.length];
-      particle.style.animationDuration = (5 + (index % 8)) + "s";
-      particle.style.animationDelay = (-1 * (index % 7)) + "s";
-      container.appendChild(particle);
-    }
-  }
-
   function icons() {
     if (window.lucide) window.lucide.createIcons({ attrs: { "aria-hidden": "true" } });
   }
   window.icons = icons;
 
   function showScreen(name) {
+    var fromGuardian = screens.guardian.classList.contains("active");
     Object.keys(screens).forEach(function (key) {
       screens[key].classList.toggle("active", key === name);
     });
+    screens.splash.inert = name !== "splash";
+    screens.guardian.inert = name !== "guardian";
     document.body.classList.remove("screen-splash", "screen-guardian", "screen-auth", "screen-setup", "screen-workspace");
     document.body.classList.add("screen-" + name);
     if (name === "auth") startImageRotation();
     else stopImageRotation();
-    if (name === "guardian") startGuardianGallery();
-    else stopGuardianGallery();
+    if (name === "guardian") renderGuardianGallery();
     if (name === "workspace") {
       renderWorkspace(document.getElementById("demoRole").value || currentDemoRole);
     }
     if (window.SafeAssistant && typeof window.SafeAssistant.setSurface === "function") window.SafeAssistant.setSurface(name);
     icons();
+    var entryFocus = name === "splash" || name === "guardian"
+      ? screens[name].querySelector("h1")
+      : (name === "auth" && fromGuardian ? screens.auth.querySelector("[data-login-mode].selected") : null);
+    if (entryFocus) window.requestAnimationFrame(function focusEntry() {
+      if (!screens[name].classList.contains("active")) return;
+      if (screens[name].contains(document.activeElement) && document.activeElement !== entryFocus) return;
+      if (getComputedStyle(entryFocus).visibility !== "visible") {
+        window.requestAnimationFrame(focusEntry);
+        return;
+      }
+      entryFocus.focus({ preventScroll: true });
+    });
   }
   window.schoolSafeShow = showScreen;
 
@@ -3070,53 +3137,19 @@
     window.dispatchEvent(new CustomEvent("safe:event", { detail: { type: type, message: message } }));
   }
 
-  function renderGuardianGallery(immediate) {
+  function renderGuardianGallery() {
     var activeMedia = schoolMediaLibrary.filter(function (media) { return media.active; }).sort(function (a, b) { return a.order - b.order; });
+    if (!activeMedia.length) return;
     document.querySelectorAll("[data-gallery-slot]").forEach(function (figure, slot) {
-      var media = activeMedia[(guardianGalleryIndex + slot) % activeMedia.length];
       var image = figure.querySelector("img");
-      var applyFocus = function () {
-        image.alt = media.alt;
-        figure.style.setProperty("--face-desktop-x", media.desktop[0] + "%");
-        figure.style.setProperty("--face-desktop-y", media.desktop[1] + "%");
-        figure.style.setProperty("--face-mobile-x", media.mobile[0] + "%");
-        figure.style.setProperty("--face-mobile-y", media.mobile[1] + "%");
-        window.setTimeout(function () { figure.classList.remove("switching"); }, 60);
-      };
-      var applyMedia = function () {
-        if (image.getAttribute("src") === media.src) {
-          applyFocus();
-          return;
-        }
-        var preloader = new Image();
-        preloader.onload = function () {
-          image.src = media.src;
-          applyFocus();
-        };
-        preloader.onerror = function () { figure.classList.remove("switching"); };
-        preloader.src = media.src;
-      };
-      if (immediate) applyMedia();
-      else {
-        figure.classList.add("switching");
-        window.setTimeout(applyMedia, 360);
-      }
+      var media = activeMedia.find(function (item) { return item.src === image.getAttribute("src"); }) || activeMedia[slot % activeMedia.length];
+      if (image.getAttribute("src") !== media.src) image.src = media.src;
+      image.alt = media.alt;
+      figure.style.setProperty("--face-desktop-x", media.desktop[0] + "%");
+      figure.style.setProperty("--face-desktop-y", media.desktop[1] + "%");
+      figure.style.setProperty("--face-mobile-x", media.mobile[0] + "%");
+      figure.style.setProperty("--face-mobile-y", media.mobile[1] + "%");
     });
-  }
-
-  function startGuardianGallery() {
-    renderGuardianGallery(true);
-    if (guardianGalleryTimer) return;
-    guardianGalleryTimer = window.setInterval(function () {
-      guardianGalleryIndex = (guardianGalleryIndex + 1) % schoolMediaLibrary.length;
-      renderGuardianGallery(false);
-    }, 5000);
-  }
-
-  function stopGuardianGallery() {
-    if (!guardianGalleryTimer) return;
-    window.clearInterval(guardianGalleryTimer);
-    guardianGalleryTimer = null;
   }
 
   function startImageRotation() {
@@ -3143,16 +3176,8 @@
   }
 
   document.getElementById("enterSplash").addEventListener("click", function () { showScreen("guardian"); });
-  screens.splash.addEventListener("click", function (event) {
-    if (event.target.closest("button") && event.target.id !== "enterSplash") return;
-    showScreen("guardian");
-  });
-  screens.splash.addEventListener("dblclick", function () { showScreen("auth"); });
+  document.getElementById("backGuardian").addEventListener("click", function () { showScreen("splash"); });
   document.getElementById("continueGuardian").addEventListener("click", function () { showScreen("auth"); });
-  screens.guardian.addEventListener("click", function (event) {
-    if (event.target.closest("button")) return;
-    showScreen("auth");
-  });
   document.getElementById("backToSplash").addEventListener("click", function () { showScreen("splash"); });
   document.getElementById("setupHome").addEventListener("click", function () { showScreen("splash"); });
   document.getElementById("closeSetup").addEventListener("click", function () { showScreen("auth"); });
@@ -3198,6 +3223,8 @@
 
   bindIfExists("workspaceBack", "click", async function () {
     clearSession();
+    // Session native (cookie HttpOnly) : déconnexion serveur réelle.
+    try { if (window.SchoolSafeAuthNative) await window.SchoolSafeAuthNative.logout(); } catch (e) {}
     try { var client = getSupabaseClient(); if (client && client.auth && client.auth.signOut) await client.auth.signOut(); } catch (e) {}
     document.getElementById("emailIdentifier").value = "";
     document.getElementById("phoneIdentifier").value = "";
@@ -3228,8 +3255,12 @@
   bindIfExists("closeSchoolModule", "click", closeSchoolModule);
   document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (button) {
     button.addEventListener("click", function () {
-      document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (b) { b.classList.remove("active"); });
+      document.querySelectorAll("#pilotageTabs [data-pilotage-tab]").forEach(function (b) {
+        b.classList.remove("active");
+        b.setAttribute("aria-pressed", "false");
+      });
       button.classList.add("active");
+      button.setAttribute("aria-pressed", "true");
       renderPilotageTab(button.getAttribute("data-pilotage-tab"));
     });
   });
@@ -3320,6 +3351,33 @@
         var email = document.getElementById("emailIdentifier").value.trim();
         var password = document.getElementById("password").value;
         if (!email || !password) { notify("Renseignez l’e-mail et le mot de passe."); return; }
+
+        // Auth native (cookie HttpOnly) en premier ; repli legacy si le
+        // serveur ne la connaît pas encore. Rien n'est supprimé : les deux
+        // chemins coexistent pendant la migration (AUTH-MIGRATION).
+        if (window.SchoolSafeAuthNative) {
+          try {
+            var nativeResult = await window.SchoolSafeAuthNative.login(email, password);
+            if (nativeResult && nativeResult.code === "PROFILE_CHOICE_REQUIRED"
+                && nativeResult.profiles && nativeResult.profiles.length) {
+              nativeResult = await window.SchoolSafeAuthNative.login(email, password, nativeResult.profiles[0].profileId);
+            }
+            if (nativeResult && nativeResult.profile_id) {
+              var nativeBootstrap = await window.SchoolSafeAuthNative.sessionBootstrap();
+              if (nativeBootstrap && nativeBootstrap.data) {
+                currentSession = { token: null, native: true };
+                applyBootstrap(nativeBootstrap.data);
+                enterLiveSession();
+                return;
+              }
+            }
+          } catch (nativeError) {
+            // 401 native = identité non migrée OU identifiants faux : le
+            // chemin legacy tranche (même message, aucune énumération).
+            console.warn("Auth native indisponible ou refusée, repli legacy", nativeError);
+          }
+        }
+
         var result = await client.auth.signInWithPassword({ email: email, password: password });
         if (result.error) throw result.error;
         var token = result.data.session.access_token;
@@ -3785,6 +3843,24 @@
 
   async function restoreSession() {
     var saved = loadSession();
+    // Session native (cookie HttpOnly) essayée en premier : le cookie parle
+    // seul, le navigateur ne manipule aucun token. Silencieux si absente.
+    if ((!saved || !saved.token) && window.SchoolSafeAuthNative) {
+      try {
+        var meData = await window.SchoolSafeAuthNative.me();
+        if (meData && meData.profile_id) {
+          var nativeBootstrap = await window.SchoolSafeAuthNative.sessionBootstrap();
+          if (nativeBootstrap && nativeBootstrap.data) {
+            currentSession = { token: null, native: true };
+            applyBootstrap(nativeBootstrap.data);
+            notify("Session restaurée.");
+            return;
+          }
+        }
+      } catch (e) {
+        // Pas de session native : le flux legacy décide ensuite.
+      }
+    }
     if (saved && saved.token) {
       try {
         var config = await loadBackendConfig();
@@ -3801,7 +3877,6 @@
       }
     }
     renderStep();
-    initParticles();
     initPwaExperience();
     icons();
   }

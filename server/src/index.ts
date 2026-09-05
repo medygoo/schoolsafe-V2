@@ -20,6 +20,7 @@ import { createSchoolService } from "./school/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
 import { createStudentsNativeService } from "./studentsnative/service.js";
 import { createTrialNativeService } from "./trialnative/service.js";
+import { createSessionNativeService } from "./sessionnative/service.js";
 import { createSupabaseAuditService } from "./audit/service.js";
 import { createClient } from "@supabase/supabase-js";
 import fastifyStatic from "@fastify/static";
@@ -222,6 +223,12 @@ const app = buildApp({
     ? {
         authService: authNativeService,
         service: createTrialNativeService(verifiedPools.businessPool),
+      }
+    : undefined,
+  sessionNative: verifiedPools && authNativeService
+    ? {
+        authService: authNativeService,
+        service: createSessionNativeService(verifiedPools.businessPool),
       }
     : undefined,
   bootstrap: {
