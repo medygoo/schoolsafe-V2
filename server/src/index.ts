@@ -18,6 +18,7 @@ import { createPedagogyService } from "./pedagogy/service.js";
 import { createRankingsService } from "./pedagogy/rankings/service.js";
 import { createSchoolService } from "./school/service.js";
 import { createSupabaseAccessService } from "./access/service.js";
+import { createStudentsNativeService } from "./studentsnative/service.js";
 import { createSupabaseAuditService } from "./audit/service.js";
 import { createClient } from "@supabase/supabase-js";
 import fastifyStatic from "@fastify/static";
@@ -208,6 +209,12 @@ const app = buildApp({
     ? {
         service: authNativeService,
         cookieSecure: env.NODE_ENV === "production",
+      }
+    : undefined,
+  studentsNative: verifiedPools && authNativeService
+    ? {
+        authService: authNativeService,
+        service: createStudentsNativeService(verifiedPools.businessPool),
       }
     : undefined,
   bootstrap: {

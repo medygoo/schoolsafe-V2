@@ -24,6 +24,7 @@ import { requirePermission } from "./access/guard.js";
 import type { AccessService } from "./access/service.js";
 import { registerStudentRoutes, type StudentRouteDependencies } from "./students/routes.js";
 import { registerAuthNativeRoutes, type AuthNativeRouteDependencies } from "./authnative/routes.js";
+import { registerStudentsNativeRoutes, type StudentsNativeRouteDependencies } from "./studentsnative/routes.js";
 
 export type BuildAppOptions = {
   testRoutes?: boolean;
@@ -46,6 +47,7 @@ export type BuildAppOptions = {
   push?: PushRouteDependencies;
   access?: AccessService;
   authNative?: AuthNativeRouteDependencies;
+  studentsNative?: StudentsNativeRouteDependencies;
 };
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -101,6 +103,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.authNative) {
     registerAuthNativeRoutes(app, options.authNative);
+  }
+
+  if (options.studentsNative) {
+    registerStudentsNativeRoutes(app, options.studentsNative);
   }
 
   if (options.setup) {
