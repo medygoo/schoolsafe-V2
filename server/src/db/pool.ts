@@ -49,3 +49,34 @@ export function createBusinessPool(env: AppEnv): BusinessPool {
     password: env.PGPASSWORD,
   }) as BusinessPool;
 }
+
+export class PoolRoleMismatchError extends Error {
+  constructor(expected: string, actual: string | undefined) {
+    super(`Rôle PostgreSQL inattendu : attendu ${expected}, obtenu ${actual ?? "inconnu"}`);
+    this.name = "PoolRoleMismatchError";
+  }
+}
+
+// Vérification runtime à l'initialisation : le rôle réel de la connexion doit
+// être EXACTEMENT celui attendu. Aucun fallback, aucune reprise — fail-closed.
+async function assertPoolRole(pool: Pool, expected: "schoolsafe_auth" | "schoolsafe_api"): Promise<void> {
+  let actual: string | undefined;
+  try {
+    const result = await pool.query("select current_user as role");
+    actual = result.rows[0]?.role as string | undefined;
+  } catch (error) {
+    throw new PoolRoleMismatchError(expected, undefined);
+  }
+  if (actual !== expected) {
+    throw new PoolRoleMismatchError(expected, actual);
+  }
+}
+
+// À appeler au démarrage, AVANT la première utilisation du pool.
+export function verifyAuthPoolRole(pool: AuthPool): Promise<void> {
+  return assertPoolRole(pool, "schoolsafe_auth");
+}
+
+export function verifyBusinessPoolRole(pool: BusinessPool): Promise<void> {
+  return assertPoolRole(pool, "schoolsafe_api");
+}

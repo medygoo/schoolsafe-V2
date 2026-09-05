@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { createAuthPool, createBusinessPool } from "../src/db/pool.js";
+import {
+  createAuthPool,
+  createBusinessPool,
+  verifyAuthPoolRole,
+  verifyBusinessPoolRole,
+  PoolRoleMismatchError,
+  type AuthPool,
+  type BusinessPool,
+} from "../src/db/pool.js";
 import type { AppEnv } from "../src/config/env.js";
 
 const BASE_ENV = {
@@ -53,5 +61,56 @@ describe("pools séparés par rôle (verrou d'architecture)", () => {
     expect(() =>
       createAuthPool({ ...incomplete, PGAUTH_USER: "a", PGAUTH_PASSWORD: "b" }),
     ).toThrow("PGHOST");
+  });
+});
+
+describe("verrou runtime de rôle PostgreSQL", () => {
+  function fakePoolWithRole(role: string) {
+    return {
+      query: async () => ({ rows: [{ role }] }),
+    };
+  }
+
+  it("auth connecté comme schoolsafe_auth = PASS", async () => {
+    await expect(
+      verifyAuthPoolRole(fakePoolWithRole("schoolsafe_auth") as unknown as AuthPool),
+    ).resolves.toBeUndefined();
+  });
+
+  it("auth connecté comme schoolsafe_api = FAIL", async () => {
+    await expect(
+      verifyAuthPoolRole(fakePoolWithRole("schoolsafe_api") as unknown as AuthPool),
+    ).rejects.toBeInstanceOf(PoolRoleMismatchError);
+  });
+
+  it("métier connecté comme schoolsafe_api = PASS", async () => {
+    await expect(
+      verifyBusinessPoolRole(fakePoolWithRole("schoolsafe_api") as unknown as BusinessPool),
+    ).resolves.toBeUndefined();
+  });
+
+  it("métier connecté comme schoolsafe_auth = FAIL", async () => {
+    await expect(
+      verifyBusinessPoolRole(fakePoolWithRole("schoolsafe_auth") as unknown as BusinessPool),
+    ).rejects.toBeInstanceOf(PoolRoleMismatchError);
+  });
+
+  it("même rôle pour les deux pools = FAIL (le vérificateur de l'autre refuse)", async () => {
+    const pool = fakePoolWithRole("schoolsafe_auth");
+    await expect(verifyAuthPoolRole(pool as unknown as AuthPool)).resolves.toBeUndefined();
+    await expect(
+      verifyBusinessPoolRole(pool as unknown as BusinessPool),
+    ).rejects.toBeInstanceOf(PoolRoleMismatchError);
+  });
+
+  it("erreur de connexion à l'initialisation = FAIL (aucun fallback)", async () => {
+    const broken = {
+      query: async () => {
+        throw new Error("connexion impossible");
+      },
+    };
+    await expect(
+      verifyAuthPoolRole(broken as unknown as AuthPool),
+    ).rejects.toBeInstanceOf(PoolRoleMismatchError);
   });
 });
