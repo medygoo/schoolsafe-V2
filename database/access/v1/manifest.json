@@ -1,0 +1,13 @@
+{
+  "access_version": "schoolsafe-access-v1",
+  "requires_baseline": "schoolsafe-vps-v1",
+  "target": "one SchoolSafe database per environment (TEST/PROD); role templates are global reference data",
+  "units": [
+    {
+      "order": 1,
+      "name": "role_templates",
+      "file": "01_role_templates.sql",
+      "sha256": "35fa083b94bb9e4718b29f84672506a425b6eb1d90595af77ff2de92ade3d4b6"
+    }
+  ]
+}
