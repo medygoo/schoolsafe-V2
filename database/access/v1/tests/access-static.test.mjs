@@ -120,3 +120,30 @@ test("le pont de provisioning est gouverné par Access_Law et audité", async ()
   assert.match(sql, /grant execute on function api\.school_provision_roles\(uuid\) to schoolsafe_api/);
   assert.doesNotMatch(sql, /to public/i);
 });
+
+test("le rejeu au niveau école est autoritaire (sync + suppression stricte)", async () => {
+  const sql = await readUnit("02_provision_bridge.sql");
+  assert.match(sql, /update iam\.role_permission_grants/);
+  assert.match(sql, /delete from iam\.grant_scopes where grant_id/);
+  assert.match(sql, /delete from iam\.permission_conditions where grant_id/);
+  assert.match(sql, /delete from iam\.role_permission_grants g[\s\S]*?not exists/);
+});
+
+test("bootstrap réservé à la session de migration, jamais aux rôles runtime", async () => {
+  const sql = await readUnit("02_provision_bridge.sql");
+  assert.match(sql, /session_user <> 'schoolsafe_migrator'/);
+  assert.match(sql, /ops\.bootstrap_school/);
+  assert.doesNotMatch(sql, /grant execute on function api\.school_bootstrap/);
+  assert.doesNotMatch(sql, /require_access\('session\.bootstrap'\)/);
+});
+
+test("fee control utilise une portée métier isolée des enseignants", async () => {
+  const m = await matrix();
+  assert.equal(m.fee_control.find(r => r[0] === 'finance.control.scan')[1], 'assigned_fee_classes');
+});
+
+test("les grants pédagogiques reçoivent la paire classe+matière (règle Enseignant)", async () => {
+  const sql = await readUnit("02_provision_bridge.sql");
+  assert.match(sql, /'assigned_subjects', null/);
+  assert.match(sql, /like 'pedagogy\.%'/);
+});

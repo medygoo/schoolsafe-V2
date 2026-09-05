@@ -26,8 +26,8 @@ readonly SECRET_HOST_PATH='/etc/schoolsafe-db/test/secrets/postgres_bootstrap_pa
 readonly BASELINE_VERSION='schoolsafe-vps-v1'
 readonly EXPECTED_IMAGE_REPO_DIGEST='postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0'
 readonly CONFIRMATION='APPLY_SCHOOLSAFE_TEST_FROM_ZERO'
-readonly EXPECTED_MANIFEST_SHA256='5aa80d428611949a56077c60c3c9fca7cc8950840800dfbca6a924df9292faae'
-readonly EXPECTED_MANIFEST_JSON_SHA256='ee9227a78f9358b945c81b21b79daeee1f29bf87783f055219745b56cffda3b1'
+readonly EXPECTED_MANIFEST_SHA256='22dfda6ba2549afbf5f0e9cf25a6165c8f4b34caa5eaa718454acbd8f2f5b2df'
+readonly EXPECTED_MANIFEST_JSON_SHA256='b90a82580df906f8c1bb80313c39f43f8ab869964221e860a9b22629859c4117'
 readonly EXPECTED_ACCESS_TEST_SHA256='23071e6ff96c15f6f66b802f29fb4b18a18d889249d919aa2af37183bd66a42c'
 readonly BACKUP_DIR='/var/backups/schoolsafe/test/pre-baseline'
 readonly LOCK_FILE='/run/schoolsafe-db-test-apply-baseline.lock'
@@ -454,9 +454,9 @@ case "$schoolsafe_application_role_count" in
             (5::smallint,'schoolsafe-vps-v1','iam','05_iam.sql','87fc9522b8b530e2c09858de46deaaf43570893472c2810b062f1ff044edf7d5'),
             (6::smallint,'schoolsafe-vps-v1','audit_ops','06_audit_ops.sql','b21c242218945cfea044a5ae8c75694df930eca42b6ded3bea7520e9d3c2e661'),
             (7::smallint,'schoolsafe-vps-v1','constraints_indexes','07_constraints_indexes.sql','7ffde1d41c06cbce867ea2f287fcb9223c0ecd76815c3f2afa8226672fc8ec89'),
-            (8::smallint,'schoolsafe-vps-v1','internal_functions','08_internal_functions.sql','3d973f644a6a6de5eb59436f56b6f3a245b39499e306dafd9d877c79337bb0ef'),
+            (8::smallint,'schoolsafe-vps-v1','internal_functions','08_internal_functions.sql','b980a266c1c7ff3ee7ec646fdbfadefa7cab62680ed6fdbc6aee8a38e5a2a866'),
             (9::smallint,'schoolsafe-vps-v1','api_rpc','09_api_rpc.sql','97bf44e8a68c3961ffe4ca12488a797c9e883a5e7a8bdabc9f04c17f1112212b'),
-            (10::smallint,'schoolsafe-vps-v1','triggers','10_triggers.sql','5c0de408c2429c380f92851a370b0f2c2d89d976ecf4c71c00c0aa14510d03ba'),
+            (10::smallint,'schoolsafe-vps-v1','triggers','10_triggers.sql','6690f7698c55b4903a81a56066fadd8383421904724429ee34aa8a726a831ab7'),
             (11::smallint,'schoolsafe-vps-v1','rls_acl','11_rls_acl.sql','484e65146d0c43009c8261f52dea6a005c9fd2c521d835478206d0f9b79e9e04'),
             (12::smallint,'schoolsafe-vps-v1','seed_permissions','12_seed_permissions.sql','8a347abde67b8efb91625346f0177be36445dd331f3c5450b40c945c252c79d2')
           ) expected(unit_order, baseline_version, unit_name, file_name, sha256)
@@ -514,7 +514,7 @@ SQL
           (5::smallint,'schoolsafe-vps-v1','iam','05_iam.sql','87fc9522b8b530e2c09858de46deaaf43570893472c2810b062f1ff044edf7d5'),
           (6::smallint,'schoolsafe-vps-v1','audit_ops','06_audit_ops.sql','b21c242218945cfea044a5ae8c75694df930eca42b6ded3bea7520e9d3c2e661'),
           (7::smallint,'schoolsafe-vps-v1','constraints_indexes','07_constraints_indexes.sql','7ffde1d41c06cbce867ea2f287fcb9223c0ecd76815c3f2afa8226672fc8ec89'),
-          (8::smallint,'schoolsafe-vps-v1','internal_functions','08_internal_functions.sql','3d973f644a6a6de5eb59436f56b6f3a245b39499e306dafd9d877c79337bb0ef'),
+          (8::smallint,'schoolsafe-vps-v1','internal_functions','08_internal_functions.sql','b980a266c1c7ff3ee7ec646fdbfadefa7cab62680ed6fdbc6aee8a38e5a2a866'),
           (9::smallint,'schoolsafe-vps-v1','api_rpc','09_api_rpc.sql','97bf44e8a68c3961ffe4ca12488a797c9e883a5e7a8bdabc9f04c17f1112212b')
         ) expected(unit_order, baseline_version, unit_name, file_name, sha256)
           on expected.unit_order = sv.unit_order
@@ -575,9 +575,9 @@ SQL
             (5::smallint,'schoolsafe-vps-v1','iam','05_iam.sql','87fc9522b8b530e2c09858de46deaaf43570893472c2810b062f1ff044edf7d5'),
             (6::smallint,'schoolsafe-vps-v1','audit_ops','06_audit_ops.sql','b21c242218945cfea044a5ae8c75694df930eca42b6ded3bea7520e9d3c2e661'),
             (7::smallint,'schoolsafe-vps-v1','constraints_indexes','07_constraints_indexes.sql','7ffde1d41c06cbce867ea2f287fcb9223c0ecd76815c3f2afa8226672fc8ec89'),
-            (8::smallint,'schoolsafe-vps-v1','internal_functions','08_internal_functions.sql','3d973f644a6a6de5eb59436f56b6f3a245b39499e306dafd9d877c79337bb0ef'),
+            (8::smallint,'schoolsafe-vps-v1','internal_functions','08_internal_functions.sql','b980a266c1c7ff3ee7ec646fdbfadefa7cab62680ed6fdbc6aee8a38e5a2a866'),
             (9::smallint,'schoolsafe-vps-v1','api_rpc','09_api_rpc.sql','97bf44e8a68c3961ffe4ca12488a797c9e883a5e7a8bdabc9f04c17f1112212b'),
-            (10::smallint,'schoolsafe-vps-v1','triggers','10_triggers.sql','5c0de408c2429c380f92851a370b0f2c2d89d976ecf4c71c00c0aa14510d03ba'),
+            (10::smallint,'schoolsafe-vps-v1','triggers','10_triggers.sql','6690f7698c55b4903a81a56066fadd8383421904724429ee34aa8a726a831ab7'),
             (11::smallint,'schoolsafe-vps-v1','rls_acl','11_rls_acl.sql','484e65146d0c43009c8261f52dea6a005c9fd2c521d835478206d0f9b79e9e04'),
             (12::smallint,'schoolsafe-vps-v1','seed_permissions','12_seed_permissions.sql','8a347abde67b8efb91625346f0177be36445dd331f3c5450b40c945c252c79d2'),
             (13::smallint,'schoolsafe-vps-v1','verification','13_verification.sql','7f4c20c7e7530d3bd27d2a45a75d342cf5fb662a9d100f7c62fb97ba6dae0d95')

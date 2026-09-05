@@ -371,10 +371,11 @@ begin
 
   v_event_type := case tg_table_name
     when 'role_permission_grants' then
+      case when tg_op = 'DELETE' then 'role.permission.revoked' else
       case coalesce(v_after ->> 'effect', v_before ->> 'effect')
         when 'allow' then 'role.permission.granted'
         else 'role.permission.revoked'
-      end
+      end end
     when 'profile_permission_exceptions' then
       case tg_op when 'DELETE' then 'user.exception.removed' else 'user.exception.added' end
     when 'profile_roles' then

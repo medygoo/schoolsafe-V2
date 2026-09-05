@@ -263,6 +263,7 @@ exception
 end
 $schoolsafe$;
 
+drop function if exists iam.scope_matches(text,uuid,uuid,uuid,uuid,uuid,uuid);
 create or replace function iam.scope_matches(
   p_scope_code text,
   p_scope_target_id uuid default null,
@@ -270,7 +271,8 @@ create or replace function iam.scope_matches(
   p_student_id uuid default null,
   p_class_id uuid default null,
   p_subject_id uuid default null,
-  p_portal_id uuid default null
+  p_portal_id uuid default null,
+  p_runtime_context jsonb default '{}'::jsonb
 )
 returns boolean
 language plpgsql
@@ -301,6 +303,23 @@ begin
           where portal.school_id = iam.current_school_id()
             and portal.id = p_portal_id
             and portal.is_active = true
+        );
+    when 'assigned_fee_classes' then
+      return p_class_id is not null
+        and nullif(p_runtime_context->>'campaign_id','') is not null
+        and (p_scope_target_id is null or p_scope_target_id=p_class_id)
+        and exists (
+          select 1 from app.fee_control_assignees a
+          join app.fee_control_campaigns c on c.id=a.campaign_id and c.school_id=a.school_id
+          join app.classes cl on cl.id=p_class_id and cl.school_id=a.school_id
+          where a.school_id=iam.current_school_id() and a.profile_id=iam.current_profile_id()
+            and c.id::text=p_runtime_context->>'campaign_id'
+            and c.status='published' and jsonb_typeof(c.classes)='array'
+            and c.classes ? p_class_id::text
+            and (p_student_id is null or exists (select 1 from app.students st
+              where st.id=p_student_id and st.school_id=a.school_id and st.class_id=p_class_id))
+            and (c.starts_at is null or c.starts_at<=pg_catalog.now())
+            and (c.ends_at is null or c.ends_at>=pg_catalog.now())
         );
     when 'assigned_classes' then
       if p_class_id is null then
@@ -346,13 +365,15 @@ begin
 end
 $schoolsafe$;
 
+drop function if exists iam.grant_scopes_match(uuid,uuid,uuid,uuid,uuid,uuid);
 create or replace function iam.grant_scopes_match(
   p_grant_id uuid,
   p_target_profile_id uuid default null,
   p_student_id uuid default null,
   p_class_id uuid default null,
   p_subject_id uuid default null,
-  p_portal_id uuid default null
+  p_portal_id uuid default null,
+  p_runtime_context jsonb default '{}'::jsonb
 )
 returns boolean
 language plpgsql
@@ -397,7 +418,8 @@ begin
             p_student_id,
             p_class_id,
             p_subject_id,
-            p_portal_id
+            p_portal_id,
+            p_runtime_context
           )
       )
       and exists (
@@ -416,7 +438,8 @@ begin
             p_student_id,
             p_class_id,
             p_subject_id,
-            p_portal_id
+            p_portal_id,
+            p_runtime_context
           )
       );
   end if;
@@ -436,19 +459,22 @@ begin
         p_student_id,
         p_class_id,
         p_subject_id,
-        p_portal_id
+        p_portal_id,
+        p_runtime_context
       )
   );
 end
 $schoolsafe$;
 
+drop function if exists iam.exception_scopes_match(uuid,uuid,uuid,uuid,uuid,uuid);
 create or replace function iam.exception_scopes_match(
   p_exception_id uuid,
   p_target_profile_id uuid default null,
   p_student_id uuid default null,
   p_class_id uuid default null,
   p_subject_id uuid default null,
-  p_portal_id uuid default null
+  p_portal_id uuid default null,
+  p_runtime_context jsonb default '{}'::jsonb
 )
 returns boolean
 language plpgsql
@@ -493,7 +519,8 @@ begin
             p_student_id,
             p_class_id,
             p_subject_id,
-            p_portal_id
+            p_portal_id,
+            p_runtime_context
           )
       )
       and exists (
@@ -512,7 +539,8 @@ begin
             p_student_id,
             p_class_id,
             p_subject_id,
-            p_portal_id
+            p_portal_id,
+            p_runtime_context
           )
       );
   end if;
@@ -532,7 +560,8 @@ begin
         p_student_id,
         p_class_id,
         p_subject_id,
-        p_portal_id
+        p_portal_id,
+        p_runtime_context
       )
   );
 end
@@ -578,7 +607,8 @@ as $schoolsafe$
           p_student_id,
           p_class_id,
           p_subject_id,
-          p_portal_id
+          p_portal_id,
+          p_runtime_context
         )
         and not exists (
           select 1
@@ -607,7 +637,8 @@ as $schoolsafe$
           p_student_id,
           p_class_id,
           p_subject_id,
-          p_portal_id
+          p_portal_id,
+          p_runtime_context
         )
         and (
           e.condition_code is null
@@ -672,7 +703,8 @@ as $schoolsafe$
             p_student_id,
             p_class_id,
             p_subject_id,
-            p_portal_id
+            p_portal_id,
+            p_runtime_context
           )
           and (
             e.condition_code is null
@@ -703,7 +735,8 @@ as $schoolsafe$
             p_student_id,
             p_class_id,
             p_subject_id,
-            p_portal_id
+            p_portal_id,
+            p_runtime_context
           )
           and not exists (
             select 1

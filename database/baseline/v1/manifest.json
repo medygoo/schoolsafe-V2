@@ -52,7 +52,7 @@
       "order": 8,
       "name": "internal_functions",
       "file": "08_internal_functions.sql",
-      "sha256": "3d973f644a6a6de5eb59436f56b6f3a245b39499e306dafd9d877c79337bb0ef"
+      "sha256": "b980a266c1c7ff3ee7ec646fdbfadefa7cab62680ed6fdbc6aee8a38e5a2a866"
     },
     {
       "order": 9,
@@ -64,7 +64,7 @@
       "order": 10,
       "name": "triggers",
       "file": "10_triggers.sql",
-      "sha256": "5c0de408c2429c380f92851a370b0f2c2d89d976ecf4c71c00c0aa14510d03ba"
+      "sha256": "6690f7698c55b4903a81a56066fadd8383421904724429ee34aa8a726a831ab7"
     },
     {
       "order": 11,

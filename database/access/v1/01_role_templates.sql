@@ -13,6 +13,10 @@
 begin;
 set local role schoolsafe_owner;
 
+insert into iam.scopes(code,label,description) values
+ ('assigned_fee_classes','Classes des campagnes affectées','Campagnes publiées actives affectées à cet agent dans son école.')
+on conflict (code) do update set label=excluded.label,description=excluded.description,is_active=true;
+
 create table if not exists iam.role_templates (
   id uuid primary key default pg_catalog.gen_random_uuid(),
   code text not null unique,
@@ -141,7 +145,7 @@ declare
 ["session.bootstrap","none"],["sync.submit","own"],["file.upload","own"],
 ["file.download","own"],["notification.subscribe","own"],["safe.assistant.use","own"],
 ["finance.control.read","school"],["finance.control.manage","school"],
-["finance.control.scan","assigned_classes"],
+["finance.control.scan","assigned_fee_classes"],
 ["finance.fee.read","school"],["finance.status.read","school"],
 ["finance.report.read","school"],["pilotage.dashboard.read","school"]
 ],
