@@ -7,13 +7,13 @@
       "order": 1,
       "name": "auth_tables",
       "file": "01_auth_tables.sql",
-      "sha256": "37a6fc38117af0452f6cedb664217536f592773d1203f4b37f76881efbd3fb68"
+      "sha256": "6dd18006c8dc8577b8365b9ffbf18a967bafab75fa195b167b7056fab40d1baf"
     },
     {
       "order": 2,
       "name": "auth_api",
       "file": "02_auth_api.sql",
-      "sha256": "a824fb89a2fc0efb5ec4c7334cc890ab2b7b6b80c83892a411ad48c0a3cf88b8"
+      "sha256": "2a04150645d2dca59c5cc5cb64b8417569dbc725032901583baa3b174a4339f1"
     }
   ]
 }

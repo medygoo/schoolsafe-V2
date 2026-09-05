@@ -54,3 +54,24 @@
 
 Si une ligne manque dans ce tableau, on ne l'invente pas : on la conçoit,
 on l'autorise, on l'ajoute au catalogue et à cette table ensemble.
+
+## Décisions de portée par rôle (ACL-01-R2, verrouillées par preuve SQL)
+
+La portée du catalogue est un défaut ; le grant d'un rôle peut la resserrer
+ou la décider autrement. Matrice prouvée sur PostgreSQL réel :
+
+| Rôle | Permission | Portée décidée | Raison |
+|---|---|---|---|
+| teacher | `pedagogy.grade.read` | `assigned_classes` | un enseignant lit les notes de SES classes, pas seulement « ses enfants » |
+| teacher | `palmarques.read` | `assigned_classes` | palmarès borné à ses classes |
+| teacher | `school.guardian.read` | `assigned_classes` | tuteurs de ses élèves uniquement |
+| parent | toutes | `own_children` | jamais de classe ni d'école entière |
+| cashier | `finance.status.read` / `fee.read` / `receipt.read` | `school` | la caisse opère sur toute l'école |
+| cashier | `finance.payment.cancel` | `school` + condition `within_cancellation_window` (24 h) | annulation jamais libre |
+| guard | `security.scan` / `pickup.*` / `events.read` | `assigned_portal` | son poste, rien d'autre |
+| school_head | lectures de supervision | `school` | portée school décidée explicitement |
+| pedagogy | `pedagogy.grade.read` | `school` | le responsable pédagogique voit tous les résultats |
+| fee_control | `finance.control.scan` | `assigned_classes` | le scan se fait par classe |
+| hr | `staff.*` | `school` | personnel de l'école |
+| hikvision_admin | `staff.attendance.read` | `school` | pointages du personnel ; écriture = PERMISSION_FUTURE (BIO-01) |
+| staff | bloc commun uniquement | `own`/`none` | socle minimal |

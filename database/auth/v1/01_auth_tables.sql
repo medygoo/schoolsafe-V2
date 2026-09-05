@@ -9,12 +9,18 @@
 -- school_id ; l'isolation repose sur FORCE RLS sans policy + ACL fonctions.
 
 begin;
+
+-- citext (e-mail insensible à la casse) : extension standard installée par
+-- l'utilisateur de session avant le changement de rôle (le rôle owner n'a
+-- pas le privilège CREATE EXTENSION — par conception).
+create extension if not exists citext with schema auth;
+
 set local role schoolsafe_owner;
 
 create table if not exists auth.identities (
   id uuid primary key default pg_catalog.gen_random_uuid(),
   user_id uuid not null references iam.users (id),
-  email citext,
+  email auth.citext,
   phone text,
   status text not null default 'active' check (status in ('active', 'disabled')),
   created_at timestamptz not null default pg_catalog.now(),

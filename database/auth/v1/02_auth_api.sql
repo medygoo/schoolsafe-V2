@@ -6,10 +6,10 @@
 -- AUTH = identité · ACCESS_LAW = autorisation · fail-closed partout.
 
 begin;
-set local role schoolsafe_owner;
 
--- Rôle dédié minimal (créé ici car la baseline réserve le schéma auth vide ;
--- même discipline d'attributs que les rôles applicatifs de la baseline).
+-- Rôle dédié minimal : créé par l'utilisateur de session (le rôle owner n'a
+-- pas CREATEROLE — par conception), puis verrouillé avec les mêmes attributs
+-- que les rôles applicatifs de la baseline.
 do $schoolsafe$
 begin
   if not exists (select 1 from pg_catalog.pg_roles where rolname = 'schoolsafe_auth') then
@@ -20,6 +20,8 @@ $schoolsafe$;
 
 alter role schoolsafe_auth with login nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
 alter role schoolsafe_auth set search_path = pg_catalog;
+
+set local role schoolsafe_owner;
 
 -- Normalisation canonique UNIQUE du login (e-mail insensible à la casse ;
 -- téléphone au format +243… — même logique que le frontend).
@@ -40,13 +42,13 @@ begin
     return '';
   end if;
 
-  if pg_catalog.position('@' in v) > 0 then
+  if pg_catalog.strpos(v, '@') > 0 then
     return pg_catalog.lower(v);
   end if;
 
   v_digits := pg_catalog.regexp_replace(v, '\D', '', 'g');
   if v_digits like '243%' and pg_catalog.length(v_digits) > 9 then
-    v_digits := pg_catalog.substring(v_digits from 4);
+    v_digits := pg_catalog.substr(v_digits, 4);
   end if;
   return '+243' || v_digits;
 end
