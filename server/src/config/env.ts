@@ -26,6 +26,14 @@ const envSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().min(1).optional(),
   VAPID_SUBJECT: z.string().min(1).default("mailto:schoolsafe@example.com"),
   DEFAULT_STAFF_PASSWORD: z.string().min(8).default("SchoolSafe2026!"),
+  // PostgreSQL direct (baseline VPS) — requis dès que le pool est utilisé.
+  PGHOST: z.string().min(1).optional(),
+  PGPORT: z.coerce.number().int().min(1).max(65535).default(5432),
+  PGDATABASE: z.string().min(1).optional(),
+  PGUSER: z.string().min(1).optional(),
+  PGPASSWORD: z.string().min(1).optional(),
+  PG_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
+  PG_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
