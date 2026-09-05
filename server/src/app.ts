@@ -25,6 +25,7 @@ import type { AccessService } from "./access/service.js";
 import { registerStudentRoutes, type StudentRouteDependencies } from "./students/routes.js";
 import { registerAuthNativeRoutes, type AuthNativeRouteDependencies } from "./authnative/routes.js";
 import { registerStudentsNativeRoutes, type StudentsNativeRouteDependencies } from "./studentsnative/routes.js";
+import { registerTrialNativeRoutes, type TrialNativeRouteDependencies } from "./trialnative/routes.js";
 
 export type BuildAppOptions = {
   testRoutes?: boolean;
@@ -48,6 +49,7 @@ export type BuildAppOptions = {
   access?: AccessService;
   authNative?: AuthNativeRouteDependencies;
   studentsNative?: StudentsNativeRouteDependencies;
+  trialNative?: TrialNativeRouteDependencies;
 };
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -107,6 +109,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.studentsNative) {
     registerStudentsNativeRoutes(app, options.studentsNative);
+  }
+
+  if (options.trialNative) {
+    registerTrialNativeRoutes(app, options.trialNative);
   }
 
   if (options.setup) {

@@ -25,6 +25,7 @@ export type ApiErrorCode =
   | "FILE_INVALID"
   | "FILE_TOO_LARGE"
   | "NOT_FOUND"
+  | "TRIAL_EXPIRED"
   | "INTERNAL_ERROR";
 
 export type ApiErrorBody = {
