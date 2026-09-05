@@ -32,6 +32,9 @@ import { createWebPushProvider } from "./notifications/providers/push.js";
 import { createPushSubscriptionService } from "./push/subscriptions.js";
 import { registerPushRoutes } from "./push/routes.js";
 import { createStudentsService } from "./students/service.js";
+import { startVerifiedPools } from "./db/startpools.js";
+import { createPgAuthDatabase } from "./db/auth-adapter.js";
+import { createAuthNativeService } from "./authnative/service.js";
 
 const env = parseEnv(process.env);
 
@@ -100,6 +103,14 @@ if (serviceClient) {
 
 const eventService = serviceClient
   ? createEventService(serviceClient, dispatcher ? { dispatcher } : undefined)
+  : undefined;
+
+// Pools PostgreSQL vérifiés AVANT toute mise en service : si l'auth native est
+// configurée mais que les rôles réels ne correspondent pas (ou que la config
+// est partielle), startVerifiedPools lève et le serveur ne démarre jamais.
+const verifiedPools = await startVerifiedPools(env);
+const authNativeService = verifiedPools
+  ? createAuthNativeService(createPgAuthDatabase(verifiedPools.authPool))
   : undefined;
 
 const cardService = env.SUPABASE_SERVICE_ROLE_KEY
@@ -193,6 +204,12 @@ const studentsService = serviceClient
   : undefined;
 
 const app = buildApp({
+  authNative: authNativeService
+    ? {
+        service: authNativeService,
+        cookieSecure: env.NODE_ENV === "production",
+      }
+    : undefined,
   bootstrap: {
     authVerifier: createSupabaseAuthVerifier(env.SUPABASE_URL, env.SUPABASE_ANON_KEY),
     service: createBootstrapService(env.SUPABASE_URL, env.SUPABASE_ANON_KEY),
