@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Pool, PoolClient } from "pg";
+import type { PoolClient } from "pg";
+import type { BusinessPool } from "../src/db/pool.js";
 import { withRequestContext, ContextInjectionError } from "../src/db/context.js";
 import { withAuthorizedContext } from "../src/db/access.js";
 
@@ -21,7 +22,7 @@ function fakePool(queryLog: QueryCall[], checkAccessResult: boolean) {
   };
   const pool = {
     connect: async () => client,
-  } as unknown as Pool;
+  } as unknown as BusinessPool;
   return { pool, client: client as PoolClient & { released: boolean } };
 }
 
@@ -83,7 +84,7 @@ describe("withRequestContext", () => {
         this.released = true;
       },
     };
-    const pool = { connect: async () => client } as unknown as Pool;
+    const pool = { connect: async () => client } as unknown as BusinessPool;
 
     await expect(withRequestContext(pool, CTX, async () => "jamais")).rejects.toThrow(
       "does not match an active identity",

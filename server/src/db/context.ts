@@ -2,7 +2,8 @@
 // Chaque exécution métier ouvre une transaction, appelle api.set_request_context
 // avec une identité résolue côté serveur (JAMAIS depuis le navigateur), puis
 // n'exécute que des fonctions api.* dans ce contexte. Fail-closed.
-import type { Pool, PoolClient } from "pg";
+import type { PoolClient } from "pg";
+import type { BusinessPool } from "./pool.js";
 
 export type RequestContext = {
   userId: string;
@@ -19,7 +20,7 @@ export class ContextInjectionError extends Error {
 }
 
 export async function withRequestContext<T>(
-  pool: Pool,
+  pool: BusinessPool,
   context: RequestContext,
   fn: (client: PoolClient) => Promise<T>,
 ): Promise<T> {

@@ -1,9 +1,10 @@
 // SchoolSafe — jonction Access_Law : contexte + permission avant toute action.
 // La permission est vérifiée DANS la transaction contextualisée, par la base
 // (api.check_access → iam.can_access) : le serveur ne décide jamais lui-même.
-import type { Pool, PoolClient } from "pg";
+import type { PoolClient } from "pg";
 import { SchoolSafeError } from "../http/errors.js";
 import { withRequestContext, type RequestContext } from "./context.js";
+import type { BusinessPool } from "./pool.js";
 
 export type AccessTarget = {
   targetProfileId?: string | null;
@@ -15,7 +16,7 @@ export type AccessTarget = {
 };
 
 export async function withAuthorizedContext<T>(
-  pool: Pool,
+  pool: BusinessPool,
   context: RequestContext,
   permission: string,
   target: AccessTarget,

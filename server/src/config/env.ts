@@ -32,6 +32,9 @@ const envSchema = z.object({
   PGDATABASE: z.string().min(1).optional(),
   PGUSER: z.string().min(1).optional(),
   PGPASSWORD: z.string().min(1).optional(),
+  // Credentials du rôle d'authentification dédié (api.auth_* uniquement).
+  PGAUTH_USER: z.string().min(1).optional(),
+  PGAUTH_PASSWORD: z.string().min(1).optional(),
   PG_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
   PG_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
 });
